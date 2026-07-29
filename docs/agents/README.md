@@ -16,6 +16,7 @@ git status --short
 | `AGENTS.md` | Всегда: planning, safety, content boundary |
 | `STACK.md` | Перед выбором runtime/dependency |
 | `ARCHITECTURE.md` | Engine, authority, replay, privacy, persistence |
+| `INFRASTRUCTURE_ROADMAP.md` | Production deployment, observability, recovery и конкурсный backlog |
 | `HARNESS.md` | Hooks, selected plan, ledger, CI |
 | `PROJECT_MEMORY.md` | Подтверждённые устойчивые ловушки |
 | `plans/README.md` | Plan lifecycle и manifests |
