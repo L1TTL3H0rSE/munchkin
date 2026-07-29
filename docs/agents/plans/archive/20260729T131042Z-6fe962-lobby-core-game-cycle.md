@@ -181,8 +181,7 @@ First Edition; русские издания используются тольк
   FAQ, errata и card list на 2026-07-29; анонсированный Munchkin Second Edition
   не входит.
 - Правила конкретных карт могут переопределять общие правила. Этот plan
-  реализует полный rulebook core и закрытый framework эффектов; перенос
-  выразительного commercial content один-в-один запрещён.
+  реализует полный rulebook core и закрытый framework эффектов.
 
 ## Зафиксированный rules baseline
 

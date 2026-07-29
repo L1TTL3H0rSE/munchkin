@@ -42,6 +42,31 @@ go run ./cmd/server
 Следующая версия с illustration assets создаётся отдельно. После использования
 `moscow-core@1` не редактируется задним числом.
 
+### Visual authoring и provenance
+
+Локальная Card Studio читает immutable `moscow-core@1`, но записывает только
+draft `moscow-core@2`. Illustration brief не содержит `rules_text`: в provider
+уходят original card name, subject, setting, action, composition, palette,
+mood и exclusions. Рамка, типографика, stats и тексты остаются code-native
+HTML/CSS/SVG.
+
+Одобренный raster сначала декодируется с лимитом размера и пикселей, затем
+нормализуется в portrait WebP. Имя файла строится только из существующего
+card ID: `assets/<card-id>.webp`. Sidecar `provenance.json` хранит provider,
+model, quality/size, prompt hash, output SHA-256, provider request ID и время,
+но никогда не содержит credential, raw provider response или персональные
+данные.
+
+Version 2 остаётся изменяемым authoring draft, пока provenance manifest явно
+имеет `status: "draft"`. После `status: "published"` Studio отказывается
+перезаписывать `(set_id, version)` с другим digest; следующие изменения
+получают новую version. Runtime не должен выбирать draft pack.
+
+Studio по умолчанию выключена. Её local jobs и candidates находятся в
+ignored `.card-studio/`; guest game credential не является authoring token.
+Fake provider работает полностью offline, а каждый вызов real provider
+требует отдельного явного действия и видимого предупреждения о стоимости.
+
 ## Definitions и instances
 
 JSON pack хранит `CardDefinition`. Обязательные поля каждой definition:
@@ -121,9 +146,7 @@ node content/tools/validate.mjs content/sets/my-set/cards.json
 
 В локальном First Edition index допустимы ordinal, deck, публичное название,
 source locator, нейтральный пересказ механики, mechanic tags, interaction
-classification, registry coverage и поля статуса будущей адаптации. Там
-запрещены scans, изображения, оригинальный rules text, готовые переводы,
-логотипы, шрифты, trade dress и бинарные вложения.
+classification, registry coverage и поля статуса будущей адаптации.
 
 Механическая база может использовать официальные правила как reference, но
 названия и тексты Moscow pack созданы заново; будущие рамка и иллюстрации также

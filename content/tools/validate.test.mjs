@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
+import {createHash} from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -18,10 +19,18 @@ const moscow = JSON.parse(
     "utf8",
   ),
 );
+const moscowV2Root = path.join(root, "sets", "moscow", "v2");
+const moscowV2 = JSON.parse(
+  fs.readFileSync(path.join(moscowV2Root, "cards.json"), "utf8"),
+);
+const moscowV2Provenance = JSON.parse(
+  fs.readFileSync(path.join(moscowV2Root, "provenance.json"), "utf8"),
+);
 const powershellProbe = spawnSync(
   "pwsh",
   ["-NoProfile", "-NonInteractive", "-Command", "exit 0"],
 );
+const sha256Pattern = /^sha256:[a-f0-9]{64}$/;
 
 function withDigest(pack) {
   pack.content_digest = cardsDigest(pack.cards);
@@ -112,6 +121,160 @@ function assertMoscowInvariants(pack) {
   return {result, stats};
 }
 
+function withoutVisualFields(card) {
+  const result = structuredClone(card);
+  delete result.image;
+  delete result.alt_text;
+  return result;
+}
+
+function assertMoscowV2Artifacts(pack, provenance, setRoot) {
+  const result = validatePack(pack);
+  requireMoscow(pack.set_id === "moscow-core", "v2 set ID changed");
+  requireMoscow(pack.version === 2, "visual pack must be version 2");
+  requireMoscow(
+    pack.source === "original-moscow-core-visual-2026",
+    "v2 source changed",
+  );
+  requireMoscow(
+    pack.author === moscow.author && pack.license === moscow.license,
+    "v2 rights metadata must match its source pack",
+  );
+  assert.deepEqual(pack.cards.map(withoutVisualFields), moscow.cards);
+
+  assert.deepEqual(
+    Object.keys(provenance).sort(),
+    [
+      "content_digest",
+      "records",
+      "schema_version",
+      "set_id",
+      "source_digest",
+      "source_version",
+      "status",
+      "version",
+    ],
+  );
+  requireMoscow(provenance.schema_version === 1, "invalid provenance schema");
+  requireMoscow(provenance.set_id === pack.set_id, "provenance set mismatch");
+  requireMoscow(provenance.version === pack.version, "provenance version mismatch");
+  requireMoscow(provenance.status === "draft", "v2 must remain an explicit draft");
+  requireMoscow(provenance.source_version === 1, "invalid source version");
+  requireMoscow(
+    provenance.source_digest === moscow.content_digest,
+    "source digest does not identify immutable Moscow v1",
+  );
+  requireMoscow(
+    provenance.content_digest === pack.content_digest,
+    "provenance content digest mismatch",
+  );
+
+  const visualCards = pack.cards.filter((card) => card.image !== undefined);
+  requireMoscow(visualCards.length > 0, "v2 needs a reviewed visual asset");
+  requireMoscow(
+    visualCards.length === provenance.records.length,
+    "each visual card needs exactly one provenance record",
+  );
+  const recordIDs = new Set();
+  for (const record of provenance.records) {
+    assert.deepEqual(
+      Object.keys(record).sort(),
+      [
+        "alt_text",
+        "approved_at",
+        "asset_path",
+        "card_id",
+        "model",
+        "output_sha256",
+        "prompt_hash",
+        "provider",
+        "provider_request_id",
+        "quality",
+        "size",
+      ],
+    );
+    requireMoscow(!recordIDs.has(record.card_id), "duplicate provenance record");
+    recordIDs.add(record.card_id);
+    const card = pack.cards.find((entry) => entry.id === record.card_id);
+    requireMoscow(card !== undefined, "provenance references an unknown card");
+    requireMoscow(
+      record.asset_path === `assets/${record.card_id}.webp`,
+      "asset path must derive from the allowlisted card ID",
+    );
+    requireMoscow(card.image === record.asset_path, "card asset path mismatch");
+    requireMoscow(card.alt_text === record.alt_text, "card alt text mismatch");
+    requireMoscow(
+      record.provider === "fake" || record.provider === "openai",
+      "invalid provenance provider",
+    );
+    requireMoscow(
+      typeof record.model === "string" && record.model.length > 0,
+      "provenance model is required",
+    );
+    requireMoscow(
+      ["low", "medium", "high", "unexposed"].includes(record.quality),
+      "invalid provenance quality",
+    );
+    const hasBuiltInMarker = record.quality === "unexposed" ||
+      record.model === "codex-imagegen-built-in";
+    requireMoscow(
+      !hasBuiltInMarker || (
+        record.provider === "openai" &&
+        record.model === "codex-imagegen-built-in" &&
+        record.quality === "unexposed"
+      ),
+      "invalid built-in ImageGen provenance",
+    );
+    requireMoscow(record.size === "1024x1536", "invalid provenance size");
+    requireMoscow(
+      sha256Pattern.test(record.prompt_hash),
+      "invalid prompt digest",
+    );
+    requireMoscow(
+      sha256Pattern.test(record.output_sha256),
+      "invalid output digest",
+    );
+    requireMoscow(
+      typeof record.provider_request_id === "string" &&
+        record.provider_request_id.length > 0,
+      "provider request ID is required",
+    );
+    requireMoscow(
+      Number.isFinite(Date.parse(record.approved_at)),
+      "approval timestamp is invalid",
+    );
+
+    const assetPath = path.resolve(setRoot, record.asset_path);
+    const relative = path.relative(setRoot, assetPath);
+    requireMoscow(
+      relative !== ".." &&
+        !relative.startsWith(`..${path.sep}`) &&
+        !path.isAbsolute(relative),
+      "asset escapes v2",
+    );
+    const assetStat = fs.lstatSync(assetPath);
+    requireMoscow(
+      assetStat.isFile() && !assetStat.isSymbolicLink(),
+      "asset must be a regular non-symlink file",
+    );
+    const bytes = fs.readFileSync(assetPath);
+    requireMoscow(
+      bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
+        bytes.subarray(8, 12).toString("ascii") === "WEBP",
+      "approved asset bytes must be WebP",
+    );
+    const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+    requireMoscow(digest === record.output_sha256, "asset digest mismatch");
+  }
+
+  const serialized = JSON.stringify(provenance);
+  requireMoscow(
+    !/(?:api[_-]?key|authorization|bearer|token)/iu.test(serialized),
+    "provenance must not contain credentials",
+  );
+  return result;
+}
+
 test("demo pack passes closed semantic validation", () => {
   const result = validatePack(structuredClone(demo));
   assert.deepEqual(
@@ -168,6 +331,79 @@ test("moscow-core v1 has immutable identity and exact slot matrix", () => {
     {definitions: 168, doors: 84, treasures: 68, deferred: 16},
   );
   assert.equal(moscow.content_digest, cardsDigest(moscow.cards));
+});
+
+test("moscow-core v2 preserves v1 mechanics and validates visual provenance", () => {
+  const result = assertMoscowV2Artifacts(
+    structuredClone(moscowV2),
+    structuredClone(moscowV2Provenance),
+    moscowV2Root,
+  );
+  assert.deepEqual(
+    {
+      setID: result.setID,
+      version: result.version,
+      digest: result.digest,
+      definitions: result.definitions,
+      doors: result.doors,
+      treasures: result.treasures,
+      deferred: result.deferred,
+    },
+    {
+      setID: "moscow-core",
+      version: 2,
+      digest: moscowV2.content_digest,
+      definitions: 168,
+      doors: 84,
+      treasures: 68,
+      deferred: 16,
+    },
+  );
+});
+
+test("moscow-core v2 rejects provenance source and asset digest drift", () => {
+  const sourceDrift = structuredClone(moscowV2Provenance);
+  sourceDrift.source_digest = `sha256:${"0".repeat(64)}`;
+  assert.throws(
+    () => assertMoscowV2Artifacts(moscowV2, sourceDrift, moscowV2Root),
+    /source digest/,
+  );
+
+  const assetDrift = structuredClone(moscowV2Provenance);
+  assetDrift.records[0].output_sha256 = `sha256:${"0".repeat(64)}`;
+  assert.throws(
+    () => assertMoscowV2Artifacts(moscowV2, assetDrift, moscowV2Root),
+    /asset digest/,
+  );
+
+  const qualityDrift = structuredClone(moscowV2Provenance);
+  qualityDrift.records[0].quality = "unknown";
+  assert.throws(
+    () => assertMoscowV2Artifacts(moscowV2, qualityDrift, moscowV2Root),
+    /provenance quality/,
+  );
+
+  const builtInQualityDrift = structuredClone(moscowV2Provenance);
+  builtInQualityDrift.records[0].quality = "low";
+  assert.throws(
+    () => assertMoscowV2Artifacts(
+      moscowV2,
+      builtInQualityDrift,
+      moscowV2Root,
+    ),
+    /built-in ImageGen provenance/,
+  );
+
+  const builtInProviderDrift = structuredClone(moscowV2Provenance);
+  builtInProviderDrift.records[0].provider = "fake";
+  assert.throws(
+    () => assertMoscowV2Artifacts(
+      moscowV2,
+      builtInProviderDrift,
+      moscowV2Root,
+    ),
+    /built-in ImageGen provenance/,
+  );
 });
 
 test("moscow-core covers every closed card, effect and modifier branch", () => {
@@ -545,6 +781,57 @@ test("moscow-core validates from a clean committed-input copy", () => {
   }
 });
 
+test("moscow-core v2 validates from a clean committed-input copy", () => {
+  const checkout = fs.mkdtempSync(
+    path.join(os.tmpdir(), "munchkin-moscow-v2-clean-"),
+  );
+  try {
+    const validatorPath = path.join(
+      checkout,
+      "content",
+      "tools",
+      "validate.mjs",
+    );
+    const copiedV2Root = path.join(
+      checkout,
+      "content",
+      "sets",
+      "moscow",
+      "v2",
+    );
+    const packPath = path.join(copiedV2Root, "cards.json");
+    fs.mkdirSync(path.dirname(validatorPath), {recursive: true});
+    fs.mkdirSync(path.dirname(copiedV2Root), {recursive: true});
+    fs.copyFileSync(path.join(root, "tools", "validate.mjs"), validatorPath);
+    fs.cpSync(moscowV2Root, copiedV2Root, {recursive: true});
+
+    const result = spawnSync(process.execPath, [validatorPath, packPath], {
+      cwd: checkout,
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.deepEqual(JSON.parse(result.stdout.trim()), {
+      ok: true,
+      setID: "moscow-core",
+      version: 2,
+      digest: moscowV2.content_digest,
+      definitions: 168,
+      doors: 84,
+      treasures: 68,
+      deferred: 16,
+    });
+    assertMoscowV2Artifacts(
+      JSON.parse(fs.readFileSync(packPath, "utf8")),
+      JSON.parse(
+        fs.readFileSync(path.join(copiedV2Root, "provenance.json"), "utf8"),
+      ),
+      copiedV2Root,
+    );
+  } finally {
+    fs.rmSync(checkout, {recursive: true, force: true});
+  }
+});
+
 test("JSON Schema accepts demo and rejects closed-contract mutations", {
   skip: powershellProbe.status === 0
     ? false
@@ -601,6 +888,14 @@ test("JSON Schema accepts committed moscow-core v1", {
     : "PowerShell Test-Json is unavailable",
 }, () => {
   assert.equal(schemaAccepts(moscow), true);
+});
+
+test("JSON Schema accepts committed moscow-core v2", {
+  skip: powershellProbe.status === 0
+    ? false
+    : "PowerShell Test-Json is unavailable",
+}, () => {
+  assert.equal(schemaAccepts(moscowV2), true);
 });
 
 test("unknown fields, effects, selectors and conditions fail closed", () => {

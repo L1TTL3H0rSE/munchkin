@@ -4,6 +4,7 @@
 !.env.example
 
 .leino/runtime/
+.card-studio/
 
 node_modules/
 .pnpm-store/

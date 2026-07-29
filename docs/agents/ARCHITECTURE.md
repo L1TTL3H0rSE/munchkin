@@ -134,6 +134,25 @@ escape и canonical cross-runtime digest. Presentation metadata включает
 локальные images и тексты, но механика остаётся typed.
 Engine получает validated immutable registry. Content не выполняет code.
 
+## Card Studio authoring boundary
+
+Локальная Card Studio принадлежит Nuxt/Nitro server boundary и не входит ни в
+pure game engine, ни в gameplay HTTP application. Browser отправляет только
+typed authoring intent и отдельный bearer token. Provider credential,
+filesystem paths, raw responses и staging metadata остаются на server.
+
+Studio disabled by default и fail-closed: каждый endpoint сначала проверяет
+feature flag и отдельный authoring credential. Guest game token не даёт прав
+на генерацию. Generation оформляется как persisted async job; retry всегда
+является новым явным действием, а request fingerprint не позволяет повторно
+вызвать платный provider под тем же request ID.
+
+AI provider создаёт только raster для illustration viewport. Original frame,
+name, stats, rules и flavor остаются доступным HTML/CSS/SVG. Candidate
+декодируется, ограничивается по bytes/pixels, нормализуется в WebP и только
+после approve попадает в draft следующей content version вместе с безопасным
+provenance sidecar. Published `(set_id, version, digest)` Studio не изменяет.
+
 ## Почему modular monolith
 
 На старте один bounded context и одна транзакционная consistency boundary.
