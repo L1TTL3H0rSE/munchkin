@@ -7,6 +7,41 @@ typed-полями, которые явно поддержаны schema, Node va
 Committed `demo-original` — небольшой оригинальный набор с вымышленными
 названиями и CC0-заглушками. Это не копия коммерческой колоды.
 
+## Московский core pack
+
+`sets/moscow/v1/cards.json` — первый полный оригинальный русскоязычный набор:
+
+- immutable identity `moscow-core@1`;
+- автор `L1TTL3H0rSE`, лицензия `All-Rights-Reserved`, source
+  `original-moscow-core-2026`;
+- 168 отдельных definitions с `copies: 1`: 95 Door и 73 Treasure;
+- 152 active slots (84 Door + 68 Treasure) и 16 полностью описанных
+  `other_players` slots (11 Door + 5 Treasure);
+- text-only presentation без `image` и `alt_text`.
+
+Все девять card kinds, все закрытые effect kinds и основные modifier/condition
+branches покрыты pack-specific Node и Go conformance tests. Терминология, тон,
+distribution matrix и originality checklist зафиксированы в
+[`docs/game/moscow-content-style-guide.md`](../docs/game/moscow-content-style-guide.md).
+
+Digest и validation:
+
+```bash
+node content/tools/digest.mjs content/sets/moscow/v1/cards.json
+node content/tools/validate.mjs content/sets/moscow/v1/cards.json
+node --test content/tools/validate.test.mjs
+```
+
+Чтобы запустить backend на этой immutable версии из `backend/game`:
+
+```powershell
+$env:GAME_CONTENT_PATH = "../../content/sets/moscow/v1/cards.json"
+go run ./cmd/server
+```
+
+Следующая версия с illustration assets создаётся отдельно. После использования
+`moscow-core@1` не редактируется задним числом.
+
 ## Definitions и instances
 
 JSON pack хранит `CardDefinition`. Обязательные поля каждой definition:
@@ -80,7 +115,7 @@ node content/tools/validate.mjs content/sets/my-set/cards.json
 Проект разделяет три слоя:
 
 1. committed оригинальный `demo-original`;
-2. будущий committed оригинальный набор «Московский манчкин»;
+2. committed оригинальный набор `moscow-core@1`;
 3. локальный `content/reference-local/`, который игнорируется Git и никогда не
    импортируется runtime, digest tooling или committed tests.
 
@@ -91,4 +126,5 @@ classification, registry coverage и поля статуса будущей ад
 логотипы, шрифты, trade dress и бинарные вложения.
 
 Механическая база может использовать официальные правила как reference, но
-названия, тексты, рамка и иллюстрации будущего Moscow pack создаются заново.
+названия и тексты Moscow pack созданы заново; будущие рамка и иллюстрации также
+создаются независимо.
