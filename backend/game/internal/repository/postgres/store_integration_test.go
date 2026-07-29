@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/leinodev/munchkin/backend/game/internal/application"
@@ -69,7 +70,7 @@ func TestPostgresServiceContract(t *testing.T) {
 		owner.Credential,
 		"postgres-start",
 		joined.Projection.Version,
-		game.CommandStart,
+		game.Command{Type: game.CommandStart},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -91,7 +92,7 @@ func TestPostgresServiceContract(t *testing.T) {
 				owner.Credential,
 				id,
 				started.Version,
-				game.CommandOpenDoor,
+				game.Command{Type: game.CommandFinishSetup},
 			)
 			results <- outcome{commandID: id, result: result, err: err}
 		}(commandID)
@@ -122,7 +123,7 @@ func TestPostgresServiceContract(t *testing.T) {
 		owner.Credential,
 		successful.commandID,
 		started.Version,
-		game.CommandOpenDoor,
+		game.Command{Type: game.CommandFinishSetup},
 	)
 	if err != nil || !replayedCommand.Replayed ||
 		replayedCommand.Version != successful.result.Version {
@@ -174,28 +175,18 @@ func TestPostgresServiceContract(t *testing.T) {
 
 func postgresPack(t *testing.T) game.Pack {
 	t.Helper()
-	cards := make([]game.Card, 0, 24)
-	for index := 0; index < 12; index++ {
-		cards = append(cards, game.Card{
-			ID: "door-" + string(rune('a'+index)), Name: "Door", Kind: game.CardDoor,
-		})
-	}
-	for index := 0; index < 12; index++ {
-		cards = append(cards, game.Card{
-			ID: "treasure-" + string(rune('a'+index)), Name: "Treasure", Kind: game.CardTreasure,
-		})
-	}
-	pack := game.Pack{
-		SchemaVersion: 1,
-		SetID:         "postgres-contract",
-		Version:       1,
-		Author:        "tests",
-		License:       "CC0-1.0",
-		Source:        "test-fixture",
-		ContentDigest: game.CardsDigest(cards),
-		Cards:         cards,
-	}
-	if err := pack.Validate(); err != nil {
+	pack, err := game.LoadPack(filepath.Join(
+		"..",
+		"..",
+		"..",
+		"..",
+		"..",
+		"content",
+		"sets",
+		"demo",
+		"cards.json",
+	))
+	if err != nil {
 		t.Fatal(err)
 	}
 	return pack

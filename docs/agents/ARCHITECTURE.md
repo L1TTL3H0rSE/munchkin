@@ -33,6 +33,44 @@ content_set_id + content_version + content_digest
 
 Pack с той же identity и другим digest отклоняется.
 
+## Lobby core rules profile
+
+`first-edition-core-v1` — immutable rules profile version 1. Он разрешает 1–6
+участников, раздаёт каждому 4 Door + 4 Treasure, задаёт hand limit 5, winning
+Level 10 и базовую цель Run Away 5. Один участник нужен как preview того же
+reducer: после конца хода очередь возвращается ему без отдельной solo-ветки.
+
+Полный ход проходит через явные состояния:
+
+```text
+setup
+  -> preparation
+  -> door_choice
+  -> combat | run_away | resolve_effect
+  -> charity
+  -> end_turn
+  -> preparation следующего lobby player
+```
+
+Pack хранит definitions с количеством копий, а game state — уникальные card
+instances. В каждый момент instance принадлежит ровно одной zone: Door или
+Treasure deck/discard, hand, carried, equipped, traits, attachments,
+persistent curses, encounter либо resolving effect.
+
+`ActionWindow` содержит eligible actors, а tagged `PendingDecision` — только
+разрешённые server-side варианты. В текущем профиле eligible всегда один
+active actor. Это сознательная граница первой итерации: будущие помощь,
+контрдействия и другие multiplayer choices расширят окно, но не authority или
+instance model.
+
+Текущий профиль материализует только definitions со scope `none`/`self`.
+Карты с `interaction_scope: other_players` валидны как будущий content, но не
+попадают в колоды и не превращаются в runtime no-op.
+
+Legacy bootstrap state/events не угадываются и не мигрируют автоматически:
+replay возвращает явную incompatible-state ошибку. Все shuffle orders и
+Run Away rolls записываются в transition event; replay RNG не вызывает.
+
 ## Application transaction
 
 1. Из bearer token hash определяется actor в exact game.
@@ -62,10 +100,15 @@ actor ID не изменится.
 Internal State не сериализуется. Projector возвращает allowlist:
 
 - `you.hand` — только actor;
-- у других игроков только `hand_count`/public stats;
+- собственные pending choices и available actions видит только actor;
+- у других игроков только `hand_count` и public zones/stats;
 - deck order, RNG, token hashes, full event payloads отсутствуют;
 - active encounter содержит только публично разрешённую metadata;
 - outsider получает deny, spectator mode отсутствует.
+
+Frontend не выводит допустимость правил самостоятельно: он рендерит
+server-supplied action descriptors и отправляет только intent с выбранными
+видимыми instance IDs.
 
 Realtime room channel общий, поэтому payload содержит только `game_id`,
 `version` и `reason`. После reconnect, gap или invalid envelope клиент читает

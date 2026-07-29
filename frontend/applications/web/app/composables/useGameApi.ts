@@ -4,11 +4,12 @@ import {
   lobbyResultSchema,
   lobbySummarySchema,
   projectionSchema,
+  commandPayloadSchema,
+  type ActionType,
+  type CommandPayload,
   type Invalidation,
   type Projection,
 } from "@munchkin/contracts";
-
-type CommandName = "start" | "open-door" | "fight" | "run-away" | "loot" | "end-turn";
 
 export function useGameApi() {
   const config = useRuntimeConfig();
@@ -69,18 +70,24 @@ export function useGameApi() {
   async function command(
     gameID: string,
     credential: string,
-    name: CommandName,
+    name: ActionType,
     expectedVersion: number,
+    payload: CommandPayload = {},
   ) {
-    const path = name === "start" ? "start" : `commands/${name}`;
+    const pathName = name.replaceAll("_", "-");
+    const path = name === "start" ? "start" : `commands/${pathName}`;
     const commandID = crypto.randomUUID();
+    const parsedPayload = commandPayloadSchema.parse(payload);
     const response = await $fetch(`${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/${path}`, {
       method: "POST",
       headers: {
         ...authorization(credential),
         "Idempotency-Key": commandID,
       },
-      body: {expected_version: expectedVersion},
+      body: {
+        expected_version: expectedVersion,
+        ...parsedPayload,
+      },
     });
     return commandResultSchema.parse(response);
   }
@@ -106,13 +113,70 @@ export function useGameApi() {
   }
 
   function contentAssetURL(setID: string, image: string) {
-    const safePath = image.split("/")
-      .map((segment) => encodeURIComponent(segment))
-      .join("/");
-    return `${baseURL}/api/v1/content/${encodeURIComponent(setID)}/${safePath}`;
+    return buildContentAssetURL(baseURL, setID, image);
   }
 
   return {createLobby, getLobby, joinLobby, getGame, command, stream, contentAssetURL};
+}
+
+export function buildContentAssetURL(
+  baseURL: string,
+  setID: string,
+  image: string,
+) {
+  const relativePath = image.startsWith("assets/")
+    ? image.slice("assets/".length)
+    : image;
+  const safePath = relativePath.split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return `${baseURL.replace(/\/$/, "")}/api/v1/content/${encodeURIComponent(setID)}/assets/${safePath}`;
+}
+
+export function createVersionedResync(options: {
+  getVersion: () => number | undefined;
+  refresh: () => Promise<void>;
+}) {
+  let pendingVersion: number | undefined;
+  let requestedRefreshGeneration = 0;
+  let completedRefreshGeneration = 0;
+  let inFlight: Promise<void> | undefined;
+
+  async function drain() {
+    for (;;) {
+      const targetGeneration = requestedRefreshGeneration;
+      await options.refresh();
+      completedRefreshGeneration = Math.max(
+        completedRefreshGeneration,
+        targetGeneration,
+      );
+      const currentVersion = options.getVersion();
+      const versionSatisfied = pendingVersion === undefined ||
+        (currentVersion !== undefined && currentVersion >= pendingVersion);
+      if (
+        versionSatisfied &&
+        completedRefreshGeneration >= requestedRefreshGeneration
+      ) {
+        return;
+      }
+    }
+  }
+
+  function request(requiredVersion?: number) {
+    if (requiredVersion === undefined) {
+      requestedRefreshGeneration++;
+    } else {
+      pendingVersion = Math.max(pendingVersion ?? requiredVersion, requiredVersion);
+    }
+    if (!inFlight) {
+      inFlight = drain().finally(() => {
+        inFlight = undefined;
+      });
+    }
+    return inFlight;
+  }
+
+  return {request};
 }
 
 async function consumeStream(

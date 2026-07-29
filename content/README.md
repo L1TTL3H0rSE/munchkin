@@ -1,48 +1,94 @@
 # Card content
 
-`content/` contains data packs. The game engine never executes expressions
-from a card: every rule is represented by a closed, typed field understood by
-the engine.
+`content/` содержит versioned data packs. Игровой движок никогда не исполняет
+текст карты или произвольное выражение: mechanics задаются только закрытыми
+typed-полями, которые явно поддержаны schema, Node validator и Go registry.
 
-The checked-in `demo-original` set is deliberately small and uses invented
-names and CC0 placeholders. It is not a copy of a commercial Munchkin set.
+Committed `demo-original` — небольшой оригинальный набор с вымышленными
+названиями и CC0-заглушками. Это не копия коммерческой колоды.
 
-## Create your fan set
+## Definitions и instances
 
-1. Copy `sets/demo` to a new directory.
-2. Choose a new immutable `set_id` and start at `version: 1`.
-3. Record the actual `author`, `license` and `source`.
-4. Put local images under that set's `assets/` directory.
-5. Reference an image as `assets/cards/my-card.webp` and always provide
-   `alt_text`.
-6. Add optional `rules_text` and `flavor_text`. Mechanical behavior still has
-   to use supported typed fields such as `combat_strength`, `treasure_count`
-   and `level_loss`.
-7. Recalculate `content_digest`, then validate the file.
+JSON pack хранит `CardDefinition`. Обязательные поля каждой definition:
 
-Only `.avif`, `.jpg`, `.jpeg`, `.png` and `.webp` repository-relative image
-paths are accepted. Absolute paths, remote URLs, `..`, backslashes and symlink
-escapes are rejected.
+- `id`, `name`, `deck`, `kind`;
+- `copies` — сколько уникальных instances материализуется из definition;
+- `interaction_scope`: `none`, `self` или `other_players`.
 
-## Recalculate a digest
+При создании игры backend создаёт отдельный immutable `CardInstance` для каждой
+копии. Instance ID перемещается между ровно одной из zones; definition и её
+presentation/mechanics при этом не дублируются в state.
 
-Print the digest without changing a file:
+Profile `first-edition-core-v1` не поддерживает вмешательство в чужой ход.
+Definition с `interaction_scope: other_players` валидируется и может оставаться
+в pack для будущего профиля, но сейчас не материализуется в deck. Она не должна
+превращаться в доступную карту без эффекта.
 
-```bash
-node content/tools/digest.mjs content/sets/my-set/cards.json
-```
+## Закрытая модель mechanics
 
-Write it back and format the JSON:
+Поддерживаемые `kind`: `monster`, `curse`, `class`, `race`,
+`trait_attachment`, `item`, `one_shot`, `level_up`, `cheat`.
+
+Kind-specific specs описывают:
+
+- Monster strength, levels/treasures, pursuit, tags, conditional modifiers,
+  automatic outcomes и typed Bad Stuff;
+- Item slot/hands, Big/Small, value, bonuses, restrictions и modifiers;
+- Class/Race-like traits, registered tags, tie-win/Big allowance, modifiers и
+  discard-cost abilities;
+- multi-trait attachment;
+- закрытый список effects: gain/lose level, combat/escape/hand/reward modifier,
+  discard по allowlisted selector, character-tag change, death, draw и
+  persistent tie-win.
+
+Unknown fields, kind-specific поля в неверном месте, незарегистрированные
+effects/selectors/conditions и invalid ranges отклоняются fail-closed. Добавить
+новую механику означает синхронно расширить schema, semantic validator, Go
+registry и tests; `rules_text` не является fallback-интерпретатором.
+
+## Presentation и assets
+
+`rules_text`, `flavor_text`, `name`, `image` и `alt_text` отвечают только за
+отображение. Длинный текст остаётся HTML в интерфейсе и не запекается в
+изображение.
+
+Разрешены только repository-relative `.avif`, `.jpg`, `.jpeg`, `.png` и
+`.webp` внутри директории конкретного set. Absolute/remote paths, `..`,
+backslashes, empty segments и symlink escape отклоняются.
+
+## Создание оригинального набора
+
+1. Скопируйте `sets/demo` в новую директорию.
+2. Выберите новый immutable `set_id` и начните с `version: 1`.
+3. Укажите фактические `author`, `license` и `source`.
+4. Создайте definitions и задайте количество через `copies`.
+5. Поместите локальные изображения в `assets/` этого set и добавьте `alt_text`.
+6. Задайте mechanics только зарегистрированными typed-полями.
+7. Рассчитайте digest и провалидируйте pack.
 
 ```bash
 node content/tools/digest.mjs content/sets/my-set/cards.json --write
-```
-
-Then validate:
-
-```bash
 node content/tools/validate.mjs content/sets/my-set/cards.json
 ```
 
-A published `(set_id, version, content_digest)` identifies immutable content.
-Any card change requires a new version and a new digest.
+Без `--write` digest tool только печатает рассчитанное значение. Опубликованный
+`(set_id, version, content_digest)` неизменяем: любое изменение definition
+требует новой version и нового digest.
+
+## Граница reference-материалов
+
+Проект разделяет три слоя:
+
+1. committed оригинальный `demo-original`;
+2. будущий committed оригинальный набор «Московский манчкин»;
+3. локальный `content/reference-local/`, который игнорируется Git и никогда не
+   импортируется runtime, digest tooling или committed tests.
+
+В локальном First Edition index допустимы ordinal, deck, публичное название,
+source locator, нейтральный пересказ механики, mechanic tags, interaction
+classification, registry coverage и поля статуса будущей адаптации. Там
+запрещены scans, изображения, оригинальный rules text, готовые переводы,
+логотипы, шрифты, trade dress и бинарные вложения.
+
+Механическая база может использовать официальные правила как reference, но
+названия, тексты, рамка и иллюстрации будущего Moscow pack создаются заново.

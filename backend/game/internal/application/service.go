@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -47,11 +48,14 @@ type CommandResult struct {
 }
 
 type LobbySummary struct {
-	GameID      string      `json:"game_id"`
-	Version     uint64      `json:"version"`
-	Status      game.Status `json:"status"`
-	PlayerCount int         `json:"player_count"`
-	MaxPlayers  int         `json:"max_players"`
+	GameID              string      `json:"game_id"`
+	Version             uint64      `json:"version"`
+	Status              game.Status `json:"status"`
+	PlayerCount         int         `json:"player_count"`
+	MinPlayers          int         `json:"min_players"`
+	MaxPlayers          int         `json:"max_players"`
+	RulesProfileID      string      `json:"rules_profile_id"`
+	RulesProfileVersion int         `json:"rules_profile_version"`
 }
 
 func NewService(store Store, pack game.Pack, clock Clock, publisher Publisher) *Service {
@@ -135,6 +139,9 @@ func (service *Service) JoinLobby(
 	var publish *Invalidation
 	err := service.store.WithinGame(ctx, gameID, func(tx Tx) error {
 		state := tx.State()
+		if err := service.ensureContentIdentity(state); err != nil {
+			return err
+		}
 		if actorID, exists := state.ActorByCredentialHash(tokenHash); exists {
 			receipt, found := tx.FindReceipt(actorID, commandID)
 			if !found {
@@ -218,9 +225,18 @@ func (service *Service) GetLobby(ctx context.Context, gameID string) (LobbySumma
 	var summary LobbySummary
 	err := service.store.WithinGame(ctx, gameID, func(tx Tx) error {
 		state := tx.State()
+		if err := service.ensureContentIdentity(state); err != nil {
+			return err
+		}
 		summary = LobbySummary{
-			GameID: gameID, Version: state.Version, Status: state.Status,
-			PlayerCount: len(state.Players), MaxPlayers: game.MaxPlayers,
+			GameID:              gameID,
+			Version:             state.Version,
+			Status:              state.Status,
+			PlayerCount:         len(state.Players),
+			MinPlayers:          game.MinPlayers,
+			MaxPlayers:          game.MaxPlayers,
+			RulesProfileID:      state.RulesProfileID,
+			RulesProfileVersion: state.RulesProfileVersion,
 		}
 		return nil
 	})
@@ -233,17 +249,21 @@ func (service *Service) Execute(
 	credential string,
 	commandID string,
 	expectedVersion uint64,
-	commandType game.CommandType,
+	command game.Command,
 ) (CommandResult, error) {
 	if gameID == "" || commandID == "" || credential == "" {
 		return CommandResult{}, ErrUnauthorized
 	}
 	tokenHash := hashCredential(credential)
-	fingerprint := commandFingerprint(commandType, expectedVersion)
+	command = normalizeCommand(command)
+	fingerprint := commandFingerprint(command, expectedVersion)
 	var result CommandResult
 	var publish *Invalidation
 	err := service.store.WithinGame(ctx, gameID, func(tx Tx) error {
 		state := tx.State()
+		if err := service.ensureContentIdentity(state); err != nil {
+			return err
+		}
 		actorID, exists := state.ActorByCredentialHash(tokenHash)
 		if !exists {
 			return ErrUnauthorized
@@ -268,7 +288,8 @@ func (service *Service) Execute(
 		if state.Version != expectedVersion {
 			return ErrVersionConflict
 		}
-		events, err := game.Handle(state, game.Command{Type: commandType, ActorID: actorID}, service.pack)
+		command.ActorID = actorID
+		events, err := game.Handle(state, command, service.pack)
 		if err != nil {
 			return err
 		}
@@ -305,7 +326,7 @@ func (service *Service) Execute(
 			OccurredAt: time.Unix(0, service.clock.Now()).UTC().Format(time.RFC3339Nano),
 			GameID:     gameID,
 			Version:    next.Version,
-			Reason:     string(commandType),
+			Reason:     string(command.Type),
 		}
 		return nil
 	})
@@ -402,9 +423,50 @@ func hashCredential(token string) string {
 	return hex.EncodeToString(digest[:])
 }
 
-func commandFingerprint(commandType game.CommandType, expectedVersion uint64) string {
-	digest := sha256.Sum256([]byte(fmt.Sprintf("%s\n%d", commandType, expectedVersion)))
+func commandFingerprint(command game.Command, expectedVersion uint64) string {
+	payload := struct {
+		Type             game.CommandType `json:"type"`
+		ExpectedVersion  uint64           `json:"expected_version"`
+		InstanceID       string           `json:"instance_id"`
+		TargetInstanceID string           `json:"target_instance_id"`
+		InstanceIDs      []string         `json:"instance_ids"`
+		ChoiceIDs        []string         `json:"choice_ids"`
+		AbilityIndex     int              `json:"ability_index"`
+	}{
+		Type:             command.Type,
+		ExpectedVersion:  expectedVersion,
+		InstanceID:       command.InstanceID,
+		TargetInstanceID: command.TargetInstanceID,
+		InstanceIDs:      command.InstanceIDs,
+		ChoiceIDs:        command.ChoiceIDs,
+		AbilityIndex:     command.AbilityIndex,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		panic(fmt.Sprintf("marshal command fingerprint: %v", err))
+	}
+	digest := sha256.Sum256(raw)
 	return hex.EncodeToString(digest[:])
+}
+
+func normalizeCommand(command game.Command) game.Command {
+	command.ActorID = ""
+	command.PlayerID = ""
+	command.DisplayName = ""
+	command.CredentialHash = ""
+	command.InstanceID = strings.TrimSpace(command.InstanceID)
+	command.TargetInstanceID = strings.TrimSpace(command.TargetInstanceID)
+	command.InstanceIDs = append([]string(nil), command.InstanceIDs...)
+	command.ChoiceIDs = append([]string(nil), command.ChoiceIDs...)
+	for index := range command.InstanceIDs {
+		command.InstanceIDs[index] = strings.TrimSpace(command.InstanceIDs[index])
+	}
+	for index := range command.ChoiceIDs {
+		command.ChoiceIDs[index] = strings.TrimSpace(command.ChoiceIDs[index])
+	}
+	slices.Sort(command.InstanceIDs)
+	slices.Sort(command.ChoiceIDs)
+	return command
 }
 
 func joinFingerprint(displayName string, expectedVersion uint64) string {
@@ -423,11 +485,15 @@ func (service *Service) ensureContentIdentity(state game.State) error {
 		state.ContentDigest != service.pack.ContentDigest {
 		return fmt.Errorf("%w: content identity drift", game.ErrInvalidContent)
 	}
+	if _, err := state.Profile(); err != nil {
+		return err
+	}
 	return nil
 }
 
 func IsRuleError(err error) bool {
 	return errors.Is(err, game.ErrIllegalCommand) ||
 		errors.Is(err, game.ErrInvalidContent) ||
-		errors.Is(err, game.ErrUnknownCard)
+		errors.Is(err, game.ErrUnknownCard) ||
+		errors.Is(err, game.ErrIncompatibleState)
 }

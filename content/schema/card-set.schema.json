@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://leinodev.github.io/munchkin/schema/card-set-v1.json",
-  "title": "Munchkin original card set",
+  "title": "Original deterministic card set",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,24 +19,27 @@
       "const": 1
     },
     "set_id": {
-      "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+      "$ref": "#/$defs/identity"
     },
     "version": {
       "type": "integer",
-      "minimum": 1
+      "minimum": 1,
+      "maximum": 9007199254740991
     },
     "author": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "[^\\s\\u0085\\uFEFF]"
     },
     "license": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "[^\\s\\u0085\\uFEFF]"
     },
     "source": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "[^\\s\\u0085\\uFEFF]"
     },
     "content_digest": {
       "type": "string",
@@ -44,61 +47,785 @@
     },
     "cards": {
       "type": "array",
-      "minItems": 24,
+      "minItems": 12,
       "items": {
         "$ref": "#/$defs/card"
       }
     }
   },
   "$defs": {
+    "identity": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+    },
+    "tag": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,47}$"
+    },
+    "cardCommonProperty": {
+      "enum": [
+        "id",
+        "name",
+        "deck",
+        "kind",
+        "copies",
+        "interaction_scope",
+        "rules_text",
+        "flavor_text",
+        "image",
+        "alt_text"
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "always",
+            "character_has_tag",
+            "character_lacks_tag",
+            "monster_has_tag"
+          ]
+        },
+        "tag": {
+          "$ref": "#/$defs/tag"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "always"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "tag"
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "tag"
+            ]
+          }
+        }
+      ]
+    },
+    "modifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "amount",
+        "condition"
+      ],
+      "properties": {
+        "target": {
+          "enum": [
+            "player_combat",
+            "monster_combat",
+            "escape",
+            "hand_limit",
+            "treasure_reward"
+          ]
+        },
+        "amount": {
+          "type": "integer",
+          "minimum": -20,
+          "maximum": 20,
+          "not": {
+            "const": 0
+          }
+        },
+        "condition": {
+          "$ref": "#/$defs/condition"
+        }
+      }
+    },
+    "restrictions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required_tags": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/tag"
+          },
+          "uniqueItems": true
+        },
+        "forbidden_tags": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/tag"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot",
+        "size",
+        "value"
+      ],
+      "properties": {
+        "slot": {
+          "enum": [
+            "none",
+            "headgear",
+            "armor",
+            "footgear",
+            "hands"
+          ]
+        },
+        "hands": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "size": {
+          "enum": [
+            "small",
+            "big"
+          ]
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "bonus": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "escape_bonus": {
+          "type": "integer",
+          "minimum": -5,
+          "maximum": 5,
+          "not": {
+            "const": 0
+          }
+        },
+        "hand_limit_bonus": {
+          "type": "integer",
+          "minimum": -5,
+          "maximum": 10,
+          "not": {
+            "const": 0
+          }
+        },
+        "big_allowance": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "restrictions": {
+          "$ref": "#/$defs/restrictions"
+        },
+        "modifiers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/modifier"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "slot": {
+                "const": "hands"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "hands"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "hands"
+              ]
+            }
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "restrictions",
+              "big_allowance"
+            ]
+          }
+        }
+      ]
+    },
+    "trait": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group"
+      ],
+      "properties": {
+        "group": {
+          "enum": [
+            "class",
+            "race"
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/tag"
+          },
+          "uniqueItems": true
+        },
+        "tie_wins": {
+          "const": true
+        },
+        "big_allowance": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "modifiers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/modifier"
+          }
+        }
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group",
+        "extra_traits"
+      ],
+      "properties": {
+        "group": {
+          "enum": [
+            "class",
+            "race"
+          ]
+        },
+        "extra_traits": {
+          "const": 1
+        }
+      }
+    },
+    "ability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "amount",
+        "discard_count"
+      ],
+      "properties": {
+        "kind": {
+          "const": "discard_for_combat"
+        },
+        "amount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "discard_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "gain_level",
+            "lose_level",
+            "modify_combat",
+            "modify_escape",
+            "modify_hand_limit",
+            "modify_treasure_reward",
+            "discard",
+            "change_character_tag",
+            "death",
+            "draw",
+            "tie_wins"
+          ]
+        },
+        "amount": {
+          "type": "integer",
+          "minimum": -20,
+          "maximum": 20,
+          "not": {
+            "const": 0
+          }
+        },
+        "selector": {
+          "enum": [
+            "hand",
+            "equipment",
+            "trait",
+            "owned_card"
+          ]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "tag": {
+          "$ref": "#/$defs/tag"
+        },
+        "replace_tag": {
+          "$ref": "#/$defs/tag"
+        },
+        "target": {
+          "enum": [
+            "player",
+            "monster"
+          ]
+        },
+        "deck": {
+          "enum": [
+            "door",
+            "treasure"
+          ]
+        },
+        "persistent": {
+          "const": true
+        },
+        "can_win": {
+          "const": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "gain_level"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "amount"
+            ],
+            "propertyNames": {
+              "enum": [
+                "kind",
+                "amount",
+                "can_win"
+              ]
+            },
+            "properties": {
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "lose_level"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "amount"
+            ],
+            "propertyNames": {
+              "enum": [
+                "kind",
+                "amount"
+              ]
+            },
+            "properties": {
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "modify_combat"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "amount",
+              "target"
+            ],
+            "propertyNames": {
+              "enum": [
+                "kind",
+                "amount",
+                "target",
+                "persistent"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "modify_escape",
+                  "modify_hand_limit",
+                  "modify_treasure_reward"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "amount"
+            ],
+            "propertyNames": {
+              "enum": [
+                "kind",
+                "amount",
+                "persistent"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "discard"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "selector",
+              "count"
+            ],
+            "propertyNames": {
+              "enum": [
+                "kind",
+                "selector",
+                "count"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "change_character_tag"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "tag"
+            ],
+            "propertyNames": {
+              "enum": [
+                "kind",
+                "tag",
+                "replace_tag"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "death"
+              }
+            }
+          },
+          "then": {
+            "propertyNames": {
+              "const": "kind"
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "draw"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "deck",
+              "amount"
+            ],
+            "propertyNames": {
+              "enum": [
+                "kind",
+                "deck",
+                "amount"
+              ]
+            },
+            "properties": {
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "tie_wins"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "persistent"
+            ],
+            "propertyNames": {
+              "enum": [
+                "kind",
+                "persistent"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "monster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strength",
+        "treasures",
+        "levels",
+        "bad_stuff"
+      ],
+      "properties": {
+        "strength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99
+        },
+        "treasures": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "levels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "pursuit_min_level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/tag"
+          },
+          "uniqueItems": true
+        },
+        "modifiers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/modifier"
+          }
+        },
+        "auto_defeat_character_tags": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/tag"
+          },
+          "uniqueItems": true
+        },
+        "auto_escape_character_tags": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/tag"
+          },
+          "uniqueItems": true
+        },
+        "bad_stuff": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/effect"
+              },
+              {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "persistent"
+                      ]
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "modify_combat",
+                            "modify_escape",
+                            "modify_hand_limit",
+                            "modify_treasure_reward",
+                            "tie_wins"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
     "card": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "id",
         "name",
-        "kind"
+        "deck",
+        "kind",
+        "copies",
+        "interaction_scope"
       ],
       "properties": {
         "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+          "$ref": "#/$defs/identity"
         },
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 120
+          "maxLength": 120,
+          "pattern": "[^\\s\\u0085\\uFEFF]"
+        },
+        "deck": {
+          "enum": [
+            "door",
+            "treasure"
+          ]
         },
         "kind": {
           "enum": [
             "monster",
             "curse",
-            "door",
-            "treasure"
+            "class",
+            "race",
+            "trait_attachment",
+            "item",
+            "one_shot",
+            "level_up",
+            "cheat"
           ]
         },
-        "combat_strength": {
+        "copies": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 99
+          "maximum": 30
         },
-        "treasure_count": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 10
+        "interaction_scope": {
+          "enum": [
+            "self",
+            "none",
+            "other_players"
+          ]
         },
-        "level_loss": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9
+        "monster": {
+          "$ref": "#/$defs/monster"
+        },
+        "item": {
+          "$ref": "#/$defs/item"
+        },
+        "trait": {
+          "$ref": "#/$defs/trait"
+        },
+        "attachment": {
+          "$ref": "#/$defs/attachment"
+        },
+        "effects": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/effect"
+          }
+        },
+        "abilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ability"
+          }
         },
         "rules_text": {
           "type": "string",
-          "maxLength": 800
+          "minLength": 1,
+          "maxLength": 800,
+          "pattern": "[^\\s\\u0085\\uFEFF]"
         },
         "flavor_text": {
           "type": "string",
-          "maxLength": 300
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "[^\\s\\u0085\\uFEFF]"
         },
         "image": {
           "type": "string",
@@ -107,7 +834,8 @@
         "alt_text": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 200
+          "maxLength": 200,
+          "pattern": "[^\\s\\u0085\\uFEFF]"
         }
       },
       "dependentRequired": {
@@ -117,7 +845,344 @@
         "alt_text": [
           "image"
         ]
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "monster"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "monster"
+            ],
+            "propertyNames": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/cardCommonProperty"
+                },
+                {
+                  "const": "monster"
+                }
+              ]
+            },
+            "properties": {
+              "deck": {
+                "const": "door"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "curse"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "effects"
+            ],
+            "propertyNames": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/cardCommonProperty"
+                },
+                {
+                  "const": "effects"
+                }
+              ]
+            },
+            "properties": {
+              "deck": {
+                "const": "door"
+              },
+              "effects": {
+                "items": {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "modify_combat",
+                          "modify_escape",
+                          "modify_hand_limit",
+                          "modify_treasure_reward",
+                          "tie_wins"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "persistent"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "class",
+                  "race"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "trait"
+            ],
+            "propertyNames": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/cardCommonProperty"
+                },
+                {
+                  "enum": [
+                    "trait",
+                    "abilities"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "deck": {
+                "const": "door"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "class"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "trait": {
+                "properties": {
+                  "group": {
+                    "const": "class"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "race"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "trait": {
+                "properties": {
+                  "group": {
+                    "const": "race"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "trait_attachment"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "attachment"
+            ],
+            "propertyNames": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/cardCommonProperty"
+                },
+                {
+                  "const": "attachment"
+                }
+              ]
+            },
+            "properties": {
+              "deck": {
+                "const": "door"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "item"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "item"
+            ],
+            "propertyNames": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/cardCommonProperty"
+                },
+                {
+                  "enum": [
+                    "item",
+                    "abilities"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "deck": {
+                "const": "treasure"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "one_shot"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "effects"
+            ],
+            "propertyNames": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/cardCommonProperty"
+                },
+                {
+                  "const": "effects"
+                }
+              ]
+            },
+            "properties": {
+              "deck": {
+                "const": "treasure"
+              },
+              "effects": {
+                "items": {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "persistent"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "modify_hand_limit",
+                              "tie_wins",
+                              "death"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "level_up"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "effects"
+            ],
+            "propertyNames": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/cardCommonProperty"
+                },
+                {
+                  "const": "effects"
+                }
+              ]
+            },
+            "properties": {
+              "deck": {
+                "const": "treasure"
+              },
+              "effects": {
+                "maxItems": 1,
+                "items": {
+                  "properties": {
+                    "kind": {
+                      "const": "gain_level"
+                    }
+                  },
+                  "not": {
+                    "required": [
+                      "can_win"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "cheat"
+              }
+            }
+          },
+          "then": {
+            "propertyNames": {
+              "$ref": "#/$defs/cardCommonProperty"
+            },
+            "properties": {
+              "deck": {
+                "const": "treasure"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

@@ -45,37 +45,37 @@ async function run(callback: () => Promise<void>) {
 <template>
   <section class="landing">
     <div class="hero-copy">
-      <p class="eyebrow">DETERMINISTIC • PRIVATE • REPLAYABLE</p>
-      <h1>Kick open a door.<br><em>Keep your hand secret.</em></h1>
+      <p class="eyebrow">ДЕТЕРМИНИРОВАННО • ПРИВАТНО • ПОВТОРЯЕМО</p>
+      <h1>Вышиби дверь.<br><em>Не показывай руку.</em></h1>
       <p class="lede">
-        A small playable slice backed by an authoritative event engine.
-        All cards in this demo are original placeholders.
+        Полный собственный ход в обычном лобби без вмешательства других игроков.
+        Комнату можно запустить одному для preview. Все карты demo-набора оригинальные.
       </p>
     </div>
 
     <div class="lobby-grid">
       <form class="panel" @submit.prevent="createGame">
         <span class="panel-number">01</span>
-        <h2>Create a room</h2>
+        <h2>Создать комнату</h2>
         <label>
-          Display name
-          <input v-model.trim="createName" required maxlength="40" placeholder="Alice">
+          Имя игрока
+          <input v-model.trim="createName" required maxlength="40" placeholder="Алиса">
         </label>
-        <button :disabled="busy || !createName">Create room</button>
+        <button :disabled="busy || !createName">Создать</button>
       </form>
 
       <form class="panel" @submit.prevent="joinGame">
         <span class="panel-number">02</span>
-        <h2>Join a room</h2>
+        <h2>Войти в комнату</h2>
         <label>
-          Game ID
+          ID игры
           <input v-model.trim="joinGameID" required placeholder="game_…">
         </label>
         <label>
-          Display name
-          <input v-model.trim="joinName" required maxlength="40" placeholder="Bob">
+          Имя игрока
+          <input v-model.trim="joinName" required maxlength="40" placeholder="Борис">
         </label>
-        <button :disabled="busy || !joinName || !joinGameID">Join room</button>
+        <button :disabled="busy || !joinName || !joinGameID">Войти</button>
       </form>
     </div>
 

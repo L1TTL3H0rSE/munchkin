@@ -8,7 +8,8 @@
     "postinstall": "nuxt prepare",
     "build": "nuxt build",
     "lint": "eslint .",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run"
   },
   "dependencies": {
     "@munchkin/contracts": "workspace:*",
@@ -23,6 +24,7 @@
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
+    "vitest": "catalog:",
     "vue-tsc": "catalog:"
   }
 }

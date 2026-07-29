@@ -61,11 +61,23 @@ func NewWithOptions(service *application.Service, options Options) http.Handler 
 	mux.HandleFunc("GET /api/v1/games/{gameID}", router.getGame)
 	mux.HandleFunc("GET /api/v1/games/{gameID}/events", router.events)
 	mux.HandleFunc("POST /api/v1/games/{gameID}/start", router.command(game.CommandStart))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/finish-setup", router.command(game.CommandFinishSetup))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/play-card", router.command(game.CommandPlayCard))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/equip-item", router.command(game.CommandEquipItem))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/unequip-item", router.command(game.CommandUnequipItem))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/discard-card", router.command(game.CommandDiscardCard))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/sell-items", router.command(game.CommandSellItems))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/open-door", router.command(game.CommandOpenDoor))
-	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/fight", router.command(game.CommandFight))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/look-for-trouble", router.command(game.CommandLookForTrouble))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/loot-room", router.command(game.CommandLootRoom))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/use-ability", router.command(game.CommandUseAbility))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/resolve-combat", router.command(game.CommandResolveCombat))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/run-away", router.command(game.CommandRunAway))
-	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/loot", router.command(game.CommandLoot))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/choose-effect", router.command(game.CommandChooseEffect))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/resolve-charity", router.command(game.CommandResolveCharity))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/end-turn", router.command(game.CommandEndTurn))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/fight", router.command(game.CommandFight))
+	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/loot", router.command(game.CommandLoot))
 	return withMiddleware(mux, allowedOrigins())
 }
 
@@ -79,7 +91,12 @@ type joinRequest struct {
 }
 
 type commandRequest struct {
-	ExpectedVersion uint64 `json:"expected_version"`
+	ExpectedVersion  uint64   `json:"expected_version"`
+	InstanceID       string   `json:"instance_id,omitempty"`
+	TargetInstanceID string   `json:"target_instance_id,omitempty"`
+	InstanceIDs      []string `json:"instance_ids,omitempty"`
+	ChoiceIDs        []string `json:"choice_ids,omitempty"`
+	AbilityIndex     int      `json:"ability_index,omitempty"`
 }
 
 func (router *Router) health(writer http.ResponseWriter, _ *http.Request) {
@@ -253,7 +270,14 @@ func (router *Router) command(commandType game.CommandType) http.HandlerFunc {
 			bearerToken(request),
 			commandID,
 			body.ExpectedVersion,
-			commandType,
+			game.Command{
+				Type:             commandType,
+				InstanceID:       body.InstanceID,
+				TargetInstanceID: body.TargetInstanceID,
+				InstanceIDs:      body.InstanceIDs,
+				ChoiceIDs:        body.ChoiceIDs,
+				AbilityIndex:     body.AbilityIndex,
+			},
 		)
 		if err != nil {
 			router.mapError(writer, err)

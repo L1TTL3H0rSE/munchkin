@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
 	"github.com/leinodev/munchkin/backend/game/internal/application"
@@ -15,30 +16,25 @@ import (
 
 func routerPack(t *testing.T) game.Pack {
 	t.Helper()
-	cards := make([]game.Card, 0, 24)
-	for index := 0; index < 12; index++ {
-		cards = append(cards, game.Card{ID: "door-" + string(rune('a'+index)), Name: "Door", Kind: game.CardDoor})
-	}
-	for index := 0; index < 12; index++ {
-		cards = append(cards, game.Card{ID: "treasure-" + string(rune('a'+index)), Name: "Treasure", Kind: game.CardTreasure})
-	}
-	pack := game.Pack{
-		SchemaVersion: 1,
-		SetID:         "http-test",
-		Version:       1,
-		Author:        "tests",
-		License:       "CC0-1.0",
-		Source:        "test-fixture",
-		ContentDigest: game.CardsDigest(cards),
-		Cards:         cards,
-	}
-	if err := pack.Validate(); err != nil {
+	pack, err := game.LoadPack(filepath.Join(
+		"..",
+		"..",
+		"..",
+		"..",
+		"..",
+		"content",
+		"sets",
+		"demo",
+		"cards.json",
+	))
+	if err != nil {
 		t.Fatal(err)
 	}
 	return pack
 }
 
-func TestCreateGetAndForgedCredential(t *testing.T) {
+func testRouter(t *testing.T) (*application.Service, *httptest.Server) {
+	t.Helper()
 	service := application.NewService(
 		memory.New(),
 		routerPack(t),
@@ -46,21 +42,41 @@ func TestCreateGetAndForgedCredential(t *testing.T) {
 		application.NoopPublisher{},
 	)
 	server := httptest.NewServer(New(service))
-	defer server.Close()
+	t.Cleanup(server.Close)
+	return service, server
+}
 
-	createResponse := requestJSON(t, server.Client(), http.MethodPost, server.URL+"/api/v1/lobbies", "", "", map[string]any{
-		"display_name": "Alice",
-	})
+func TestCreateGetAndForgedCredential(t *testing.T) {
+	_, server := testRouter(t)
+	createResponse := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/lobbies",
+		"",
+		"",
+		map[string]any{"display_name": "Alice"},
+	)
 	if createResponse.StatusCode != http.StatusCreated {
 		t.Fatalf("create status %d", createResponse.StatusCode)
 	}
 	var created application.LobbyResult
 	decodeResponse(t, createResponse, &created)
-	if created.Credential == "" || created.GameID == "" {
-		t.Fatalf("missing credential result: %#v", created)
+	if created.Credential == "" ||
+		created.GameID == "" ||
+		created.Projection.RulesProfileID != game.FirstEditionCoreProfileID {
+		t.Fatalf("missing identity result: %#v", created)
 	}
 
-	getResponse := requestJSON(t, server.Client(), http.MethodGet, server.URL+"/api/v1/games/"+created.GameID, created.Credential, "", nil)
+	getResponse := requestJSON(
+		t,
+		server.Client(),
+		http.MethodGet,
+		server.URL+"/api/v1/games/"+created.GameID,
+		created.Credential,
+		"",
+		nil,
+	)
 	if getResponse.StatusCode != http.StatusOK {
 		t.Fatalf("get status %d", getResponse.StatusCode)
 	}
@@ -70,7 +86,15 @@ func TestCreateGetAndForgedCredential(t *testing.T) {
 		t.Fatalf("wrong actor projection: %#v", projection.You)
 	}
 
-	forged := requestJSON(t, server.Client(), http.MethodGet, server.URL+"/api/v1/games/"+created.GameID, "forged", "", nil)
+	forged := requestJSON(
+		t,
+		server.Client(),
+		http.MethodGet,
+		server.URL+"/api/v1/games/"+created.GameID,
+		"forged",
+		"",
+		nil,
+	)
 	if forged.StatusCode != http.StatusForbidden {
 		t.Fatalf("forged status %d", forged.StatusCode)
 	}
@@ -78,27 +102,38 @@ func TestCreateGetAndForgedCredential(t *testing.T) {
 }
 
 func TestLobbySummaryAndJoinAreBrowserSafe(t *testing.T) {
-	service := application.NewService(
-		memory.New(),
-		routerPack(t),
-		application.SystemClock{},
-		application.NoopPublisher{},
+	_, server := testRouter(t)
+	createResponse := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/lobbies",
+		"",
+		"",
+		map[string]any{"display_name": "Alice"},
 	)
-	server := httptest.NewServer(New(service))
-	defer server.Close()
-
-	createResponse := requestJSON(t, server.Client(), http.MethodPost, server.URL+"/api/v1/lobbies", "", "", map[string]any{
-		"display_name": "Alice",
-	})
 	var created application.LobbyResult
 	decodeResponse(t, createResponse, &created)
 
-	summaryResponse := requestJSON(t, server.Client(), http.MethodGet, server.URL+"/api/v1/lobbies/"+created.GameID, "", "", nil)
+	summaryResponse := requestJSON(
+		t,
+		server.Client(),
+		http.MethodGet,
+		server.URL+"/api/v1/lobbies/"+created.GameID,
+		"",
+		"",
+		nil,
+	)
 	if summaryResponse.StatusCode != http.StatusOK {
 		t.Fatalf("summary status %d", summaryResponse.StatusCode)
 	}
 	var summary application.LobbySummary
 	decodeResponse(t, summaryResponse, &summary)
+	if summary.MinPlayers != 1 ||
+		summary.MaxPlayers != 6 ||
+		summary.RulesProfileID != game.FirstEditionCoreProfileID {
+		t.Fatalf("rules profile missing from summary: %#v", summary)
+	}
 
 	joined := requestJSON(
 		t,
@@ -107,7 +142,10 @@ func TestLobbySummaryAndJoinAreBrowserSafe(t *testing.T) {
 		server.URL+"/api/v1/games/"+created.GameID+"/players",
 		"join-client-credential",
 		"join-http-1",
-		map[string]any{"display_name": "Bob", "expected_version": summary.Version},
+		map[string]any{
+			"display_name":     "Bob",
+			"expected_version": summary.Version,
+		},
 	)
 	if joined.StatusCode != http.StatusCreated {
 		t.Fatalf("join status %d", joined.StatusCode)
@@ -119,8 +157,114 @@ func TestLobbySummaryAndJoinAreBrowserSafe(t *testing.T) {
 	}
 }
 
+func TestTypedCommandRoutesAndUnknownPayloadFailClosed(t *testing.T) {
+	_, server := testRouter(t)
+	createResponse := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/lobbies",
+		"",
+		"",
+		map[string]any{"display_name": "Alice"},
+	)
+	var created application.LobbyResult
+	decodeResponse(t, createResponse, &created)
+
+	started := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+created.GameID+"/start",
+		created.Credential,
+		"start-http-1",
+		map[string]any{"expected_version": created.Projection.Version},
+	)
+	if started.StatusCode != http.StatusOK {
+		t.Fatalf("start status %d", started.StatusCode)
+	}
+	var startResult application.CommandResult
+	decodeResponse(t, started, &startResult)
+	if startResult.Projection.Turn.Phase != game.PhaseSetup {
+		t.Fatalf("unexpected setup projection: %#v", startResult.Projection.Turn)
+	}
+
+	finished := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+created.GameID+"/commands/finish-setup",
+		created.Credential,
+		"setup-http-1",
+		map[string]any{"expected_version": startResult.Version},
+	)
+	if finished.StatusCode != http.StatusOK {
+		t.Fatalf("finish setup status %d", finished.StatusCode)
+	}
+	var setupResult application.CommandResult
+	decodeResponse(t, finished, &setupResult)
+
+	opened := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+created.GameID+"/commands/open-door",
+		created.Credential,
+		"open-http-1",
+		map[string]any{"expected_version": setupResult.Version},
+	)
+	if opened.StatusCode != http.StatusOK {
+		t.Fatalf("open door status %d", opened.StatusCode)
+	}
+	var openResult application.CommandResult
+	decodeResponse(t, opened, &openResult)
+	if openResult.Projection.Version <= setupResult.Projection.Version {
+		t.Fatal("typed command did not advance version")
+	}
+
+	unknown := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+created.GameID+"/commands/play-card",
+		created.Credential,
+		"unknown-http-1",
+		map[string]any{
+			"expected_version": openResult.Version,
+			"instance_id":      "forged",
+			"player_id":        created.PlayerID,
+		},
+	)
+	if unknown.StatusCode != http.StatusBadRequest {
+		t.Fatalf("authority field was not rejected: %d", unknown.StatusCode)
+	}
+	unknown.Body.Close()
+
+	forgedSelection := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+created.GameID+"/commands/play-card",
+		created.Credential,
+		"forged-http-1",
+		map[string]any{
+			"expected_version": openResult.Version,
+			"instance_id":      "forged",
+		},
+	)
+	if forgedSelection.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("forged selection status %d", forgedSelection.StatusCode)
+	}
+	forgedSelection.Body.Close()
+}
+
 func TestCORSPreflightUsesExactAllowlistOrigin(t *testing.T) {
-	service := application.NewService(memory.New(), routerPack(t), application.SystemClock{}, application.NoopPublisher{})
+	service := application.NewService(
+		memory.New(),
+		routerPack(t),
+		application.SystemClock{},
+		application.NoopPublisher{},
+	)
 	request := httptest.NewRequest(http.MethodOptions, "/api/v1/lobbies", nil)
 	request.Header.Set("Origin", "http://localhost:3000")
 	request.Header.Set("Access-Control-Request-Method", "POST")
@@ -129,19 +273,20 @@ func TestCORSPreflightUsesExactAllowlistOrigin(t *testing.T) {
 	New(service).ServeHTTP(response, request)
 	if response.Code != http.StatusNoContent ||
 		response.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3000" {
-		t.Fatalf("preflight response: status=%d headers=%v", response.Code, response.Header())
+		t.Fatalf(
+			"preflight response: status=%d headers=%v",
+			response.Code,
+			response.Header(),
+		)
 	}
 }
 
 func TestCommandRequiresIdempotencyKey(t *testing.T) {
-	service := application.NewService(memory.New(), routerPack(t), application.SystemClock{}, application.NoopPublisher{})
+	service, server := testRouter(t)
 	created, err := service.CreateLobby(context.Background(), "Alice")
 	if err != nil {
 		t.Fatal(err)
 	}
-	server := httptest.NewServer(New(service))
-	defer server.Close()
-
 	response := requestJSON(
 		t,
 		server.Client(),

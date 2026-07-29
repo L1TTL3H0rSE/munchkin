@@ -1,152 +1,660 @@
 {
   "schema_version": 1,
   "set_id": "demo-original",
-  "version": 1,
+  "version": 2,
   "author": "L1TTL3H0rSE",
   "license": "CC0-1.0",
-  "source": "original-demo-placeholders",
-  "content_digest": "sha256:0674733e90fff10a720ed369d39b29761e831f5888db57059a373fa966f25696",
+  "source": "original-core-cycle-demo",
+  "content_digest": "sha256:3f32638963d1e77243ba746023153214482e6e7e4ca202ea99553e4e26018acf",
   "cards": [
     {
-      "id": "dust-bunny",
-      "name": "Dust Bunny",
+      "id": "courtyard-pigeon",
+      "name": "Дворовый голубь",
+      "deck": "door",
       "kind": "monster",
-      "combat_strength": 1,
-      "treasure_count": 1,
-      "level_loss": 1
+      "copies": 3,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 1,
+        "treasures": 1,
+        "levels": 1,
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, потеряй уровень."
     },
     {
-      "id": "grumpy-teapot",
-      "name": "Grumpy Teapot",
+      "id": "metro-turnstile",
+      "name": "Сердитый турникет",
+      "deck": "door",
       "kind": "monster",
-      "combat_strength": 2,
-      "treasure_count": 1,
-      "level_loss": 1
+      "copies": 3,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 4,
+        "treasures": 1,
+        "levels": 1,
+        "pursuit_min_level": 1,
+        "tags": [
+          "landmark"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "tourist"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Сильнее против туриста."
     },
     {
-      "id": "sock-goblin",
-      "name": "Sock Goblin",
+      "id": "archive-dust",
+      "name": "Архивная пыль",
+      "deck": "door",
       "kind": "monster",
-      "combat_strength": 3,
-      "treasure_count": 1,
-      "level_loss": 1
+      "copies": 3,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 7,
+        "treasures": 2,
+        "levels": 1,
+        "pursuit_min_level": 2,
+        "tags": [
+          "paper"
+        ],
+        "auto_escape_character_tags": [
+          "courier"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Курьера не преследует."
     },
     {
-      "id": "paper-dragon",
-      "name": "Paper Dragon",
+      "id": "concrete-centipede",
+      "name": "Бетонная сороконожка",
+      "deck": "door",
       "kind": "monster",
-      "combat_strength": 4,
-      "treasure_count": 2,
-      "level_loss": 1
+      "copies": 3,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 10,
+        "treasures": 3,
+        "levels": 1,
+        "tags": [
+          "underground"
+        ],
+        "auto_defeat_character_tags": [
+          "tourist"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 2
+          }
+        ]
+      },
+      "rules_text": "Турист проигрывает автоматически."
     },
     {
-      "id": "basement-mimic",
-      "name": "Basement Mimic",
+      "id": "night-inspector",
+      "name": "Ночной инспектор",
+      "deck": "door",
       "kind": "monster",
-      "combat_strength": 5,
-      "treasure_count": 2,
-      "level_loss": 2
+      "copies": 3,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 16,
+        "treasures": 4,
+        "levels": 2,
+        "tags": [
+          "official"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "death"
+          }
+        ]
+      },
+      "rules_text": "Неудачный побег заканчивается смертью."
     },
     {
-      "id": "clockwork-slug",
-      "name": "Clockwork Slug",
-      "kind": "monster",
-      "combat_strength": 2,
-      "treasure_count": 1,
-      "level_loss": 1
-    },
-    {
-      "id": "slippery-boots",
-      "name": "Slippery Boots",
+      "id": "wet-documents",
+      "name": "Промокшие документы",
+      "deck": "door",
       "kind": "curse",
-      "level_loss": 1
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "hand",
+          "count": 1
+        }
+      ],
+      "rules_text": "Выбери и сбрось карту с руки."
     },
     {
-      "id": "bent-compass",
-      "name": "Bent Compass",
+      "id": "broken-laces",
+      "name": "Порванные шнурки",
+      "deck": "door",
       "kind": "curse",
-      "level_loss": 1
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": -1,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −1 к побегу."
     },
     {
-      "id": "loud-sneeze",
-      "name": "Loud Sneeze",
+      "id": "tiny-pockets",
+      "name": "Крошечные карманы",
+      "deck": "door",
       "kind": "curse",
-      "level_loss": 1
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_hand_limit",
+          "amount": -1,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Лимит руки уменьшен на одну карту."
     },
     {
-      "id": "spare-map",
-      "name": "Spare Map",
-      "kind": "door"
+      "id": "identity-mixup",
+      "name": "Перепутанная прописка",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "change_character_tag",
+          "tag": "local",
+          "replace_tag": "tourist"
+        }
+      ],
+      "rules_text": "Замени метку туриста на местного."
     },
     {
-      "id": "rusty-key",
-      "name": "Rusty Key",
-      "kind": "door"
+      "id": "bent-weapon",
+      "name": "Погнутая вещь",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "equipment",
+          "count": 1
+        }
+      ],
+      "rules_text": "Выбери и сбрось один предмет."
     },
     {
-      "id": "lucky-button",
-      "name": "Lucky Button",
-      "kind": "door"
+      "id": "forgotten-title",
+      "name": "Забытая должность",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "trait",
+          "count": 1
+        }
+      ],
+      "rules_text": "Выбери и сбрось одну черту."
     },
     {
-      "id": "wooden-spoon",
-      "name": "Wooden Spoon",
-      "kind": "treasure"
+      "id": "public-shame",
+      "name": "Доска порицания",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -1,
+          "target": "player",
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −1 к боевой силе."
     },
     {
-      "id": "shiny-pebble",
-      "name": "Shiny Pebble",
-      "kind": "treasure"
+      "id": "stubborn-luck",
+      "name": "Упрямое везение",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "tie_wins",
+          "persistent": true
+        }
+      ],
+      "rules_text": "Ничья в бою считается победой."
     },
     {
-      "id": "heroic-socks",
-      "name": "Heroic Socks",
-      "kind": "treasure"
+      "id": "swift-courier",
+      "name": "Шустрый курьер",
+      "deck": "door",
+      "kind": "class",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "courier"
+        ],
+        "modifiers": [
+          {
+            "target": "escape",
+            "amount": 1,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 3,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "Сбрось карту с руки: +3 в текущем бою."
     },
     {
-      "id": "pocket-lantern",
-      "name": "Pocket Lantern",
-      "kind": "treasure"
+      "id": "patient-archivist",
+      "name": "Терпеливый архивист",
+      "deck": "door",
+      "kind": "class",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "archivist"
+        ],
+        "tie_wins": true,
+        "modifiers": [
+          {
+            "target": "treasure_reward",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "paper"
+            }
+          }
+        ]
+      },
+      "rules_text": "Побеждает при ничьей; бумажные монстры дают дополнительное сокровище."
     },
     {
-      "id": "tin-crown",
-      "name": "Tin Crown",
-      "kind": "treasure"
+      "id": "born-local",
+      "name": "Коренной житель",
+      "deck": "door",
+      "kind": "race",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "local"
+        ],
+        "big_allowance": 1
+      },
+      "rules_text": "Можно нести на один большой предмет больше."
     },
     {
-      "id": "folding-ladder",
-      "name": "Folding Ladder",
-      "kind": "treasure"
+      "id": "curious-tourist",
+      "name": "Любопытный турист",
+      "deck": "door",
+      "kind": "race",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "tourist"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "landmark"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 против достопримечательностей."
     },
     {
-      "id": "velvet-rope",
-      "name": "Velvet Rope",
-      "kind": "treasure"
+      "id": "double-shift",
+      "name": "Двойная смена",
+      "deck": "door",
+      "kind": "trait_attachment",
+      "copies": 1,
+      "interaction_scope": "self",
+      "attachment": {
+        "group": "class",
+        "extra_traits": 1
+      },
+      "rules_text": "Позволяет иметь ещё один класс."
     },
     {
-      "id": "brass-whistle",
-      "name": "Brass Whistle",
-      "kind": "treasure"
+      "id": "mixed-neighborhood",
+      "name": "Смешанный район",
+      "deck": "door",
+      "kind": "trait_attachment",
+      "copies": 1,
+      "interaction_scope": "self",
+      "attachment": {
+        "group": "race",
+        "extra_traits": 1
+      },
+      "rules_text": "Позволяет иметь ещё одну расу."
     },
     {
-      "id": "emergency-cookie",
-      "name": "Emergency Cookie",
-      "kind": "treasure"
+      "id": "borrowed-badge",
+      "name": "Чужой пропуск",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "owned_card",
+          "count": 1
+        }
+      ],
+      "rules_text": "Отложено до появления взаимодействия между игроками."
     },
     {
-      "id": "cardboard-shield",
-      "name": "Cardboard Shield",
-      "kind": "treasure"
+      "id": "folding-umbrella",
+      "name": "Складной зонт",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 400,
+        "bonus": 2,
+        "escape_bonus": 1
+      }
     },
     {
-      "id": "polite-hammer",
-      "name": "Polite Hammer",
-      "kind": "treasure"
+      "id": "heavy-kiosk",
+      "name": "Карманный киоск",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "big",
+        "value": 700,
+        "bonus": 4
+      }
     },
     {
-      "id": "mystery-ribbon",
-      "name": "Mystery Ribbon",
-      "kind": "treasure"
+      "id": "red-cap",
+      "name": "Красная кепка",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "headgear",
+        "size": "small",
+        "value": 300,
+        "bonus": 1
+      }
+    },
+    {
+      "id": "quilted-vest",
+      "name": "Стёганый жилет",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "armor",
+        "size": "small",
+        "value": 500,
+        "bonus": 2,
+        "hand_limit_bonus": 1
+      }
+    },
+    {
+      "id": "fast-sneakers",
+      "name": "Быстрые кроссовки",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "footgear",
+        "size": "small",
+        "value": 400,
+        "bonus": 1,
+        "escape_bonus": 2
+      }
+    },
+    {
+      "id": "two-handed-sign",
+      "name": "Двуручная вывеска",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 2,
+        "size": "big",
+        "value": 800,
+        "bonus": 5,
+        "restrictions": {
+          "required_tags": [
+            "courier"
+          ]
+        }
+      },
+      "rules_text": "Обычно доступна только курьеру."
+    },
+    {
+      "id": "archive-key",
+      "name": "Архивный ключ",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 600,
+        "bonus": 1,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "archivist"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "roomy-cart",
+      "name": "Вместительная тележка",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "big",
+        "value": 500,
+        "bonus": 1,
+        "big_allowance": 1
+      }
+    },
+    {
+      "id": "pocket-sand",
+      "name": "Песок из кармана",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -3,
+          "target": "monster"
+        }
+      ]
+    },
+    {
+      "id": "pep-talk",
+      "name": "Убедительная речь",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 3,
+          "target": "player"
+        },
+        {
+          "kind": "modify_treasure_reward",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "hidden-shortcut",
+      "name": "Скрытый проход",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "lucky-find",
+      "name": "Удачная находка",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "draw",
+          "deck": "treasure",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "late-train-lesson",
+      "name": "Урок опоздавшего поезда",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "useful-queue",
+      "name": "Полезная очередь",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "stamped-exception",
+      "name": "Исключение с печатью",
+      "deck": "treasure",
+      "kind": "cheat",
+      "copies": 2,
+      "interaction_scope": "self",
+      "rules_text": "Выбранный предмет игнорирует ограничения использования."
+    },
+    {
+      "id": "swap-bag",
+      "name": "Обменный пакет",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "owned_card",
+          "count": 1
+        }
+      ],
+      "rules_text": "Отложено до появления взаимодействия между игроками."
     }
   ]
 }
