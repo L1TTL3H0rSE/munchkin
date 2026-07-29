@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "id": "repository-workflow",
+  "kind": "repository",
+  "roots": [
+    ".codex/**",
+    ".leino/**",
+    ".agents/skills/**",
+    "tools/leinoctl/**",
+    "docs/agents/**",
+    ".editorconfig",
+    ".gitattributes",
+    ".gitignore",
+    ".dockerignore",
+    ".env.example",
+    ".gitlab-ci.yml",
+    "AGENTS.md",
+    "README.md",
+    "scripts/ci-impact.sh",
+    "backend/AGENTS.md",
+    "frontend/AGENTS.md",
+    "leinoctl",
+    "leinoctl.cmd"
+  ],
+  "contracts": [
+    "leinoctl:cli-v1",
+    "leinoctl:profile-v1",
+    "leinoctl:plan-manifest-v1"
+  ],
+  "checks": [
+    {
+      "id": "codex-harness-tests",
+      "cwd": ".",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        ".codex/hooks/test/commands.test.mjs",
+        ".codex/hooks/test/configuration.test.mjs",
+        ".codex/hooks/test/delegation.test.mjs",
+        ".codex/hooks/test/encoding.test.mjs",
+        ".codex/hooks/test/paths.test.mjs",
+        ".codex/hooks/test/plans.test.mjs",
+        ".codex/hooks/test/policy.test.mjs",
+        ".codex/hooks/test/stop-policy.test.mjs"
+      ]
+    },
+    {
+      "id": "leinoctl-tests",
+      "cwd": "tools/leinoctl",
+      "argv": [
+        "node",
+        "--test"
+      ]
+    },
+    {
+      "id": "plan-lint",
+      "cwd": ".",
+      "argv": [
+        "node",
+        ".codex/hooks/plan-lint.mjs"
+      ]
+    }
+  ]
+}

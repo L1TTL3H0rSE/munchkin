@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "frontend-workspace",
+  "kind": "pnpm-workspace",
+  "roots": [
+    "frontend/**"
+  ],
+  "consumes": [
+    "go:backend/game"
+  ],
+  "contracts": [
+    "pnpm-workspace:frontend",
+    "game:http-v1",
+    "game:realtime-v1"
+  ],
+  "composeService": "web",
+  "checks": [
+    {
+      "id": "frontend-lint",
+      "cwd": "frontend",
+      "argv": [
+        "pnpm",
+        "lint"
+      ]
+    },
+    {
+      "id": "frontend-typecheck-and-test",
+      "cwd": "frontend",
+      "argv": [
+        "pnpm",
+        "check"
+      ]
+    },
+    {
+      "id": "frontend-build",
+      "cwd": "frontend",
+      "argv": [
+        "pnpm",
+        "build"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "game-content",
+  "kind": "integration",
+  "roots": [
+    "content/**"
+  ],
+  "contracts": [
+    "content:card-set-v1",
+    "content:effect-registry-v1"
+  ],
+  "checks": [
+    {
+      "id": "content-validator-tests",
+      "cwd": ".",
+      "argv": [
+        "node",
+        "--test",
+        "content/tools/validate.test.mjs"
+      ]
+    },
+    {
+      "id": "content-validation",
+      "cwd": ".",
+      "argv": [
+        "node",
+        "content/tools/validate.mjs",
+        "content/sets/demo/cards.json"
+      ]
+    }
+  ]
+}

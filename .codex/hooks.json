@@ -1,0 +1,60 @@
+{
+  "description": "Munchkin repository workflow guardrails.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const f=require('node:fs'),p=require('node:path'),u=require('node:url');let d=process.cwd();for(;;){if(f.existsSync(p.join(d,'.codex','hooks','session-start.mjs')))break;const n=p.dirname(d);if(n===d){console.error('HARNESS_BOOTSTRAP: root not found');process.exit(2)}d=n}import(u.pathToFileURL(p.join(d,'.codex','hooks','session-start.mjs')).href).catch(e=>{console.error('HARNESS_BOOTSTRAP: '+e.message);process.exit(2)})\"",
+            "commandWindows": "node -e \"const f=require('node:fs'),p=require('node:path'),u=require('node:url');let d=process.cwd();for(;;){if(f.existsSync(p.join(d,'.codex','hooks','session-start.mjs')))break;const n=p.dirname(d);if(n===d){console.error('HARNESS_BOOTSTRAP: root not found');process.exit(2)}d=n}import(u.pathToFileURL(p.join(d,'.codex','hooks','session-start.mjs')).href).catch(e=>{console.error('HARNESS_BOOTSTRAP: '+e.message);process.exit(2)})\"",
+            "timeout": 10,
+            "statusMessage": "Loading Munchkin workflow policy"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch|Edit|Write|Agent|spawn_agent|collaboration\\.spawn_agent|collaborationspawn_agent)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const f=require('node:fs'),p=require('node:path'),u=require('node:url');let d=process.cwd();for(;;){if(f.existsSync(p.join(d,'.codex','hooks','pre-tool-use.mjs')))break;const n=p.dirname(d);if(n===d){console.error('HARNESS_BOOTSTRAP: root not found');process.exit(2)}d=n}import(u.pathToFileURL(p.join(d,'.codex','hooks','pre-tool-use.mjs')).href).catch(e=>{console.error('HARNESS_BOOTSTRAP: '+e.message);process.exit(2)})\"",
+            "commandWindows": "node -e \"const f=require('node:fs'),p=require('node:path'),u=require('node:url');let d=process.cwd();for(;;){if(f.existsSync(p.join(d,'.codex','hooks','pre-tool-use.mjs')))break;const n=p.dirname(d);if(n===d){console.error('HARNESS_BOOTSTRAP: root not found');process.exit(2)}d=n}import(u.pathToFileURL(p.join(d,'.codex','hooks','pre-tool-use.mjs')).href).catch(e=>{console.error('HARNESS_BOOTSTRAP: '+e.message);process.exit(2)})\"",
+            "timeout": 10,
+            "statusMessage": "Checking Munchkin workflow policy"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const f=require('node:fs'),p=require('node:path'),u=require('node:url');let d=process.cwd();for(;;){if(f.existsSync(p.join(d,'.codex','hooks','post-tool-use.mjs')))break;const n=p.dirname(d);if(n===d){console.error('HARNESS_BOOTSTRAP: root not found');process.exit(2)}d=n}import(u.pathToFileURL(p.join(d,'.codex','hooks','post-tool-use.mjs')).href).catch(e=>{console.error('HARNESS_BOOTSTRAP: '+e.message);process.exit(2)})\"",
+            "commandWindows": "node -e \"const f=require('node:fs'),p=require('node:path'),u=require('node:url');let d=process.cwd();for(;;){if(f.existsSync(p.join(d,'.codex','hooks','post-tool-use.mjs')))break;const n=p.dirname(d);if(n===d){console.error('HARNESS_BOOTSTRAP: root not found');process.exit(2)}d=n}import(u.pathToFileURL(p.join(d,'.codex','hooks','post-tool-use.mjs')).href).catch(e=>{console.error('HARNESS_BOOTSTRAP: '+e.message);process.exit(2)})\"",
+            "timeout": 10,
+            "statusMessage": "Validating changed text"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const f=require('node:fs'),p=require('node:path'),u=require('node:url');let d=process.cwd();for(;;){if(f.existsSync(p.join(d,'.codex','hooks','stop.mjs')))break;const n=p.dirname(d);if(n===d){console.error('HARNESS_BOOTSTRAP: root not found');process.exit(2)}d=n}import(u.pathToFileURL(p.join(d,'.codex','hooks','stop.mjs')).href).catch(e=>{console.error('HARNESS_BOOTSTRAP: '+e.message);process.exit(2)})\"",
+            "commandWindows": "node -e \"const f=require('node:fs'),p=require('node:path'),u=require('node:url');let d=process.cwd();for(;;){if(f.existsSync(p.join(d,'.codex','hooks','stop.mjs')))break;const n=p.dirname(d);if(n===d){console.error('HARNESS_BOOTSTRAP: root not found');process.exit(2)}d=n}import(u.pathToFileURL(p.join(d,'.codex','hooks','stop.mjs')).href).catch(e=>{console.error('HARNESS_BOOTSTRAP: '+e.message);process.exit(2)})\"",
+            "timeout": 10,
+            "statusMessage": "Checking unresolved plan state"
+          }
+        ]
+      }
+    ]
+  }
+}

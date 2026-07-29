@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "set_id": "demo-original",
+  "version": 1,
+  "author": "L1TTL3H0rSE",
+  "license": "CC0-1.0",
+  "source": "original-demo-placeholders",
+  "content_digest": "sha256:0674733e90fff10a720ed369d39b29761e831f5888db57059a373fa966f25696",
+  "cards": [
+    {
+      "id": "dust-bunny",
+      "name": "Dust Bunny",
+      "kind": "monster",
+      "combat_strength": 1,
+      "treasure_count": 1,
+      "level_loss": 1
+    },
+    {
+      "id": "grumpy-teapot",
+      "name": "Grumpy Teapot",
+      "kind": "monster",
+      "combat_strength": 2,
+      "treasure_count": 1,
+      "level_loss": 1
+    },
+    {
+      "id": "sock-goblin",
+      "name": "Sock Goblin",
+      "kind": "monster",
+      "combat_strength": 3,
+      "treasure_count": 1,
+      "level_loss": 1
+    },
+    {
+      "id": "paper-dragon",
+      "name": "Paper Dragon",
+      "kind": "monster",
+      "combat_strength": 4,
+      "treasure_count": 2,
+      "level_loss": 1
+    },
+    {
+      "id": "basement-mimic",
+      "name": "Basement Mimic",
+      "kind": "monster",
+      "combat_strength": 5,
+      "treasure_count": 2,
+      "level_loss": 2
+    },
+    {
+      "id": "clockwork-slug",
+      "name": "Clockwork Slug",
+      "kind": "monster",
+      "combat_strength": 2,
+      "treasure_count": 1,
+      "level_loss": 1
+    },
+    {
+      "id": "slippery-boots",
+      "name": "Slippery Boots",
+      "kind": "curse",
+      "level_loss": 1
+    },
+    {
+      "id": "bent-compass",
+      "name": "Bent Compass",
+      "kind": "curse",
+      "level_loss": 1
+    },
+    {
+      "id": "loud-sneeze",
+      "name": "Loud Sneeze",
+      "kind": "curse",
+      "level_loss": 1
+    },
+    {
+      "id": "spare-map",
+      "name": "Spare Map",
+      "kind": "door"
+    },
+    {
+      "id": "rusty-key",
+      "name": "Rusty Key",
+      "kind": "door"
+    },
+    {
+      "id": "lucky-button",
+      "name": "Lucky Button",
+      "kind": "door"
+    },
+    {
+      "id": "wooden-spoon",
+      "name": "Wooden Spoon",
+      "kind": "treasure"
+    },
+    {
+      "id": "shiny-pebble",
+      "name": "Shiny Pebble",
+      "kind": "treasure"
+    },
+    {
+      "id": "heroic-socks",
+      "name": "Heroic Socks",
+      "kind": "treasure"
+    },
+    {
+      "id": "pocket-lantern",
+      "name": "Pocket Lantern",
+      "kind": "treasure"
+    },
+    {
+      "id": "tin-crown",
+      "name": "Tin Crown",
+      "kind": "treasure"
+    },
+    {
+      "id": "folding-ladder",
+      "name": "Folding Ladder",
+      "kind": "treasure"
+    },
+    {
+      "id": "velvet-rope",
+      "name": "Velvet Rope",
+      "kind": "treasure"
+    },
+    {
+      "id": "brass-whistle",
+      "name": "Brass Whistle",
+      "kind": "treasure"
+    },
+    {
+      "id": "emergency-cookie",
+      "name": "Emergency Cookie",
+      "kind": "treasure"
+    },
+    {
+      "id": "cardboard-shield",
+      "name": "Cardboard Shield",
+      "kind": "treasure"
+    },
+    {
+      "id": "polite-hammer",
+      "name": "Polite Hammer",
+      "kind": "treasure"
+    },
+    {
+      "id": "mystery-ribbon",
+      "name": "Mystery Ribbon",
+      "kind": "treasure"
+    }
+  ]
+}

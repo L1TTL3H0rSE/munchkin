@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "repositoryId": "munchkin",
+  "componentsDir": ".leino/components",
+  "generatorsFile": ".leino/generators.json",
+  "runtimeDir": ".leino/runtime",
+  "plans": {
+    "activeDir": "docs/agents/plans/active",
+    "archiveDir": "docs/agents/plans/archive"
+  },
+  "composeFiles": [
+    "docker-compose.yml"
+  ],
+  "sync": {
+    "jobs": 8
+  },
+  "toolchain": {
+    "requiredExecutables": [
+      "bash",
+      "find",
+      "git",
+      "go",
+      "node",
+      "pnpm",
+      "rg"
+    ],
+    "minimumVersions": {
+      "bash": "4.0.0",
+      "go": "1.25.1",
+      "node": "24.0.0",
+      "pnpm": "10.8.0"
+    },
+    "versionProbes": {
+      "bash": [
+        "--version"
+      ],
+      "go": [
+        "version"
+      ],
+      "node": [
+        "--version"
+      ],
+      "pnpm": [
+        "--version"
+      ]
+    },
+    "capabilities": [
+      {
+        "id": "docker-compose-v2",
+        "cwd": ".",
+        "argv": [
+          "docker",
+          "compose",
+          "version"
+        ]
+      }
+    ]
+  },
+  "verification": {
+    "nodeScripts": [
+      "test",
+      "typecheck",
+      "lint",
+      "build"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "go:backend/game",
+  "kind": "go-service",
+  "roots": [
+    "backend/game"
+  ],
+  "consumes": [
+    "game-content"
+  ],
+  "contracts": [
+    "game:http-v1",
+    "game:realtime-v1",
+    "game:events-v1"
+  ],
+  "composeService": "game",
+  "checks": [
+    {
+      "id": "backend-game-tests",
+      "cwd": "backend/game",
+      "argv": [
+        "go",
+        "test",
+        "./..."
+      ]
+    }
+  ]
+}

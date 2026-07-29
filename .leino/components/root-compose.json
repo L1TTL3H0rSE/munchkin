@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "root-compose",
+  "kind": "integration",
+  "roots": [
+    "docker-compose.yml",
+    "docker/**",
+    "scripts/dev.sh"
+  ],
+  "consumes": [
+    "go:backend/game",
+    "frontend-workspace"
+  ],
+  "contracts": [
+    "compose:local-dev"
+  ],
+  "checks": [
+    {
+      "id": "root-script-syntax",
+      "cwd": ".",
+      "argv": [
+        "bash",
+        "-n",
+        "scripts/dev.sh"
+      ]
+    },
+    {
+      "id": "compose-config",
+      "cwd": ".",
+      "argv": [
+        "docker",
+        "compose",
+        "--parallel",
+        "8",
+        "config"
+      ]
+    }
+  ]
+}

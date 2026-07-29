@@ -1,0 +1,28 @@
+{
+  "name": "@munchkin/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "postinstall": "nuxt prepare",
+    "build": "nuxt build",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@munchkin/contracts": "workspace:*",
+    "@pinia/nuxt": "catalog:",
+    "nuxt": "catalog:",
+    "pinia": "catalog:",
+    "vue": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "catalog:",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}

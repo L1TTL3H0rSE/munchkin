@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leino.dev/schemas/leinoctl/verify-data-v1.json",
+  "title": "leinoctl verify success data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "paths",
+    "components",
+    "checks"
+  ],
+  "properties": {
+    "paths": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/repoPath"
+      }
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "cwd",
+          "argv",
+          "dryRun"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "cwd": {
+            "$ref": "#/$defs/repoPath"
+          },
+          "argv": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "repoPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?=.*\\S)(?![\\\\/])(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    }
+  }
+}

@@ -1,0 +1,111 @@
+stages:
+  - policy
+  - test
+  - build
+
+default:
+  interruptible: true
+
+variables:
+  GIT_DEPTH: "0"
+
+harness:
+  stage: policy
+  image: node:24-bookworm
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends git ripgrep
+  script:
+    - node --test --test-isolation=none .codex/hooks/test/*.test.mjs
+    - node --test tools/leinoctl/test/*.test.mjs
+    - node .codex/hooks/plan-lint.mjs
+    - ./leinoctl preflight
+    - ./scripts/ci-impact.sh
+
+content:
+  stage: test
+  image: node:24-bookworm
+  script:
+    - node --test content/tools/validate.test.mjs
+    - node content/tools/validate.mjs content/sets/demo/cards.json
+
+backend-unit:
+  stage: test
+  image: golang:1.25.1-bookworm
+  cache:
+    key: go-${CI_COMMIT_REF_SLUG}
+    paths:
+      - .cache/go-build
+      - .cache/go-mod
+  variables:
+    GOCACHE: ${CI_PROJECT_DIR}/.cache/go-build
+    GOMODCACHE: ${CI_PROJECT_DIR}/.cache/go-mod
+  script:
+    - cd backend/game
+    - go test ./...
+
+backend-postgres:
+  stage: test
+  image: golang:1.25.1-bookworm
+  services:
+    - name: postgres:17-alpine
+      alias: postgres
+  variables:
+    POSTGRES_DB: munchkin_test
+    POSTGRES_USER: munchkin
+    POSTGRES_PASSWORD: munchkin
+    TEST_DATABASE_URL: postgres://munchkin:munchkin@postgres:5432/munchkin_test?sslmode=disable
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends postgresql-client
+    - |
+      for attempt in $(seq 1 30); do
+        if pg_isready -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+          break
+        fi
+        if [ "$attempt" -eq 30 ]; then
+          exit 1
+        fi
+        sleep 1
+      done
+  script:
+    - cd backend/game
+    - go test ./internal/repository/postgres -run TestPostgresServiceContract -count=1
+
+frontend:
+  stage: test
+  image: node:24-bookworm
+  cache:
+    key:
+      files:
+        - frontend/pnpm-lock.yaml
+    paths:
+      - frontend/.pnpm-store
+  before_script:
+    - corepack enable
+    - corepack prepare pnpm@10.8.0 --activate
+    - cd frontend
+    - pnpm config set store-dir .pnpm-store
+    - pnpm install --frozen-lockfile
+  script:
+    - pnpm lint
+    - pnpm check
+    - pnpm build
+
+compose-config:
+  stage: test
+  image: docker:28-cli
+  script:
+    - docker compose --parallel 8 -f docker-compose.yml config
+
+docker-images:
+  stage: build
+  image: docker:28-cli
+  services:
+    - name: docker:28-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker compose --parallel 8 -f docker-compose.yml build game web

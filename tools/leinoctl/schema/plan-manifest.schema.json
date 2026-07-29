@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leino.dev/schemas/leinoctl/plan-manifest-v1.json",
+  "title": "leinoctl plan relevance manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "paths",
+    "components",
+    "contracts",
+    "dependsOn",
+    "sharedResources"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "paths": {
+      "$ref": "#/$defs/pathArray"
+    },
+    "components": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "contracts": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "dependsOn": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "sharedResources": {
+      "$ref": "#/$defs/stringArray"
+    }
+  },
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      }
+    },
+    "pathArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/repoPath"
+      }
+    },
+    "repoPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?=.*\\S)(?![\\\\/])(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    }
+  }
+}
