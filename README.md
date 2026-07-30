@@ -85,6 +85,18 @@ Nuxt/Vue client
 Подробности: `docs/agents/ARCHITECTURE.md` и ADR в
 `docs/agents/decisions/`.
 
+## Подготовка production infrastructure
+
+Первый production environment планируется в Yandex Cloud и управляется через
+Terraform. Прежде чем создавать VM, сеть, registry, buckets или DNS, владелец
+готовит account/billing, отдельные cloud+folder, budget, domain, локальный
+`yc` profile и SSH public key по инструкции:
+
+[`docs/operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md`](docs/operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md).
+
+Документ является prerequisite runbook, а не утверждением, что production
+resources уже созданы.
+
 ## Карты, тексты и изображения
 
 Формат описан в `content/schema/card-set.schema.json`, а пошаговый workflow —

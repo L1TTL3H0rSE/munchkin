@@ -10,3 +10,4 @@ ADR фиксирует причину сквозного принятого ре
 - `0006-administration-control-plane.md`
 - `0007-single-vps-production-platform.md`
 - `0008-multiplayer-interaction-windows.md`
+- `0009-yandex-cloud-terraform-production.md`

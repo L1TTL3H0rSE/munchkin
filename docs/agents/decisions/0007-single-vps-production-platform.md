@@ -22,8 +22,11 @@ service mesh или message broker на одну VPS увеличило бы ope
 
 Первой production platform является одна Linux VPS с Docker Engine и Docker
 Compose. Traefik — единственный публичный ingress и публикует только `80/443`.
-Frontend, backend, PostgreSQL, OpenTelemetry Collector и выбранные telemetry
-backends работают во внутренних Docker networks.
+Frontend, backend, PostgreSQL и OpenTelemetry Collector работают во внутренних
+Docker networks. Если telemetry backend self-hosted, он также остаётся во
+внутренней сети; provider-specific решение может вместо этого разрешить
+Collector исходящий export в managed backend. Для первого Yandex Cloud
+environment этот вариант выбран ADR-0009.
 
 Один hostname обслуживает:
 
@@ -38,8 +41,10 @@ PostgreSQL, OTLP, Prometheus, Tempo и container management interfaces нико�
 
 GitHub Actions заменяет GitLab CI только после parity существующих policy,
 content, Go, PostgreSQL contract, frontend и container checks. Production
-images публикуются в GHCR с immutable full commit SHA. `latest` не является
-deployment reference, а production images не собираются на VPS.
+images публикуются в выбранный OCI-compatible registry с immutable full commit
+SHA. `latest` не является deployment reference, а production images не
+собираются на VPS. Provider-specific ADR-0009 выбирает Yandex Container
+Registry для первого production environment.
 
 Production deploy:
 
@@ -142,7 +147,8 @@ security, observability и recoverability важнее имитации multi-no
 
 Каждая implementation-фаза получает отдельный согласованный plan. Этот ADR не
 доказывает, что GitHub Actions, VPS, Traefik, OpenTelemetry или backups уже
-реализованы.
+реализованы. Yandex Cloud/Terraform provider boundary принадлежит ADR-0009 и
+не меняет portable runtime topology этого решения.
 
 ## Отклонённые альтернативы
 
@@ -157,6 +163,8 @@ security, observability и recoverability важнее имитации multi-no
 ## Связанные материалы
 
 - [Infrastructure roadmap](../INFRASTRUCTURE_ROADMAP.md)
+- [ADR-0009: Yandex Cloud and Terraform](0009-yandex-cloud-terraform-production.md)
+- [Yandex Cloud owner bootstrap](../../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md)
 - [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
 - [GitHub: publishing Docker images](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
 - [GitHub: deployments and environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)

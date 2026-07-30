@@ -17,8 +17,8 @@
 ```text
 commit
   -> GitHub Actions checks
-  -> immutable game/web images in GHCR
-  -> controlled deployment to one VPS
+  -> immutable game/web images in Yandex Container Registry
+  -> controlled deployment to one Yandex Compute VM
   -> Traefik + HTTPS
   -> readiness and public smoke
   -> traces, metrics and deploy version in the selected telemetry UI
@@ -35,12 +35,13 @@ delivery, observability, security и recovery.
 flowchart LR
   Dev["Developer push"] --> GHA["GitHub Actions"]
   GHA --> Checks["Policy, tests, build, scan"]
-  Checks --> GHCR["GHCR<br/>game:web by full SHA"]
+  Checks --> Registry["Yandex Container Registry<br/>game:web by full SHA"]
   GHA --> Deploy["Serialized production deploy"]
+  GHA --> WIF["Yandex IAM<br/>Workload Identity Federation"]
 
-  User["Browser"] --> DNS["Domain / DNS"]
+  User["Browser"] --> DNS["Domain / Yandex Cloud DNS"]
 
-  subgraph VPS["Single Linux VPS"]
+  subgraph VPS["Single Yandex Compute VM"]
     Traefik["Traefik<br/>public :80 / :443"]
     Web["Nuxt web<br/>private :3000"]
     Game["Go game API<br/>private :8080"]
@@ -60,10 +61,12 @@ flowchart LR
   end
 
   DNS --> Traefik
-  GHCR --> Deploy
+  Registry --> Deploy
   Deploy --> VPS
-  Collector --> Managed["Managed OTLP backend<br/>and visualization UI"]
-  Backup --> ObjectStorage[("External S3-compatible<br/>encrypted backups")]
+  WIF --> Registry
+  WIF --> Deploy
+  Collector --> Managed["Yandex managed telemetry<br/>via configurable exporter"]
+  Backup --> ObjectStorage[("Yandex Object Storage<br/>encrypted backups")]
 ```
 
 ## Подтверждённое текущее состояние
@@ -81,7 +84,8 @@ flowchart LR
 | Realtime | Authenticated SSE с heartbeat/version invalidation | Нужен long-lived proxy smoke через Traefik |
 | Studio | Local `.card-studio`, production persistence отсутствует | Оставить выключенной на public deployment |
 | Telemetry | Нет OTel, metrics endpoint, structured logs и dashboards | Реализовать vendor-neutral instrumentation |
-| Delivery | Images не публикуются, VPS deployment и rollback отсутствуют | Построить полный GitHub -> GHCR -> VPS path |
+| IaC | Yandex Cloud resources и Terraform configuration отсутствуют | Сначала создать bootstrap/state/IAM boundary |
+| Delivery | Images не публикуются, VM deployment и rollback отсутствуют | Построить полный GitHub -> Container Registry -> Compute VM path |
 
 ## Неподвижные production-инварианты
 
@@ -106,6 +110,9 @@ flowchart LR
     понятным failure/restore path.
 13. Доступ к Docker socket/`docker` group считается root-equivalent. CI не
     получает его неявно под названием «непривилегированный deploy user».
+14. Yandex Cloud resources после bootstrap меняются через reviewed Terraform
+    plan; production state приватен, versioned, encrypted и сериализован.
+15. Lockbox payload не проходит через Terraform variables, plan или state.
 
 ## P0-A: submission-critical live deployment
 
@@ -141,7 +148,7 @@ observability stack.
 - Его состав не слабее текущего GitLab pipeline.
 - Failure любого canonical check блокирует image publication/deployment.
 
-### INFRA-002 — immutable images и GHCR
+### INFRA-002 — immutable images и Yandex Container Registry
 
 **Работа**
 
@@ -150,6 +157,10 @@ observability stack.
   участвует в deploy resolution.
 - Добавить OCI metadata: source repository, revision, created time и license.
 - Использовать registry build cache; production image запускается non-root.
+- Использовать GitHub OIDC -> Yandex Workload Identity Federation вместо
+  persistent authorized-key JSON для registry push.
+- Добавить bounded image retention и on-push/scheduled vulnerability scan
+  после проверки тарификации.
 - Сохранить deploy-visible `service.version`/revision.
 
 **Definition of Done**
@@ -159,11 +170,17 @@ observability stack.
 - На VPS отсутствуют source checkout и production build toolchain как
   обязательная часть deploy.
 
-### INFRA-003 — VPS bootstrap и host security
+### INFRA-003 — Yandex Cloud Terraform/Compute bootstrap и host security
 
 **Работа**
 
-- Выбрать Linux LTS VPS/region и зафиксировать минимальный resource budget.
+- Создать reviewed Terraform graph для VPC, subnet, security groups, static
+  IPv4, Ubuntu LTS Compute VM, disks, service accounts и минимальных IAM roles.
+- Выбрать доступную zone; default `ru-central1-d` проверяется через актуальный
+  `yc compute zone list`.
+- Хранить Terraform state в отдельном private/versioned/KMS-encrypted Object
+  Storage bucket и запретить concurrent apply до доказанного locking.
+- Зафиксировать минимальный resource budget и billing notifications.
 - Создать отдельного deploy user; вход только по SSH key.
 - Зафиксировать SSH host key VPS в GitHub deploy configuration и запрещать
   `StrictHostKeyChecking=no`.
@@ -461,7 +478,7 @@ stdout с `trace_id`/`span_id` и bounded Docker log rotation.
 **Пятиминутный demo**
 
 1. Показать commit и зелёный GitHub Actions run.
-2. Показать два GHCR image с этим SHA.
+2. Показать два Yandex Container Registry image с этим SHA.
 3. Показать successful deploy и public HTTPS.
 4. Создать игру и открыть trace до PostgreSQL span в выбранном telemetry UI.
 5. Показать dashboard с request/command/SSE signals и deploy version.
@@ -528,12 +545,14 @@ stdout с `trace_id`/`span_id` и bounded Docker log rotation.
 
 | Решение | Default до новых данных | Что подтвердить |
 |---|---|---|
-| VPS provider/region | Один Linux LTS VPS с public IPv4 | Бюджет, RAM/CPU/disk, backup snapshots, network policy |
+| Provider/region | Yandex Cloud, одна Compute VM; `ru-central1-d` если доступна | Фактическая zone/quota, RAM/CPU/disk, calculator estimate |
+| Infrastructure as code | Terraform; один production root после bootstrap | Pinned Terraform/provider и reviewed state migration |
+| Terraform state | Private/versioned/KMS-encrypted Object Storage; serialized apply | `use_lockfile` compatibility test, restricted backend credential rotation |
 | VPS size | Managed telemetry для малого host; self-host только после measurement | Peak RAM, disk growth, retention |
-| Domain | Купить и использовать один production hostname | Registrar, DNS provider, имя |
+| Domain | Купить domain; public zone/records в Cloud DNS | Registrar access, hostname, existing records |
 | IPv6 | Не публиковать `AAAA` до end-to-end test | Provider route, firewall, Traefik |
-| Telemetry sink | Local Collector всегда; exporter configurable | Managed или self-hosted, credentials, retention |
-| Backup storage | Внешний S3-compatible bucket | Provider, encryption, retention, restore region |
+| Telemetry sink | Local Collector -> Yandex managed telemetry; exporter configurable | Credentials, pricing, retention и OTLP integration smoke |
+| Backup storage | Отдельный encrypted Yandex Object Storage bucket | KMS, retention, checksum и restore drill |
 | Deploy trigger | Manual production approval либо explicit dispatch | Repository visibility/plan и desired automation |
 | Alerts | Telegram или email | Канал, quiet hours, escalation |
 | Grafana exposure | Authenticated hostname или SSH tunnel | Authentication и allowlist |
@@ -543,13 +562,14 @@ stdout с `trace_id`/`span_id` и bounded Docker log rotation.
 Каждый пункт ниже проходит обычный approve/select/verify lifecycle и не
 смешивается с остальными без явного расширения scope:
 
-1. `github-actions-ci-and-ghcr`
-2. `production-compose-and-traefik`
-3. `vps-bootstrap-and-controlled-deploy`
-4. `backend-readiness-and-opentelemetry`
-5. `telemetry-backend-dashboards-and-alerts`
-6. `postgres-off-host-backup-and-restore`
-7. `contest-readme-runbooks-and-demo`
+1. `yandex-cloud-terraform-bootstrap-and-state`
+2. `yandex-cloud-network-registry-and-compute`
+3. `github-actions-yandex-images`
+4. `production-compose-traefik-and-deploy`
+5. `backend-readiness-and-opentelemetry`
+6. `telemetry-backend-dashboards-and-alerts`
+7. `postgres-object-storage-backup-and-restore`
+8. `contest-readme-runbooks-and-demo`
 
 Отдельные уже подготовленные draft-направления:
 
@@ -564,6 +584,13 @@ stdout с `trace_id`/`span_id` и bounded Docker log rotation.
   `backend/game/Dockerfile`, `frontend/Dockerfile`,
   `backend/game/cmd/server/main.go`,
   `backend/game/internal/transport/httpapi/router.go`.
+- [ADR-0009: Yandex Cloud and Terraform](decisions/0009-yandex-cloud-terraform-production.md)
+- [Yandex Cloud owner bootstrap](../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md)
+- [Yandex Cloud: Terraform quickstart](https://yandex.cloud/ru/docs/terraform/quickstart)
+- [Yandex Cloud: Terraform state in Object Storage](https://yandex.cloud/ru/docs/terraform/tutorials/terraform-state-storage)
+- [Yandex Cloud: Workload Identity Federation](https://yandex.cloud/ru/docs/iam/concepts/workload-identity)
+- [Yandex Cloud: Container Registry](https://yandex.cloud/ru/docs/container-registry/)
+- [Yandex Cloud: availability zones](https://yandex.cloud/en/docs/overview/concepts/geo-scope)
 - [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
 - [GitHub: publishing Docker images](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
 - [GitHub: deployments and environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)

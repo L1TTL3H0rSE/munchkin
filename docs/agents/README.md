@@ -19,6 +19,7 @@ git status --short
 | `FRONTEND_ENGINEERING_SPEC.md` | Нормативные frontend architecture, code, markup, CSS, responsive и review rules |
 | `GAME_UI_UX_SPEC.md` | Product lobby/game layouts, visual direction, interaction surfaces, motion и responsive viewport/state verification |
 | `INFRASTRUCTURE_ROADMAP.md` | Production deployment, observability, recovery и конкурсный backlog |
+| `../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md` | Owner prerequisites до первого Yandex Cloud/Terraform implementation plan |
 | `HARNESS.md` | Hooks, selected plan, ledger, CI |
 | `PROJECT_MEMORY.md` | Подтверждённые устойчивые ловушки |
 | `plans/README.md` | Plan lifecycle и manifests |
