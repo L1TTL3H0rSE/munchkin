@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
+	"time"
 )
 
 const (
@@ -153,6 +155,136 @@ type ActionWindow struct {
 	EligibleActorIDs []string `json:"eligible_actor_ids"`
 }
 
+type InteractionKind string
+
+const (
+	InteractionKindCombatResponse    InteractionKind = "combat_response"
+	InteractionKindAddressedResponse InteractionKind = "addressed_response"
+	InteractionKindPrivateChoice     InteractionKind = "private_choice"
+)
+
+type InteractionSubjectKind string
+
+const (
+	InteractionSubjectTurn        InteractionSubjectKind = "turn"
+	InteractionSubjectEncounter   InteractionSubjectKind = "encounter"
+	InteractionSubjectEffect      InteractionSubjectKind = "effect"
+	InteractionSubjectInteraction InteractionSubjectKind = "interaction"
+)
+
+type InteractionEligibilityPolicy string
+
+const (
+	InteractionEligibilityPublicPredicate InteractionEligibilityPolicy = "public_predicate"
+	InteractionEligibilityActorPrivate    InteractionEligibilityPolicy = "actor_private"
+	InteractionEligibilityOpaquePublicSet InteractionEligibilityPolicy = "opaque_public_set"
+)
+
+type InteractionIntent string
+
+const (
+	InteractionIntentPass        InteractionIntent = "pass"
+	InteractionIntentRespond     InteractionIntent = "respond"
+	InteractionIntentAccept      InteractionIntent = "accept"
+	InteractionIntentDecline     InteractionIntent = "decline"
+	InteractionIntentAutoResolve InteractionIntent = "auto_resolve"
+)
+
+type InteractionResponseRequirement string
+
+const (
+	InteractionResponseOptional  InteractionResponseRequirement = "optional"
+	InteractionResponseMandatory InteractionResponseRequirement = "mandatory"
+)
+
+type InteractionResponseState string
+
+const (
+	InteractionResponsePending      InteractionResponseState = "pending"
+	InteractionResponsePassed       InteractionResponseState = "passed"
+	InteractionResponseActed        InteractionResponseState = "acted"
+	InteractionResponseAccepted     InteractionResponseState = "accepted"
+	InteractionResponseDeclined     InteractionResponseState = "declined"
+	InteractionResponseTimedOut     InteractionResponseState = "timed_out"
+	InteractionResponseAutoResolved InteractionResponseState = "auto_resolved"
+)
+
+type InteractionWindowStatus string
+
+const (
+	InteractionWindowOpen   InteractionWindowStatus = "open"
+	InteractionWindowClosed InteractionWindowStatus = "closed"
+)
+
+type InteractionCloseReason string
+
+const (
+	InteractionCloseAllResponded       InteractionCloseReason = "all_responded"
+	InteractionCloseAccepted           InteractionCloseReason = "accepted"
+	InteractionCloseDeclined           InteractionCloseReason = "declined"
+	InteractionCloseCancelled          InteractionCloseReason = "cancelled"
+	InteractionCloseSuperseded         InteractionCloseReason = "superseded"
+	InteractionCloseDeadlineExpired    InteractionCloseReason = "deadline_expired"
+	InteractionCloseAutoSkipped        InteractionCloseReason = "auto_skipped_no_public_action"
+	InteractionCloseSubjectInvalidated InteractionCloseReason = "subject_invalidated"
+	InteractionCloseParentClosed       InteractionCloseReason = "parent_closed"
+	InteractionCloseGameFinished       InteractionCloseReason = "game_finished"
+)
+
+type InteractionParent struct {
+	Phase               Phase                  `json:"phase"`
+	SubjectKind         InteractionSubjectKind `json:"subject_kind"`
+	SubjectID           string                 `json:"subject_id"`
+	ParentInteractionID string                 `json:"parent_interaction_id,omitempty"`
+}
+
+type InteractionDeadlinePolicy struct {
+	BaseSeconds          int `json:"base_seconds"`
+	LateThresholdSeconds int `json:"late_threshold_seconds,omitempty"`
+	ExtensionStepSeconds int `json:"extension_step_seconds,omitempty"`
+	MaxSeconds           int `json:"max_seconds"`
+}
+
+type InteractionResponse struct {
+	Requirement   InteractionResponseRequirement `json:"requirement"`
+	TimeoutIntent InteractionIntent              `json:"timeout_intent"`
+	State         InteractionResponseState       `json:"state"`
+	Intent        InteractionIntent              `json:"intent,omitempty"`
+	AcceptedAt    time.Time                      `json:"accepted_at,omitempty"`
+}
+
+type InteractionWindow struct {
+	ID                     string                         `json:"interaction_id"`
+	Kind                   InteractionKind                `json:"kind"`
+	Parent                 InteractionParent              `json:"parent"`
+	InitiatorActorID       string                         `json:"initiator_actor_id"`
+	EligibilityPolicy      InteractionEligibilityPolicy   `json:"eligibility_policy"`
+	AllowedIntents         []InteractionIntent            `json:"allowed_intents"`
+	EligibleActorIDs       []string                       `json:"eligible_actor_ids"`
+	OpenedAt               time.Time                      `json:"opened_at"`
+	DeadlineAt             time.Time                      `json:"deadline_at"`
+	DeadlineRevision       uint32                         `json:"deadline_revision"`
+	DeadlinePolicy         InteractionDeadlinePolicy      `json:"deadline_policy"`
+	ExtensionBudgetSeconds int                            `json:"extension_budget_seconds"`
+	Responses              map[string]InteractionResponse `json:"responses"`
+	Status                 InteractionWindowStatus        `json:"status"`
+	CloseReason            InteractionCloseReason         `json:"close_reason,omitempty"`
+	ClosedAt               time.Time                      `json:"closed_at,omitempty"`
+}
+
+func (window InteractionWindow) clone() *InteractionWindow {
+	clone := window
+	clone.AllowedIntents = append([]InteractionIntent(nil), window.AllowedIntents...)
+	clone.EligibleActorIDs = append([]string(nil), window.EligibleActorIDs...)
+	if window.Responses != nil {
+		clone.Responses = make(map[string]InteractionResponse, len(window.Responses))
+		for actorID, response := range window.Responses {
+			clone.Responses[actorID] = response
+		}
+	}
+	return &clone
+}
+
 type PendingFinalize struct {
 	Phase            Phase  `json:"phase"`
 	DiscardSource    bool   `json:"discard_source"`
@@ -210,6 +342,7 @@ type State struct {
 	RulesProfileID      string                  `json:"rules_profile_id"`
 	RulesProfileVersion int                     `json:"rules_profile_version"`
 	WinnerPlayerID      string                  `json:"winner_player_id,omitempty"`
+	InteractionWindow   *InteractionWindow      `json:"interaction_window,omitempty"`
 }
 
 func (state State) Clone() State {
@@ -237,6 +370,9 @@ func (state State) Clone() State {
 	if state.Turn.Encounter != nil {
 		encounter := *state.Turn.Encounter
 		clone.Turn.Encounter = &encounter
+	}
+	if state.InteractionWindow != nil {
+		clone.InteractionWindow = state.InteractionWindow.clone()
 	}
 	return clone
 }
@@ -342,6 +478,9 @@ func (state State) Validate() error {
 	default:
 		return fmt.Errorf("%w: invalid status", ErrIllegalCommand)
 	}
+	if err := state.validateInteractionWindow(); err != nil {
+		return err
+	}
 	if state.Status != StatusLobby {
 		if err := state.validateInstanceZones(); err != nil {
 			return err
@@ -364,6 +503,337 @@ func validPhase(phase Phase) bool {
 	default:
 		return false
 	}
+}
+
+func (state State) validateInteractionWindow() error {
+	window := state.InteractionWindow
+	if window == nil {
+		return nil
+	}
+	if state.Status != StatusActive && window.Status == InteractionWindowOpen {
+		return fmt.Errorf("%w: open interaction requires active game", ErrIllegalCommand)
+	}
+	if window.Status == InteractionWindowOpen &&
+		window.Parent.Phase != state.Turn.Phase {
+		return fmt.Errorf("%w: open interaction parent is stale", ErrIllegalCommand)
+	}
+	if window.Status == InteractionWindowOpen &&
+		!state.interactionParentMatches(window.Parent) {
+		return fmt.Errorf("%w: interaction parent subject is stale", ErrIllegalCommand)
+	}
+	if strings.TrimSpace(window.ID) == "" || len(window.ID) > 128 {
+		return fmt.Errorf("%w: invalid interaction ID", ErrIllegalCommand)
+	}
+	if !validInteractionKind(window.Kind) {
+		return fmt.Errorf("%w: invalid interaction kind", ErrIllegalCommand)
+	}
+	if !validPhase(window.Parent.Phase) ||
+		!validInteractionSubjectKind(window.Parent.SubjectKind) ||
+		strings.TrimSpace(window.Parent.SubjectID) == "" ||
+		window.Parent.ParentInteractionID == window.ID {
+		return fmt.Errorf("%w: invalid interaction parent", ErrIllegalCommand)
+	}
+	if state.PlayerIndex(window.InitiatorActorID) < 0 {
+		return fmt.Errorf("%w: invalid interaction initiator", ErrIllegalCommand)
+	}
+	if !validInteractionEligibilityPolicy(window.EligibilityPolicy) {
+		return fmt.Errorf("%w: invalid interaction eligibility policy", ErrIllegalCommand)
+	}
+	if len(window.AllowedIntents) == 0 || len(window.EligibleActorIDs) == 0 {
+		return fmt.Errorf("%w: interaction actors and intents are required", ErrIllegalCommand)
+	}
+	seenIntents := make(map[InteractionIntent]struct{}, len(window.AllowedIntents))
+	for _, intent := range window.AllowedIntents {
+		if !validInteractionIntent(intent) {
+			return fmt.Errorf("%w: invalid interaction intent", ErrIllegalCommand)
+		}
+		if _, exists := seenIntents[intent]; exists {
+			return fmt.Errorf("%w: duplicate interaction intent", ErrIllegalCommand)
+		}
+		seenIntents[intent] = struct{}{}
+	}
+	seenActors := make(map[string]struct{}, len(window.EligibleActorIDs))
+	for _, actorID := range window.EligibleActorIDs {
+		if state.PlayerIndex(actorID) < 0 {
+			return fmt.Errorf("%w: invalid eligible interaction actor", ErrIllegalCommand)
+		}
+		if _, exists := seenActors[actorID]; exists {
+			return fmt.Errorf("%w: duplicate eligible interaction actor", ErrIllegalCommand)
+		}
+		seenActors[actorID] = struct{}{}
+		response, exists := window.Responses[actorID]
+		if !exists {
+			return fmt.Errorf("%w: missing interaction response state", ErrIllegalCommand)
+		}
+		if err := validateInteractionResponse(response, seenIntents); err != nil {
+			return err
+		}
+		if response.State != InteractionResponsePending {
+			if response.AcceptedAt.Before(window.OpenedAt) {
+				return fmt.Errorf(
+					"%w: interaction response predates window",
+					ErrIllegalCommand,
+				)
+			}
+			switch response.State {
+			case InteractionResponseTimedOut,
+				InteractionResponseAutoResolved:
+				if response.AcceptedAt.Before(window.DeadlineAt) {
+					return fmt.Errorf(
+						"%w: timeout response predates deadline",
+						ErrIllegalCommand,
+					)
+				}
+			default:
+				if !response.AcceptedAt.Before(window.DeadlineAt) {
+					return fmt.Errorf(
+						"%w: interaction response missed deadline",
+						ErrIllegalCommand,
+					)
+				}
+			}
+		}
+	}
+	if len(window.Responses) != len(seenActors) {
+		return fmt.Errorf("%w: response exists for ineligible actor", ErrIllegalCommand)
+	}
+	if err := validateInteractionDeadline(*window); err != nil {
+		return err
+	}
+	switch window.Status {
+	case InteractionWindowOpen:
+		if window.CloseReason != "" || !window.ClosedAt.IsZero() {
+			return fmt.Errorf("%w: open interaction has close state", ErrIllegalCommand)
+		}
+	case InteractionWindowClosed:
+		if !validInteractionCloseReason(window.CloseReason) ||
+			window.ClosedAt.IsZero() ||
+			window.ClosedAt.Before(window.OpenedAt) {
+			return fmt.Errorf("%w: closed interaction lacks terminal state", ErrIllegalCommand)
+		}
+		switch window.CloseReason {
+		case InteractionCloseAllResponded:
+			if !interactionAllResponded(*window) {
+				return fmt.Errorf("%w: all-responded interaction is pending", ErrIllegalCommand)
+			}
+		case InteractionCloseAccepted:
+			if !interactionHasResponseState(*window, InteractionResponseAccepted) {
+				return fmt.Errorf("%w: accepted interaction has no acceptance", ErrIllegalCommand)
+			}
+		case InteractionCloseDeclined:
+			if !interactionHasResponseState(*window, InteractionResponseDeclined) {
+				return fmt.Errorf("%w: declined interaction has no decline", ErrIllegalCommand)
+			}
+		case InteractionCloseDeadlineExpired:
+			if window.ClosedAt.Before(window.DeadlineAt) ||
+				!interactionAllResponded(*window) {
+				return fmt.Errorf("%w: invalid expired interaction", ErrIllegalCommand)
+			}
+		}
+	default:
+		return fmt.Errorf("%w: invalid interaction status", ErrIllegalCommand)
+	}
+	return nil
+}
+
+func (state State) interactionParentMatches(parent InteractionParent) bool {
+	switch parent.SubjectKind {
+	case InteractionSubjectTurn:
+		return parent.SubjectID == state.Turn.PlayerID
+	case InteractionSubjectEncounter:
+		return state.Turn.Encounter != nil &&
+			parent.SubjectID == state.Turn.Encounter.MonsterInstanceID
+	case InteractionSubjectEffect:
+		return slices.Contains(state.Turn.Resolving, parent.SubjectID)
+	case InteractionSubjectInteraction:
+		return parent.ParentInteractionID != "" &&
+			parent.SubjectID == parent.ParentInteractionID
+	default:
+		return false
+	}
+}
+
+func validateInteractionResponse(
+	response InteractionResponse,
+	allowed map[InteractionIntent]struct{},
+) error {
+	switch response.Requirement {
+	case InteractionResponseOptional:
+		if response.TimeoutIntent != InteractionIntentPass {
+			return fmt.Errorf("%w: optional response must timeout as pass", ErrIllegalCommand)
+		}
+	case InteractionResponseMandatory:
+		if response.TimeoutIntent != InteractionIntentAutoResolve {
+			return fmt.Errorf("%w: mandatory response lacks typed default", ErrIllegalCommand)
+		}
+	default:
+		return fmt.Errorf("%w: invalid response requirement", ErrIllegalCommand)
+	}
+	if _, exists := allowed[response.TimeoutIntent]; !exists {
+		return fmt.Errorf("%w: timeout intent is not allowed", ErrIllegalCommand)
+	}
+	switch response.State {
+	case InteractionResponsePending:
+		if response.Intent != "" || !response.AcceptedAt.IsZero() {
+			return fmt.Errorf("%w: pending response has outcome", ErrIllegalCommand)
+		}
+	case InteractionResponsePassed:
+		if response.Intent != InteractionIntentPass || response.AcceptedAt.IsZero() {
+			return fmt.Errorf("%w: malformed pass response", ErrIllegalCommand)
+		}
+	case InteractionResponseActed:
+		if response.Intent != InteractionIntentRespond || response.AcceptedAt.IsZero() {
+			return fmt.Errorf("%w: malformed acted response", ErrIllegalCommand)
+		}
+	case InteractionResponseAccepted:
+		if response.Intent != InteractionIntentAccept || response.AcceptedAt.IsZero() {
+			return fmt.Errorf("%w: malformed accepted response", ErrIllegalCommand)
+		}
+	case InteractionResponseDeclined:
+		if response.Intent != InteractionIntentDecline || response.AcceptedAt.IsZero() {
+			return fmt.Errorf("%w: malformed declined response", ErrIllegalCommand)
+		}
+	case InteractionResponseTimedOut:
+		if response.Requirement != InteractionResponseOptional ||
+			response.Intent != InteractionIntentPass ||
+			response.AcceptedAt.IsZero() {
+			return fmt.Errorf("%w: malformed timed-out response", ErrIllegalCommand)
+		}
+	case InteractionResponseAutoResolved:
+		if response.Requirement != InteractionResponseMandatory ||
+			response.Intent != response.TimeoutIntent ||
+			response.AcceptedAt.IsZero() {
+			return fmt.Errorf("%w: malformed auto-resolved response", ErrIllegalCommand)
+		}
+	default:
+		return fmt.Errorf("%w: invalid interaction response state", ErrIllegalCommand)
+	}
+	if response.Intent != "" {
+		if _, exists := allowed[response.Intent]; !exists {
+			return fmt.Errorf("%w: response intent is not allowed", ErrIllegalCommand)
+		}
+	}
+	return nil
+}
+
+func validateInteractionDeadline(window InteractionWindow) error {
+	policy := window.DeadlinePolicy
+	if window.OpenedAt.IsZero() ||
+		window.DeadlineAt.IsZero() ||
+		!window.DeadlineAt.After(window.OpenedAt) ||
+		window.DeadlineRevision == 0 ||
+		policy.BaseSeconds <= 0 ||
+		policy.MaxSeconds < policy.BaseSeconds ||
+		policy.LateThresholdSeconds < 0 ||
+		policy.ExtensionStepSeconds < 0 ||
+		window.ExtensionBudgetSeconds < 0 {
+		return fmt.Errorf("%w: malformed interaction deadline", ErrIllegalCommand)
+	}
+	if policy.ExtensionStepSeconds == 0 {
+		if policy.LateThresholdSeconds != 0 ||
+			window.ExtensionBudgetSeconds != 0 ||
+			policy.MaxSeconds != policy.BaseSeconds {
+			return fmt.Errorf("%w: malformed non-extendable deadline", ErrIllegalCommand)
+		}
+	} else if policy.LateThresholdSeconds == 0 ||
+		policy.LateThresholdSeconds > policy.MaxSeconds ||
+		window.ExtensionBudgetSeconds > policy.MaxSeconds-policy.BaseSeconds {
+		return fmt.Errorf("%w: malformed extendable deadline", ErrIllegalCommand)
+	}
+	hardDeadline := window.OpenedAt.Add(time.Duration(policy.MaxSeconds) * time.Second)
+	if window.DeadlineAt.After(hardDeadline) ||
+		window.DeadlineAt.Add(
+			time.Duration(window.ExtensionBudgetSeconds)*time.Second,
+		).After(hardDeadline) {
+		return fmt.Errorf("%w: interaction deadline exceeds hard cap", ErrIllegalCommand)
+	}
+	return nil
+}
+
+func validInteractionKind(kind InteractionKind) bool {
+	switch kind {
+	case InteractionKindCombatResponse,
+		InteractionKindAddressedResponse,
+		InteractionKindPrivateChoice:
+		return true
+	default:
+		return false
+	}
+}
+
+func validInteractionSubjectKind(kind InteractionSubjectKind) bool {
+	switch kind {
+	case InteractionSubjectTurn,
+		InteractionSubjectEncounter,
+		InteractionSubjectEffect,
+		InteractionSubjectInteraction:
+		return true
+	default:
+		return false
+	}
+}
+
+func validInteractionEligibilityPolicy(policy InteractionEligibilityPolicy) bool {
+	switch policy {
+	case InteractionEligibilityPublicPredicate,
+		InteractionEligibilityActorPrivate,
+		InteractionEligibilityOpaquePublicSet:
+		return true
+	default:
+		return false
+	}
+}
+
+func validInteractionIntent(intent InteractionIntent) bool {
+	switch intent {
+	case InteractionIntentPass,
+		InteractionIntentRespond,
+		InteractionIntentAccept,
+		InteractionIntentDecline,
+		InteractionIntentAutoResolve:
+		return true
+	default:
+		return false
+	}
+}
+
+func validInteractionCloseReason(reason InteractionCloseReason) bool {
+	switch reason {
+	case InteractionCloseAllResponded,
+		InteractionCloseAccepted,
+		InteractionCloseDeclined,
+		InteractionCloseCancelled,
+		InteractionCloseSuperseded,
+		InteractionCloseDeadlineExpired,
+		InteractionCloseAutoSkipped,
+		InteractionCloseSubjectInvalidated,
+		InteractionCloseParentClosed,
+		InteractionCloseGameFinished:
+		return true
+	default:
+		return false
+	}
+}
+
+func interactionAllResponded(window InteractionWindow) bool {
+	for _, actorID := range window.EligibleActorIDs {
+		if window.Responses[actorID].State == InteractionResponsePending {
+			return false
+		}
+	}
+	return true
+}
+
+func interactionHasResponseState(
+	window InteractionWindow,
+	state InteractionResponseState,
+) bool {
+	for _, actorID := range window.EligibleActorIDs {
+		if window.Responses[actorID].State == state {
+			return true
+		}
+	}
+	return false
 }
 
 func (state State) validateInstanceZones() error {
