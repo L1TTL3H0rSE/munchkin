@@ -17,6 +17,7 @@ git status --short
 | `STACK.md` | Перед выбором runtime/dependency |
 | `ARCHITECTURE.md` | Engine, authority, replay, privacy, persistence |
 | `FRONTEND_ENGINEERING_SPEC.md` | Нормативные frontend architecture, code, markup, CSS, responsive и review rules |
+| `GAME_UI_UX_SPEC.md` | Product lobby/game layouts, visual direction, interaction surfaces, motion и responsive viewport/state verification |
 | `INFRASTRUCTURE_ROADMAP.md` | Production deployment, observability, recovery и конкурсный backlog |
 | `HARNESS.md` | Hooks, selected plan, ledger, CI |
 | `PROJECT_MEMORY.md` | Подтверждённые устойчивые ловушки |
