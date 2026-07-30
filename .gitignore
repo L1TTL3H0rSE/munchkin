@@ -34,6 +34,7 @@ leino-check-plan.json
 
 # Terraform local, generated and potentially secret-bearing artifacts.
 **/.terraform/**
+/infra/terraform/bootstrap/backend.tf
 *.tfstate
 *.tfstate.*
 *.tfplan

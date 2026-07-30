@@ -66,9 +66,23 @@ unset \
 export TF_IN_AUTOMATION=1
 export TF_INPUT=0
 
-if [[ -e "$terraform_root/bootstrap/backend.tf" ]]; then
-  echo "bootstrap/backend.tf must remain absent until the approved state migration" >&2
-  exit 1
+bootstrap_backend="$terraform_root/bootstrap/backend.tf"
+bootstrap_backend_example="$terraform_root/bootstrap/backend.tf.example"
+bootstrap_backend_relative="infra/terraform/bootstrap/backend.tf"
+
+if [[ -e "$bootstrap_backend" ]]; then
+  if ! cmp -s -- "$bootstrap_backend_example" "$bootstrap_backend"; then
+    echo "bootstrap/backend.tf must match the reviewed backend.tf.example byte-for-byte" >&2
+    exit 1
+  fi
+  if ! git -C "$repo_root" check-ignore -q -- "$bootstrap_backend_relative"; then
+    echo "bootstrap/backend.tf must remain ignored" >&2
+    exit 1
+  fi
+  if git -C "$repo_root" ls-files --error-unmatch -- "$bootstrap_backend_relative" >/dev/null 2>&1; then
+    echo "bootstrap/backend.tf must remain untracked" >&2
+    exit 1
+  fi
 fi
 
 for lock_backend in \
