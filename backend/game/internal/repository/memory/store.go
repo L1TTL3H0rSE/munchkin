@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
+	"time"
 
 	"github.com/leinodev/munchkin/backend/game/internal/application"
 	"github.com/leinodev/munchkin/backend/game/internal/game"
@@ -14,6 +16,7 @@ type record struct {
 	state    game.State
 	events   []game.EventEnvelope
 	receipts map[string]application.Receipt
+	deadline *application.InteractionDeadline
 }
 
 type Store struct {
@@ -46,6 +49,7 @@ func (store *Store) Create(
 		state:    state.Clone(),
 		events:   append([]game.EventEnvelope(nil), events...),
 		receipts: make(map[string]application.Receipt),
+		deadline: deadlineFromState(state),
 	}
 	return nil
 }
@@ -71,6 +75,37 @@ func (store *Store) WithinGame(
 	}
 	store.records[gameID] = tx.record
 	return nil
+}
+
+func (store *Store) DueInteractions(
+	ctx context.Context,
+	now time.Time,
+	limit int,
+) ([]application.InteractionDeadline, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	candidates := make([]application.InteractionDeadline, 0)
+	for _, current := range store.records {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if current.deadline != nil && !current.deadline.DeadlineAt.After(now) {
+			candidates = append(candidates, *current.deadline)
+		}
+	}
+	sort.Slice(candidates, func(left, right int) bool {
+		if candidates[left].DeadlineAt.Equal(candidates[right].DeadlineAt) {
+			return candidates[left].GameID < candidates[right].GameID
+		}
+		return candidates[left].DeadlineAt.Before(candidates[right].DeadlineAt)
+	})
+	if len(candidates) > limit {
+		candidates = candidates[:limit]
+	}
+	return candidates, nil
 }
 
 type transaction struct {
@@ -116,6 +151,7 @@ func (tx *transaction) Save(
 	}
 	tx.record.state = state.Clone()
 	tx.record.events = append(tx.record.events, events...)
+	tx.record.deadline = deadlineFromState(state)
 	if receipt != nil {
 		key := receiptKey(receipt.ActorID, receipt.CommandID)
 		if _, exists := tx.record.receipts[key]; exists {
@@ -132,6 +168,10 @@ func cloneRecord(source record) record {
 		state:    source.state.Clone(),
 		events:   append([]game.EventEnvelope(nil), source.events...),
 		receipts: make(map[string]application.Receipt, len(source.receipts)),
+	}
+	if source.deadline != nil {
+		deadline := *source.deadline
+		clone.deadline = &deadline
 	}
 	for key, receipt := range source.receipts {
 		clone.receipts[key] = receipt
@@ -155,4 +195,17 @@ func validateReceipt(receipt *application.Receipt, state game.State) error {
 
 func receiptKey(actorID, commandID string) string {
 	return actorID + "\x00" + commandID
+}
+
+func deadlineFromState(state game.State) *application.InteractionDeadline {
+	window := state.InteractionWindow
+	if window == nil || window.Status != game.InteractionWindowOpen {
+		return nil
+	}
+	return &application.InteractionDeadline{
+		GameID:           state.GameID,
+		InteractionID:    window.ID,
+		DeadlineRevision: window.DeadlineRevision,
+		DeadlineAt:       window.DeadlineAt,
+	}
 }

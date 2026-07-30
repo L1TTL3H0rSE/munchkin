@@ -1,0 +1,89 @@
+{
+  "game_id": "game_fixture",
+  "version": 7,
+  "status": "active",
+  "is_owner": false,
+  "you": {
+    "player_id": "player_b",
+    "name": "Bob",
+    "level": 1,
+    "combat_strength": 1,
+    "escape_bonus": 0,
+    "hand_limit": 5,
+    "character_tags": [],
+    "hand": [],
+    "carried": [],
+    "equipped": [],
+    "traits": [],
+    "attachments": [],
+    "persistent_curses": [],
+    "setup_done": false,
+    "dead": false,
+    "needs_redraw": false
+  },
+  "players": [
+    {
+      "player_id": "player_a",
+      "name": "Alice",
+      "level": 1,
+      "hand_count": 8,
+      "carried": [],
+      "equipped": [],
+      "traits": [],
+      "attachments": [],
+      "persistent_curses": [],
+      "setup_done": false,
+      "dead": false
+    },
+    {
+      "player_id": "player_b",
+      "name": "Bob",
+      "level": 1,
+      "hand_count": 8,
+      "carried": [],
+      "equipped": [],
+      "traits": [],
+      "attachments": [],
+      "persistent_curses": [],
+      "setup_done": false,
+      "dead": false
+    }
+  ],
+  "turn": {
+    "player_id": "player_a",
+    "phase": "setup",
+    "resolving": [],
+    "available_actions": []
+  },
+  "door_deck_count": 32,
+  "door_discard_count": 0,
+  "treasure_deck_count": 22,
+  "treasure_discard_count": 0,
+  "content_set_id": "demo-original",
+  "content_version": 2,
+  "rules_profile_id": "first-edition-core-v1",
+  "rules_profile_version": 1,
+  "interaction": {
+    "interaction_id": "interaction_0123456789abcdef",
+    "public_kind": "response_window",
+    "parent_phase": "setup",
+    "public_subject": "current_turn",
+    "status": "open",
+    "deadline_at": "2026-07-30T20:01:00Z",
+    "server_time": "2026-07-30T20:00:10Z",
+    "my_response_state": "pending",
+    "response_required_for_you": true,
+    "actions": [
+      {
+        "action_id": "act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "interaction_id": "interaction_0123456789abcdef",
+        "type": "pass"
+      },
+      {
+        "action_id": "act_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "interaction_id": "interaction_0123456789abcdef",
+        "type": "respond"
+      }
+    ]
+  }
+}

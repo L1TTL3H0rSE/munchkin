@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/leinodev/munchkin/backend/game/internal/application"
@@ -300,6 +302,165 @@ func TestCommandRequiresIdempotencyKey(t *testing.T) {
 		t.Fatalf("status %d", response.StatusCode)
 	}
 	response.Body.Close()
+}
+
+func TestInteractionRoutesUseActorProjectionAndRejectAuthorityFields(t *testing.T) {
+	service, server := testRouter(t)
+	ctx := context.Background()
+	owner, err := service.CreateLobby(ctx, "Alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined, err := service.JoinLobby(
+		ctx,
+		owner.GameID,
+		"interaction-http-credential",
+		"interaction-http-join",
+		owner.Projection.Version,
+		"Bob",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"interaction-http-start",
+		joined.Projection.Version,
+		game.Command{Type: game.CommandStart},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	interactionID, err := service.OpenInteraction(
+		ctx,
+		owner.GameID,
+		"interaction-http-open",
+		started.Version,
+		application.InteractionOpenSpec{
+			Kind: game.InteractionKindCombatResponse,
+			Parent: game.InteractionParent{
+				Phase:       started.Projection.Turn.Phase,
+				SubjectKind: game.InteractionSubjectTurn,
+				SubjectID:   started.Projection.Turn.PlayerID,
+			},
+			InitiatorActorID:  owner.PlayerID,
+			EligibilityPolicy: game.InteractionEligibilityPublicPredicate,
+			AllowedIntents: []game.InteractionIntent{
+				game.InteractionIntentPass,
+				game.InteractionIntentRespond,
+			},
+			Participants: []application.InteractionParticipant{{
+				ActorID:       joined.PlayerID,
+				Requirement:   game.InteractionResponseOptional,
+				TimeoutIntent: game.InteractionIntentPass,
+			}},
+			DeadlinePolicy: game.CollectiveInteractionDeadlinePolicy(),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := service.Get(ctx, owner.GameID, joined.Credential)
+	if err != nil || projection.Interaction == nil {
+		t.Fatalf("interaction projection=%#v err=%v", projection.Interaction, err)
+	}
+	action := projection.Interaction.Actions[0]
+	for _, candidate := range projection.Interaction.Actions {
+		if candidate.Type == game.InteractionIntentPass {
+			action = candidate
+			break
+		}
+	}
+	forged := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+"/commands/pass-interaction",
+		"forged",
+		"interaction-http-forged-credential",
+		map[string]any{
+			"expected_version": projection.Version,
+			"interaction_id":   interactionID,
+			"action_id":        action.ActionID,
+			"intent":           game.InteractionIntentPass,
+		},
+	)
+	if forged.StatusCode != http.StatusForbidden {
+		t.Fatalf("forged interaction credential status %d", forged.StatusCode)
+	}
+	forged.Body.Close()
+	response := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+"/commands/pass-interaction",
+		joined.Credential,
+		"interaction-http-pass",
+		map[string]any{
+			"expected_version": projection.Version,
+			"interaction_id":   interactionID,
+			"action_id":        action.ActionID,
+			"intent":           game.InteractionIntentPass,
+		},
+	)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("interaction pass status %d", response.StatusCode)
+	}
+	var result application.CommandResult
+	decodeResponse(t, response, &result)
+	if result.Projection.Interaction != nil {
+		t.Fatalf("closed interaction remained projected: %#v", result.Projection.Interaction)
+	}
+
+	unknownAuthority := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+"/commands/respond-interaction",
+		joined.Credential,
+		"interaction-http-forged",
+		map[string]any{
+			"expected_version":  projection.Version,
+			"interaction_id":    interactionID,
+			"action_id":         action.ActionID,
+			"intent":            game.InteractionIntentRespond,
+			"deadline_revision": 1,
+		},
+	)
+	if unknownAuthority.StatusCode != http.StatusBadRequest {
+		t.Fatalf("authority field status %d", unknownAuthority.StatusCode)
+	}
+	unknownAuthority.Body.Close()
+}
+
+func TestInteractionProjectionFixtureIsStrictGoContract(t *testing.T) {
+	raw, err := os.ReadFile("testdata/interaction-projection-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var projection game.Projection
+	if err := decoder.Decode(&projection); err != nil {
+		t.Fatal(err)
+	}
+	if projection.Interaction == nil ||
+		projection.Interaction.InteractionID == "" ||
+		len(projection.Interaction.Actions) != 2 {
+		t.Fatalf("invalid interaction fixture: %#v", projection.Interaction)
+	}
+	for _, forbidden := range []string{
+		"eligible_actor_ids",
+		"initiator_actor_id",
+		"deadline_revision",
+		"responses",
+	} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatalf("fixture leaked %q", forbidden)
+		}
+	}
 }
 
 func requestJSON(

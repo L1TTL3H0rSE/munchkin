@@ -6,7 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
+	"sort"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -41,12 +45,25 @@ func (store *Store) Close() {
 }
 
 func (store *Store) Migrate(ctx context.Context, filePath string) error {
-	raw, err := os.ReadFile(filePath)
+	paths, err := migrationPaths(filePath)
 	if err != nil {
 		return err
 	}
-	_, err = store.pool.Exec(ctx, string(raw))
-	return err
+	tx, err := store.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	for _, migrationPath := range paths {
+		raw, err := os.ReadFile(migrationPath)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, string(raw)); err != nil {
+			return fmt.Errorf("apply migration %s: %w", filepath.Base(migrationPath), err)
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (store *Store) Create(
@@ -87,6 +104,9 @@ func (store *Store) Create(
 		return err
 	}
 	if err := insertEvents(ctx, tx, events); err != nil {
+		return err
+	}
+	if err := syncInteractionDeadline(ctx, tx, state); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -150,6 +170,49 @@ func (store *Store) WithinGame(
 		return err
 	}
 	return nil
+}
+
+func (store *Store) DueInteractions(
+	ctx context.Context,
+	now time.Time,
+	limit int,
+) ([]application.InteractionDeadline, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	rows, err := store.pool.Query(
+		ctx,
+		`SELECT game_id, interaction_id, deadline_revision, deadline_at
+		 FROM game_interaction_deadlines
+		 WHERE deadline_at <= $1
+		 ORDER BY deadline_at, game_id
+		 LIMIT $2`,
+		now,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	candidates := make([]application.InteractionDeadline, 0)
+	for rows.Next() {
+		var candidate application.InteractionDeadline
+		var revision int64
+		if err := rows.Scan(
+			&candidate.GameID,
+			&candidate.InteractionID,
+			&revision,
+			&candidate.DeadlineAt,
+		); err != nil {
+			return nil, err
+		}
+		if revision <= 0 || uint64(revision) > uint64(^uint32(0)) {
+			return nil, fmt.Errorf("invalid interaction deadline revision %d", revision)
+		}
+		candidate.DeadlineRevision = uint32(revision)
+		candidates = append(candidates, candidate)
+	}
+	return candidates, rows.Err()
 }
 
 type gameTx struct {
@@ -221,6 +284,9 @@ func (transaction *gameTx) Save(
 	if err := insertPlayers(transaction.ctx, transaction.tx, state); err != nil {
 		return err
 	}
+	if err := syncInteractionDeadline(transaction.ctx, transaction.tx, state); err != nil {
+		return err
+	}
 	if receipt != nil {
 		_, err := transaction.tx.Exec(
 			transaction.ctx,
@@ -289,6 +355,33 @@ func insertEvents(ctx context.Context, tx pgx.Tx, events []game.EventEnvelope) e
 	return nil
 }
 
+func syncInteractionDeadline(ctx context.Context, tx pgx.Tx, state game.State) error {
+	window := state.InteractionWindow
+	if window == nil || window.Status != game.InteractionWindowOpen {
+		_, err := tx.Exec(
+			ctx,
+			`DELETE FROM game_interaction_deadlines WHERE game_id = $1`,
+			state.GameID,
+		)
+		return err
+	}
+	_, err := tx.Exec(
+		ctx,
+		`INSERT INTO game_interaction_deadlines
+		 (game_id, interaction_id, deadline_revision, deadline_at)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (game_id) DO UPDATE
+		 SET interaction_id = EXCLUDED.interaction_id,
+		     deadline_revision = EXCLUDED.deadline_revision,
+		     deadline_at = EXCLUDED.deadline_at`,
+		state.GameID,
+		window.ID,
+		window.DeadlineRevision,
+		window.DeadlineAt,
+	)
+	return err
+}
+
 func loadReceipts(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -347,4 +440,30 @@ func uniqueViolation(err error) bool {
 func serializationFailure(err error) bool {
 	var pgError *pgconn.PgError
 	return errors.As(err, &pgError) && pgError.Code == "40001"
+}
+
+func migrationPaths(configuredPath string) ([]string, error) {
+	info, err := os.Stat(configuredPath)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return []string{configuredPath}, nil
+	}
+	entries, err := os.ReadDir(configuredPath)
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".up.sql") {
+			continue
+		}
+		paths = append(paths, filepath.Join(configuredPath, entry.Name()))
+	}
+	sort.Strings(paths)
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("no .up.sql migrations in %s", configuredPath)
+	}
+	return paths, nil
 }

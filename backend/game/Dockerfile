@@ -16,7 +16,7 @@ COPY --chown=app:app content /app/content
 
 ENV SERVER_ADDR=:8080 \
     GAME_CONTENT_PATH=/app/content/sets/demo/cards.json \
-    MIGRATION_PATH=/app/migrations/000001_game.up.sql \
+    MIGRATION_PATH=/app/migrations \
     AUTO_MIGRATE=true
 
 EXPOSE 8080

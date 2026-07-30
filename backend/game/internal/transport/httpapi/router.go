@@ -78,6 +78,14 @@ func NewWithOptions(service *application.Service, options Options) http.Handler 
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/end-turn", router.command(game.CommandEndTurn))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/fight", router.command(game.CommandFight))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/loot", router.command(game.CommandLoot))
+	mux.HandleFunc(
+		"POST /api/v1/games/{gameID}/commands/respond-interaction",
+		router.interaction(false),
+	)
+	mux.HandleFunc(
+		"POST /api/v1/games/{gameID}/commands/pass-interaction",
+		router.interaction(true),
+	)
 	return withMiddleware(mux, allowedOrigins())
 }
 
@@ -97,6 +105,13 @@ type commandRequest struct {
 	InstanceIDs      []string `json:"instance_ids,omitempty"`
 	ChoiceIDs        []string `json:"choice_ids,omitempty"`
 	AbilityIndex     int      `json:"ability_index,omitempty"`
+}
+
+type interactionRequest struct {
+	ExpectedVersion uint64                 `json:"expected_version"`
+	InteractionID   string                 `json:"interaction_id"`
+	ActionID        string                 `json:"action_id"`
+	Intent          game.InteractionIntent `json:"intent"`
 }
 
 func (router *Router) health(writer http.ResponseWriter, _ *http.Request) {
@@ -287,6 +302,62 @@ func (router *Router) command(commandType game.CommandType) http.HandlerFunc {
 	}
 }
 
+func (router *Router) interaction(pass bool) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var body interactionRequest
+		if err := decodeJSON(writer, request, &body); err != nil {
+			writeError(writer, http.StatusBadRequest, "invalid_request", err.Error())
+			return
+		}
+		if (pass && body.Intent != game.InteractionIntentPass) ||
+			(!pass && !respondInteractionIntent(body.Intent)) {
+			writeError(
+				writer,
+				http.StatusBadRequest,
+				"invalid_interaction_intent",
+				"interaction intent does not match route",
+			)
+			return
+		}
+		commandID := strings.TrimSpace(request.Header.Get("Idempotency-Key"))
+		if commandID == "" || len(commandID) > 128 {
+			writeError(
+				writer,
+				http.StatusBadRequest,
+				"idempotency_key_required",
+				"Idempotency-Key is required",
+			)
+			return
+		}
+		result, err := router.service.ExecuteInteraction(
+			request.Context(),
+			request.PathValue("gameID"),
+			bearerToken(request),
+			commandID,
+			body.ExpectedVersion,
+			body.InteractionID,
+			body.ActionID,
+			body.Intent,
+		)
+		if err != nil {
+			router.mapError(writer, err)
+			return
+		}
+		writeJSON(writer, http.StatusOK, result)
+	}
+}
+
+func respondInteractionIntent(intent game.InteractionIntent) bool {
+	switch intent {
+	case game.InteractionIntentRespond,
+		game.InteractionIntentAccept,
+		game.InteractionIntentDecline:
+		return true
+	default:
+		return false
+	}
+}
+
 func (router *Router) mapError(writer http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, application.ErrNotFound):
@@ -297,6 +368,12 @@ func (router *Router) mapError(writer http.ResponseWriter, err error) {
 		writeError(writer, http.StatusConflict, "version_conflict", "reload the current projection")
 	case errors.Is(err, application.ErrIdempotencyConflict):
 		writeError(writer, http.StatusConflict, "idempotency_key_reused", "key was used with another request")
+	case errors.Is(err, application.ErrInteractionExpired):
+		writeError(writer, http.StatusConflict, "interaction_expired", "reload the current projection")
+	case errors.Is(err, application.ErrInteractionClosed):
+		writeError(writer, http.StatusConflict, "interaction_closed", "reload the current projection")
+	case errors.Is(err, application.ErrInteractionAction):
+		writeError(writer, http.StatusUnprocessableEntity, "illegal_interaction_action", "interaction action is not available")
 	case application.IsRuleError(err):
 		writeError(writer, http.StatusUnprocessableEntity, "rule_violation", err.Error())
 	default:

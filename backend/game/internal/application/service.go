@@ -115,7 +115,7 @@ func (service *Service) CreateLobby(ctx context.Context, displayName string) (Lo
 	if err := service.store.Create(ctx, state, []game.EventEnvelope{envelope}); err != nil {
 		return LobbyResult{}, err
 	}
-	projection, err := game.ProjectForActor(state, playerID, service.pack)
+	projection, err := service.projectForActor(state, playerID, time.Time{})
 	if err != nil {
 		return LobbyResult{}, err
 	}
@@ -182,7 +182,7 @@ func (service *Service) JoinLobby(
 		if err != nil {
 			return err
 		}
-		projection, err := game.ProjectForActor(next, playerID, service.pack)
+		projection, err := service.projectForActor(next, playerID, time.Time{})
 		if err != nil {
 			return err
 		}
@@ -297,7 +297,7 @@ func (service *Service) Execute(
 		if err != nil {
 			return err
 		}
-		projection, err := game.ProjectForActor(next, actorID, service.pack)
+		projection, err := service.projectForActor(next, actorID, time.Time{})
 		if err != nil {
 			return err
 		}
@@ -355,7 +355,7 @@ func (service *Service) Get(ctx context.Context, gameID, credential string) (gam
 			return ErrUnauthorized
 		}
 		var err error
-		projection, err = game.ProjectForActor(state, actorID, service.pack)
+		projection, err = service.projectForActor(state, actorID, time.Time{})
 		return err
 	})
 	return projection, err
@@ -366,11 +366,36 @@ func (service *Service) apply(
 	commandID string,
 	events []game.DomainEvent,
 ) ([]game.EventEnvelope, game.State, error) {
+	return service.applyAt(state, commandID, events, time.Time{})
+}
+
+func (service *Service) applyAt(
+	state game.State,
+	commandID string,
+	events []game.DomainEvent,
+	occurredAt time.Time,
+) ([]game.EventEnvelope, game.State, error) {
 	next := state
 	envelopes := make([]game.EventEnvelope, 0, len(events))
 	for _, event := range events {
 		sequence := next.Version + 1
-		envelope := service.envelope(state.GameID, commandID, sequence, event)
+		var envelope game.EventEnvelope
+		if occurredAt.IsZero() {
+			envelope = service.envelope(
+				state.GameID,
+				commandID,
+				sequence,
+				event,
+			)
+		} else {
+			envelope = service.envelopeAt(
+				state.GameID,
+				commandID,
+				sequence,
+				event,
+				occurredAt,
+			)
+		}
 		applied, err := game.Apply(next, event)
 		if err != nil {
 			return nil, game.State{}, err
@@ -389,6 +414,21 @@ func (service *Service) envelope(
 	sequence uint64,
 	event game.DomainEvent,
 ) game.EventEnvelope {
+	return service.envelopeAt(
+		gameID,
+		commandID,
+		sequence,
+		event,
+		time.Unix(0, service.clock.Now()).UTC(),
+	)
+}
+
+func (service *Service) envelopeAt(
+	gameID, commandID string,
+	sequence uint64,
+	event game.DomainEvent,
+	occurredAt time.Time,
+) game.EventEnvelope {
 	return game.EventEnvelope{
 		GameID:     gameID,
 		Sequence:   sequence,
@@ -396,7 +436,7 @@ func (service *Service) envelope(
 		CommandID:  commandID,
 		Type:       event.Type,
 		Schema:     1,
-		OccurredAt: time.Unix(0, service.clock.Now()).UTC(),
+		OccurredAt: occurredAt.UTC(),
 		Payload:    event.Payload,
 	}
 }
@@ -489,6 +529,24 @@ func (service *Service) ensureContentIdentity(state game.State) error {
 		return err
 	}
 	return nil
+}
+
+func (service *Service) projectForActor(
+	state game.State,
+	actorID string,
+	serverTime time.Time,
+) (game.Projection, error) {
+	projection, err := game.ProjectForActor(state, actorID, service.pack)
+	if err != nil {
+		return game.Projection{}, err
+	}
+	if projection.Interaction != nil {
+		if serverTime.IsZero() {
+			serverTime = time.Unix(0, service.clock.Now()).UTC()
+		}
+		projection.Interaction.ServerTime = &serverTime
+	}
+	return projection, nil
 }
 
 func IsRuleError(err error) bool {

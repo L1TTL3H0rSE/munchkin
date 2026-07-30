@@ -1,5 +1,6 @@
 import {
   commandResultSchema,
+  interactionCommandRequestSchema,
   invalidationSchema,
   lobbyResultSchema,
   lobbySummarySchema,
@@ -8,6 +9,7 @@ import {
   type ActionType,
   type CommandPayload,
   type Invalidation,
+  type InteractionIntent,
   type Projection,
 } from "@munchkin/contracts";
 
@@ -92,6 +94,37 @@ export function useGameApi() {
     return commandResultSchema.parse(response);
   }
 
+  async function interaction(
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    interactionID: string,
+    actionID: string,
+    intent: InteractionIntent,
+  ) {
+    const request = interactionCommandRequestSchema.parse({
+      expected_version: expectedVersion,
+      interaction_id: interactionID,
+      action_id: actionID,
+      intent,
+    });
+    const path = intent === "pass"
+      ? "pass-interaction"
+      : "respond-interaction";
+    const response = await $fetch(
+      `${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/commands/${path}`,
+      {
+        method: "POST",
+        headers: {
+          ...authorization(credential),
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: request,
+      },
+    );
+    return commandResultSchema.parse(response);
+  }
+
   function stream(
     gameID: string,
     credential: string,
@@ -116,7 +149,16 @@ export function useGameApi() {
     return buildContentAssetURL(baseURL, setID, image);
   }
 
-  return {createLobby, getLobby, joinLobby, getGame, command, stream, contentAssetURL};
+  return {
+    createLobby,
+    getLobby,
+    joinLobby,
+    getGame,
+    command,
+    interaction,
+    stream,
+    contentAssetURL,
+  };
 }
 
 export function buildContentAssetURL(
