@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"slices"
+	"time"
 )
 
 type CombatTotals struct {
@@ -19,6 +20,114 @@ func setTurnPhase(state *State, phase Phase) {
 		Kind:             string(phase),
 		EligibleActorIDs: []string{state.Turn.PlayerID},
 	}
+}
+
+func CollectiveInteractionDeadlinePolicy() InteractionDeadlinePolicy {
+	return InteractionDeadlinePolicy{
+		BaseSeconds:          60,
+		LateThresholdSeconds: 30,
+		ExtensionStepSeconds: 10,
+		MaxSeconds:           90,
+	}
+}
+
+func AddressedInteractionDeadlinePolicy() InteractionDeadlinePolicy {
+	return InteractionDeadlinePolicy{
+		BaseSeconds: 30,
+		MaxSeconds:  30,
+	}
+}
+
+func interactionResponseStateForIntent(
+	intent InteractionIntent,
+) (InteractionResponseState, error) {
+	switch intent {
+	case InteractionIntentPass:
+		return InteractionResponsePassed, nil
+	case InteractionIntentRespond:
+		return InteractionResponseActed, nil
+	case InteractionIntentAccept:
+		return InteractionResponseAccepted, nil
+	case InteractionIntentDecline:
+		return InteractionResponseDeclined, nil
+	default:
+		return "", fmt.Errorf("%w: intent cannot be submitted", ErrIllegalCommand)
+	}
+}
+
+func interactionDeadlineAfter(
+	window InteractionWindow,
+	acceptedAt time.Time,
+	intent InteractionIntent,
+) (time.Time, uint32, int, error) {
+	if acceptedAt.IsZero() ||
+		acceptedAt.Before(window.OpenedAt) ||
+		!acceptedAt.Before(window.DeadlineAt) {
+		return time.Time{}, 0, 0, fmt.Errorf(
+			"%w: interaction response is outside deadline",
+			ErrIllegalCommand,
+		)
+	}
+	deadline := window.DeadlineAt
+	revision := window.DeadlineRevision
+	budget := window.ExtensionBudgetSeconds
+	policy := window.DeadlinePolicy
+	if intent != InteractionIntentRespond ||
+		policy.ExtensionStepSeconds == 0 ||
+		acceptedAt.Before(
+			window.OpenedAt.Add(
+				time.Duration(policy.LateThresholdSeconds)*time.Second,
+			),
+		) ||
+		budget < policy.ExtensionStepSeconds {
+		return deadline, revision, budget, nil
+	}
+	hardDeadline := window.OpenedAt.Add(
+		time.Duration(policy.MaxSeconds) * time.Second,
+	)
+	extended := deadline.Add(
+		time.Duration(policy.ExtensionStepSeconds) * time.Second,
+	)
+	if extended.After(hardDeadline) {
+		extended = hardDeadline
+	}
+	added := int(extended.Sub(deadline) / time.Second)
+	if added <= 0 {
+		return deadline, revision, budget, nil
+	}
+	if revision == ^uint32(0) {
+		return time.Time{}, 0, 0, fmt.Errorf(
+			"%w: interaction deadline revision overflow",
+			ErrIllegalCommand,
+		)
+	}
+	return extended, revision + 1, budget - added, nil
+}
+
+func interactionResponseAt(
+	window InteractionWindow,
+	actorID string,
+) (InteractionResponse, error) {
+	if window.Status != InteractionWindowOpen {
+		return InteractionResponse{}, fmt.Errorf(
+			"%w: interaction is already closed",
+			ErrIllegalCommand,
+		)
+	}
+	response, exists := window.Responses[actorID]
+	if !exists || !slices.Contains(window.EligibleActorIDs, actorID) {
+		return InteractionResponse{}, fmt.Errorf(
+			"%w: actor is not eligible for interaction",
+			ErrIllegalCommand,
+		)
+	}
+	if response.State != InteractionResponsePending {
+		return InteractionResponse{}, fmt.Errorf(
+			"%w: interaction actor already responded",
+			ErrIllegalCommand,
+		)
+	}
+	return response, nil
 }
 
 func removeString(values []string, target string) ([]string, bool) {

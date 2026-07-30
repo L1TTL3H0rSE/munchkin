@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 )
 
 type CommandType string
@@ -27,22 +28,34 @@ const (
 	CommandResolveCharity CommandType = "resolve_charity"
 	CommandEndTurn        CommandType = "end_turn"
 
+	CommandOpenInteractionWindow  CommandType = "open_interaction_window"
+	CommandRespondInteraction     CommandType = "respond_interaction"
+	CommandPassInteraction        CommandType = "pass_interaction"
+	CommandTimeoutInteraction     CommandType = "timeout_interaction"
+	CommandCloseInteractionWindow CommandType = "close_interaction_window"
+
 	// Bootstrap aliases remain parseable, but use the new deterministic paths.
 	CommandFight CommandType = "fight"
 	CommandLoot  CommandType = "loot"
 )
 
 type Command struct {
-	Type             CommandType `json:"type"`
-	ActorID          string      `json:"-"`
-	PlayerID         string      `json:"-"`
-	DisplayName      string      `json:"-"`
-	CredentialHash   string      `json:"-"`
-	InstanceID       string      `json:"instance_id,omitempty"`
-	TargetInstanceID string      `json:"target_instance_id,omitempty"`
-	InstanceIDs      []string    `json:"instance_ids,omitempty"`
-	ChoiceIDs        []string    `json:"choice_ids,omitempty"`
-	AbilityIndex     int         `json:"ability_index,omitempty"`
+	Type                   CommandType            `json:"type"`
+	ActorID                string                 `json:"-"`
+	PlayerID               string                 `json:"-"`
+	DisplayName            string                 `json:"-"`
+	CredentialHash         string                 `json:"-"`
+	InstanceID             string                 `json:"instance_id,omitempty"`
+	TargetInstanceID       string                 `json:"target_instance_id,omitempty"`
+	InstanceIDs            []string               `json:"instance_ids,omitempty"`
+	ChoiceIDs              []string               `json:"choice_ids,omitempty"`
+	AbilityIndex           int                    `json:"ability_index,omitempty"`
+	InteractionID          string                 `json:"-"`
+	InteractionIntent      InteractionIntent      `json:"-"`
+	InteractionAt          time.Time              `json:"-"`
+	InteractionRevision    uint32                 `json:"-"`
+	InteractionCloseReason InteractionCloseReason `json:"-"`
+	InteractionWindow      *InteractionWindow     `json:"-"`
 }
 
 func CreateLobby(gameID string, owner Player, pack Pack, seed uint64) (DomainEvent, error) {
@@ -112,9 +125,327 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 		return handleResolveCharity(state, command, pack)
 	case CommandEndTurn:
 		return handleEndTurn(state, command, pack)
+	case CommandOpenInteractionWindow:
+		return handleOpenInteractionWindow(state, command)
+	case CommandRespondInteraction:
+		return handleRespondInteraction(state, command)
+	case CommandPassInteraction:
+		return handlePassInteraction(state, command)
+	case CommandTimeoutInteraction:
+		return handleTimeoutInteraction(state, command)
+	case CommandCloseInteractionWindow:
+		return handleCloseInteractionWindow(state, command)
 	default:
 		return nil, fmt.Errorf("%w: unknown command %s", ErrIllegalCommand, command.Type)
 	}
+}
+
+func handleOpenInteractionWindow(
+	state State,
+	command Command,
+) ([]DomainEvent, error) {
+	if state.Status != StatusActive || command.InteractionWindow == nil {
+		return nil, fmt.Errorf(
+			"%w: interaction requires active game and typed window",
+			ErrIllegalCommand,
+		)
+	}
+	if state.InteractionWindow != nil &&
+		state.InteractionWindow.Status == InteractionWindowOpen {
+		return nil, fmt.Errorf("%w: interaction is already open", ErrIllegalCommand)
+	}
+	window := command.InteractionWindow.clone()
+	if state.InteractionWindow != nil &&
+		state.InteractionWindow.ID == window.ID {
+		return nil, fmt.Errorf(
+			"%w: interaction ID cannot be reused",
+			ErrIllegalCommand,
+		)
+	}
+	if command.ActorID == "" ||
+		command.ActorID != window.InitiatorActorID ||
+		state.PlayerIndex(command.ActorID) < 0 {
+		return nil, fmt.Errorf(
+			"%w: actor cannot open interaction",
+			ErrIllegalCommand,
+		)
+	}
+	if window.Parent.Phase != state.Turn.Phase {
+		return nil, fmt.Errorf(
+			"%w: interaction parent phase is stale",
+			ErrIllegalCommand,
+		)
+	}
+	event, err := newEvent(
+		EventInteractionWindowOpened,
+		interactionWindowOpenedPayload{Window: *window},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := Apply(state, event); err != nil {
+		return nil, err
+	}
+	return []DomainEvent{event}, nil
+}
+
+func handleRespondInteraction(
+	state State,
+	command Command,
+) ([]DomainEvent, error) {
+	if command.InteractionIntent == InteractionIntentPass ||
+		command.InteractionIntent == InteractionIntentAutoResolve {
+		return nil, fmt.Errorf(
+			"%w: use the typed pass or timeout transition",
+			ErrIllegalCommand,
+		)
+	}
+	return recordInteractionResponse(
+		state,
+		command,
+		command.InteractionIntent,
+		false,
+	)
+}
+
+func handlePassInteraction(
+	state State,
+	command Command,
+) ([]DomainEvent, error) {
+	return recordInteractionResponse(
+		state,
+		command,
+		InteractionIntentPass,
+		false,
+	)
+}
+
+func recordInteractionResponse(
+	state State,
+	command Command,
+	intent InteractionIntent,
+	timeout bool,
+) ([]DomainEvent, error) {
+	window, err := requireInteractionWindow(state, command.InteractionID)
+	if err != nil {
+		return nil, err
+	}
+	current, err := interactionResponseAt(window, command.ActorID)
+	if err != nil {
+		return nil, err
+	}
+	var responseState InteractionResponseState
+	if timeout {
+		switch current.Requirement {
+		case InteractionResponseOptional:
+			intent = InteractionIntentPass
+			responseState = InteractionResponseTimedOut
+		case InteractionResponseMandatory:
+			intent = current.TimeoutIntent
+			responseState = InteractionResponseAutoResolved
+		default:
+			return nil, fmt.Errorf(
+				"%w: invalid interaction response requirement",
+				ErrIllegalCommand,
+			)
+		}
+	} else {
+		responseState, err = interactionResponseStateForIntent(intent)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !slices.Contains(window.AllowedIntents, intent) {
+		return nil, fmt.Errorf(
+			"%w: interaction intent is not allowed",
+			ErrIllegalCommand,
+		)
+	}
+	deadline := window.DeadlineAt
+	revision := window.DeadlineRevision
+	budget := window.ExtensionBudgetSeconds
+	if timeout {
+		if command.InteractionAt.IsZero() ||
+			command.InteractionAt.Before(window.DeadlineAt) {
+			return nil, fmt.Errorf(
+				"%w: interaction deadline has not expired",
+				ErrIllegalCommand,
+			)
+		}
+	} else {
+		deadline, revision, budget, err = interactionDeadlineAfter(
+			window,
+			command.InteractionAt,
+			intent,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+	response := current
+	response.State = responseState
+	response.Intent = intent
+	response.AcceptedAt = command.InteractionAt
+	event, err := newEvent(
+		EventInteractionResponseRecorded,
+		interactionResponseRecordedPayload{
+			InteractionID:          window.ID,
+			ActorID:                command.ActorID,
+			Response:               response,
+			DeadlineAt:             deadline,
+			DeadlineRevision:       revision,
+			ExtensionBudgetSeconds: budget,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := Apply(state, event); err != nil {
+		return nil, err
+	}
+	return []DomainEvent{event}, nil
+}
+
+func handleTimeoutInteraction(
+	state State,
+	command Command,
+) ([]DomainEvent, error) {
+	if command.ActorID != "" {
+		return nil, fmt.Errorf(
+			"%w: player cannot issue interaction timeout",
+			ErrIllegalCommand,
+		)
+	}
+	window, err := requireInteractionWindow(state, command.InteractionID)
+	if err != nil {
+		return nil, err
+	}
+	if command.InteractionRevision != window.DeadlineRevision {
+		return nil, fmt.Errorf(
+			"%w: stale interaction deadline revision",
+			ErrIllegalCommand,
+		)
+	}
+	if command.InteractionAt.IsZero() ||
+		command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: interaction deadline has not expired",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	events := make([]DomainEvent, 0, len(window.EligibleActorIDs)+1)
+	for _, actorID := range window.EligibleActorIDs {
+		if next.InteractionWindow.Responses[actorID].State !=
+			InteractionResponsePending {
+			continue
+		}
+		responseEvents, err := recordInteractionResponse(
+			next,
+			Command{
+				ActorID:       actorID,
+				InteractionID: command.InteractionID,
+				InteractionAt: command.InteractionAt,
+			},
+			"",
+			true,
+		)
+		if err != nil {
+			return nil, err
+		}
+		next, err = Apply(next, responseEvents[0])
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, responseEvents[0])
+	}
+	closeEvent, err := newEvent(
+		EventInteractionWindowClosed,
+		interactionWindowClosedPayload{
+			InteractionID: command.InteractionID,
+			Reason:        InteractionCloseDeadlineExpired,
+			ClosedAt:      command.InteractionAt,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := Apply(next, closeEvent); err != nil {
+		return nil, err
+	}
+	return append(events, closeEvent), nil
+}
+
+func handleCloseInteractionWindow(
+	state State,
+	command Command,
+) ([]DomainEvent, error) {
+	window, err := requireInteractionWindow(state, command.InteractionID)
+	if err != nil {
+		return nil, err
+	}
+	if command.ActorID == "" || command.ActorID != window.InitiatorActorID {
+		return nil, fmt.Errorf(
+			"%w: actor cannot close interaction",
+			ErrIllegalCommand,
+		)
+	}
+	if command.InteractionAt.IsZero() ||
+		command.InteractionAt.Before(window.OpenedAt) ||
+		!command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: invalid interaction close instant",
+			ErrIllegalCommand,
+		)
+	}
+	reason := command.InteractionCloseReason
+	if reason == "" {
+		reason = InteractionCloseAllResponded
+	}
+	if reason == InteractionCloseDeadlineExpired ||
+		reason == InteractionCloseAutoSkipped ||
+		!validInteractionCloseReason(reason) {
+		return nil, fmt.Errorf(
+			"%w: close reason requires another typed transition",
+			ErrIllegalCommand,
+		)
+	}
+	event, err := newEvent(
+		EventInteractionWindowClosed,
+		interactionWindowClosedPayload{
+			InteractionID: command.InteractionID,
+			Reason:        reason,
+			ClosedAt:      command.InteractionAt,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := Apply(state, event); err != nil {
+		return nil, err
+	}
+	return []DomainEvent{event}, nil
+}
+
+func requireInteractionWindow(
+	state State,
+	interactionID string,
+) (InteractionWindow, error) {
+	if strings.TrimSpace(interactionID) == "" ||
+		state.InteractionWindow == nil ||
+		state.InteractionWindow.ID != interactionID {
+		return InteractionWindow{}, fmt.Errorf(
+			"%w: stale interaction ID",
+			ErrIllegalCommand,
+		)
+	}
+	if state.InteractionWindow.Status != InteractionWindowOpen {
+		return InteractionWindow{}, fmt.Errorf(
+			"%w: interaction is already closed",
+			ErrIllegalCommand,
+		)
+	}
+	return *state.InteractionWindow.clone(), nil
 }
 
 func requireActiveActor(state State, command Command) (int, error) {

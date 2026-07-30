@@ -1,11 +1,11 @@
 # PLAN: generic interaction window engine kernel
 
 - **Plan ID:** `20260730T134442Z-bfe764-generic-interaction-window-engine-kernel`
-- **Статус:** approved
+- **Статус:** completed
 - **Создан:** 2026-07-30 13:44:42 UTC
-- **Обновлён:** 2026-07-30 14:12:52 UTC
-- **Владелец:** отдельная Codex backend-session после согласования
-- **Workspace:** отдельный worktree
+- **Обновлён:** 2026-07-30 14:51:46 UTC
+- **Владелец:** Codex session `019fb36e-5e67-7aa0-9e55-b5e58c8ec116`
+- **Workspace:** `/Users/kolyalis/Dev/munchkin`
 - **Ветка:** `codex/generic-interaction-window-engine-kernel`
 - **Режим параллельности:** conditional
 - **Зависит от:** plan `20260730T001008Z-74d4bb-map-multiplayer-interactions`.
@@ -53,41 +53,41 @@ HTTP projection или frontend contract.
 
 ## Критерии приёмки
 
-- [ ] Pure model содержит отдельное `InteractionWindow`, не перегружая
+- [x] Pure model содержит отдельное `InteractionWindow`, не перегружая
   существующий turn-owner `ActionWindow`: opaque stable ID, closed kind,
   parent reference, eligibility policy, allowed intents, eligible actors,
   opened/deadline instants, extension budget, per-actor response state и close
   reason.
-- [ ] `State.Clone` делает глубокую копию window collections, а
+- [x] `State.Clone` делает глубокую копию window collections, а
   `State.Validate` отклоняет пустой/дублированный actor, unknown enum,
   malformed deadline/extension и невозможную open/closed state combination.
-- [ ] Kernel поддерживает typed open/respond/pass/timeout/close transitions.
+- [x] Kernel поддерживает typed open/respond/pass/timeout/close transitions.
   Actor, interaction ID и intent проверяются server-side; illegal/stale/
   already-closed transition возвращает ошибку и не создаёт событий.
-- [ ] Deadline policy может выразить принятые defaults `60/30/+10` с жёстким
+- [x] Deadline policy может выразить принятые defaults `60/30/+10` с жёстким
   extension cap. Engine не читает wall clock: opened/deadline/observed instant
   поступают как trusted input и полностью фиксируются в событиях.
-- [ ] Pure transitions CAS-compatible: они детерминированы, side-effect-free и
+- [x] Pure transitions CAS-compatible: они детерминированы, side-effect-free и
   возвращают immutable events от одной base state. Проверка expected-version
   и concurrent winner остаётся в application layer и явно переносится в
   следующий integration plan.
-- [ ] `opaque_public_set` существует как закрытая policy и не вычисляется по
+- [x] `opaque_public_set` существует как закрытая policy и не вычисляется по
   hidden hand внутри public path. В этом slice нет projection, поэтому
   eligibility и responses остаются internal state.
-- [ ] Timeout детерминированно auto-pass-ит оставшихся optional responders и
+- [x] Timeout детерминированно auto-pass-ит оставшихся optional responders и
   закрывает window; reconnect не продлевает deadline. Mandatory/default
   behavior в generic model только typed, без конкретных card rules.
-- [ ] Новые stored event types имеют явные versioned names
+- [x] Новые stored event types имеют явные versioned names
   `game.v1.interaction_window_opened`,
   `game.v1.interaction_response_recorded` и
   `game.v1.interaction_window_closed`, используют envelope schema `1` и
   содержат все данные, нужные replay без clock/RNG.
-- [ ] Legacy current-game envelope/state sequence без interaction fields
+- [x] Legacy current-game envelope/state sequence без interaction fields
   replay-ится как прежде с zero closed window; malformed/unknown new schema
   fail-closed. Old games не угадывают новые fields.
-- [ ] Текущий `first-edition-core-v1` не открывает новый window и сохраняет
+- [x] Текущий `first-edition-core-v1` не открывает новый window и сохраняет
   прежнее observable gameplay behavior.
-- [ ] Focused tests и полный `go test ./...` проходят; HTTP/application/store,
+- [x] Focused tests и полный `go test ./...` проходят; HTTP/application/store,
   frontend и infrastructure не меняются.
 
 ## Контекст и подтверждённое состояние
@@ -187,27 +187,27 @@ HTTP projection или frontend contract.
 
 ## План реализации
 
-1. [ ] Добавить typed window/policy/response model, deep clone и invariants.
-2. [ ] Добавить pure open/respond/pass/timeout/close commands и events.
-3. [ ] Реализовать deterministic event application и compatibility with
+1. [x] Добавить typed window/policy/response model, deep clone и invariants.
+2. [x] Добавить pure open/respond/pass/timeout/close commands и events.
+3. [x] Реализовать deterministic event application и compatibility with
    current turn rules.
-4. [ ] Покрыть validation, illegal actor/intent, duplicate response, hard
+4. [x] Покрыть validation, illegal actor/intent, duplicate response, hard
    extension cap, timeout auto-pass, versioned/legacy replay и unchanged
    current flow.
-5. [ ] Запустить focused/full Go tests, canonical verify и scope-check.
-6. [ ] Провести read-only adversarial review server authority/replay/privacy,
+5. [x] Запустить focused/full Go tests, canonical verify и scope-check.
+6. [x] Провести read-only adversarial review server authority/replay/privacy,
    исправить findings в write set и архивировать plan.
 
 ## Проверки
 
-- [ ] `gofmt -w` только для write set Go files
-- [ ] `go test ./internal/game -run InteractionWindow -count=1`
-- [ ] `go test ./...`
-- [ ] Replay equivalence, legacy replay и zero-events-on-error assertions
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260730T134442Z-bfe764-generic-interaction-window-engine-kernel`
-- [ ] `git diff --check`
+- [x] `gofmt -w` только для write set Go files
+- [x] `go test ./internal/game -run InteractionWindow -count=1`
+- [x] `go test ./...`
+- [x] Replay equivalence, legacy replay и zero-events-on-error assertions
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260730T134442Z-bfe764-generic-interaction-window-engine-kernel`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -245,8 +245,47 @@ HTTP projection или frontend contract.
 - Draft создан атомарно; реализация не начата.
 - Read-only review ADR-0008, protocol и current engine подтвердил, что pure
   dormant kernel можно отделить от projection/application/persistence.
-- Exact plan ID согласован; implementation ожидает отдельную session/worktree.
+- Exact plan ID был согласован для отдельной implementation session/worktree.
+- Dependency plan завершён; `leinoctl context` подтвердил plan как eligible,
+  исходный worktree был чистым.
+- Session `019fb36e-5e67-7aa0-9e55-b5e58c8ec116` выбрала plan в ветке
+  `codex/generic-interaction-window-engine-kernel`; статус переведён в
+  `in_progress`.
+- Добавлены закрытые interaction kind/policy/intent/response/close enums,
+  authoritative parent/actor sets, fixed instants, deadline policy и
+  deep-cloned per-actor response map. Nil window остаётся legacy zero-state и
+  не добавляет поле в current `game.v2` event payload.
+- Добавлены pure open/respond/pass/timeout/close commands и три
+  `game.v1.interaction_*` event type. Apply проверяет stale ID, actor,
+  registered intent, deadline/revision, replay outcome и fail-closed payload.
+- Collective default выражает `60/30/+10/90`; только late typed `respond`
+  расходует bounded budget. Timeout по exact revision фиксирует optional
+  auto-pass, mandatory typed auto-resolution и terminal close events.
+- Focused tests покрыли clone/validation, deterministic equal-base result,
+  extension cap, illegal/stale/duplicate/late transitions, timeout,
+  malformed schema/payload, replay equivalence и unchanged current flow.
+- Adversarial review дополнительно запретил reuse opaque ID, проверил parent
+  subject по authoritative state и передал close после deadline только
+  timeout transition.
+- Focused `go test ./internal/game -run 'Interaction|LegacyCurrent' -count=1`
+  и полный `go test ./...` прошли.
+- Canonical `./leinoctl verify --changed` прошёл на Node 24, Go 1.26.5 и
+  repository-pinned pnpm 10.8.0: frontend contracts 7/7, web 41/41,
+  lint/typecheck/build; backend all packages; hooks 42/42; leinoctl 64/64;
+  plan-lint 0 issues; Bash syntax и `docker compose --parallel 8 config`.
+- `text-check`: 6 paths, issues `[]`; `gofmt -d` и `git diff --check` без
+  вывода. `scope-check`: `ok: true`, `outsideWriteSet: []`,
+  `missingRequiredChecks: []`; 6 paths diagnostic `unledgered`, поскольку
+  desktop PostToolUse ledger их не записал.
 
 ## Итог
 
-Заполняется после реализации.
+Реализован dormant pure-engine kernel generic interaction window без
+изменения HTTP/application/store/frontend. Window получает opaque stable ID,
+closed typed policies/intents, authoritative actors, fixed deadline state,
+bounded extension budget, replayed responses и terminal reason. New events
+полностью восстанавливают open/respond/pass/timeout/close sequence без clock
+или RNG; legacy/current `first-edition-core-v1` продолжает работать с nil
+window и прежним observable event payload. Persistence/CAS winner,
+projection/privacy DTO, scheduler и combat/help activation остаются
+следующими отдельными plans.

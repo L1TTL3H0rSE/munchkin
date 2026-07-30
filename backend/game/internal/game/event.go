@@ -24,6 +24,10 @@ const (
 	EventCharityResolved  = "game.v2.charity_resolved"
 	EventTurnAdvanced     = "game.v2.turn_advanced"
 
+	EventInteractionWindowOpened     = "game.v1.interaction_window_opened"
+	EventInteractionResponseRecorded = "game.v1.interaction_response_recorded"
+	EventInteractionWindowClosed     = "game.v1.interaction_window_closed"
+
 	legacyEventPlayerJoined    = "game.v1.player_joined"
 	legacyEventGameStarted     = "game.v1.game_started"
 	legacyEventDoorResolved    = "game.v1.door_resolved"
@@ -71,6 +75,25 @@ type stateChangedPayload struct {
 	Reason   CommandType     `json:"reason"`
 	State    State           `json:"state"`
 	Outcomes []RandomOutcome `json:"outcomes,omitempty"`
+}
+
+type interactionWindowOpenedPayload struct {
+	Window InteractionWindow `json:"window"`
+}
+
+type interactionResponseRecordedPayload struct {
+	InteractionID          string              `json:"interaction_id"`
+	ActorID                string              `json:"actor_id"`
+	Response               InteractionResponse `json:"response"`
+	DeadlineAt             time.Time           `json:"deadline_at"`
+	DeadlineRevision       uint32              `json:"deadline_revision"`
+	ExtensionBudgetSeconds int                 `json:"extension_budget_seconds"`
+}
+
+type interactionWindowClosedPayload struct {
+	InteractionID string                 `json:"interaction_id"`
+	Reason        InteractionCloseReason `json:"reason"`
+	ClosedAt      time.Time              `json:"closed_at"`
 }
 
 func newEvent(eventType string, payload any) (DomainEvent, error) {
@@ -163,6 +186,89 @@ func Apply(state State, event DomainEvent) (State, error) {
 			return State{}, err
 		}
 		return next, nil
+	case EventInteractionWindowOpened:
+		payload, err := decode[interactionWindowOpenedPayload](event)
+		if err != nil {
+			return State{}, err
+		}
+		if state.InteractionWindow != nil &&
+			state.InteractionWindow.Status == InteractionWindowOpen {
+			return State{}, fmt.Errorf(
+				"%w: interaction is already open",
+				ErrIllegalCommand,
+			)
+		}
+		window := payload.Window
+		if state.InteractionWindow != nil &&
+			state.InteractionWindow.ID == window.ID {
+			return State{}, fmt.Errorf(
+				"%w: interaction ID cannot be reused",
+				ErrIllegalCommand,
+			)
+		}
+		if window.Status != InteractionWindowOpen ||
+			window.DeadlineRevision != 1 ||
+			window.DeadlineAt.After(
+				window.OpenedAt.Add(
+					time.Duration(window.DeadlinePolicy.BaseSeconds)*time.Second,
+				),
+			) {
+			return State{}, fmt.Errorf(
+				"%w: malformed interaction open event",
+				ErrIllegalCommand,
+			)
+		}
+		for _, actorID := range window.EligibleActorIDs {
+			if window.Responses[actorID].State != InteractionResponsePending {
+				return State{}, fmt.Errorf(
+					"%w: interaction opens with recorded response",
+					ErrIllegalCommand,
+				)
+			}
+		}
+		next := state.Clone()
+		next.InteractionWindow = window.clone()
+		next.Version++
+		if err := next.Validate(); err != nil {
+			return State{}, err
+		}
+		return next, nil
+	case EventInteractionResponseRecorded:
+		payload, err := decode[interactionResponseRecordedPayload](event)
+		if err != nil {
+			return State{}, err
+		}
+		next, err := applyInteractionResponse(state, payload)
+		if err != nil {
+			return State{}, err
+		}
+		next.Version++
+		if err := next.Validate(); err != nil {
+			return State{}, err
+		}
+		return next, nil
+	case EventInteractionWindowClosed:
+		payload, err := decode[interactionWindowClosedPayload](event)
+		if err != nil {
+			return State{}, err
+		}
+		if state.InteractionWindow == nil ||
+			state.InteractionWindow.ID != payload.InteractionID ||
+			state.InteractionWindow.Status != InteractionWindowOpen {
+			return State{}, fmt.Errorf(
+				"%w: stale or closed interaction",
+				ErrIllegalCommand,
+			)
+		}
+		next := state.Clone()
+		next.InteractionWindow.Status = InteractionWindowClosed
+		next.InteractionWindow.CloseReason = payload.Reason
+		next.InteractionWindow.ClosedAt = payload.ClosedAt
+		next.Version++
+		if err := next.Validate(); err != nil {
+			return State{}, err
+		}
+		return next, nil
 	case legacyEventPlayerJoined,
 		legacyEventGameStarted,
 		legacyEventDoorResolved,
@@ -179,6 +285,105 @@ func Apply(state State, event DomainEvent) (State, error) {
 	default:
 		return State{}, fmt.Errorf("%w: unknown event %s", ErrIllegalCommand, event.Type)
 	}
+}
+
+func applyInteractionResponse(
+	state State,
+	payload interactionResponseRecordedPayload,
+) (State, error) {
+	if state.InteractionWindow == nil ||
+		state.InteractionWindow.ID != payload.InteractionID ||
+		state.InteractionWindow.Status != InteractionWindowOpen {
+		return State{}, fmt.Errorf(
+			"%w: stale or closed interaction",
+			ErrIllegalCommand,
+		)
+	}
+	window := *state.InteractionWindow
+	current, err := interactionResponseAt(window, payload.ActorID)
+	if err != nil {
+		return State{}, err
+	}
+	if payload.Response.Requirement != current.Requirement ||
+		payload.Response.TimeoutIntent != current.TimeoutIntent {
+		return State{}, fmt.Errorf(
+			"%w: response policy changed",
+			ErrIllegalCommand,
+		)
+	}
+	switch payload.Response.State {
+	case InteractionResponseTimedOut:
+		if current.Requirement != InteractionResponseOptional ||
+			payload.Response.Intent != InteractionIntentPass ||
+			payload.Response.AcceptedAt.Before(window.DeadlineAt) {
+			return State{}, fmt.Errorf(
+				"%w: malformed optional timeout response",
+				ErrIllegalCommand,
+			)
+		}
+		if !sameInteractionDeadline(window, payload) {
+			return State{}, fmt.Errorf(
+				"%w: timeout changed interaction deadline",
+				ErrIllegalCommand,
+			)
+		}
+	case InteractionResponseAutoResolved:
+		if current.Requirement != InteractionResponseMandatory ||
+			payload.Response.Intent != current.TimeoutIntent ||
+			payload.Response.AcceptedAt.Before(window.DeadlineAt) {
+			return State{}, fmt.Errorf(
+				"%w: malformed mandatory timeout response",
+				ErrIllegalCommand,
+			)
+		}
+		if !sameInteractionDeadline(window, payload) {
+			return State{}, fmt.Errorf(
+				"%w: timeout changed interaction deadline",
+				ErrIllegalCommand,
+			)
+		}
+	default:
+		expectedState, err := interactionResponseStateForIntent(
+			payload.Response.Intent,
+		)
+		if err != nil || expectedState != payload.Response.State {
+			return State{}, fmt.Errorf(
+				"%w: response state does not match intent",
+				ErrIllegalCommand,
+			)
+		}
+		deadline, revision, budget, err := interactionDeadlineAfter(
+			window,
+			payload.Response.AcceptedAt,
+			payload.Response.Intent,
+		)
+		if err != nil {
+			return State{}, err
+		}
+		if !payload.DeadlineAt.Equal(deadline) ||
+			payload.DeadlineRevision != revision ||
+			payload.ExtensionBudgetSeconds != budget {
+			return State{}, fmt.Errorf(
+				"%w: response deadline outcome differs",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	next := state.Clone()
+	next.InteractionWindow.Responses[payload.ActorID] = payload.Response
+	next.InteractionWindow.DeadlineAt = payload.DeadlineAt
+	next.InteractionWindow.DeadlineRevision = payload.DeadlineRevision
+	next.InteractionWindow.ExtensionBudgetSeconds = payload.ExtensionBudgetSeconds
+	return next, nil
+}
+
+func sameInteractionDeadline(
+	window InteractionWindow,
+	payload interactionResponseRecordedPayload,
+) bool {
+	return payload.DeadlineAt.Equal(window.DeadlineAt) &&
+		payload.DeadlineRevision == window.DeadlineRevision &&
+		payload.ExtensionBudgetSeconds == window.ExtensionBudgetSeconds
 }
 
 func Replay(events []EventEnvelope) (State, error) {
