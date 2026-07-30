@@ -1,11 +1,11 @@
 # PLAN: frontend safe shell breakpoint foundation
 
 - **Plan ID:** `20260730T134443Z-3ffbc0-frontend-safe-shell-breakpoint-foundation`
-- **Статус:** approved
+- **Статус:** completed
 - **Создан:** 2026-07-30 13:44:43 UTC
-- **Обновлён:** 2026-07-30 14:12:52 UTC
-- **Владелец:** отдельная Codex frontend-session после согласования
-- **Workspace:** отдельный worktree
+- **Обновлён:** 2026-07-30 16:14:08 UTC
+- **Владелец:** Codex session `019fb3a9-1bf1-7442-8b5f-96755c79a3fb`
+- **Workspace:** clean worktree, выделенный под frontend plan
 - **Ветка:** `codex/frontend-safe-shell-breakpoint-foundation`
 - **Режим параллельности:** conditional
 - **Зависит от:** plans `20260729T234102Z-898ef6-frontend-engineering-spec`, `20260730T001013Z-717040-design-responsive-game-ui-ux`.
@@ -48,33 +48,33 @@ reduced-motion, dynamic viewport и safe-area policy. Не менять game con
 
 ## Критерии приёмки
 
-- [ ] На странице ровно один semantic `main` с устойчивым target ID; skip link
+- [x] На странице ровно один semantic `main` с устойчивым target ID; skip link
   первым keyboard focus переводит пользователя к main content и видим при
   фокусе.
-- [ ] На `320 × 568` выполняется
+- [x] На `320 × 568` выполняется
   `document.documentElement.scrollWidth <= clientWidth`; header/main/focused
   controls не выходят за safe viewport.
-- [ ] Raw audit-only `@media (max-width: 720px)` удалён. Canonical boundaries
+- [x] Raw audit-only `@media (max-width: 720px)` удалён. Canonical boundaries
   `374/427/599/767/1023/1279/1439/1900` получают локальные names/semantics, но
   media queries добавляются только для реально нужных content-driven
   transitions.
-- [ ] Каждый используемый breakpoint проверен на `N-1/N/N+1`; transition не
+- [x] Каждый используемый breakpoint проверен на `N-1/N/N+1`; transition не
   создаёт overlap/gap, document overflow или потерю focus.
-- [ ] `.app-shell` имеет `100vh` fallback и `100dvh` enhancement; safe-area
+- [x] `.app-shell` имеет `100vh` fallback и `100dvh` enhancement; safe-area
   insets добавляются к spacing без двойного padding.
-- [ ] Общий `:focus-visible` cue различим не только цветом, переживает dark
+- [x] Общий `:focus-visible` cue различим не только цветом, переживает dark
   background и keyboard-only navigation; mouse click не получает навязчивый
   focus ring.
-- [ ] `prefers-reduced-motion: reduce` отключает/сокращает non-essential
+- [x] `prefers-reduced-motion: reduce` отключает/сокращает non-essential
   transitions/scroll behavior, сохраняя static state cue.
-- [ ] Disabled control больше не означает автоматически «ожидание» курсором:
+- [x] Disabled control больше не означает автоматически «ожидание» курсором:
   универсальный `cursor: wait` удалён. Отдельный pending/busy cue отложен до
   plan, который добавит явную state semantics в компоненты.
-- [ ] Short landscape, zoom/reflow и safe-area не скрывают brand, main target
+- [x] Short landscape, zoom/reflow и safe-area не скрывают brand, main target
   или critical native controls.
-- [ ] Существующая visual language сохраняется. Lobby/game business logic,
+- [x] Существующая visual language сохраняется. Lobby/game business logic,
   available actions, server status, projection decoding и routes не меняются.
-- [ ] Frontend lint/check/tests/build, canonical verify, browser matrix и
+- [x] Frontend lint/check/tests/build, canonical verify, browser matrix и
   scope-check проходят.
 
 ## Контекст и подтверждённое состояние
@@ -166,31 +166,31 @@ reduced-motion, dynamic viewport и safe-area policy. Не менять game con
 
 ## План реализации
 
-1. [ ] Добавить skip link и единственный focusable `main` target.
-2. [ ] Исправить 320 px root sizing без document-level clipping workaround.
-3. [ ] Добавить named responsive, `dvh`, safe-area, focus-visible,
+1. [x] Добавить skip link и единственный focusable `main` target.
+2. [x] Исправить 320 px root sizing без document-level clipping workaround.
+3. [x] Добавить named responsive, `dvh`, safe-area, focus-visible,
    reduced-motion foundation и убрать ложный universal disabled-wait cursor.
-4. [ ] Заменить raw 720 px query на content-driven canonical boundary usage,
+4. [x] Заменить raw 720 px query на content-driven canonical boundary usage,
    сохранив current visual language.
-5. [ ] Выполнить lint/check/build и browser matrix; исправить только findings
+5. [x] Выполнить lint/check/build и browser matrix; исправить только findings
    внутри двух production files.
-6. [ ] Повторить canonical verify/scope-check, записать evidence и
+6. [x] Повторить canonical verify/scope-check, записать evidence и
    архивировать plan.
 
 ## Проверки
 
-- [ ] `pnpm lint` из `frontend`
-- [ ] `pnpm check` из `frontend`
-- [ ] `pnpm build` из `frontend`
-- [ ] Browser: `320 × 568`, `374 × 812`, `427 × 926`, `599 × 960`,
+- [x] `pnpm lint` из `frontend`
+- [x] `pnpm check` из `frontend`
+- [x] `pnpm build` из `frontend`
+- [x] Browser: `320 × 568`, `374 × 812`, `427 × 926`, `599 × 960`,
   `667 × 375`, `768 × 1024`, `1024 × 768`, `1280 × 720`, `1440 × 900`,
   `1900 × 1080`; плюс `N-1/N/N+1` для каждого реально используемого switch
-- [ ] Browser: keyboard-only skip/focus, reduced motion, short landscape,
+- [x] Browser: keyboard-only skip/focus, reduced motion, short landscape,
   safe-area emulation и root overflow assertion
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260730T134443Z-3ffbc0-frontend-safe-shell-breakpoint-foundation`
-- [ ] `git diff --check`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260730T134443Z-3ffbc0-frontend-safe-shell-breakpoint-foundation`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -221,6 +221,8 @@ reduced-motion, dynamic viewport и safe-area policy. Не менять game con
   Разрешаю зафиксировать и запушить approved drafts». Пользователь запустит
   другой approved plan на другом устройстве; эта infra-session данный plan не
   выбирает и не реализует.
+- **Implementation handoff:** 2026-07-30 15:36:59 UTC, пользователь:
+  «Делай фронтенд план».
 
 ## Ход выполнения
 
@@ -228,7 +230,37 @@ reduced-motion, dynamic viewport и safe-area policy. Не менять game con
 - Read-only review accepted UI/UX spec и live audit зафиксировал точную 320 px
   причину, доступный narrow write set и отсутствие contract overlap.
 - Exact plan ID согласован; implementation ожидает отдельную session/worktree.
+- Plan claimed/selected session
+  `019fb3a9-1bf1-7442-8b5f-96755c79a3fb`; clean worktree переключён на
+  `codex/frontend-safe-shell-breakpoint-foundation`, status `in_progress`.
 
 ## Итог
 
-Заполняется после реализации.
+- В `app.vue` добавлены app-level `viewport-fit=cover`, первый skip link и
+  единственный player-route `main#main-content` с программным focus target.
+- Root containment больше не использует `body { min-width: 320px }` или
+  document-level clipping. Дополнительный live finding для длинного
+  `.phase-display` устранён через `min-width: 0` и безопасный перенос.
+- В global foundation добавлены именованные inclusive boundaries, один
+  content-driven `atMost(tablet)` switch на `767px`, `100vh` → `100dvh`,
+  additive safe-area insets, двухчастный focus cue, forced-colors fallback,
+  reduced-motion override и честный disabled cursor.
+- Browser evidence на lobby, game lobby и active setup прошло для
+  `320×568`, `374×812`, `427×926`, `599×960`, `667×375`, `766/767/768`,
+  `1024×768`, `1280×720`, `1440×900`, `1900×1080`: root overflow везде
+  `0`; inclusive switch активен на `767` и выключен на `768`.
+- На `320×568` последняя action-кнопка раскрылась keyboard focus внутри
+  viewport (`left=52`, `right=287`, `scrollLeft=1641`) с solid `3px` cue.
+  Reduced-motion emulation дала `transition-duration: 0.00001s`; runtime
+  viewport meta содержит `viewport-fit=cover`. Browser runtime не предоставляет
+  ненулевой device-cutout inset или отдельный zoom control, поэтому safe-area
+  и zoom/reflow дополнительно подтверждены source/computed policy и
+  эквивалентными effective-width rows, без заявления о real-device notch.
+- `pnpm lint`, `pnpm check` (48 tests), `pnpm build`,
+  `node .codex/hooks/plan-lint.mjs`, полный `./leinoctl verify --changed`,
+  `scope-check` и `git diff --check` прошли. Canonical verify дополнительно
+  выполнил 42 hook tests, 64 `leinoctl` tests, script syntax и
+  `docker compose --parallel 8 config`.
+- Контракты, lockfile, pages/composables, backend, content и business logic не
+  изменялись; временные in-memory API/Nuxt/proxy для browser evidence
+  остановлены, proxy удалён.
