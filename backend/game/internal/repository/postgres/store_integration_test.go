@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/leinodev/munchkin/backend/game/internal/application"
 	"github.com/leinodev/munchkin/backend/game/internal/game"
@@ -22,12 +23,18 @@ func TestPostgresServiceContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	if err := store.Migrate(ctx, "../../../migrations/000001_game.up.sql"); err != nil {
+	if err := store.Migrate(
+		ctx,
+		"../../../migrations/000001_game.up.sql",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Migrate(ctx, "../../../migrations"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.pool.Exec(
 		ctx,
-		"TRUNCATE game_command_receipts, game_events, game_players, games CASCADE",
+		"TRUNCATE game_interaction_deadlines, game_command_receipts, game_events, game_players, games CASCADE",
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -170,6 +177,136 @@ func TestPostgresServiceContract(t *testing.T) {
 	}
 	if eventCount != 4 || receiptCount != 3 {
 		t.Fatalf("persisted counts: events=%d receipts=%d", eventCount, receiptCount)
+	}
+
+	runtimeClock := &postgresClock{
+		value: time.Date(2026, time.July, 30, 21, 0, 0, 0, time.UTC),
+	}
+	runtimeService := application.NewService(
+		store,
+		postgresPack(t),
+		runtimeClock,
+		application.NoopPublisher{},
+	)
+	initiatorID := before.Turn.PlayerID
+	participantID := owner.PlayerID
+	participantCredential := owner.Credential
+	if participantID == initiatorID {
+		participantID = joined.PlayerID
+		participantCredential = joined.Credential
+	}
+	interactionID, err := runtimeService.OpenInteraction(
+		ctx,
+		owner.GameID,
+		"postgres-interaction-open",
+		before.Version,
+		application.InteractionOpenSpec{
+			Kind: game.InteractionKindCombatResponse,
+			Parent: game.InteractionParent{
+				Phase:       before.Turn.Phase,
+				SubjectKind: game.InteractionSubjectTurn,
+				SubjectID:   before.Turn.PlayerID,
+			},
+			InitiatorActorID:  initiatorID,
+			EligibilityPolicy: game.InteractionEligibilityPublicPredicate,
+			AllowedIntents: []game.InteractionIntent{
+				game.InteractionIntentPass,
+				game.InteractionIntentRespond,
+			},
+			Participants: []application.InteractionParticipant{{
+				ActorID:       participantID,
+				Requirement:   game.InteractionResponseOptional,
+				TimeoutIntent: game.InteractionIntentPass,
+			}},
+			DeadlinePolicy: game.CollectiveInteractionDeadlinePolicy(),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projected, err := runtimeService.Get(
+		ctx,
+		owner.GameID,
+		participantCredential,
+	)
+	if err != nil || projected.Interaction == nil ||
+		projected.Interaction.InteractionID != interactionID {
+		t.Fatalf("persisted interaction projection=%#v err=%v", projected.Interaction, err)
+	}
+
+	restartedStore, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restartedStore.Close()
+	runtimeClock.value = projected.Interaction.DeadlineAt
+	candidates, err := restartedStore.DueInteractions(ctx, runtimeClock.value, 10)
+	if err != nil || len(candidates) != 1 {
+		t.Fatalf("restart due candidates=%#v err=%v", candidates, err)
+	}
+	restartedService := application.NewService(
+		restartedStore,
+		postgresPack(t),
+		runtimeClock,
+		application.NoopPublisher{},
+	)
+	processed, err := restartedService.ProcessInteractionTimeout(ctx, candidates[0])
+	if err != nil || !processed {
+		t.Fatalf("restart timeout processed=%v err=%v", processed, err)
+	}
+	afterTimeout, err := restartedService.Get(
+		ctx,
+		owner.GameID,
+		participantCredential,
+	)
+	if err != nil || afterTimeout.Interaction != nil {
+		t.Fatalf("timeout projection=%#v err=%v", afterTimeout.Interaction, err)
+	}
+	var deadlineCount int
+	if err := restartedStore.pool.QueryRow(
+		ctx,
+		"SELECT count(*) FROM game_interaction_deadlines WHERE game_id = $1",
+		owner.GameID,
+	).Scan(&deadlineCount); err != nil {
+		t.Fatal(err)
+	}
+	if deadlineCount != 0 {
+		t.Fatalf("closed interaction retained %d deadline rows", deadlineCount)
+	}
+}
+
+type postgresClock struct {
+	value time.Time
+}
+
+func (clock *postgresClock) Now() int64 {
+	return clock.value.UnixNano()
+}
+
+func TestMigrationPathsSelectOnlySortedUpFiles(t *testing.T) {
+	directory := t.TempDir()
+	for _, name := range []string{
+		"000002_second.up.sql",
+		"000001_first.up.sql",
+		"000002_second.down.sql",
+		"README.md",
+	} {
+		if err := os.WriteFile(
+			filepath.Join(directory, name),
+			[]byte("-- fixture"),
+			0o600,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	paths, err := migrationPaths(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 2 ||
+		filepath.Base(paths[0]) != "000001_first.up.sql" ||
+		filepath.Base(paths[1]) != "000002_second.up.sql" {
+		t.Fatalf("migration paths: %#v", paths)
 	}
 }
 

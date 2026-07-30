@@ -1,7 +1,9 @@
+import {readFileSync} from "node:fs";
 import {describe, expect, it} from "vitest";
 import {
   actionViewSchema,
   commandPayloadSchema,
+  interactionCommandRequestSchema,
   invalidationSchema,
   projectionSchema,
   studioAPIErrorSchema,
@@ -142,6 +144,57 @@ describe("wire contracts", () => {
     };
     expect(invalidationSchema.parse(event).version).toBe(5);
     expect(() => invalidationSchema.parse({...event, hand: []})).toThrow();
+  });
+
+  it("parses the Go-owned interaction projection without private state", () => {
+    const fixture: unknown = JSON.parse(readFileSync(new URL(
+      "../../../../backend/game/internal/transport/httpapi/testdata/"
+        + "interaction-projection-v1.json",
+      import.meta.url,
+    ), "utf8"));
+    const parsed = projectionSchema.parse(fixture);
+    const interaction = parsed.interaction;
+    expect(interaction?.actions.map((action) => action.type))
+      .toEqual(["pass", "respond"]);
+    if (!interaction) {
+      throw new Error("interaction fixture was not parsed");
+    }
+    expect(() => projectionSchema.parse({
+      ...parsed,
+      interaction: {
+        ...interaction,
+        eligible_actor_ids: ["player_b"],
+      },
+    })).toThrow();
+    expect(() => projectionSchema.parse({
+      ...parsed,
+      interaction: {
+        ...interaction,
+        responses: {player_b: {state: "pending"}},
+      },
+    })).toThrow();
+  });
+
+  it("keeps interaction commands version-bound and authority-free", () => {
+    const request = {
+      expected_version: 7,
+      interaction_id: "interaction_0123456789abcdef",
+      action_id: "act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      intent: "pass",
+    };
+    expect(interactionCommandRequestSchema.parse(request).intent).toBe("pass");
+    expect(() => interactionCommandRequestSchema.parse({
+      ...request,
+      actor_id: "player_b",
+    })).toThrow();
+    expect(() => interactionCommandRequestSchema.parse({
+      ...request,
+      deadline_revision: 1,
+    })).toThrow();
+    expect(() => interactionCommandRequestSchema.parse({
+      ...request,
+      intent: "auto_resolve",
+    })).toThrow();
   });
 
   it("keeps Card Studio generation requests closed and path-free", () => {

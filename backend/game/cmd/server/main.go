@@ -36,7 +36,7 @@ func main() {
 		if valueOrDefault("AUTO_MIGRATE", "false") == "true" {
 			if err := postgresStore.Migrate(
 				ctx,
-				valueOrDefault("MIGRATION_PATH", "migrations/000001_game.up.sql"),
+				valueOrDefault("MIGRATION_PATH", "migrations"),
 			); err != nil {
 				log.Fatalf("migrate database: %v", err)
 			}
@@ -68,6 +68,18 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	go func() {
+		if err := service.RunInteractionTimeoutWorker(
+			ctx,
+			time.Second,
+			100,
+			func(err error) {
+				log.Printf("interaction timeout sweep: %v", err)
+			},
+		); err != nil && ctx.Err() == nil {
+			log.Printf("interaction timeout worker stopped: %v", err)
+		}
+	}()
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

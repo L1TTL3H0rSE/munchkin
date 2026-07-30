@@ -1,7 +1,10 @@
 package game
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"strconv"
+	"time"
 )
 
 type CardView struct {
@@ -96,6 +99,25 @@ type TurnView struct {
 	AvailableActions []ActionView  `json:"available_actions"`
 }
 
+type InteractionActionView struct {
+	ActionID      string            `json:"action_id"`
+	InteractionID string            `json:"interaction_id"`
+	Type          InteractionIntent `json:"type"`
+}
+
+type InteractionView struct {
+	InteractionID          string                   `json:"interaction_id"`
+	PublicKind             string                   `json:"public_kind"`
+	ParentPhase            Phase                    `json:"parent_phase"`
+	PublicSubject          string                   `json:"public_subject"`
+	Status                 InteractionWindowStatus  `json:"status"`
+	DeadlineAt             time.Time                `json:"deadline_at"`
+	ServerTime             *time.Time               `json:"server_time,omitempty"`
+	MyResponseState        InteractionResponseState `json:"my_response_state,omitempty"`
+	ResponseRequiredForYou bool                     `json:"response_required_for_you"`
+	Actions                []InteractionActionView  `json:"actions"`
+}
+
 type Projection struct {
 	GameID               string            `json:"game_id"`
 	Version              uint64            `json:"version"`
@@ -113,6 +135,7 @@ type Projection struct {
 	ContentVersion       int               `json:"content_version"`
 	RulesProfileID       string            `json:"rules_profile_id"`
 	RulesProfileVersion  int               `json:"rules_profile_version"`
+	Interaction          *InteractionView  `json:"interaction,omitempty"`
 }
 
 func ProjectForActor(state State, actorID string, pack Pack) (Projection, error) {
@@ -197,7 +220,76 @@ func ProjectForActor(state State, actorID string, pack Pack) (Projection, error)
 		return Projection{}, err
 	}
 	projection.Turn.AvailableActions = actions
+	projection.Interaction = projectInteraction(state, actorID)
 	return projection, nil
+}
+
+func projectInteraction(state State, actorID string) *InteractionView {
+	window := state.InteractionWindow
+	if window == nil || window.Status != InteractionWindowOpen {
+		return nil
+	}
+	view := &InteractionView{
+		InteractionID: window.ID,
+		PublicKind:    "response_window",
+		ParentPhase:   window.Parent.Phase,
+		PublicSubject: publicInteractionSubject(window.Parent.SubjectKind),
+		Status:        window.Status,
+		DeadlineAt:    window.DeadlineAt,
+		Actions:       []InteractionActionView{},
+	}
+	response, eligible := window.Responses[actorID]
+	if !eligible {
+		return view
+	}
+	view.MyResponseState = response.State
+	view.ResponseRequiredForYou = response.State == InteractionResponsePending
+	if !view.ResponseRequiredForYou {
+		return view
+	}
+	for _, intent := range window.AllowedIntents {
+		if intent == InteractionIntentAutoResolve ||
+			(window.EligibilityPolicy == InteractionEligibilityOpaquePublicSet &&
+				intent != InteractionIntentPass) {
+			continue
+		}
+		view.Actions = append(view.Actions, InteractionActionView{
+			ActionID:      interactionActionID(window.ID, actorID, intent, state.Version),
+			InteractionID: window.ID,
+			Type:          intent,
+		})
+	}
+	return view
+}
+
+func publicInteractionSubject(kind InteractionSubjectKind) string {
+	switch kind {
+	case InteractionSubjectTurn:
+		return "current_turn"
+	case InteractionSubjectEncounter:
+		return "current_encounter"
+	case InteractionSubjectEffect:
+		return "current_effect"
+	case InteractionSubjectInteraction:
+		return "parent_interaction"
+	default:
+		return "current_context"
+	}
+}
+
+func interactionActionID(
+	interactionID string,
+	actorID string,
+	intent InteractionIntent,
+	version uint64,
+) string {
+	digest := sha256.Sum256([]byte(
+		interactionID + "\x00" +
+			actorID + "\x00" +
+			string(intent) + "\x00" +
+			strconv.FormatUint(version, 10),
+	))
+	return fmt.Sprintf("act_%x", digest[:16])
 }
 
 func selfView(state State, playerIndex int, pack Pack) (SelfView, error) {

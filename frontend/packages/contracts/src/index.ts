@@ -46,6 +46,21 @@ export const actionTypeSchema = z.enum([
   "fight",
   "loot",
 ]);
+export const interactionIntentSchema = z.enum([
+  "pass",
+  "respond",
+  "accept",
+  "decline",
+]);
+export const interactionResponseStateSchema = z.enum([
+  "pending",
+  "passed",
+  "acted",
+  "accepted",
+  "declined",
+  "timed_out",
+  "auto_resolved",
+]);
 
 export const cardViewSchema = z.object({
   instance_id: z.string().min(1),
@@ -141,6 +156,31 @@ export const turnViewSchema = z.object({
   available_actions: nullableArray(actionViewSchema),
 }).strict();
 
+export const interactionActionViewSchema = z.object({
+  action_id: z.string().regex(/^act_[a-f0-9]{32}$/),
+  interaction_id: z.string().min(1),
+  type: interactionIntentSchema,
+}).strict();
+
+export const interactionViewSchema = z.object({
+  interaction_id: z.string().min(1),
+  public_kind: z.literal("response_window"),
+  parent_phase: phaseSchema,
+  public_subject: z.enum([
+    "current_turn",
+    "current_encounter",
+    "current_effect",
+    "parent_interaction",
+    "current_context",
+  ]),
+  status: z.literal("open"),
+  deadline_at: z.string().datetime(),
+  server_time: z.string().datetime(),
+  my_response_state: interactionResponseStateSchema.optional(),
+  response_required_for_you: z.boolean(),
+  actions: z.array(interactionActionViewSchema),
+}).strict();
+
 export const projectionSchema = z.object({
   game_id: z.string().min(1),
   version: z.number().int().nonnegative(),
@@ -158,6 +198,7 @@ export const projectionSchema = z.object({
   content_version: z.number().int().positive(),
   rules_profile_id: z.literal("first-edition-core-v1"),
   rules_profile_version: z.literal(1),
+  interaction: interactionViewSchema.optional(),
 }).strict();
 
 export const lobbySummarySchema = z.object({
@@ -194,12 +235,21 @@ export const commandPayloadSchema = z.object({
   ability_index: z.number().int().nonnegative().optional(),
 }).strict();
 
+export const interactionCommandRequestSchema = z.object({
+  expected_version: z.number().int().nonnegative(),
+  interaction_id: z.string().min(1),
+  action_id: z.string().regex(/^act_[a-f0-9]{32}$/),
+  intent: interactionIntentSchema,
+}).strict();
+
 export const invalidationSchema = z.object({
   type: z.literal("game.v1.version_advanced"),
   occurred_at: z.string().datetime(),
   game_id: z.string().min(1),
   version: z.number().int().positive(),
-  reason: actionTypeSchema.or(z.literal("join")),
+  reason: actionTypeSchema
+    .or(z.literal("join"))
+    .or(z.literal("interaction_changed")),
 }).strict();
 
 export const apiErrorSchema = z.object({
@@ -350,6 +400,11 @@ export type Invalidation = z.infer<typeof invalidationSchema>;
 export type ActionDescriptor = z.infer<typeof actionViewSchema>;
 export type ActionType = z.infer<typeof actionTypeSchema>;
 export type CommandPayload = z.infer<typeof commandPayloadSchema>;
+export type InteractionIntent = z.infer<typeof interactionIntentSchema>;
+export type InteractionView = z.infer<typeof interactionViewSchema>;
+export type InteractionCommandRequest = z.infer<
+  typeof interactionCommandRequestSchema
+>;
 export type StudioArtBrief = z.infer<typeof studioArtBriefSchema>;
 export type StudioGenerationSettings = z.infer<
   typeof studioGenerationSettingsSchema

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/leinodev/munchkin/backend/game/internal/game"
 )
@@ -14,6 +15,9 @@ var (
 	ErrIdempotencyConflict = errors.New("idempotency key reused")
 	ErrUnauthorized        = errors.New("invalid game credential")
 	ErrAlreadyExists       = errors.New("game already exists")
+	ErrInteractionClosed   = errors.New("interaction is closed")
+	ErrInteractionExpired  = errors.New("interaction is expired")
+	ErrInteractionAction   = errors.New("invalid interaction action")
 )
 
 type Receipt struct {
@@ -38,6 +42,14 @@ type Tx interface {
 type Store interface {
 	Create(context.Context, game.State, []game.EventEnvelope) error
 	WithinGame(context.Context, string, func(Tx) error) error
+	DueInteractions(context.Context, time.Time, int) ([]InteractionDeadline, error)
+}
+
+type InteractionDeadline struct {
+	GameID           string
+	InteractionID    string
+	DeadlineRevision uint32
+	DeadlineAt       time.Time
 }
 
 type Clock interface {
