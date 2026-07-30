@@ -1,9 +1,9 @@
 # PLAN: record card art object storage
 
 - **Plan ID:** `20260729T224707Z-7f21dd-record-card-art-object-storage`
-- **Статус:** awaiting_approval
+- **Статус:** completed
 - **Создан:** 2026-07-29 22:47:07 UTC
-- **Обновлён:** 2026-07-29 23:48:05 UTC
+- **Обновлён:** 2026-07-30 00:48:00 UTC
 - **Владелец:** Codex
 - **Workspace:** shared
 - **Ветка:** `main`
@@ -50,22 +50,22 @@ PostgreSQL backups из ADR-0007 и не выдавать направление
 
 ## Критерии приёмки
 
-- [ ] ADR явно разделяет текущий local/dev storage и будущий shared production
+- [x] ADR явно разделяет текущий local/dev storage и будущий shared production
   object storage и относит последний к P2 после конкурсного P0-A/P0-B.
-- [ ] Будущее направление называет S3-compatible storage для binary candidates
+- [x] Будущее направление называет S3-compatible storage для binary candidates
   и published illustrations, сохраняя требования immutable content version,
   digest и provenance.
-- [ ] Illustration assets и PostgreSQL backups определены как разные data
+- [x] Illustration assets и PostgreSQL backups определены как разные data
   classes: по умолчанию используются отдельные buckets и IAM credentials, а
   namespace, retention/lifecycle, encryption и recovery policy не
   переиспользуются неявно.
-- [ ] Candidates остаются private и выдаются только через backend-authorized
+- [x] Candidates остаются private и выдаются только через backend-authorized
   temporary signed access; опубликованные immutable illustrations могут
   получить digest-addressed cache/CDN policy без открытия Card Studio.
-- [ ] Текст оставляет конкретного vendor, exact key layout, signed URL TTL,
+- [x] Текст оставляет конкретного vendor, exact key layout, signed URL TTL,
   lifecycle values, CDN provider, migration и failure-recovery mechanics
   будущему implementation plan/ADR.
-- [ ] Ни production code, ни config/schema/infra, ни текущий Card Studio
+- [x] Ни production code, ни config/schema/infra, ни текущий Card Studio
   contract и local workflow не меняются.
 
 ## Контекст и подтверждённое состояние
@@ -154,22 +154,22 @@ PostgreSQL backups из ADR-0007 и не выдавать направление
 
 ## План реализации
 
-1. [ ] Добавить в ADR-0005 раздел о future P2 production object storage.
-2. [ ] Связать его с ADR-0007 и явно отделить assets/candidates от P0-B
+1. [x] Добавить в ADR-0005 раздел о future P2 production object storage.
+2. [x] Связать его с ADR-0007 и явно отделить assets/candidates от P0-B
    PostgreSQL backup bucket, credentials и lifecycle.
-3. [ ] Зафиксировать private candidate access, immutable published art и
+3. [x] Зафиксировать private candidate access, immutable published art и
    запрет незащищённой публикации Card Studio.
-4. [ ] Проверить, что формулировка не заявляет S3 уже реализованным и не
+4. [x] Проверить, что формулировка не заявляет S3 уже реализованным и не
    предрешает vendor/exact implementation.
-5. [ ] Выполнить canonical checks, scope-check и архивировать plan.
+5. [x] Выполнить canonical checks, scope-check и архивировать plan.
 
 ## Проверки
 
-- [ ] `node .codex/hooks/plan-lint.mjs`.
-- [ ] `./leinoctl text-check --changed`.
-- [ ] `./leinoctl verify --changed` на repository Node 24 toolchain.
-- [ ] `./leinoctl scope-check --plan 20260729T224707Z-7f21dd-record-card-art-object-storage`.
-- [ ] `git diff --check` и финальный read-only diff review.
+- [x] `node .codex/hooks/plan-lint.mjs`.
+- [x] `./leinoctl text-check --changed`.
+- [x] `./leinoctl verify --changed` на repository Node 24 toolchain.
+- [x] `./leinoctl scope-check --plan 20260729T224707Z-7f21dd-record-card-art-object-storage`.
+- [x] `git diff --check` и финальный read-only diff review.
 
 ## Риски и откат
 
@@ -196,21 +196,47 @@ PostgreSQL backups из ADR-0007 и не выдавать направление
 
 ## Согласование
 
-- **Статус:** awaiting renewed user approval after material dependency and
-  risk update
+- **Статус:** approved
 - **Запрошено:** 2026-07-29 23:48:05 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** «Надо где-то это записать на
-  будущее» после уточнения, что текущая реализация не использует S3; затем
-  пользователь потребовал учесть утверждённый infrastructure roadmap в обоих
-  active drafts и разрешил исправить их в обновлённой session.
+- **Подтверждено:** 2026-07-30 03:40 MSK
+- **Формулировка согласования:** пользователь явно согласовал четыре плана в
+  предложенном порядке, начиная с точного plan ID
+  `20260729T224707Z-7f21dd-record-card-art-object-storage`.
+- **Формулировка/ограничения пользователя:** «После полного завершения,
+  отдельного commit и успешного push каждого плана разрешаю release и select
+  следующего». Исходное направление: «Надо где-то это записать на будущее»
+  после уточнения, что текущая реализация не использует S3; infrastructure
+  roadmap и разделение asset/backup storage обязательны.
 
 ## Ход выполнения
 
 - Draft создан атомарно.
 - После принятия ADR-0007 обновлены зависимости, P2 sequencing, storage data
   classes, privacy и coordination; реализация ADR-0005 не начата.
+- Получено повторное явное согласование exact plan ID. Lifecycle передан
+  текущей execution-session через проверенный `plan claim --takeover`; прежняя
+  planning-session остановлена, implementation writes отсутствовали.
+- Plan выбран session `019fb06a-77eb-7c53-b1ae-fb95d21f81fa` командой
+  `leinoctl plan select`; реализация начата.
+- ADR-0005 дополнен future P2 storage boundary: local/dev filesystem отделён
+  от S3-compatible production asset data plane, а illustration objects — от
+  P0-B PostgreSQL backup data class.
+- Read-only review обнаружил противоречие со старой фразой о `cloud storage`;
+  последствия уточнены так, что вне ADR остаются implementation/provisioning,
+  а принятая future boundary сохраняется.
+- Финальный `text-check`, `git diff --check` и plan-lint прошли.
+  Canonical verify на Node 24.14.0 / pnpm 11.9.0 / Git Bash 5.2: hooks
+  `42/42`, leinoctl `63 passed / 1 platform skip`, plan-lint `0 issues`.
+- `scope-check` завершился `ok: true`, `outsideWriteSet: []`,
+  `missingRequiredChecks: []`. После архивации он сохранил non-blocking warning
+  о трёх `unledgered` lifecycle/content paths из desktop PostToolUse
+  integration; все exact paths входят в write set, а content input полностью
+  покрыт current-fingerprint canonical checks.
 
 ## Итог
 
-Заполняется после реализации.
+ADR-0005 теперь фиксирует не реализованный P2 object-storage boundary для
+private Card Studio candidates и immutable published art. Asset и database
+backup storage разделены по buckets/credentials/policy; vendor, key layout,
+TTL, lifecycle, CDN и migration оставлены будущему implementation plan.
+Production code, config, API, content packs и deployment не менялись.

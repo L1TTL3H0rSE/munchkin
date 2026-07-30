@@ -45,6 +45,35 @@ provider/model не меняют prompt semantics. Compiler отдельно з�
 portrait `1024x1536`, crop-safe margins и запреты embedded text, logos,
 watermarks, card borders, stats/UI, artist imitation и commercial trade dress.
 
+## Future production storage
+
+Текущий ignored filesystem остаётся local/dev authoring implementation. До
+включения shared production Card Studio или admin asset workflow binary
+candidates и опубликованные illustrations должны быть вынесены в отдельный
+S3-compatible object-storage data plane. Это будущее P2-направление после
+конкурсных P0-A/P0-B из
+[ADR-0007](0007-single-vps-production-platform.md), а не реализованная
+инфраструктура и не условие первого single-VPS deployment игры.
+
+Illustration objects и off-host PostgreSQL backups из ADR-0007 являются
+разными data classes. По умолчанию им нужны отдельные buckets и IAM
+credentials; namespace, retention/lifecycle, encryption и recovery policy
+также не переиспользуются неявно. Один vendor допустим, но не отменяет
+разделение permissions и blast radius.
+
+Raw candidates остаются private authoring artifacts. Browser получает к ним
+только backend-authorized temporary signed access; frontend не получает S3
+credentials, raw filesystem paths или прямой bucket browser. Published art
+сначала связывается с immutable `(set_id, version, content_digest)` и
+provenance, после чего для digest-addressed objects может быть отдельно
+включена cache/CDN policy. Это не разрешает публиковать Card Studio либо его
+candidates без отдельной production admin identity/auth boundary.
+
+Конкретный vendor, object-key layout, signed URL TTL, lifecycle values, CDN,
+migration, idempotency и failure-recovery mechanics определяются отдельным
+implementation plan/ADR до production rollout. Текущее решение не создаёт
+buckets, credentials, API/config или migration contract.
+
 ## Последствия
 
 Gameplay и production build не зависят от provider availability или
@@ -53,5 +82,5 @@ configured key и отдельного пользовательского под
 
 Version 1 остаётся неизменной. Draft version 2 можно собирать по одной карте;
 после публикации дальнейший art создаёт следующую content version. Print
-export, public admin auth, cloud queue/storage и автоматический bulk остаются
-за пределами решения.
+export, public admin auth, cloud queue, автоматический bulk, а также
+реализация/provisioning будущего object storage остаются за пределами решения.
