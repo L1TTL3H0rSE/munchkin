@@ -1,9 +1,9 @@
 # PLAN: map multiplayer interactions
 
 - **Plan ID:** `20260730T001008Z-74d4bb-map-multiplayer-interactions`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-30 00:10:08 UTC
-- **Обновлён:** 2026-07-30 00:13:24 UTC
+- **Обновлён:** 2026-07-30 04:38 MSK
 - **Владелец:** Codex
 - **Workspace:** shared / `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`
@@ -53,63 +53,63 @@ implementation slices, не выдавая проектируемый прото
 
 ## Критерии приёмки
 
-- [ ] Документ содержит end-to-end Mermaid state graph от lobby/setup до
+- [x] Документ содержит end-to-end Mermaid state graph от lobby/setup до
   end-turn и отмечает все места, где возможны self choice, response другого
   игрока, collective window, negotiation, forced interaction или auto-skip.
-- [ ] Для каждой фазы и capability приведена interaction matrix:
+- [x] Для каждой фазы и capability приведена interaction matrix:
   initiator, eligible actors, legal intents/cards/targets, public/private
   projection, mandatory/optional response, close condition, timeout policy и
   следующий state.
-- [ ] Отдельно разобраны combat interventions, voluntary/forced help,
+- [x] Отдельно разобраны combat interventions, voluntary/forced help,
   предложение награды в сокровищах, accept/decline/cancel/supersede,
   дополнительные монстры/усилители/one-shot modifiers, Run Away, targetable
   curses/effects, trade/gift, charity transfer, theft, death/loot и
   disconnect/reconnect.
-- [ ] Формальная модель окна включает stable `interaction_id`, kind,
+- [x] Формальная модель окна включает stable `interaction_id`, kind,
   parent phase/subject, initiator, eligible actors, allowed intents,
   `opened_at`, authoritative `deadline_at`, extension budget, response state
   и terminal close reason.
-- [ ] Для каждого окна определён deterministic legal-action predicate. По
+- [x] Для каждого окна определён deterministic legal-action predicate. По
   умолчанию, если ни у одного eligible actor нет разрешённого действия, окно
   и timer не создаются, а переход выполняется сразу через явное domain event.
-- [ ] Для predicate по hidden state документируется неизбежный timing
+- [x] Для predicate по hidden state документируется неизбежный timing
   side-channel: immediate skip публично раскрывает только агрегированный факт
   «legal response отсутствует», но не actor/card/reason. Для interaction kinds,
   где даже такой aggregate чувствителен, выбирается public-capability
   predicate либо indistinguishable minimum window вместо hidden-state skip.
-- [ ] Таймеры остаются server-authoritative. Спека выбирает per-window base
+- [x] Таймеры остаются server-authoritative. Спека выбирает per-window base
   durations, late-action grace formula, maximum extension/cap и правила,
   исключающие last-second sniping, бесконечное продление retry/pass командами
   и griefing; предложенные пользователем 60/30/+10 секунд оцениваются как
   исходный default, а не принимаются без проверки.
-- [ ] Pure engine не читает clock: application/scheduler передаёт
+- [x] Pure engine не читает clock: application/scheduler передаёт
   зафиксированный момент либо timeout intent, а accepted action, deadline
   extension, timeout, auto-pass и close reason сохраняются событиями, чтобы
   replay не зависел от текущего времени.
-- [ ] Описан restart-safe deadline worker/sweeper: persisted deadline,
+- [x] Описан restart-safe deadline worker/sweeper: persisted deadline,
   повторный поиск overdue windows после старта, normal optimistic transaction,
   idempotent system command и race policy между timeout и последней player
   command.
-- [ ] Help negotiation задаёт server-validated диапазон награды
+- [x] Help negotiation задаёт server-validated диапазон награды
   `1..max_available_treasures`, одного выбранного helper, момент фиксации
   сделки и обязательное settlement после победы; поздний accept и обещание
   невозможной награды отклоняются.
-- [ ] Actor-specific projection не раскрывает actor-specific contents чужой
+- [x] Actor-specific projection не раскрывает actor-specific contents чужой
   руки через eligibility или option lists. Aggregate empty-window timing
   signal классифицирован как осознанная game-visible information либо заменён
   opaque policy по предыдущему критерию. Клиент получает только разрешённый
   descriptor, absolute deadline и server time/offset metadata; countdown
   остаётся advisory.
-- [ ] Описаны version/idempotency semantics для одновременных ответов,
+- [x] Описаны version/idempotency semantics для одновременных ответов,
   duplicate command, stale version, closed/expired window и reconnect; realtime
   остаётся version-only invalidation.
-- [ ] Приведены sequence diagrams минимум для combat intervention, help offer
+- [x] Приведены sequence diagrams минимум для combat intervention, help offer
   и timeout/restart, а также test matrix для engine, application,
   persistence, contracts, privacy и UI consumers.
-- [ ] Roadmap делит реализацию на небольшие планы: generic windows/deadlines,
+- [x] Roadmap делит реализацию на небольшие планы: generic windows/deadlines,
   combat interventions/help, остальные other-player mechanics, frontend
   interaction surfaces и баланс таймингов.
-- [ ] Runtime code, migrations, API/Zod contracts, content packs и frontend
+- [x] Runtime code, migrations, API/Zod contracts, content packs и frontend
   поведение в рамках этого docs-only plan не меняются.
 
 ## Контекст и подтверждённое состояние
@@ -220,28 +220,28 @@ implementation slices, не выдавая проектируемый прото
 
 ## План реализации
 
-1. [ ] Полностью инвентаризировать текущие phases, commands, effects,
+1. [x] Полностью инвентаризировать текущие phases, commands, effects,
    projections и отложенные ADR-0004 interactions.
-2. [ ] Составить phase/interaction graph и каталог всех interaction kinds.
-3. [ ] Зафиксировать generic window/deadline/auto-skip/concurrency/replay
+2. [x] Составить phase/interaction graph и каталог всех interaction kinds.
+3. [x] Зафиксировать generic window/deadline/auto-skip/concurrency/replay
    model и privacy-safe actor projections.
-4. [ ] Разобрать combat/help/reward и timeout/restart sequence diagrams.
-5. [ ] Определить capability tiers, test matrix и будущие implementation
+4. [x] Разобрать combat/help/reward и timeout/restart sequence diagrams.
+5. [x] Определить capability tiers, test matrix и будущие implementation
    plans без изменения runtime.
-6. [ ] Создать ADR-0008, добавить его в decision index и связать с подробной
+6. [x] Создать ADR-0008, добавить его в decision index и связать с подробной
    картой.
-7. [ ] Выполнить canonical checks, scope-check, exact diff review и
+7. [x] Выполнить canonical checks, scope-check, exact diff review и
    архивировать plan.
 
 ## Проверки
 
-- [ ] `node .codex/hooks/plan-lint.mjs`.
-- [ ] `./leinoctl text-check --changed`.
-- [ ] `./leinoctl verify --changed` на repository Node 24 toolchain.
-- [ ] `./leinoctl scope-check --plan 20260730T001008Z-74d4bb-map-multiplayer-interactions`.
-- [ ] `git diff --check` и read-only review графов, таблиц, dependencies и
+- [x] `node .codex/hooks/plan-lint.mjs`.
+- [x] `./leinoctl text-check --changed`.
+- [x] `./leinoctl verify --changed` на repository Node 24 toolchain.
+- [x] `./leinoctl scope-check --plan 20260730T001008Z-74d4bb-map-multiplayer-interactions`.
+- [x] `git diff --check` и read-only review графов, таблиц, dependencies и
   отсутствия заявлений о реализованном runtime.
-- [ ] Go/frontend tests не запускать: production/test code не меняется.
+- [x] Go/frontend tests не запускать: production/test code не меняется.
 
 ## Риски и откат
 
@@ -265,40 +265,82 @@ implementation slices, не выдавая проектируемый прото
 - **Откат:** удалить ADR/map и вернуть строку decision index обычным revert;
   runtime/data остаются неизменными.
 
-## Открытые вопросы
+## Закрытые design questions
 
-- Какие base duration, late threshold, grace и total cap нужны каждому типу
-  окна; исходная гипотеза боя — 60 секунд, late zone после 30 секунд и
-  +10 секунд за material intervention.
-- Для каких interaction kinds aggregate «ни у кого нет legal response»
-  допустим как game-visible information, а где нужен opaque minimum window.
-- Нужна ли свободная simultaneous-response модель или explicit
-  priority/pass order для отдельных interactions.
-- Кто инициирует help negotiation: combatant приглашает конкретного игрока,
-  другие игроки предлагают помощь либо поддерживаются оба направления.
-- Можно ли иметь несколько pending offers при одном выбранном helper, и как
-  supersede/cancel влияет на deadline.
-- Какие mechanics войдут в первый runtime slice после generic window kernel.
-- Как обрабатывать длительно disconnected eligible actor: обычный timeout,
-  явный auto-pass либо настраиваемый lobby policy.
+Эта таблица является retrospective decision log: она сохраняется также в
+`GAME_INTERACTION_PROTOCOL.md`, чтобы после реализации можно было увидеть не
+только выбранный вариант, но и причину.
+
+| Вопрос | Выбор v1 | Почему |
+|---|---|---|
+| Base/grace/cap | collective combat window 60 s; addressed offer/choice 30 s; после первых 30 s committed material intervention добавляет 10 s; absolute cap 90 s от `opened_at` | Даёт время на реакцию, защищает поздний ход и механически ограничивает griefing |
+| Empty-window privacy | Public-state predicate auto-skips сразу; hidden-hand-dependent kind всегда открывает opaque window для public actor set, даже если конкретный actor видит только `pass` | Не раскрывает actor/card/reason и не превращает timing в hidden-hand oracle |
+| Concurrent responses | Simultaneous intent model по умолчанию; existing expected-version CAS определяет первый committed transition | Нет искусственного seat-order преимущества; replay получает один deterministic commit order |
+| Help initiator | Combatant отправляет предложение одному конкретному helper с server-validated reward | Минимальная переговорная state machine, отсутствие unsolicited spam и ambiguity |
+| Несколько offers | До accept существует не более одного offer; combatant может cancel/supersede его новой version. После accept helper и reward immutable до settlement/terminal combat outcome | Устраняет double-accept и делает награду enforceable |
+| Первый runtime slice | Generic persisted windows/deadlines/CAS/privacy projection, затем combat intervention и help/reward поверх kernel | Проверяет абстракцию на главном multi-actor flow до trade/death/charity breadth |
+| Disconnect | Disconnect сам по себе не является authoritative pass. Reconnect восстанавливает window; на deadline scheduler записывает auto-pass/timeout за nonresponders | Presence ненадёжна; deadline даёт restart-safe одинаковое правило и не позволяет принудительно закрывать чужое окно |
 
 ## Согласование
 
-- **Статус:** backlog draft; approval intentionally not requested yet
-- **Запрошено:** —
-- **Подтверждено:** —
+- **Статус:** approved
+- **Запрошено:** 2026-07-30 00:13:24 UTC
+- **Подтверждено:** 2026-07-30 03:40 MSK
+- **Формулировка согласования:** пользователь явно согласовал exact plan ID
+  `20260730T001008Z-74d4bb-map-multiplayer-interactions` третьим из четырёх
+  последовательных планов. После полного завершения, отдельного commit и
+  успешного push разрешены release и select следующего plan.
 - **Формулировка/ограничения пользователя:** сначала составить карту/граф
-  всех взаимодействий на каждом шаге, затем реализовывать; timer создавать
-  только при возможных действиях, bounded-продление защищает от позднего
-  вмешательства, а помощь оформляется явным предложением награды и
-  accept/decline.
+  всех взаимодействий на каждом шаге, затем реализовывать; самостоятельно
+  закрыть design questions консервативными server-authoritative/privacy-first
+  решениями: «60/30/+10 с жёстким лимитом, CAS/simultaneous по умолчанию,
+  opaque window для чувствительных проверок, один зафиксированный helper с
+  server-enforced наградой, timeout/auto-pass при disconnect и первый
+  implementation slice generic windows → combat/help». Все вопросы, выборы и
+  причины должны остаться доступны для ретроспективы.
 
 ## Ход выполнения
 
 - Draft создан атомарно; реализация не начата.
 - Выполнен read-only аудит current phases, single-actor invariants,
   projections, commands, Clock usage, realtime/idempotency и tests.
+- Получено явное согласование exact plan и делегирование design choices;
+  открытые вопросы закрыты в retrospective decision log без изменения scope.
+- Lifecycle передан текущей session через `plan claim --takeover`; прежняя
+  planning-session остановлена. Plan выбран session
+  `019fb06a-77eb-7c53-b1ae-fb95d21f81fa` через `leinoctl plan select`.
+- Три независимых read-only source audit покрыли pure engine/phases/content,
+  application/CAS/persistence/clock и projection/HTTP/Zod/UI/privacy.
+- Создан 980-line `GAME_INTERACTION_PROTOCOL.md`: end-to-end Mermaid graph,
+  phase/capability matrices, formal window model, predicates, opaque timing,
+  timer/CAS/helper mechanics, restart sweeper, three sequence diagrams, test
+  matrix, implementation slices и полный retrospective decision log.
+- Создан accepted ADR-0008 и добавлен в decision index. Документы явно
+  отделяют future target protocol от current single-actor runtime.
+- Два adversarial review pass нашли и помогли закрыть: unbounded pre-parent
+  help supersede, отсутствующие theft/forced-help graph paths, child return
+  state/tags, clock sampling placement, active deadline uniqueness и
+  post-commit publisher failure semantics. Финальные reviewers не оставили
+  actionable findings.
+- Structure review: 4 Mermaid diagrams, balanced Markdown fences и valid
+  local links; strict UTF-8 и `git diff --check` прошли.
+- `./leinoctl text-check --changed`: 4 files, issues `[]`; plan-lint:
+  11 plans, 3 active до архивации, 8 archive, 0 issues.
+- Canonical `./leinoctl verify --changed` прошёл на Node 24.14.0: harness
+  42/42, leinoctl 63 passed + 1 platform skip, plan-lint 0 issues. Impact
+  содержал только `repository-workflow`; Go/frontend tests не запускались,
+  production/test code не менялся.
+- `scope-check`: `ok: true`, `outsideWriteSet: []`,
+  `missingRequiredChecks: []`; 4 exact paths отмечены diagnostic
+  `unledgered`, потому что desktop PostToolUse ledger их не записал.
 
 ## Итог
 
-Заполняется после реализации.
+Принят server-authoritative/privacy-first interaction protocol: generic
+persisted windows, public/actor-private/opaque predicates, simultaneous CAS,
+60/30/+10 с absolute cap 90, restart-safe deadline sweeper, один helper с
+server-enforced reward и bounded disconnect timeout. Все исходные design
+questions, выбранные варианты и причины сохранены и в lifecycle plan, и в
+подробном protocol. Первый future implementation path зафиксирован как
+generic windows/deadlines → combat interventions/help → frontend surface;
+runtime в этом docs-only плане не менялся.

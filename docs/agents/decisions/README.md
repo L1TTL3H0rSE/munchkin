@@ -8,3 +8,4 @@ ADR фиксирует причину сквозного принятого ре
 - `0004-lobby-core-cycle-and-interaction-boundary.md`
 - `0005-original-card-art-studio.md`
 - `0007-single-vps-production-platform.md`
+- `0008-multiplayer-interaction-windows.md`
