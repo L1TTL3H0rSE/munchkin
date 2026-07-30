@@ -2,7 +2,9 @@
 
 Этот каталог содержит Terraform foundation для production-инфраструктуры
 Munchkin в Yandex Cloud. Bootstrap apply от 2026-07-30 создал два service
-account, KMS key и state bucket; ignored bootstrap state пока остаётся local.
+account, KMS key и state bucket. Bootstrap state перенесён в private,
+versioned и KMS-encrypted Yandex Object Storage; ignored local plaintext state
+и backup удалены после повторной remote-проверки.
 Владелец создал один static S3 key вне Terraform и передал его только через
 process environment. Bucket-scoped `storage.configurer` remediation применена
 ровно для state service account; полный follow-up plan чистый. Повторный
@@ -13,8 +15,8 @@ service account; полный follow-up plan чистый. После remediatio
 Terraform plan подтвердил exact backend access и полный lock create/delete
 cycle. Concurrent race дал `1 planned / 3 blocked`, а post-race plan завершился
 exit `2`; `use_lockfile = true` поэтому закреплён во всех remote backend
-definitions. Remote backend не инициализировался для bootstrap/production,
-state migration не выполнялась.
+definitions. Bootstrap S3 backend активирован и migration завершена clean
+cloud-authenticated plan; production backend по-прежнему не инициализирован.
 
 ## Закреплённые версии
 
@@ -30,18 +32,23 @@ state migration не выполнялась.
 
 | Root | Backend сейчас | State key | Назначение |
 |---|---|---|---|
-| `bootstrap` | local | `bootstrap/terraform.tfstate` после отдельно согласованной миграции | Два service account, KMS key, state bucket и scoped access |
-| `environments/production` | S3 boundary с `use_lockfile = true`; локальные проверки используют `-backend=false` | `environments/production/terraform.tfstate` | Следующие production infrastructure plans |
+| `bootstrap` | S3 active, `use_lockfile = true`; local activation file ignored | `bootstrap/terraform.tfstate` | Два service account, KMS key, state bucket и scoped access |
+| `environments/production` | S3 skeleton с `use_lockfile = true`; backend ещё не инициализирован, локальные проверки используют `-backend=false` | `environments/production/terraform.tfstate` | Следующие production infrastructure plans |
 | `tests/state-lock` | S3 с `use_lockfile = true` | `tests/state-lock/terraform.tfstate` | Только isolated compatibility test |
 
 Workspaces не используются. Каждый root владеет ровно одним state key.
-Production и test roots всегда инициализируются как новые state; флаг
-`-migrate-state` допустим только для bootstrap root.
+Production и test roots всегда инициализируются как новые state. Одноразовая
+bootstrap migration уже выполнена; повторять `-migrate-state` без отдельного
+recovery plan нельзя.
 
-Bootstrap намеренно не загружает remote backend: конфигурация хранится как
-`bootstrap/backend.tf.example`. Копировать её в `backend.tf` можно только после
-отдельно подтверждённых bootstrap apply, owner-only создания S3 key и
-state-migration gate. Пример уже содержит проверенный `use_lockfile = true`.
+Bootstrap загружает remote backend из ignored `bootstrap/backend.tf`,
+byte-for-byte созданного из reviewed `bootstrap/backend.tf.example`. В Git
+остаётся только example; credential передаётся заново через process
+environment. Migration создала допустимые для Terraform S3 fallback новую
+lineage и serial `1`; exact semantic payload и девять resource addresses
+совпали с исходным local backup. Последующий cloud-authenticated plan вернул
+`No changes`, lock object освободился, а post-cleanup remote read повторно
+подтвердил payload и addresses.
 
 ## State boundary
 
@@ -187,13 +194,15 @@ focused check. До отдельного CI/toolchain plan `terraform-check.sh` 
 
 До отдельной явной команды владельца запрещены:
 
-1. копирование `backend.tf.example` в `backend.tf`;
-2. `terraform init -migrate-state`;
-3. инициализация production remote key;
-4. создание второго static key, rotation/revoke текущего key без отдельной
+1. инициализация production remote key;
+2. повторная bootstrap migration, `state push`, ручная правка state или
+   переключение bootstrap обратно на local backend;
+3. создание второго static key, rotation/revoke текущего key без отдельной
    recovery-команды;
-5. любые object operations вне
-   `tests/state-lock/terraform.tfstate` и его `.tflock`.
+4. direct object mutations и операции вне exact bootstrap/production/test
+   state и lock keys;
+5. восстановление previous version: versioning включён, но recovery drill ещё
+   не доказан.
 
 Authenticated bootstrap plan и reviewed apply уже были отдельно согласованы и
 завершены. Владелец отдельно разрешил exact `storage.configurer` binding:
@@ -211,12 +220,11 @@ access/recovery/concurrent-lock tests остаются остановлены д
 строго `1 add / 0 change / 0 destroy`. После отдельного approval интерактивный
 targeted apply завершился `1 added / 0 changed / 0 destroyed`, полный follow-up
 plan — `No changes`. Live IAM содержит ровно `storage.configurer` и
-`storage.editor`, оба только для state service account. Migration остаётся
-запрещена. Последующий isolated lock-cycle и concurrent race успешно
-подтвердили S3 lockfile compatibility.
-Перед state migration отдельно подтверждаются bucket/KMS, owner-only
-credential delivery и читаемый local state. После миграции remote object
-проверяется до удаления любого local backup.
+`storage.editor`, оба только для state service account. Последующий isolated
+lock-cycle и concurrent race успешно подтвердили S3 lockfile compatibility.
+После отдельного согласования bootstrap migration выполнена интерактивно без
+`-force-copy`; remote semantic equality, clean plan, lock release и повторная
+readability доказаны до и после exact удаления local state/backup.
 
 Успешный isolated concurrent-lock test разрешает `use_lockfile = true` в
 bootstrap example и production backend skeleton. Это не отменяет serialized

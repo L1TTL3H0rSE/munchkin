@@ -472,10 +472,10 @@ OS Login может позже заменить long-lived human key на IAM-ma
 Исключение возможно только в отдельной bootstrap phase для Terraform state,
 после нового plan и точного перечня commands/resources.
 
-## Как будет защищён Terraform state
+## Как защищён Terraform state
 
-Это не действие владельца на текущем шаге, а зафиксированная следующая
-реализация:
+Bootstrap state уже использует следующую реализацию; production backend
+остаётся skeleton до отдельной инициализации:
 
 1. Backend prerequisites создаются отдельной bootstrap phase.
 2. State хранится в отдельном private Object Storage bucket.
@@ -514,11 +514,11 @@ Terraform state может содержать sensitive values. Поэтому L
 
 ## Реализованный Terraform handoff
 
-На 2026-07-30 cloud bootstrap foundation применён с local state, а repository
-handoff содержит:
+На 2026-07-31 cloud bootstrap foundation применён, а bootstrap state
+перенесён в S3 backend Yandex Object Storage. Repository handoff содержит:
 
 - Terraform `1.15.8`, provider `yandex-cloud/yandex` `0.220.0`;
-- bootstrap root с local state;
+- bootstrap root с active ignored S3 backend и remote state;
 - production backend skeleton;
 - isolated `use_lockfile` compatibility fixture и воспроизводимый concurrent
   race test;
@@ -538,11 +538,11 @@ handoff содержит:
 - local fmt/init-without-backend/validate, credential scan и
   multi-platform lockfile check.
 
-Bootstrap remote backend намеренно остаётся неактивным в
-`infra/terraform/bootstrap/backend.tf.example`. Успешный isolated cloud race
-разрешил закрепить `use_lockfile = true` в bootstrap example и production
-backend skeleton. Это не активирует backend и не отменяет
-single-operator/serialized apply policy.
+Bootstrap remote backend активирован через ignored
+`infra/terraform/bootstrap/backend.tf`, byte-for-byte созданный из reviewed
+example. `use_lockfile = true` закреплён и в bootstrap example, и в production
+backend skeleton. Production backend это не инициализирует и
+single-operator/serialized apply policy не отменяет.
 
 Provider authentication использует только short-lived credential. Владелец
 создал один backend static key вне Terraform и передал его только через
@@ -551,7 +551,8 @@ state и saved plan не передаются в этот runbook.
 
 Созданы оба service account, KMS key и bucket; reviewed bootstrap apply
 завершился `7 added / 0 changed / 0 destroyed`. Static S3 key создан
-владельцем; state migration и production backend init не выполнялись.
+владельцем вне Terraform. Bootstrap migration выполнена; production backend
+init не выполнялся.
 Isolated test init не создал objects. Первый access probe получил `404` для
 отсутствующего exact `.tflock` и `403` на encrypted `PutObject`. Ответ `404`
 не доказывал разрешённое чтение; гипотеза, что достаточно отсутствующего
@@ -575,7 +576,8 @@ lock-lifecycle кандидат — bucket-scoped `storage.editor` с сохра
 bucket policy. Владелец отдельно разрешил repository change и
 cloud-authenticated plan exact
 `yandex_storage_bucket_iam_binding.state_backend_editor`, а затем отдельным
-сообщением разрешил apply только этого resource. Migration остаётся запрещена.
+сообщением разрешил apply только этого resource. На этом этапе migration
+оставалась запрещена.
 `storage.uploader` недостаточен, потому что lock cleanup требует
 `DeleteObject`.
 
@@ -599,8 +601,24 @@ account. На этом этапе migration ещё не запускалась, 
 `2`, а current test prefix остался пуст. Это доказывает совместимость pinned
 Terraform `1.15.8` с S3 lockfile в Yandex Object Storage.
 
-Владелец завершил cloud verification на успешном locking result.
-Previous-version recovery и state migration в этом plan не выполняются.
+После отдельного согласования ignored bootstrap backend активирован
+byte-for-byte из example, а local state интерактивно перенесён exact командой
+`terraform init -migrate-state` без `-force-copy`. S3 backend использовал
+Terraform fallback migration: remote state получил новую lineage и serial `1`.
+Сравнение в памяти подтвердило exact semantic equality
+`resources`/`outputs`/`check_results`, normalized operational payload и все
+девять resource addresses. Cloud-authenticated bootstrap plan с lock timeout
+вернул exit `0` и `No changes`; exact `.tflock` отсутствовал после команды.
+После повторной remote-проверки удалены только local
+`terraform.tfstate`/`.backup`. Финальный post-cleanup read снова подтвердил
+remote serial `1`, normalized SHA-256
+`2750a2ed8ba385a6ce00eec4f66df6137f97aa91a6950612990c907e30c2644f`
+и exact девять addresses. Raw state и credentials не записывались в runbook,
+Git или command output.
+
+Previous-version recovery остаётся непроверенным: bucket versioning включён,
+но recovery drill требует отдельного plan. Production backend init также не
+выполнялся.
 Попытка начать recovery через operator `yc` была отклонена `403` до создания
 любой state version; непроверенный recovery helper удалён из repository.
 
@@ -651,8 +669,8 @@ trusted control-plane principal: bucket-scoped `storage.configurer` нужен �
 lifecycle, encryption и другую configuration dedicated state bucket, но не
 даёт data access. Exact object ARNs в current bucket policy остаются
 неизменными. Согласованный HCL использует `storage.editor` только на exact
-bucket и только для state service account; live apply пока запрещён. После
-такого apply static backend credential нельзя будет считать неэскалируемой
+bucket и только для state service account; binding применён. Поэтому static
+backend credential нельзя считать неэскалируемой
 data-only boundary. Folder-wide role ему не выдаётся. Каждый authoritative
 binding требует pre-apply inventory полного current member set.
 
