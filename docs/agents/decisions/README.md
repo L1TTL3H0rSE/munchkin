@@ -7,5 +7,6 @@ ADR фиксирует причину сквозного принятого ре
 - `0003-content-pack-and-licensing-boundary.md`
 - `0004-lobby-core-cycle-and-interaction-boundary.md`
 - `0005-original-card-art-studio.md`
+- `0006-administration-control-plane.md`
 - `0007-single-vps-production-platform.md`
 - `0008-multiplayer-interaction-windows.md`

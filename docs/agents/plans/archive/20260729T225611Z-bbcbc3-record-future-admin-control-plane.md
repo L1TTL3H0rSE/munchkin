@@ -1,17 +1,17 @@
 # PLAN: record future admin control plane
 
 - **Plan ID:** `20260729T225611Z-bbcbc3-record-future-admin-control-plane`
-- **Статус:** awaiting_approval
+- **Статус:** completed
 - **Создан:** 2026-07-29 22:56:11 UTC
-- **Обновлён:** 2026-07-30 00:13:24 UTC
+- **Обновлён:** 2026-07-30 01:49:44 UTC
 - **Владелец:** Codex
 - **Workspace:** shared
 - **Ветка:** `main`
 - **Режим параллельности:** exclusive
 - **Зависит от:** plans `20260729T230648Z-127dc2-record-contest-infrastructure-roadmap`, `20260729T224707Z-7f21dd-record-card-art-object-storage`, `20260730T001008Z-74d4bb-map-multiplayer-interactions`.
 - **Блокирует:** будущие implementation plans для production admin console
-- **Связанные ADR/handoff:** ADR-0002, ADR-0003, ADR-0005, ADR-0007,
-  proposed ADR-0006, proposed ADR-0008,
+- **Связанные ADR/handoff:** ADR-0002, ADR-0003, ADR-0005, ADR-0006, ADR-0007,
+  ADR-0008,
   `docs/agents/INFRASTRUCTURE_ROADMAP.md`, storage plan
   `20260729T224707Z-7f21dd-record-card-art-object-storage`, interaction plan
   `20260730T001008Z-74d4bb-map-multiplayer-interactions`
@@ -55,47 +55,47 @@ local/dev Card Studio, P0-A/P0-B конкурсной инфраструктур
 
 ## Критерии приёмки
 
-- [ ] ADR описывает разделы будущей админки: content sets/versions/decks/cards,
+- [x] ADR описывает разделы будущей админки: content sets/versions/decks/cards,
   assets и provenance, Card Studio jobs, games, participants, безопасная
   история событий/боёв, а также audit/operations.
-- [ ] Admin control plane явно относится к P2 после стабильных HTTPS deploy,
+- [x] Admin control plane явно относится к P2 после стабильных HTTPS deploy,
   readiness, observability и backup/restore и не блокирует Sunday MVP.
-- [ ] «Показать всё, что хранится» определено как полное покрытие предметных
+- [x] «Показать всё, что хранится» определено как полное покрытие предметных
   сущностей curated read-моделями, а не как raw DB/filesystem browser.
-- [ ] Опубликованный `(set_id, version, content_digest)` остаётся immutable:
+- [x] Опубликованный `(set_id, version, content_digest)` остаётся immutable:
   создание и редактирование карт выполняется в draft следующей версии,
   публикация проходит schema/content/provenance validation.
-- [ ] Admin identity и authorization отделены от игровых bearer credentials;
+- [x] Admin identity и authorization отделены от игровых bearer credentials;
   для первого MVP рекомендована минимальная owner/admin роль, а расширенный
   RBAC оставлен отдельному implementation plan.
-- [ ] Admin и Card Studio не публикуются ingress-ом до отдельной production
+- [x] Admin и Card Studio не публикуются ingress-ом до отдельной production
   admin identity/auth boundary; после включения они доступны только через
   защищённый Traefik route/hostname, без прямых public DB/object-storage ports.
-- [ ] Raw snapshots, event payloads, command receipt projections, credential
+- [x] Raw snapshots, event payloads, command receipt projections, credential
   hashes, deck order, RNG state и private player state не показываются по
   умолчанию; история строится как redacted timeline/read model.
-- [ ] ADR фиксирует, что сейчас существуют только game-scoped guest players,
+- [x] ADR фиксирует, что сейчас существуют только game-scoped guest players,
   а не global user accounts; account/OIDC domain проектируется отдельно, если
   потребуются настоящие зарегистрированные пользователи.
-- [ ] Asset catalog работает через backend admin API и storage adapter:
+- [x] Asset catalog работает через backend admin API и storage adapter:
   frontend не получает S3 credentials, raw filesystem paths или прямой bucket
   browser; private candidates выдаются временными signed URLs.
-- [ ] Card-art asset storage отделён от PostgreSQL backup storage; admin не
+- [x] Card-art asset storage отделён от PostgreSQL backup storage; admin не
   показывает backup objects, backup credentials или содержимое backup.
-- [ ] Admin audit и OpenTelemetry разведены: append-only audit покрывает
+- [x] Admin audit и OpenTelemetry разведены: append-only audit покрывает
   каждую admin mutation минимальной allowlisted записью
   `actor/action/target/timestamp/result` без credentials, raw
   payloads/snapshots, prompts/images или иных secrets; operational telemetry
   может sampling-иться и не содержит display names или high-cardinality
   entity IDs.
-- [ ] Operations UI показывает только curated summaries: deployed SHA,
+- [x] Operations UI показывает только curated summaries: deployed SHA,
   readiness, backup age/result и безопасный статус Studio jobs, но не secrets,
   raw infrastructure config, backup contents или telemetry storage.
-- [ ] Будущие admin migrations, read models и audit data наследуют migration
+- [x] Будущие admin migrations, read models и audit data наследуют migration
   compatibility, readiness, backup/restore и rollback требования ADR-0007.
-- [ ] Связь с принятым S3-compatible asset storage decision обозначена без
+- [x] Связь с принятым S3-compatible asset storage decision обозначена без
   повторного выбора vendor, exact key layout, lifecycle/CDN или migration.
-- [ ] Документ содержит поэтапный roadmap и явно не меняет runtime code,
+- [x] Документ содержит поэтапный roadmap и явно не меняет runtime code,
   database, API, auth, storage либо content packs.
 
 ## Контекст и подтверждённое состояние
@@ -114,7 +114,8 @@ local/dev Card Studio, P0-A/P0-B конкурсной инфраструктур
   illustration brief, создавать generation jobs и approve-ить WebP в draft
   Moscow v2. CRUD механик карт, колод, наборов и production-admin auth нет.
 - Studio jobs/candidates сейчас лежат в локальном `.card-studio`, а approved
-  assets — внутри versioned content pack; S3-compatible production boundary
+  assets workflow помещает в draft `moscow-core@2` внутри versioned content
+  pack; это не доказывает публикацию v2. S3-compatible production boundary
   фиксируется предшествующим storage plan.
 - ADR-0007 задаёт single-VPS/Traefik production topology, vendor-neutral OTel
   boundary, readiness/deploy/rollback и off-host PostgreSQL backup и прямо
@@ -148,7 +149,9 @@ local/dev Card Studio, P0-A/P0-B конкурсной инфраструктур
 - Реализация S3 client, buckets, IAM, presigned URLs, CDN, retention или
   migration.
 - Изменение Traefik routes, OTel exporters/dashboards, backup jobs или restore.
-- Commit, push и публикация.
+- Production deploy, открытие ingress и публикация admin/Card Studio.
+  Commit/push выполняются только как обязательный lifecycle этого plan после
+  завершения проверок и архивирования.
 
 ## Архитектурный подход
 
@@ -225,25 +228,26 @@ local/dev Card Studio, P0-A/P0-B конкурсной инфраструктур
 
 ## План реализации
 
-1. [ ] После завершения storage и interaction dependencies создать ADR-0006
+1. [x] После завершения storage и interaction dependencies создать ADR-0006
    и перечислить current storage/domain inventory.
-2. [ ] Зафиксировать admin modules, protected Traefik exposure,
+2. [x] Зафиксировать admin modules, protected Traefik exposure,
    authorization/privacy boundaries, immutable draft/publish workflow и
    backend-owned asset access.
-3. [ ] Развести append-only admin audit и sampled operational OTel; описать
+3. [x] Развести append-only admin audit и sampled operational OTel; описать
    safe operations summaries и forbidden data.
-4. [ ] Наследовать migration/readiness/backup/restore/rollback boundary
+4. [x] Наследовать migration/readiness/backup/restore/rollback boundary
    ADR-0007 и добавить staged P2 implementation roadmap.
-5. [ ] Добавить ссылки на ADR-0002/0003/0005/0007 и ADR-0006 в decision index.
-6. [ ] Выполнить canonical checks, scope-check и архивировать plan.
+5. [x] Добавить ссылки на ADR-0002/0003/0005/0007/0008 и ADR-0006 в decision
+   index.
+6. [x] Выполнить canonical checks, scope-check и архивировать plan.
 
 ## Проверки
 
-- [ ] `node .codex/hooks/plan-lint.mjs`.
-- [ ] `./leinoctl text-check --changed`.
-- [ ] `./leinoctl verify --changed` на repository Node 24 toolchain.
-- [ ] `./leinoctl scope-check --plan 20260729T225611Z-bbcbc3-record-future-admin-control-plane`.
-- [ ] `git diff --check` и финальный read-only diff review.
+- [x] `node .codex/hooks/plan-lint.mjs`.
+- [x] `./leinoctl text-check --changed`.
+- [x] `./leinoctl verify --changed` на repository Node 24 toolchain.
+- [x] `./leinoctl scope-check --plan 20260729T225611Z-bbcbc3-record-future-admin-control-plane`.
+- [x] `git diff --check` и финальный read-only diff review.
 
 ## Риски и откат
 
@@ -266,29 +270,32 @@ local/dev Card Studio, P0-A/P0-B конкурсной инфраструктур
   **Снижение:** только typed summaries без secrets, configs и backup contents.
 - **Откат:** удалить новый ADR и строку из index обычным revert.
 
-## Открытые вопросы
+## Закрытые и отложенные design questions
 
-- Нужны ли отдельные зарегистрированные accounts уже в первом MVP, или раздел
-  «пользователи» сначала показывает только game-scoped guest participants.
-- Конкретный admin identity provider, protected hostname/route и RBAC matrix;
-  базовая single-VPS/Traefik topology уже задана ADR-0007.
-- Retention/export policy для games, events, receipts, studio jobs и assets.
-- Точный состав derived battle summaries и допустимый break-glass доступ.
-- Exact signed URL TTL и admin asset operations после принятия storage ADR.
+| Вопрос | Решение | Обоснование |
+|---|---|---|
+| Accounts в первом MVP | Только game-scoped guest participants | Global account domain сейчас отсутствует; нельзя выдавать guest player за user account |
+| Admin IdP/hostname/RBAC | Отложить отдельному auth implementation plan; первый role — owner/admin и deny-by-default | Конкретный механизм зависит от deployment/threat model, а игровые/Studio credentials переиспользовать нельзя |
+| Retention/export | Не добавлять destructive/export UI до отдельной data-class policy | Games, audit, jobs, candidates, published assets и backups требуют разных сроков и recovery |
+| Battle summaries | Versioned redacted projector по typed events и ADR-0008 | Raw replay/events содержат private authoritative state |
+| Break-glass | Не входит в owner-only MVP; требует отдельного решения со strong re-auth, purpose/expiry и immutable access audit | Generic raw-state browser слишком широк и опасен |
+| Signed URL TTL и operations | Закрепить short-lived/scoped/non-listable boundary, exact TTL и allowlist выбрать в storage implementation plan | Значения зависят от provider и измеренного workflow |
 
 ## Согласование
 
-- **Статус:** awaiting renewed user approval after material dependency and
-  risk update
+- **Статус:** approved and in progress
 - **Запрошено:** 2026-07-29 23:48:05 UTC
-- **Подтверждено:** —
+- **Подтверждено:** 2026-07-30 01:41:40 UTC
 - **Формулировка/ограничения пользователя:** «Я также хочу админку, в которой
   можно будет видеть текущие колоды, файлы, которые к ним прикреплены и
   возможность редактирования полей у каждой карты и создания новых… там
   должно отображаться вообще всё, что у нас хранится, то есть также пользаки
   и история боёв»; затем пользователь потребовал учесть утверждённый
   infrastructure roadmap в обоих active drafts и разрешил исправить их в
-  обновлённой session.
+  обновлённой session. 2026-07-30 пользователь явно согласовал четыре плана в
+  указанном порядке, включая этот четвёртый plan, и разрешил его `select`
+  только после полного завершения, отдельного commit и успешного push каждого
+  предшествующего plan.
 
 ## Ход выполнения
 
@@ -296,8 +303,35 @@ local/dev Card Studio, P0-A/P0-B конкурсной инфраструктур
   Card Studio и frontend contracts.
 - После принятия ADR-0007 обновлены dependencies, P2 sequencing, ingress,
   storage, audit/telemetry и recovery boundaries.
-- Draft заполнен; ADR и runtime реализация не начаты.
+- Storage и multiplayer dependencies завершены, отдельно закоммичены и
+  отправлены в `main` (`8653732`, `a08e2eb`); lifecycle ownership явно передан
+  текущей session.
+- Создан ADR-0006 и обновлён decision index. ADR сохраняет P2/docs-only
+  boundary, отделяет admin identity от игровых credentials и фиксирует curated
+  read models, immutable publish, private asset access, atomic mutation/audit,
+  recovery и staged roadmap.
+- Два независимых read-only review не нашли acceptance, security, privacy,
+  dependency или runtime-scope противоречий.
+- `leinoctl text-check --changed` проверил ADR и index без issues.
+- Canonical `leinoctl verify --changed` прошёл на Node 24.14.0: hooks `42/42`,
+  leinoctl `63 passed / 1 platform skip`, plan lint `0 issues`; impact
+  ограничен `repository-workflow`, поэтому Go/frontend/runtime checks не
+  запускались.
+- `git diff --check` и два независимых финальных read-only review прошли;
+  замечаний нет.
+- Active `scope-check` завершился с `ok: true`, `outsideWriteSet: []`,
+  `missingRequiredChecks: []`; три unledgered paths являются диагностикой
+  отсутствующего desktop PostToolUse ledger, а не scope violation.
+- Plan завершён и перенесён в archive. Runtime, API, database, auth, storage,
+  content pack и production configuration не менялись.
 
 ## Итог
 
-Заполняется после реализации.
+Принят ADR-0006 для будущего P2 admin control plane и обновлён ADR index.
+Решение каталогизирует content/assets/Studio/games/participants/history/audit
+и operations через curated typed read models, сохраняет immutable
+draft/publish boundary, отделяет admin identity от игровых credentials,
+запрещает raw snapshots/events/receipts и прямой storage/database browser,
+разводит append-only audit и sampled OTel и наследует recovery boundary
+ADR-0007. Открытые implementation-параметры сохранены как явно отложенные
+решения с privacy-first defaults.
