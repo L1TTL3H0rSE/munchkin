@@ -71,19 +71,535 @@ if [[ -e "$terraform_root/bootstrap/backend.tf" ]]; then
   exit 1
 fi
 
-if rg -q 'use_lockfile[[:space:]]*=' \
-  "$terraform_root/environments/production/backend.tf"; then
-  echo "production use_lockfile requires a successful isolated compatibility test" >&2
-  exit 1
-fi
-
-if ! rg -q 'use_lockfile[[:space:]]*=[[:space:]]*true' \
-  "$terraform_root/tests/state-lock/backend.tf"; then
-  echo "state-lock fixture must remain the isolated use_lockfile probe" >&2
-  exit 1
-fi
+for lock_backend in \
+  "$terraform_root/bootstrap/backend.tf.example" \
+  "$terraform_root/environments/production/backend.tf" \
+  "$terraform_root/tests/state-lock/backend.tf"; do
+  lock_setting_count="$(
+    rg -c 'use_lockfile[[:space:]]*=' "$lock_backend" || true
+  )"
+  if [[ "$lock_setting_count" != "1" ]] ||
+    ! rg -q 'use_lockfile[[:space:]]*=[[:space:]]*true' "$lock_backend"; then
+    echo "all remote backend definitions must enable proven S3 lockfiles exactly once: $lock_backend" >&2
+    exit 1
+  fi
+done
 
 terraform fmt -check -recursive "$terraform_root"
+
+policy_source="$terraform_root/bootstrap/main.tf"
+
+extract_policy_statement() {
+  local sid="$1"
+  awk -v sid="$sid" '
+    index($0, "Sid    = \"" sid "\"") {
+      in_statement = 1
+    }
+    in_statement {
+      print
+    }
+    in_statement && /^      },[[:space:]]*$/ {
+      exit
+    }
+  ' "$policy_source"
+}
+
+require_assignment_count() {
+  local label="$1"
+  local block="$2"
+  local expected_count="$3"
+  local actual_count
+
+  actual_count="$(
+    printf '%s\n' "$block" |
+      awk '
+        /^[[:space:]]*#/ {
+          next
+        }
+        index($0, "=") {
+          count += 1
+        }
+        END {
+          print count + 0
+        }
+      '
+  )"
+  if [[ "$actual_count" != "$expected_count" ]]; then
+    echo "$label must contain exactly $expected_count assignments; got $actual_count" >&2
+    exit 1
+  fi
+}
+
+require_exact_scalar_attribute() {
+  local label="$1"
+  local block="$2"
+  local attribute="$3"
+  local expected_value="$4"
+  local actual_values
+
+  actual_values="$(
+    printf '%s\n' "$block" |
+      awk -v attribute="$attribute" '
+        index($0, "=") {
+          line = $0
+          sub(/^[[:space:]]*/, "", line)
+          equals = index(line, "=")
+          name = substr(line, 1, equals - 1)
+          value = substr(line, equals + 1)
+          sub(/[[:space:]]*$/, "", name)
+          sub(/^[[:space:]]*/, "", value)
+          sub(/[[:space:]]*$/, "", value)
+          if (name == attribute) {
+            print value
+          }
+        }
+      '
+  )"
+  if [[ "$actual_values" != "$expected_value" ]]; then
+    echo "$label must set only $attribute = $expected_value" >&2
+    exit 1
+  fi
+}
+
+require_exact_hcl_list() {
+  local label="$1"
+  local block="$2"
+  local attribute="$3"
+  shift 3
+  local expected_values
+  local actual_values
+
+  expected_values="$(printf '%s\n' "$@")"
+  if ! actual_values="$(
+    printf '%s\n' "$block" |
+      awk -v attribute="$attribute" '
+        {
+          line = $0
+          sub(/^[[:space:]]*/, "", line)
+        }
+        !in_list && index(line, "=") {
+          equals = index(line, "=")
+          name = substr(line, 1, equals - 1)
+          value = substr(line, equals + 1)
+          sub(/[[:space:]]*$/, "", name)
+          sub(/^[[:space:]]*/, "", value)
+          sub(/[[:space:]]*$/, "", value)
+          if (name == attribute) {
+            seen += 1
+            if (value != "[") {
+              invalid = 1
+            }
+            in_list = 1
+            next
+          }
+        }
+        in_list && line == "]" {
+          closed = 1
+          in_list = 0
+          next
+        }
+        in_list {
+          if (line ~ /^"[^"]+",?$/) {
+            sub(/^"/, "", line)
+            sub(/",?$/, "", line)
+            print line
+            next
+          }
+          if (line != "") {
+            invalid = 1
+          }
+        }
+        END {
+          if (seen != 1 || !closed || invalid) {
+            exit 2
+          }
+        }
+      '
+  )"; then
+    echo "$label must contain one literal $attribute list" >&2
+    exit 1
+  fi
+  if [[ "$actual_values" != "$expected_values" ]]; then
+    echo "$label has unexpected $attribute values" >&2
+    exit 1
+  fi
+}
+
+require_unique_policy_statement() {
+  local sid="$1"
+  local statement="$2"
+
+  if [[ -z "$statement" ]] ||
+    [[ "$(rg -c -F "Sid    = \"$sid\"" "$policy_source")" != "1" ]]; then
+    echo "bucket policy must contain exactly one $sid statement" >&2
+    exit 1
+  fi
+}
+
+locals_signature="locals {"
+bootstrap_locals="$(
+  awk -v signature="$locals_signature" '
+    $0 == signature {
+      in_locals = 1
+    }
+    in_locals {
+      print
+    }
+    in_locals && /^}$/ {
+      exit
+    }
+  ' "$policy_source"
+)"
+if [[ -z "$bootstrap_locals" ]] ||
+  [[ "$(rg -c -F "$locals_signature" "$policy_source")" != "1" ]]; then
+  echo "bootstrap must contain exactly one reviewed locals block" >&2
+  exit 1
+fi
+require_assignment_count "bootstrap locals" "$bootstrap_locals" 10
+require_exact_scalar_attribute \
+  "bootstrap locals" \
+  "$bootstrap_locals" \
+  "state_bucket_name" \
+  '"munchkin-prod-tfstate-b1g55l8i2mtpv23b5ql7"'
+require_exact_scalar_attribute \
+  "bootstrap locals" \
+  "$bootstrap_locals" \
+  "operator_principal_id" \
+  'split(":", var.operator_subject)[1]'
+require_exact_hcl_list \
+  "bootstrap locals" \
+  "$bootstrap_locals" \
+  "state_keys" \
+  "bootstrap/terraform.tfstate" \
+  "environments/production/terraform.tfstate" \
+  "tests/state-lock/terraform.tfstate"
+require_exact_scalar_attribute \
+  "bootstrap locals" \
+  "$bootstrap_locals" \
+  "lock_keys" \
+  '[for key in local.state_keys : "${key}.tflock"]'
+require_exact_scalar_attribute \
+  "bootstrap locals" \
+  "$bootstrap_locals" \
+  "list_prefixes" \
+  "concat(local.state_keys, local.lock_keys)"
+
+state_object_arns_definition="$(
+  printf '%s\n' "$bootstrap_locals" |
+    awk '
+      /^  state_object_arns = \[$/ {
+        in_definition = 1
+      }
+      in_definition {
+        print
+      }
+      in_definition && /^  \]$/ {
+        exit
+      }
+    '
+)"
+expected_state_object_arns_definition='  state_object_arns = [
+    for key in local.state_keys :
+    "arn:aws:s3:::${local.state_bucket_name}/${key}"
+  ]'
+if [[ "$state_object_arns_definition" != "$expected_state_object_arns_definition" ]]; then
+  echo "state object ARNs must derive only from the three reviewed state keys" >&2
+  exit 1
+fi
+
+lock_object_arns_definition="$(
+  printf '%s\n' "$bootstrap_locals" |
+    awk '
+      /^  lock_object_arns = \[$/ {
+        in_definition = 1
+      }
+      in_definition {
+        print
+      }
+      in_definition && /^  \]$/ {
+        exit
+      }
+    '
+)"
+expected_lock_object_arns_definition='  lock_object_arns = [
+    for key in local.lock_keys :
+    "arn:aws:s3:::${local.state_bucket_name}/${key}"
+  ]'
+if [[ "$lock_object_arns_definition" != "$expected_lock_object_arns_definition" ]]; then
+  echo "lock object ARNs must derive only from the three reviewed lock keys" >&2
+  exit 1
+fi
+
+configurer_signature='resource "yandex_storage_bucket_iam_binding" "state_backend_configurer" {'
+configurer_binding="$(
+  awk -v signature="$configurer_signature" '
+    $0 == signature {
+      in_resource = 1
+    }
+    in_resource {
+      print
+    }
+    in_resource && /^}$/ {
+      exit
+    }
+  ' "$policy_source"
+)"
+if [[ -z "$configurer_binding" ]] ||
+  [[ "$(rg -c -F "$configurer_signature" "$policy_source")" != "1" ]]; then
+  echo "bootstrap must contain exactly one bucket-scoped state backend configurer binding" >&2
+  exit 1
+fi
+require_assignment_count "state backend configurer binding" "$configurer_binding" 3
+require_exact_scalar_attribute \
+  "state backend configurer binding" \
+  "$configurer_binding" \
+  "bucket" \
+  "yandex_storage_bucket.terraform_state.bucket"
+require_exact_scalar_attribute \
+  "state backend configurer binding" \
+  "$configurer_binding" \
+  "role" \
+  '"storage.configurer"'
+require_exact_hcl_list \
+  "state backend configurer binding" \
+  "$configurer_binding" \
+  "members" \
+  'serviceAccount:${yandex_iam_service_account.state_backend.id}'
+if printf '%s\n' "$configurer_binding" |
+  rg -q 'folder_id|cloud_id|terraform_deployer|operator'; then
+  echo "state backend configurer must not be folder-wide or target another identity" >&2
+  exit 1
+fi
+if [[ "$(
+  rg -c '^[[:space:]]*role[[:space:]]*=[[:space:]]*"storage\.configurer"$' \
+    "$policy_source"
+)" != "1" ]]; then
+  echo "storage.configurer must have exactly one bucket-scoped declaration" >&2
+  exit 1
+fi
+
+editor_signature='resource "yandex_storage_bucket_iam_binding" "state_backend_editor" {'
+editor_binding="$(
+  awk -v signature="$editor_signature" '
+    $0 == signature {
+      in_resource = 1
+    }
+    in_resource {
+      print
+    }
+    in_resource && /^}$/ {
+      exit
+    }
+  ' "$policy_source"
+)"
+if [[ -z "$editor_binding" ]] ||
+  [[ "$(rg -c -F "$editor_signature" "$policy_source")" != "1" ]]; then
+  echo "bootstrap must contain exactly one bucket-scoped state backend editor binding" >&2
+  exit 1
+fi
+require_assignment_count "state backend editor binding" "$editor_binding" 3
+require_exact_scalar_attribute \
+  "state backend editor binding" \
+  "$editor_binding" \
+  "bucket" \
+  "yandex_storage_bucket.terraform_state.bucket"
+require_exact_scalar_attribute \
+  "state backend editor binding" \
+  "$editor_binding" \
+  "role" \
+  '"storage.editor"'
+require_exact_hcl_list \
+  "state backend editor binding" \
+  "$editor_binding" \
+  "members" \
+  'serviceAccount:${yandex_iam_service_account.state_backend.id}'
+if printf '%s\n' "$editor_binding" |
+  rg -q 'folder_id|cloud_id|terraform_deployer|operator'; then
+  echo "state backend editor must not be folder-wide or target another identity" >&2
+  exit 1
+fi
+if [[ "$(
+  rg -c '^[[:space:]]*role[[:space:]]*=[[:space:]]*"storage\.editor"$' \
+    "$policy_source"
+)" != "1" ]]; then
+  echo "storage.editor must have exactly one bucket-scoped declaration" >&2
+  exit 1
+fi
+if [[ "$(
+  rg -c '^resource "yandex_storage_bucket_iam_binding"' "$policy_source"
+)" != "2" ]]; then
+  echo "bootstrap must contain only the reviewed configurer and editor bucket IAM bindings" >&2
+  exit 1
+fi
+
+if [[ "$(rg -c '^      \{$' "$policy_source")" != "5" ]] ||
+  [[ "$(rg -c '^[[:space:]]*Sid[[:space:]]*=' "$policy_source")" != "5" ]]; then
+  echo "bucket policy must contain exactly the five reviewed statements" >&2
+  exit 1
+fi
+
+operator_sid="ManageBucketConfigurationWithoutObjectAccess"
+operator_statement="$(extract_policy_statement "$operator_sid")"
+require_unique_policy_statement "$operator_sid" "$operator_statement"
+require_assignment_count "$operator_sid statement" "$operator_statement" 6
+require_exact_scalar_attribute \
+  "$operator_sid statement" "$operator_statement" "Sid" "\"$operator_sid\""
+require_exact_scalar_attribute \
+  "$operator_sid statement" "$operator_statement" "Effect" '"Allow"'
+require_exact_scalar_attribute \
+  "$operator_sid statement" "$operator_statement" "Principal" "{"
+require_exact_scalar_attribute \
+  "$operator_sid" \
+  "$operator_statement" \
+  "CanonicalUser" \
+  "local.operator_principal_id"
+require_exact_scalar_attribute \
+  "$operator_sid statement" "$operator_statement" "Action" '"s3:*"'
+require_exact_scalar_attribute \
+  "$operator_sid statement" \
+  "$operator_statement" \
+  "Resource" \
+  '"arn:aws:s3:::${local.state_bucket_name}"'
+if printf '%s\n' "$operator_statement" |
+  rg -q 'state_object_arns|lock_object_arns|arn:aws:s3:::[^"]+/|/\*'; then
+  echo "operator bucket policy statement must not contain an object ARN" >&2
+  exit 1
+fi
+
+location_sid="ReadBucketLocation"
+location_statement="$(extract_policy_statement "$location_sid")"
+require_unique_policy_statement "$location_sid" "$location_statement"
+require_assignment_count "$location_sid statement" "$location_statement" 6
+require_exact_scalar_attribute \
+  "$location_sid statement" "$location_statement" "Sid" "\"$location_sid\""
+require_exact_scalar_attribute \
+  "$location_sid statement" "$location_statement" "Effect" '"Allow"'
+require_exact_scalar_attribute \
+  "$location_sid statement" "$location_statement" "Principal" "{"
+require_exact_scalar_attribute \
+  "$location_sid statement" \
+  "$location_statement" \
+  "CanonicalUser" \
+  "yandex_iam_service_account.state_backend.id"
+require_exact_scalar_attribute \
+  "$location_sid statement" \
+  "$location_statement" \
+  "Action" \
+  '"s3:GetBucketLocation"'
+require_exact_scalar_attribute \
+  "$location_sid statement" \
+  "$location_statement" \
+  "Resource" \
+  '"arn:aws:s3:::${local.state_bucket_name}"'
+
+list_sid="ListOnlyStatePrefixes"
+list_statement="$(extract_policy_statement "$list_sid")"
+require_unique_policy_statement "$list_sid" "$list_statement"
+require_assignment_count "$list_sid statement" "$list_statement" 9
+require_exact_scalar_attribute \
+  "$list_sid statement" "$list_statement" "Sid" "\"$list_sid\""
+require_exact_scalar_attribute \
+  "$list_sid statement" "$list_statement" "Effect" '"Allow"'
+require_exact_scalar_attribute \
+  "$list_sid statement" "$list_statement" "Principal" "{"
+require_exact_scalar_attribute \
+  "$list_sid statement" \
+  "$list_statement" \
+  "CanonicalUser" \
+  "yandex_iam_service_account.state_backend.id"
+require_exact_scalar_attribute \
+  "$list_sid statement" "$list_statement" "Action" '"s3:ListBucket"'
+require_exact_scalar_attribute \
+  "$list_sid statement" \
+  "$list_statement" \
+  "Resource" \
+  '"arn:aws:s3:::${local.state_bucket_name}"'
+require_exact_scalar_attribute \
+  "$list_sid statement" "$list_statement" "Condition" "{"
+require_exact_scalar_attribute \
+  "$list_sid statement" "$list_statement" "StringEquals" "{"
+require_exact_scalar_attribute \
+  "$list_sid statement" \
+  "$list_statement" \
+  '"s3:prefix"' \
+  "local.list_prefixes"
+
+state_sid="ReadWriteExactStateObjects"
+state_statement="$(extract_policy_statement "ReadWriteExactStateObjects")"
+require_unique_policy_statement "$state_sid" "$state_statement"
+require_assignment_count "$state_sid statement" "$state_statement" 6
+require_exact_scalar_attribute \
+  "$state_sid statement" "$state_statement" "Sid" "\"$state_sid\""
+require_exact_scalar_attribute \
+  "$state_sid statement" "$state_statement" "Effect" '"Allow"'
+require_exact_scalar_attribute \
+  "$state_sid statement" "$state_statement" "Principal" "{"
+require_exact_scalar_attribute \
+  "$state_sid statement" \
+  "$state_statement" \
+  "CanonicalUser" \
+  "yandex_iam_service_account.state_backend.id"
+require_exact_hcl_list \
+  "$state_sid statement" \
+  "$state_statement" \
+  "Action" \
+  "s3:GetObject" \
+  "s3:GetObjectVersion" \
+  "s3:PutObject"
+require_exact_scalar_attribute \
+  "$state_sid statement" "$state_statement" "Resource" "local.state_object_arns"
+
+lock_sid="ManageExactLockObjects"
+lock_statement="$(extract_policy_statement "ManageExactLockObjects")"
+require_unique_policy_statement "$lock_sid" "$lock_statement"
+require_assignment_count "$lock_sid statement" "$lock_statement" 6
+require_exact_scalar_attribute \
+  "$lock_sid statement" "$lock_statement" "Sid" "\"$lock_sid\""
+require_exact_scalar_attribute \
+  "$lock_sid statement" "$lock_statement" "Effect" '"Allow"'
+require_exact_scalar_attribute \
+  "$lock_sid statement" "$lock_statement" "Principal" "{"
+require_exact_scalar_attribute \
+  "$lock_sid statement" \
+  "$lock_statement" \
+  "CanonicalUser" \
+  "yandex_iam_service_account.state_backend.id"
+require_exact_hcl_list \
+  "$lock_sid statement" \
+  "$lock_statement" \
+  "Action" \
+  "s3:DeleteObject" \
+  "s3:GetObject" \
+  "s3:PutObject"
+require_exact_scalar_attribute \
+  "$lock_sid statement" "$lock_statement" "Resource" "local.lock_object_arns"
+
+policy_statement_body="$(
+  awk '
+    /^    Statement = \[$/ {
+      in_statements = 1
+      next
+    }
+    in_statements && /^    \]$/ {
+      exit
+    }
+    in_statements {
+      print
+    }
+  ' "$policy_source" |
+    sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d'
+)"
+reviewed_statement_body="$(
+  printf '      {\n%s\n' "$operator_statement"
+  printf '      {\n%s\n' "$location_statement"
+  printf '      {\n%s\n' "$list_statement"
+  printf '      {\n%s\n' "$state_statement"
+  printf '      {\n%s\n' "$lock_statement"
+)"
+if [[ "$policy_statement_body" != "$reviewed_statement_body" ]]; then
+  echo "bucket policy statement list must contain only the five reviewed statements" >&2
+  exit 1
+fi
 
 temp_parent="${TMPDIR:-/tmp}"
 mkdir -p -- "$temp_parent"

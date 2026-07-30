@@ -1,8 +1,9 @@
 locals {
-  cloud_id          = "b1gppf0332cb1uanlrqf"
-  folder_id         = "b1g55l8i2mtpv23b5ql7"
-  default_zone      = "ru-central1-d"
-  state_bucket_name = "munchkin-prod-tfstate-b1g55l8i2mtpv23b5ql7"
+  cloud_id              = "b1gppf0332cb1uanlrqf"
+  folder_id             = "b1g55l8i2mtpv23b5ql7"
+  default_zone          = "ru-central1-d"
+  state_bucket_name     = "munchkin-prod-tfstate-b1g55l8i2mtpv23b5ql7"
+  operator_principal_id = split(":", var.operator_subject)[1]
 
   state_keys = [
     "bootstrap/terraform.tfstate",
@@ -95,19 +96,57 @@ resource "yandex_storage_bucket" "terraform_state" {
   }
 }
 
+# Yandex requires storage.configurer in addition to the KMS key role when
+# working with a KMS-encrypted bucket. This role is configuration-only and does
+# not satisfy the initial IAM/ACL gate for object data. Scope it to this
+# dedicated bucket: it can still change bucket policy/encryption and is
+# therefore a trusted control-plane boundary, while object policy grants remain
+# exact-key below.
+resource "yandex_storage_bucket_iam_binding" "state_backend_configurer" {
+  bucket = yandex_storage_bucket.terraform_state.bucket
+  role   = "storage.configurer"
+  members = [
+    "serviceAccount:${yandex_iam_service_account.state_backend.id}",
+  ]
+}
+
+# Object Storage evaluates IAM/bucket ACL before bucket policy. Terraform's
+# lock lifecycle requires read, upload, and delete, so the smallest suitable
+# built-in data role is storage.editor. Keep it bucket-scoped and rely on the
+# exact-key policy below as the second gate. The static-key identity remains a
+# trusted principal because configurer already lets it rewrite that policy.
+resource "yandex_storage_bucket_iam_binding" "state_backend_editor" {
+  bucket = yandex_storage_bucket.terraform_state.bucket
+  role   = "storage.editor"
+  members = [
+    "serviceAccount:${yandex_iam_service_account.state_backend.id}",
+  ]
+}
+
 resource "yandex_storage_bucket_policy" "terraform_state" {
   bucket = yandex_storage_bucket.terraform_state.bucket
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # Trusted control-plane administrator: no object ARN is granted directly,
+      # but policy/config management can change future access and availability.
+      {
+        Sid    = "ManageBucketConfigurationWithoutObjectAccess"
+        Effect = "Allow"
+        Principal = {
+          CanonicalUser = local.operator_principal_id
+        }
+        Action   = "s3:*"
+        Resource = "arn:aws:s3:::${local.state_bucket_name}"
+      },
       {
         Sid    = "ReadBucketLocation"
         Effect = "Allow"
         Principal = {
           CanonicalUser = yandex_iam_service_account.state_backend.id
         }
-        Action   = ["s3:GetBucketLocation"]
-        Resource = ["arn:aws:s3:::${local.state_bucket_name}"]
+        Action   = "s3:GetBucketLocation"
+        Resource = "arn:aws:s3:::${local.state_bucket_name}"
       },
       {
         Sid    = "ListOnlyStatePrefixes"
@@ -115,10 +154,8 @@ resource "yandex_storage_bucket_policy" "terraform_state" {
         Principal = {
           CanonicalUser = yandex_iam_service_account.state_backend.id
         }
-        Action = [
-          "s3:ListBucket",
-        ]
-        Resource = ["arn:aws:s3:::${local.state_bucket_name}"]
+        Action   = "s3:ListBucket"
+        Resource = "arn:aws:s3:::${local.state_bucket_name}"
         Condition = {
           StringEquals = {
             "s3:prefix" = local.list_prefixes
@@ -156,5 +193,7 @@ resource "yandex_storage_bucket_policy" "terraform_state" {
 
   depends_on = [
     yandex_kms_symmetric_key_iam_member.state_backend,
+    yandex_storage_bucket_iam_binding.state_backend_configurer,
+    yandex_storage_bucket_iam_binding.state_backend_editor,
   ]
 }

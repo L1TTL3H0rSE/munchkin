@@ -486,7 +486,12 @@ OS Login может позже заменить long-lived human key на IAM-ma
    принадлежит отдельному state service account и ограничен state bucket.
    Static key создаётся защищённой owner/bootstrap-процедурой вне Terraform:
    Terraform не управляет key resource, не импортирует secret и не сохраняет
-   его в state.
+   его в state. Для KMS-encrypted bucket state account получает
+   документированный Yandex configuration prerequisite `storage.configurer`
+   только на dedicated state bucket. Эта роль не даёт object data access:
+   отдельно нужен базовый IAM/ACL data grant, который согласуется только после
+   exact access test. Это trusted configuration boundary, не folder-wide role
+   и не hard isolation.
 7. Production apply сериализуется GitHub `concurrency` и manual approval.
 8. S3 `use_lockfile` допускается только после concurrent-lock test на test
    state с pinned Terraform version.
@@ -507,41 +512,149 @@ Terraform state может содержать sensitive values. Поэтому L
 - [HashiCorp S3 backend](https://developer.hashicorp.com/terraform/language/backend/s3);
 - [HashiCorp sensitive data](https://developer.hashicorp.com/terraform/language/manage-sensitive-data).
 
-## Реализованный code-only Terraform handoff
+## Реализованный Terraform handoff
 
-На 2026-07-30 repository содержит локально проверенный, но ещё не применённый
-Terraform foundation:
+На 2026-07-30 cloud bootstrap foundation применён с local state, а repository
+handoff содержит:
 
 - Terraform `1.15.8`, provider `yandex-cloud/yandex` `0.220.0`;
 - bootstrap root с local state;
 - production backend skeleton;
-- isolated `use_lockfile` compatibility fixture;
+- isolated `use_lockfile` compatibility fixture и воспроизводимый concurrent
+  race test;
 - ожидаемый bucket
   `munchkin-prod-tfstate-b1g55l8i2mtpv23b5ql7`;
 - state keys `bootstrap/terraform.tfstate`,
   `environments/production/terraform.tfstate` и
   `tests/state-lock/terraform.tfstate`;
-- отдельные deployer/state service accounts, KMS key, private versioned bucket
-  и policy для exact state/lock objects;
+- применённые отдельные deployer/state service accounts, KMS key, private
+  versioned bucket и policy для exact state/lock objects;
+- применённый bucket-scoped `storage.configurer` state account как
+  configuration prerequisite KMS-encrypted bucket; data access эта роль не
+  предоставляет;
+- operator bucket-policy statement с `s3:*` только на bucket ARN без `/*`;
+  он позволяет Terraform refresh и управление bucket configuration/policy,
+  но не даёт operator прямой object-level grant к содержимому state;
 - local fmt/init-without-backend/validate, credential scan и
   multi-platform lockfile check.
 
 Bootstrap remote backend намеренно остаётся неактивным в
-`infra/terraform/bootstrap/backend.tf.example`. Production пока не включает
-`use_lockfile`: до isolated cloud test действует single-operator/serialized
-policy.
+`infra/terraform/bootstrap/backend.tf.example`. Успешный isolated cloud race
+разрешил закрепить `use_lockfile = true` в bootstrap example и production
+backend skeleton. Это не активирует backend и не отменяет
+single-operator/serialized apply policy.
 
-Provider authentication использует только short-lived credential. Backend
-credential позже передаётся только через `AWS_ACCESS_KEY_ID` и
-`AWS_SECRET_ACCESS_KEY`; static key создаёт владелец вне Terraform после
-отдельного подтверждения. Key, state и saved plan не передаются в этот
-runbook.
+Provider authentication использует только short-lived credential. Владелец
+создал один backend static key вне Terraform и передал его только через
+`AWS_ACCESS_KEY_ID` и `AWS_SECRET_ACCESS_KEY` в process environment. Key,
+state и saved plan не передаются в этот runbook.
 
-Сейчас не создан ни один service account, KMS key или bucket; не выполнялись
-cloud plan/apply, key creation, state migration, access/recovery/locking tests.
-Каждый из этих gates требует отдельной команды владельца. Технические границы
-и разрешённые локальные команды описаны в
+Созданы оба service account, KMS key и bucket; reviewed bootstrap apply
+завершился `7 added / 0 changed / 0 destroyed`. Static S3 key создан
+владельцем; state migration и production backend init не выполнялись.
+Isolated test init не создал objects. Первый access probe получил `404` для
+отсутствующего exact `.tflock` и `403` на encrypted `PutObject`. Ответ `404`
+не доказывал разрешённое чтение; гипотеза, что достаточно отсутствующего
+`storage.configurer`, оказалась неполной. Repository remediation и
+authenticated plan были разрешены; exact plan показал
+`1 add / 0 change / 0 destroy`, только
+`yandex_storage_bucket_iam_binding.state_backend_configurer`. После отдельного
+разрешения targeted apply завершился `1 added / 0 changed / 0 destroyed`;
+полный follow-up plan без `-target` вернул `No changes`.
+
+Повторный isolated Terraform plan после apply снова остановился на exact
+`tests/state-lock/terraform.tfstate.tflock`: `PutObject` вернул `403`, а
+`GetObject` отсутствующего lock — `404`. Direct ListObjectsV2 вернул `403` и
+для exact test prefix, и для foreign prefix. Live bucket policy, KMS
+`kms.keys.encrypterDecrypter`, static-key owner и exact principal совпадают с
+HCL; live bucket IAM содержит только `storage.configurer` state service
+account. По алгоритму Yandex bucket policy проверяется после начального
+IAM/bucket-ACL gate, а `storage.configurer` прямо не предоставляет data access.
+Следовательно, access/locking/recovery пока не готовы. Следующий полный
+lock-lifecycle кандидат — bucket-scoped `storage.editor` с сохранением exact-key
+bucket policy. Владелец отдельно разрешил repository change и
+cloud-authenticated plan exact
+`yandex_storage_bucket_iam_binding.state_backend_editor`, а затем отдельным
+сообщением разрешил apply только этого resource. Migration остаётся запрещена.
+`storage.uploader` недостаточен, потому что lock cleanup требует
+`DeleteObject`.
+
+Read-only authoritative preflight подтвердил `storage.editor = 0`, при этом
+единственный live bucket binding — ранее применённый `storage.configurer`
+exact state service account. Полный cloud-authenticated Terraform plan без
+`-target` и без saved plan завершился exit `2`: единственный create —
+`yandex_storage_bucket_iam_binding.state_backend_editor`, summary строго
+`1 add / 0 change / 0 destroy`. Непосредственно перед apply inventory и fresh
+plan дали тот же результат. Интерактивный targeted apply без `-auto-approve`
+завершился `1 added / 0 changed / 0 destroyed`; обязательный полный follow-up
+plan без `-target` вернул `No changes`. Post-apply inventory содержит ровно два
+binding — `storage.configurer` и `storage.editor` — оба только для state service
+account. На этом этапе migration ещё не запускалась, test prefix был пуст.
+
+После remediation isolated plan на
+`tests/state-lock/terraform.tfstate` завершился exit `2`, показал ровно
+`1 add / 0 change / 0 destroy` и успешно прошёл create/delete cycle exact
+`.tflock`. Затем четыре одновременных plan дали один `planned` и три
+`Error acquiring the state lock`; контрольный post-race plan снова вернул exit
+`2`, а current test prefix остался пуст. Это доказывает совместимость pinned
+Terraform `1.15.8` с S3 lockfile в Yandex Object Storage.
+
+Владелец завершил cloud verification на успешном locking result.
+Previous-version recovery и state migration в этом plan не выполняются.
+Попытка начать recovery через operator `yc` была отклонена `403` до создания
+любой state version; непроверенный recovery helper удалён из repository.
+
+Каждый Terraform IAM binding authoritative для своей роли: apply заменяет
+полный список bucket-level role на `members` из HCL, а обычный plan не
+показывает удаление участников, добавленных вне Terraform. Read-only
+`Bucket.ListAccessBindings` по bucket `resource_id`
+`e3e78pmu1f66ldcmhct5` перед текущим apply вернул `200` и
+`storage.configurer = 0`; неожиданных участников, которых binding мог бы
+вытеснить, не было. После apply тот же API подтвердил ровно одного участника:
+`serviceAccount:ajerqsno94ctbvgmlltf`. Повторять inventory нужно перед каждым
+следующим apply для `storage.configurer` или `storage.editor` и
+останавливаться при любом расхождении. Имя bucket нельзя подставлять вместо
+`resource_id`: такой запрос возвращает `NOT_FOUND`.
+
+Технические границы и разрешённые локальные команды описаны в
 [`infra/terraform/README.md`](../../infra/terraform/README.md).
+
+### Одноразовое восстановление bucket policy
+
+Если exact-object policy уже применена без operator bucket-level statement,
+Terraform provider получает `403` при refresh bucket и не может сам исправить
+policy. После отдельного owner approval разрешён один control-plane update:
+
+1. сформировать временный non-secret JSON, полностью совпадающий с policy в
+   `infra/terraform/bootstrap/main.tf`;
+2. проверить, что operator statement содержит только bucket ARN без `/*`, а
+   object ARNs принадлежат только state service account;
+3. выполнить `yc storage bucket update --policy-from-file <temporary-file>`;
+4. немедленно запустить authenticated Terraform plan и требовать
+   `0 add / 0 change / 0 destroy`;
+5. удалить временный JSON.
+
+Этот recovery не создаёт static S3 key, не включает backend и не мигрирует
+local state.
+
+Operator при этом является trusted control-plane administrator, а не
+неэскалируемым read-only principal. Bucket ARN не является object ARN, поэтому
+current statement напрямую не разрешает object data actions. Однако
+возможность менять policy, lifecycle, encryption и access configuration может
+изменить будущий доступ или косвенно удалить/раскрыть state; direct API actions
+обходят Terraform `prevent_destroy`. Любая такая операция требует отдельного
+review и проверки cloud audit log.
+
+State service account после KMS configuration remediation также является
+trusted control-plane principal: bucket-scoped `storage.configurer` нужен для
+работы с KMS-encrypted bucket и одновременно позволяет менять policy,
+lifecycle, encryption и другую configuration dedicated state bucket, но не
+даёт data access. Exact object ARNs в current bucket policy остаются
+неизменными. Согласованный HCL использует `storage.editor` только на exact
+bucket и только для state service account; live apply пока запрещён. После
+такого apply static backend credential нельзя будет считать неэскалируемой
+data-only boundary. Folder-wide role ему не выдаётся. Каждый authoritative
+binding требует pre-apply inventory полного current member set.
 
 ## Definition of Ready
 
