@@ -83,17 +83,20 @@ Application Load Balancer, CDN, Valkey, Kafka или другие data clusters.
 
 | Решение | Рекомендуемый default | Ваше значение |
 |---|---|---|
-| Cloud name | `munchkin-prod` | |
-| Folder name | `munchkin-prod` | |
-| Zone | `ru-central1-d`, если доступна | |
-| Monthly budget ceiling | не меньше подтверждённого calculator estimate | |
-| Budget thresholds | `50%`, `80%`, `100%` | |
-| Database profile | `local-postgres` | |
-| Domain zone | существующий или новый domain | |
-| Production hostname | один hostname, например `game.example.ru` | |
-| GitHub repository | `L1TTL3H0rSE/munchkin` | |
-| Human SSH access | отдельный ED25519 key с passphrase | |
-| OS Login | `not-now`; оценить в host-security plan | |
+| Cloud name | `munchkin-prod` | `munchkin` |
+| Folder name | `munchkin-prod` | `munchkin-prod` |
+| Zone | `ru-central1-d`, если доступна | `ru-central1-d` (`UP` на 2026-07-30) |
+| Monthly budget ceiling | не меньше подтверждённого calculator estimate | `5000 RUB` |
+| Budget thresholds | `50%`, `80%`, `100%` | `50%`, `80%`, `100%` |
+| Database profile | `local-postgres` | `local-postgres` |
+| Domain zone | существующий или новый domain | `l1ttl3h0rse.ru` |
+| Root hostname | будущая визитка | `l1ttl3h0rse.ru` |
+| Production hostname | один hostname, например `game.example.ru` | `munchkin.l1ttl3h0rse.ru` |
+| Domain registrar | внешний registrar | Timeweb |
+| Authoritative DNS | Yandex Cloud DNS после Terraform zone | Yandex Cloud DNS |
+| GitHub repository | `L1TTL3H0rSE/munchkin` | `L1TTL3H0rSE/munchkin` |
+| Human SSH access | отдельный ED25519 key с passphrase | создан; private key не передавался |
+| OS Login | `not-now`; оценить в host-security plan | `not-now` |
 
 Budget является notification boundary, а не hard limit: достижение порога само
 по себе не останавливает VM или другие ресурсы. Если максимальная допустимая
@@ -116,6 +119,22 @@ ceiling сохраните датированный расчёт из актуа
 Monthly ceiling должен быть не ниже этого estimate и включать явно выбранный
 reserve. Если хотя бы один параметр ещё неизвестен, используйте conservative
 upper assumption и пометьте его для проверки в implementation plan.
+
+### Зафиксированное состояние на 2026-07-30
+
+- Calculator VM profile: `2 vCPU`, core fraction `50%`, `4 GB RAM`.
+- Disks: network SSD boot `35 GB`, network SSD PostgreSQL data `20 GB`.
+- Network: static public IPv4 и `100 GB/month` public outbound traffic.
+- Object Storage: `1 GB` standard для state и `20 GB` cold для backup.
+- KMS/Lockbox assumption: `2` keys и `10 000` operations.
+- Calculator estimate: `3295.44 RUB/month`; вручную учтённые позиции:
+  `312.44 RUB/month`; conservative estimate: около `3608 RUB/month`.
+- Monthly budget ceiling: `5000 RUB`, то есть выше estimate с reserve.
+- Платёжная карта привязана; внутренний баланс не пополнялся. Это не является
+  hard spending limit: budget только отправляет уведомления, а списания
+  зависят от billing model и привязанного способа оплаты.
+- Budget создан для `munchkin` / `munchkin-prod` с thresholds
+  `50%`, `80%`, `100%`.
 
 ## Шаг 1. Подготовить Yandex account, billing, cloud и folder
 
@@ -164,7 +183,7 @@ drift/import работу.
 1. Откройте платёжный аккаунт.
 2. Перейдите в **Бюджеты** и нажмите **Создать бюджет**.
 3. Выберите тип **К оплате**.
-4. Scope ограничьте cloud/folder `munchkin-prod`.
+4. Scope ограничьте cloud `munchkin` / folder `munchkin-prod`.
 5. Укажите monthly budget ceiling из шага 0.
 6. Добавьте основной account в recipients.
 7. Создайте thresholds `50%`, `80%`, `100%`; при необходимости добавьте
@@ -191,6 +210,16 @@ registrar.
 3. Записать текущие DNS records domain, особенно MX/TXT/CNAME, если domain уже
    используется.
 4. Проверить доступ к изменению NS records.
+
+Для текущего production зафиксировано:
+
+- registrar: Timeweb;
+- domain zone: `l1ttl3h0rse.ru`;
+- root hostname будущей визитки: `l1ttl3h0rse.ru`;
+- application hostname: `munchkin.l1ttl3h0rse.ru`;
+- текущие NS остаются у Timeweb до создания public zone и records через
+  Terraform;
+- после Terraform apply domain будет делегирован на Yandex Cloud DNS.
 
 Пока не:
 
@@ -309,7 +338,7 @@ yc init
 
 CLI откроет browser authentication. В wizard выберите:
 
-- cloud `munchkin-prod`;
+- cloud `munchkin`;
 - folder `munchkin-prod`;
 - доступную default zone; предпочтительно `ru-central1-d`.
 
@@ -335,7 +364,8 @@ $munchkinCloudId
 $munchkinFolderId
 ```
 
-Убедитесь, что IDs относятся именно к `munchkin-prod`:
+Убедитесь, что IDs относятся именно к cloud `munchkin` и folder
+`munchkin-prod`:
 
 ```powershell
 yc resource-manager cloud get $munchkinCloudId
@@ -472,69 +502,84 @@ Terraform state может содержать sensitive values. Поэтому L
 
 Перед handoff все пункты должны быть истинны:
 
-- [ ] Billing account имеет статус `ACTIVE` или `TRIAL_ACTIVE`.
-- [ ] Cloud `munchkin-prod` создан и привязан к billing.
-- [ ] Folder `munchkin-prod` создан без default network.
-- [ ] Budget ограничен этим cloud/folder и имеет thresholds.
-- [ ] Monthly budget ceiling записан числом.
-- [ ] Датированный calculator estimate сохранён вместе с VM/disk/IP,
+- [x] Billing account имеет статус `ACTIVE` или `TRIAL_ACTIVE`.
+- [x] Cloud `munchkin` создан и привязан к billing.
+- [x] Folder `munchkin-prod` создан без default network.
+- [x] Budget ограничен этим cloud/folder и имеет thresholds.
+- [x] Monthly budget ceiling записан числом.
+- [x] Датированный calculator estimate сохранён вместе с VM/disk/IP,
   storage/KMS/Lockbox, telemetry retention и traffic assumptions.
-- [ ] Domain status зафиксирован; если domain уже куплен, registrar access
+- [x] Domain status зафиксирован; если domain уже куплен, registrar access
   проверен и текущие records сохранены.
-- [ ] Production hostname выбран либо явно отмечен как blocker только для
+- [x] Production hostname выбран либо явно отмечен как blocker только для
   public DNS/TLS slice.
-- [ ] Для существующего domain NS пока не менялись.
-- [ ] GitHub repository и Actions доступны владельцу.
-- [ ] `yc version` работает.
-- [ ] `yc init` указывает на правильные cloud/folder.
-- [ ] `yc compute zone list` показывает выбранную zone.
-- [ ] `terraform version` работает.
-- [ ] Отдельный ED25519 public key создан, private key защищён passphrase.
-- [ ] VM/network/IP/registry/buckets/IAM/DNS ещё не создавались вручную.
-- [ ] Ни один secret не передан в repository или handoff.
+- [x] Для существующего domain NS пока не менялись.
+- [x] GitHub repository и Actions доступны владельцу.
+- [x] `yc version` работает.
+- [x] `yc init` указывает на правильные cloud/folder.
+- [x] `yc compute zone list` показывает выбранную zone.
+- [x] `terraform version` работает.
+- [x] Отдельный ED25519 public key создан, private key защищён passphrase.
+- [x] VM/network/IP/registry/buckets/IAM/DNS ещё не создавались вручную.
+- [x] Ни один secret не передан в repository или handoff.
 
 ## Handoff для Codex
 
-После выполнения отправьте только этот заполненный блок:
+Подтверждённый owner handoff на 2026-07-30:
 
 ```text
 YANDEX_CLOUD_READY
 
-billing_status: ACTIVE | TRIAL_ACTIVE
-cloud_name: munchkin-prod
-cloud_id: <non-secret ID>
+billing_status: ACTIVE
+payment_method_linked: yes
+internal_balance_funded: no
+cloud_name: munchkin
+cloud_id: b1gppf0332cb1uanlrqf
 folder_name: munchkin-prod
-folder_id: <non-secret ID>
+folder_id: b1g55l8i2mtpv23b5ql7
 default_network_created: no
-default_zone: ru-central1-d | <другая доступная zone>
+default_zone: ru-central1-d
+yc_cli_version: 1.22.0 windows/amd64
+yc_profile: default
 
-monthly_budget_ceiling_rub: <число>
-calculator_checked_on: <YYYY-MM-DD>
-calculator_estimate_rub: <число>
-calculator_configuration: <vCPU/RAM/core fraction; disks; static IP; registry; Object Storage; KMS/Lockbox; telemetry retention; traffic>
+monthly_budget_ceiling_rub: 5000
+calculator_checked_on: 2026-07-30
+calculator_service_estimate_rub: 3295.44
+calculator_manual_addons_rub: 312.44
+calculator_estimate_rub: 3607.88
+calculator_vm: 2 vCPU / 4 GB / 50%
+calculator_disks: SSD boot 35 GB; SSD PostgreSQL 20 GB
+calculator_network: static IPv4; 100 GB public egress
+calculator_object_storage: state 1 GB standard; backup 20 GB cold
+calculator_kms_lockbox: 2 keys; 10000 operations
 budget_thresholds: 50%, 80%, 100%
 
-domain_zone: <example.ru. | not-owned-yet>
-production_hostname: <game.example.ru | undecided>
-registrar_access_confirmed: yes | no
-existing_dns_records_saved: yes | not-applicable
+domain_zone: l1ttl3h0rse.ru
+root_hostname: l1ttl3h0rse.ru
+production_hostname: munchkin.l1ttl3h0rse.ru
+registrar: Timeweb
+authoritative_dns_after_terraform: Yandex Cloud DNS
+registrar_access_confirmed: yes
+existing_dns_records_saved: yes
+registrar_ns_changed: no
 
 github_repository: L1TTL3H0rSE/munchkin
-github_actions_admin: yes | no
+github_actions_admin: yes
 
-ssh_public_key_path: <путь только к .pub>
-ssh_public_key: <одна строка ssh-ed25519 AAAA...>
-ssh_public_key_fingerprint: <SHA256 fingerprint>
+ssh_key_pair_created: yes
+ssh_public_key_details_stored_in_git: no
 ssh_private_key_shared: no
 
 database_profile: local-postgres
-os_login: not-now | planned
+os_login: not-now
 
-unexpected_existing_cloud_resources: none | <только имена/ID, без secrets>
+unexpected_existing_cloud_resources: none
 ```
 
 Не добавляйте billing account ID, OAuth/IAM token, private key, `.env`,
-password или state.
+password или state. Путь, значение и fingerprint SSH public key будут
+переданы локально только тому implementation step, который создаёт VM; этот
+owner readiness document намеренно не хранит их в Git.
 
 ## Stop conditions
 
