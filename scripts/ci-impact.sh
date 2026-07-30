@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-all_paths=".leino/profile.json,backend/game,frontend,content,docker-compose.yml,scripts/dev.sh,.gitlab-ci.yml,README.md,docs/agents"
+all_paths=".leino/profile.json,.leino/components,backend/game,frontend,content,infra/terraform,scripts/terraform-check.sh,docker-compose.yml,scripts/dev.sh,.gitlab-ci.yml,README.md,docs/agents"
 zero_sha="0000000000000000000000000000000000000000"
 base="${LEINO_BASE_SHA:-${CI_MERGE_REQUEST_DIFF_BASE_SHA:-${CI_COMMIT_BEFORE_SHA:-}}}"
 
