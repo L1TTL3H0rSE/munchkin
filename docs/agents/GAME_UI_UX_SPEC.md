@@ -227,9 +227,10 @@ Visual reordering may not produce a contradictory keyboard order.
   level, public strength, status and at most two most important public badges.
 - Detail opens from a semantic button into a non-modal disclosure on wide
   layouts or a sheet on compact layouts.
-- No opponent is hidden behind an unlabeled carousel dot. If summaries become
-  scrollable, the region exposes count, current position and next/previous
-  controls.
+- A bounded opponent carousel/rail is allowed as a compact fallback, but the
+  current actor and turn context stay visible outside its inactive slides.
+  The region exposes an ordered overview, item count, current position and
+  next/previous controls; unlabeled dots alone are insufficient navigation.
 - Turn owner and actor are not indicated by color alone: use text and icon
   plus `aria-current` or equivalent semantics selected in implementation.
 
@@ -342,6 +343,31 @@ the longest supported Russian copy is rendered.
   an accessible full value.
 - Fixed/sticky surfaces remain within logical inline bounds at zoom.
 
+### Carousel and rail terminology
+
+This specification does **not** prohibit carousels as a component family.
+`Bounded card carousel/rail` means a user-controlled viewport over an ordered
+set of peer cards. A rail is the carousel variant where several cards or the
+edge of the next card may be visible at once; it is the selected compact-hand
+pattern below.
+
+Allowed carousel behavior:
+
+- manual touch/pointer/keyboard navigation and native scrolling;
+- stable card order, visible continuation cue and item count/position;
+- previous/next controls and automatic reveal of the focused card;
+- scroll snap that can be disabled without losing access;
+- a complete grid/sheet overview when cards are decision-critical.
+
+Prohibited carousel behavior:
+
+- autoplay or timed slide advance;
+- dot-only discovery with no card/context overview;
+- clipped or lost keyboard focus;
+- accidental document-level overflow;
+- hiding the only mandatory or legal action in an inactive slide without an
+  immediately reachable full-view alternative.
+
 ### Bounded rail contract
 
 A horizontal rail is allowed only for peer items, never as an accidental
@@ -360,11 +386,12 @@ overflow fix. Every rail must have:
 
 ### Hand decision
 
-TARGET uses a bounded hand rail on compact layouts plus a semantic
-«Открыть всю руку» sheet. This preserves card legibility without a very tall
-page and provides a complete non-rail alternative. A decorative fan stack is
-not the primary interaction because overlapping text and unpredictable focus
-order harm scanning and accessibility.
+TARGET uses a bounded hand carousel/rail on compact layouts plus a semantic
+«Открыть всю руку» sheet. This carousel is explicitly allowed and selected:
+it preserves card legibility without a very tall page and provides a complete
+grid/sheet alternative. A decorative fan stack is not the primary interaction
+because overlapping text and unpredictable focus order harm scanning and
+accessibility.
 
 - Up to three cards may switch to a grid when measured width permits.
 - Four or more cards use bounded rail on compact layouts.
@@ -375,8 +402,9 @@ order harm scanning and accessibility.
 - Wide layouts may use a wrapping grid only when it does not push the action
   surface outside the initial context; otherwise the same rail remains valid.
 
-Opponents use compact wrapping grid/stack by default, not a rail. Encounter
-and mandatory choices never hide their only legal action in a rail.
+Opponents use compact wrapping grid/stack by default; a bounded carousel/rail
+remains a permitted fallback under the density rules above. Encounter and
+mandatory choices never hide their only legal action in an inactive slide.
 
 ## Responsive compositions
 

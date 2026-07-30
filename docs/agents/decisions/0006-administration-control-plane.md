@@ -127,6 +127,70 @@ Admin identity полностью отделена от game-scoped guest creden
 - short session lifetime, CSRF/session protections и strong transport
   security, конкретные механизмы которых выбирает auth implementation plan.
 
+#### AuthN, claims и server-side capabilities
+
+JWT/session claims и RBAC не являются взаимоисключающими подходами. Claims
+могут доставлять проверенную identity и coarse role, но не заменяют
+authorization policy.
+
+Admin request проходит последовательную границу:
+
+```text
+validated OIDC/JWT or server session
+  → canonical admin subject (`sub`)
+  → coarse `owner/admin` role
+  → server-side role-to-capability mapping
+  → deny-by-default capability check for the concrete query/command
+  → typed/redacted response or audited mutation
+```
+
+До использования claims server-side auth boundary проверяет как минимум
+JWT signature, issuer, audience и expiry либо authenticity/expiry выбранной
+server session. Client-supplied role, декодированный без проверки token либо
+UI state не являются authority.
+Наличие `owner/admin` claim открывает только вход в эту server policy; оно не
+даёт generic raw-data access и не отменяет проверку конкретной capability.
+
+Первый semantic capability catalog:
+
+| Capability | Разрешённая область |
+|---|---|
+| `admin.games.read` | Curated games и participant summaries |
+| `admin.history.read` | Versioned redacted history/battle summaries |
+| `admin.content.read` | Published/draft content metadata через typed read model |
+| `admin.content.draft.write` | Typed mutation только следующего draft |
+| `admin.content.publish` | Recoverable immutable publish command |
+| `admin.assets.read` | Authorized metadata/private preview boundary |
+| `admin.assets.write` | Candidate approve/link workflow без raw bucket access |
+| `admin.operations.read` | Bounded health/deploy/backup summaries |
+| `admin.audit.read` | Redacted append-only admin audit projection |
+
+`owner/admin` server-side отображается только на реализованные и
+feature-enabled capabilities текущего roadmap slice. Owner-only read MVP
+включает read capabilities и не получает mutation только потому, что такие
+policy keys уже перечислены. Query и mutation permissions остаются
+раздельными.
+
+Frontend может получить actor-safe effective-capabilities projection для
+навигации и disabled states, но не является Policy Enforcement Point. Каждый
+admin handler повторно проверяет capability, а resource identity/attributes
+загружает backend, не принимает их authority из UI.
+
+Fine-grained permissions, resource scopes и mutable role assignments не
+копируются в long-lived JWT: они быстро устаревают и связывают отзыв прав с
+token refresh. Если появятся реальные `viewer`, `operator`,
+`content_editor` и дополнительные owner use cases, отдельный plan выбирает
+server-side assignments/evaluator, revocation/versioning и audit. Полный RBAC
+editor и Digiversity-sized external PDP не нужны owner-only MVP.
+
+Даже owner-only MVP обязан fail-closed учитывать disable/revocation admin
+subject и изменение capability policy. Short session lifetime уменьшает окно
+риска, но не является единственным механизмом отзыва. Auth implementation
+plan должен выбрать и проверить bounded freshness/revocation strategy для
+identity и policy (например, revocable server session, subject/policy version
+либо fresh validation) и определить более строгую freshness для privileged
+mutations. Этот ADR не выбирает конкретный IdP/PDP механизм.
+
 Конкретный IdP, OIDC flow, protected hostname, session mechanism и полная RBAC
 matrix не выбираются этим ADR. Нельзя временно заменить их:
 
@@ -382,9 +446,11 @@ rollback.
 | Вопрос | Решение этого ADR | Почему |
 |---|---|---|
 | Accounts в первом slice | показывать только game-scoped guest participants | global account domain сейчас не существует |
-| Первый role | один owner/admin, deny-by-default | минимальный auditable surface до RBAC |
+| Первый role | один owner/admin с server-side mapping на feature-enabled capabilities, deny-by-default | минимальный auditable surface до expanded RBAC |
 | IdP/OIDC/hostname | отложить auth implementation plan | зависит от deployment и threat model |
-| RBAC matrix | отложить; не имитировать UI checks | требует списка реальных operations |
+| JWT/session claims | canonical subject + coarse role после полной validation; не fine-grained policy authority | mutable permissions/scopes устаревают до refresh |
+| Owner disable/revocation | fail-closed bounded freshness обязательна уже в owner-only MVP; short TTL недостаточен | удалённый owner не должен сохранять доступ до случайного refresh |
+| RBAC matrix | baseline capability catalog принят; persisted assignments/scopes и expanded roles отложены | сначала нужны реальные multi-admin operations |
 | Retention/export | запретить destructive/export UI до policy plan | сроки различаются по data class и privacy |
 | Battle summary | только redacted typed projector | raw replay содержит private authority state |
 | Break-glass | отсутствует в MVP; отдельное решение | слишком широкий privileged bypass |
@@ -417,6 +483,8 @@ rollback.
   admin console.
 - Прямой browser access к filesystem, bucket listing либо S3 credentials.
 - Использование game bearer или Card Studio token как production admin auth.
+- Использование JWT role/permissions либо frontend checks как единственного
+  authorization решения для privileged query/command.
 - Публикация admin/Card Studio до auth только потому, что URL «неизвестен».
 - Редактирование опубликованного content pack на месте.
 - Frontend-orchestrated publish из независимых calls без authoritative state.
