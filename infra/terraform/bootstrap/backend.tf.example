@@ -1,0 +1,18 @@
+# This file is intentionally not loaded by Terraform during the local-state
+# bootstrap. After the separately approved bucket apply and owner-only S3 key
+# delivery, copy it to backend.tf and migrate only the bootstrap state.
+terraform {
+  backend "s3" {
+    endpoints = {
+      s3 = "https://storage.yandexcloud.net"
+    }
+    bucket = "munchkin-prod-tfstate-b1g55l8i2mtpv23b5ql7"
+    region = "ru-central1"
+    key    = "bootstrap/terraform.tfstate"
+
+    skip_region_validation      = true
+    skip_credentials_validation = true
+    skip_requesting_account_id  = true
+    skip_s3_checksum            = true
+  }
+}

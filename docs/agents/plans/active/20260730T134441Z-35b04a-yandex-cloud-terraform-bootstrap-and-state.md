@@ -1,11 +1,11 @@
 # PLAN: yandex cloud terraform bootstrap and state
 
 - **Plan ID:** `20260730T134441Z-35b04a-yandex-cloud-terraform-bootstrap-and-state`
-- **Статус:** approved
+- **Статус:** in_progress
 - **Создан:** 2026-07-30 13:44:41 UTC
-- **Обновлён:** 2026-07-30 14:12:52 UTC
-- **Владелец:** отдельная Codex infra-session после согласования
-- **Workspace:** отдельный worktree
+- **Обновлён:** 2026-07-30 14:53:36 UTC
+- **Владелец:** Codex `/root`
+- **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `codex/yandex-cloud-terraform-bootstrap-and-state`
 - **Режим параллельности:** conditional
 - **Зависит от:** plan `20260730T132310Z-0ce347-record-yandex-cloud-bootstrap-facts`.
@@ -55,36 +55,38 @@ Object Storage bucket, разделённые deployer/state identities, pinned 
 
 ## Критерии приёмки
 
-- [ ] `.gitignore` до первого `terraform init` исключает `.terraform`,
+- [x] `.gitignore` до первого `terraform init` исключает `.terraform`,
   `*.tfstate*`, saved plans, `*.tfvars*`, backend config и crash artifacts,
   но не исключает `.terraform.lock.hcl`.
-- [ ] Terraform version pin соответствует проверенной локальной версии
+- [x] Terraform version pin соответствует проверенной локальной версии
   `1.15.8`; Yandex provider получает точный совместимый pin, а lockfiles
   содержат checksums для `windows_amd64` и `linux_amd64`.
 - [ ] Новый Leino component запускает focused Terraform checks только при
   impact на Terraform paths; Terraform не становится глобальной обязательной
   зависимостью для unrelated backend/frontend plans.
-- [ ] Bootstrap root описывает только два service account
+- [x] Bootstrap root описывает только два service account
   (`terraform_deployer`, `state_backend`), один KMS key, один state bucket и
   минимальные scoped IAM bindings. State backend не получает folder-wide
   `editor`, а runtime/VM identity не получает доступа к state.
-- [ ] State bucket private, versioned и KMS-encrypted; public access и
-  `force_destroy` выключены, bucket и KMS key защищены от случайного удаления.
-- [ ] Production root содержит S3-compatible backend boundary без credentials
+- [x] State bucket private, versioned и KMS-encrypted; public access и
+  `force_destroy` выключены. KMS key имеет native deletion protection и
+  `prevent_destroy`; bucket защищён `prevent_destroy`, `force_destroy = false`
+  и versioning.
+- [x] Production root содержит S3-compatible backend boundary без credentials
   в HCL, tfvars, command arguments, saved plan или Git.
-- [ ] Backend keys не пересекаются:
+- [x] Backend keys не пересекаются:
   `bootstrap/terraform.tfstate` принадлежит bootstrap root,
   `environments/production/terraform.tfstate` — production root,
   `tests/state-lock/terraform.tfstate` — только compatibility fixture. Только
   bootstrap local state мигрируется; production/test roots не используют
   `-migrate-state`.
-- [ ] Static S3 access key создаётся владельцем вне Terraform и передаётся
+- [x] Static S3 access key создаётся владельцем вне Terraform и передаётся
   только через `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`; агент не создаёт,
   не читает и не печатает secret.
-- [ ] `use_lockfile` включается только после успешного concurrent-lock test на
+- [x] `use_lockfile` включается только после успешного concurrent-lock test на
   отдельном non-production key. До этого production apply остаётся
   single-operator/serialized; `-lock=false` запрещён.
-- [ ] До cloud mutation владелец отдельно подтверждает exact reviewed plan,
+- [x] До cloud mutation владелец отдельно подтверждает exact reviewed plan,
   marginal cost и ожидаемый resource list. До миграции state владелец отдельно
   подтверждает готовность bucket/KMS и защищённой backend credential.
 - [ ] После разрешённого apply повторный `terraform plan
@@ -107,8 +109,8 @@ Object Storage bucket, разделённые deployer/state identities, pinned 
   spending cap. Карта привязана, баланс пока не пополнялся.
 - Yandex Cloud CLI `1.22.0` настроен на правильные cloud/folder. Локально
   доступен Terraform `1.15.8`.
-- В repository сейчас нет `infra/terraform`, Terraform component и защиты
-  Terraform artifacts в `.gitignore`.
+- До начала этого plan в repository не было `infra/terraform`, Terraform
+  component и защиты Terraform artifacts в `.gitignore`.
 - ADR-0009 требует отдельный state service account/static S3 boundary,
   encrypted/versioned bucket, отсутствие runtime access и доказательство
   `use_lockfile` compatibility до concurrent production use.
@@ -198,10 +200,10 @@ Object Storage bucket, разделённые deployer/state identities, pinned 
 
 ## План реализации
 
-1. [ ] Добавить ignore policy и Terraform component/check script.
-2. [ ] Создать pinned bootstrap, production backend и state-lock roots.
-3. [ ] Обновить owner runbook безопасной staged procedure без secrets.
-4. [ ] Выполнить local fmt/init-without-backend/validate, lockfile,
+1. [x] Добавить ignore policy и Terraform component/check script.
+2. [x] Создать pinned bootstrap, production backend и state-lock roots.
+3. [x] Обновить owner runbook безопасной staged procedure без secrets.
+4. [x] Выполнить local fmt/init-without-backend/validate, lockfile,
    ignore/secret и canonical checks.
 5. [ ] После `.leino` diff/tests остановиться, release/handoff того же plan в
    том же worktree новой trusted session; повторить preflight и доказать, что
@@ -222,26 +224,26 @@ Object Storage bucket, разделённые deployer/state identities, pinned 
 
 ## Проверки
 
-- [ ] `terraform version`
-- [ ] `terraform fmt -check -recursive infra/terraform`
-- [ ] `scripts/terraform-check.sh`
+- [x] `terraform version`
+- [x] `terraform fmt -check -recursive infra/terraform`
+- [x] `scripts/terraform-check.sh`
 - [ ] New trusted session: `./leinoctl preflight` и focused verify реально
   выбирают `terraform-infrastructure`
-- [ ] `terraform init -backend=false` и `terraform validate` для applicable
+- [x] `terraform init -backend=false` и `terraform validate` для applicable
   roots
-- [ ] Multi-platform `.terraform.lock.hcl` checksum check
-- [ ] `git check-ignore` для state/tfvars/plan/backend artifacts и negative
+- [x] Multi-platform `.terraform.lock.hcl` checksum check
+- [x] `git check-ignore` для state/tfvars/plan/backend artifacts и negative
   check для `.terraform.lock.hcl`
-- [ ] Secret/artifact scan tracked diff без печати найденных значений
+- [x] Secret/artifact scan tracked diff без печати найденных значений
 - [ ] Reviewed bootstrap `terraform plan` с exact expected resources
 - [ ] Post-apply `terraform plan -detailed-exitcode` возвращает `0`
 - [ ] Bucket public access/versioning/KMS/deletion-protection assertions
 - [ ] Scoped positive state access и negative foreign-prefix access
 - [ ] Isolated concurrent-lock and previous-version recovery tests
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
 - [ ] `./leinoctl scope-check --plan 20260730T134441Z-35b04a-yandex-cloud-terraform-bootstrap-and-state`
-- [ ] `git diff --check`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -271,6 +273,9 @@ Object Storage bucket, разделённые deployer/state identities, pinned 
   результат не блокирует state bootstrap, но оставляет serialized policy.
 - Cloud mutation и migration не считаются согласованными самим фактом
   согласования draft: для каждого gate нужна явная owner-команда.
+- GitLab harness сейчас только dry-run проверяет Terraform impact и не содержит
+  Terraform executable. Исполнение focused check в CI требует отдельного
+  plan/write set для `.gitlab-ci.yml`; до него это обязательный local gate.
 
 ## Согласование
 
@@ -291,6 +296,38 @@ Object Storage bucket, разделённые deployer/state identities, pinned 
   runtime plans.
 - Пользователь явно согласовал exact plan ID и ограничил текущую реализацию
   repository code и локальной валидацией без cloud apply/key/migration.
+- Approved drafts зафиксированы commit `ffd6438` и успешно pushed в
+  `origin/main`; plan выбран session
+  `019fb06a-77eb-7c53-b1ae-fb95d21f81fa`, реализация начата в отдельной
+  ветке `codex/yandex-cloud-terraform-bootstrap-and-state`.
+- Добавлены pinned Terraform roots, scoped state IAM/bucket policy, локальный
+  check script, Leino component, ignore/CI impact policy и owner runbook.
+  Bootstrap backend остаётся local-first; production не включает
+  `use_lockfile`, test fixture использует отдельный non-production key.
+- Сгенерированы одинаковые provider lockfiles с checksums для
+  `windows_amd64` и `linux_amd64`: Terraform `1.15.8`, Yandex provider
+  `0.220.0`.
+- Локально прошли `fmt`, Git Bash syntax, `init -backend=false`, `validate`
+  всех трёх roots, lockfile regeneration/compare, ignore и secret/artifact
+  checks. Canonical `verify --changed` прошёл: hooks `42/42`, leinoctl
+  `63 passed / 1 platform skip`, plan lint `0 issues`,
+  `terraform-check: ok`; выбраны `repository-workflow` и
+  `terraform-infrastructure`.
+- Cloud plan/apply, S3 key, state migration и access/recovery/concurrency
+  tests не запускались. Ни один Yandex Cloud resource не создан. Следующий
+  обязательный шаг — handoff новой trusted session из-за изменения `.leino`;
+  owner cloud gates остаются закрыты.
+- Read-only adversarial review не нашёл P0 и подтвердил отсутствие
+  cloud-mutation/credential leakage. Два P1 устранены: прямой PowerShell →
+  Git Bash запуск теперь сам добавляет coreutils в `PATH`, а `ListBucket`
+  ограничен `StringEquals` только exact state/lock keys без
+  `ListBucketVersions`. Exact команда из owner README после исправления
+  завершилась `terraform-check: ok`.
+- P2 review про отсутствие исполняемого Terraform gate в текущем GitLab CI
+  зафиксирован явно и не скрыт: CI сейчас делает только impact dry-run.
+  Исправление `.gitlab-ci.yml` находится вне согласованного write set и должно
+  получить отдельный plan; локальный/canonical gate этого slice остаётся
+  обязательным.
 
 ## Итог
 

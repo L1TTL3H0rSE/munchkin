@@ -321,9 +321,18 @@ choco install terraform
 terraform version
 ```
 
-На подготовительном этапе не запускайте `terraform init`, `plan`, `apply`,
-`destroy`, `import` или `force-unlock`. Следующий implementation plan закрепит
-Terraform/provider versions и создаст `.terraform.lock.hcl`.
+Repository теперь закрепляет Terraform `1.15.8` и Yandex provider `0.220.0`;
+lock-файлы содержат checksums для Windows и Linux. Разрешённая локальная
+проверка из корня repository:
+
+```powershell
+terraform fmt -check -recursive infra/terraform
+& 'C:\Program Files\Git\bin\bash.exe' scripts/terraform-check.sh
+```
+
+Она использует `init -backend=false`, не обращается к Yandex Cloud API и не
+создаёт resources. До отдельного owner approval не запускайте cloud plan,
+`apply`, state migration, `destroy`, `import` или `force-unlock`.
 
 Yandex quickstart:
 [Terraform в Yandex Cloud](https://yandex.cloud/ru/docs/terraform/quickstart).
@@ -497,6 +506,42 @@ Terraform state может содержать sensitive values. Поэтому L
 - [Yandex state locking warning](https://yandex.cloud/ru/docs/terraform/tutorials/terraform-state-lock);
 - [HashiCorp S3 backend](https://developer.hashicorp.com/terraform/language/backend/s3);
 - [HashiCorp sensitive data](https://developer.hashicorp.com/terraform/language/manage-sensitive-data).
+
+## Реализованный code-only Terraform handoff
+
+На 2026-07-30 repository содержит локально проверенный, но ещё не применённый
+Terraform foundation:
+
+- Terraform `1.15.8`, provider `yandex-cloud/yandex` `0.220.0`;
+- bootstrap root с local state;
+- production backend skeleton;
+- isolated `use_lockfile` compatibility fixture;
+- ожидаемый bucket
+  `munchkin-prod-tfstate-b1g55l8i2mtpv23b5ql7`;
+- state keys `bootstrap/terraform.tfstate`,
+  `environments/production/terraform.tfstate` и
+  `tests/state-lock/terraform.tfstate`;
+- отдельные deployer/state service accounts, KMS key, private versioned bucket
+  и policy для exact state/lock objects;
+- local fmt/init-without-backend/validate, credential scan и
+  multi-platform lockfile check.
+
+Bootstrap remote backend намеренно остаётся неактивным в
+`infra/terraform/bootstrap/backend.tf.example`. Production пока не включает
+`use_lockfile`: до isolated cloud test действует single-operator/serialized
+policy.
+
+Provider authentication использует только short-lived credential. Backend
+credential позже передаётся только через `AWS_ACCESS_KEY_ID` и
+`AWS_SECRET_ACCESS_KEY`; static key создаёт владелец вне Terraform после
+отдельного подтверждения. Key, state и saved plan не передаются в этот
+runbook.
+
+Сейчас не создан ни один service account, KMS key или bucket; не выполнялись
+cloud plan/apply, key creation, state migration, access/recovery/locking tests.
+Каждый из этих gates требует отдельной команды владельца. Технические границы
+и разрешённые локальные команды описаны в
+[`infra/terraform/README.md`](../../infra/terraform/README.md).
 
 ## Definition of Ready
 

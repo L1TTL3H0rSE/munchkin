@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "terraform-infrastructure",
+  "kind": "integration",
+  "roots": [
+    ".leino/components/terraform-infrastructure.json",
+    "scripts/terraform-check.sh",
+    "infra/terraform/**"
+  ],
+  "contracts": [],
+  "checks": [
+    {
+      "id": "terraform-local-validation",
+      "cwd": ".",
+      "argv": [
+        "bash",
+        "scripts/terraform-check.sh"
+      ]
+    }
+  ]
+}

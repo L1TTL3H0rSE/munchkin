@@ -31,3 +31,18 @@ content/reference-local/
 
 leino-impact.json
 leino-check-plan.json
+
+# Terraform local, generated and potentially secret-bearing artifacts.
+**/.terraform/**
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+*.tfbackend
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
