@@ -1,9 +1,9 @@
 # PLAN: frontend engineering spec
 
 - **Plan ID:** `20260729T234102Z-898ef6-frontend-engineering-spec`
-- **Статус:** awaiting_approval
+- **Статус:** completed
 - **Создан:** 2026-07-29 23:41:02 UTC
-- **Обновлён:** 2026-07-30 02:41 MSK
+- **Обновлён:** 2026-07-30 04:09 MSK
 - **Владелец:** Codex
 - **Workspace:** shared / `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`
@@ -48,33 +48,33 @@ frontend и текущего Munchkin UI. Спецификация должна 
 
 ## Критерии приёмки
 
-- [ ] `docs/agents/FRONTEND_ENGINEERING_SPEC.md` различает нормативные правила,
+- [x] `docs/agents/FRONTEND_ENGINEERING_SPEC.md` различает нормативные правила,
       объяснение/примеры и датированный audit snapshot; живой Digiversity код
       не объявляется автоматически эталонным.
-- [ ] Спека задаёт практические правила для workspace ownership, Nuxt app
+- [x] Спека задаёт практические правила для workspace ownership, Nuxt app
       structure, contracts/adapters/providers, server authority, realtime
       resync, state ownership, typed mocks, ошибок и async lifecycle.
-- [ ] Спека задаёт точные соглашения TypeScript/Vue: strict types, imports,
+- [x] Спека задаёт точные соглашения TypeScript/Vue: strict types, imports,
       naming файлов/типов/functions, Composition API, props/emits/models,
       composables/stores, pages/layouts/components и ограничения на `any`,
       assertions, side effects и monolithic components.
-- [ ] Отдельный раздел покрывает семантическую разметку, forms, keyboard/focus,
+- [x] Отдельный раздел покрывает семантическую разметку, forms, keyboard/focus,
       aria, loading/empty/error/disabled/offline states и безопасные
       интерактивные элементы.
-- [ ] Отдельный раздел покрывает CSS architecture: local tokens, global reset,
+- [x] Отдельный раздел покрывает CSS architecture: local tokens, global reset,
       component ownership, BEM-like classes, scoped/global policy, units,
       layout primitives, overflow, stacking, animation/reduced-motion и
       запрет зависимости от Digiversity SCSS/component package.
-- [ ] Responsive contract задаёт mobile-first/default behavior, именованный
+- [x] Responsive contract задаёт mobile-first/default behavior, именованный
       локальный breakpoint set, content-driven transitions, touch/hover
       capabilities, `dvh`/safe-area/overflow handling и обязательную
       viewport matrix для проверки.
-- [ ] Включена таблица отличий текущего `munchkin` от нормализованного
+- [x] Включена таблица отличий текущего `munchkin` от нормализованного
       Digiversity-подхода с приоритетами; хорошие target-практики также
       сохранены, а код в рамках этого плана не меняется.
-- [ ] `frontend/AGENTS.md` явно направляет любого frontend-агента к спеке до
+- [x] `frontend/AGENTS.md` явно направляет любого frontend-агента к спеке до
       реализации; `docs/agents/README.md` добавляет её в индекс.
-- [ ] Документ содержит Definition of Done и copy-ready checklist для нового
+- [x] Документ содержит Definition of Done и copy-ready checklist для нового
       frontend change; проверки документации и scope проходят.
 
 ## Контекст и подтверждённое состояние
@@ -134,8 +134,10 @@ frontend и текущего Munchkin UI. Спецификация должна 
   packages/assets/fonts/tokens или копирование его private product styling.
 - Исправление найденных Munchkin отличий; это backlog для будущих отдельных
   implementation plans.
-- Runtime/browser visual audit, screenshots, Docker, build и dependency
-  installation.
+- Runtime/browser visual audit, screenshots, dependency installation и запуск
+  Docker/services. Canonical impact verify может выполнять существующие
+  frontend lint/check/tests/build и
+  `docker compose --parallel 8 config`, не поднимая сервисы.
 - Commit, push и публикация.
 
 ## Архитектурный подход
@@ -188,26 +190,27 @@ frontend и текущего Munchkin UI. Спецификация должна 
 
 ## План реализации
 
-1. [ ] Получить явное approval exact plan ID, записать формулировку, перевести
+1. [x] Получить явное approval exact plan ID, записать формулировку, перевести
        plan в `in_progress` и выбрать его.
-2. [ ] Написать `FRONTEND_ENGINEERING_SPEC.md`: source assessment,
+2. [x] Написать `FRONTEND_ENGINEERING_SPEC.md`: source assessment,
        normative architecture/code/markup/style/responsive/accessibility/test
        contracts и Definition of Done.
-3. [ ] Добавить датированную Munchkin gap matrix с приоритетами, не меняя код.
-4. [ ] Добавить ссылки из `frontend/AGENTS.md` и `docs/agents/README.md`.
-5. [ ] Выполнить text/plan/verify/scope checks, exact diff review, записать
+3. [x] Добавить датированную Munchkin gap matrix с приоритетами, не меняя код.
+4. [x] Добавить ссылки из `frontend/AGENTS.md` и `docs/agents/README.md`.
+5. [x] Выполнить text/plan/verify/scope checks, exact diff review, записать
        результаты, завершить и архивировать plan.
 
 ## Проверки
 
-- [ ] `node .codex/hooks/plan-lint.mjs`.
-- [ ] `./leinoctl text-check --changed`.
-- [ ] `./leinoctl verify --changed`.
-- [ ] `./leinoctl scope-check --plan 20260729T234102Z-898ef6-frontend-engineering-spec`.
-- [ ] `git diff --check`, strict UTF-8 check и финальный read-only review
+- [x] `node .codex/hooks/plan-lint.mjs`.
+- [x] `./leinoctl text-check --changed`.
+- [x] `./leinoctl verify --changed`.
+- [x] `./leinoctl scope-check --plan 20260729T234102Z-898ef6-frontend-engineering-spec`.
+- [x] `git diff --check`, strict UTF-8 check и финальный read-only review
       только заявленных пяти lifecycle/docs paths.
-- [ ] Docker, browser, build и frontend code tests не запускать: runtime code
-      не меняется.
+- [x] Canonical impact verify включает существующие frontend lint/check/tests/
+      build и `docker compose --parallel 8 config`; browser, dependency
+      installation и запуск сервисов не выполняются.
 
 ## Риски и откат
 
@@ -225,6 +228,13 @@ frontend и текущего Munchkin UI. Спецификация должна 
   contracts.
 - **Риск:** агент не найдёт документ. **Снижение:** обязательная ссылка из
   ближайшего `frontend/AGENTS.md` и docs index.
+- **Риск:** изменение `frontend/AGENTS.md` расширяет canonical impact до всего
+  frontend workspace и Compose config, хотя runtime code не меняется.
+  **Снижение:** пользователь явно разрешил полный existing gate на Node 24 и
+  `docker compose --parallel 8 config`; frontend manifest остаётся источником
+  истины с `packageManager: pnpm@10.8.0`. Фактическая версия доступного runner
+  записывается в результаты и не канонизируется; сервисы не запускаются, а
+  найденный baseline failure не маскируется изменением production scope.
 - **Откат:** удалить новый spec, вернуть две индексные ссылки и lifecycle plan
   обычным revert; runtime/data не затрагиваются.
 
@@ -234,14 +244,21 @@ frontend и текущего Munchkin UI. Спецификация должна 
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-30 02:41 MSK
-- **Подтверждено:** —
+- **Подтверждено:** 2026-07-30 03:40 MSK
+- **Формулировка согласования:** пользователь явно согласовал exact plan ID
+  `20260729T234102Z-898ef6-frontend-engineering-spec` вторым из четырёх
+  последовательных планов.
 - **Формулировка/ограничения:** пользователь запросил аудит стиля кода,
   архитектуры, naming, подходов, вёрстки, стилей и адаптивов Digiversity
   frontend, переносимую спеку в `C:\Dev\_Personal\_Pet\munchkin`, сравнение с
   уже существующим Munchkin frontend, без написания frontend-кода и без
-  зависимости от исходного монорепозитория или его библиотеки.
+  зависимости от исходного монорепозитория или его библиотеки. Дополнительно:
+  «Для frontend-spec разрешаю полный canonical verify, включая
+  lint/check/tests/build и `docker compose --parallel 8 config`, но без запуска
+  сервисов». После полного завершения разрешены отдельный commit/push, release
+  и select следующего плана.
 
 ## Ход выполнения
 
@@ -253,8 +270,42 @@ frontend и текущего Munchkin UI. Спецификация должна 
   Card Studio UI, global CSS, responsive rule, tests и architecture docs.
 - Проверены target status/context и полностью прочитаны оба active draft plan;
   конфликтов write set не найдено.
-- Draft создан и заполнен; implementation docs ещё не начата.
+- Draft создан и заполнен; после select написана нормативная спецификация без
+  изменений production/test/config code.
+- Получено явное согласование exact plan и full canonical impact verify.
+  Lifecycle передан текущей execution-session через проверенный
+  `plan claim --takeover`; прежняя planning-session остановлена и writes не
+  начинала.
+- Plan выбран session `019fb06a-77eb-7c53-b1ae-fb95d21f81fa` командой
+  `leinoctl plan select`; docs implementation начата.
+- Добавлены обязательные entry points из `frontend/AGENTS.md` и
+  `docs/agents/README.md`; датированный audit сохраняет сильные стороны и
+  приоритизирует найденные Munchkin gaps.
+- Три независимых read-only аудита покрыли architecture/data, TypeScript/Vue/
+  tests и CSS/responsive/accessibility. Финальный adversarial review подтвердил
+  все девять acceptance criteria; его единственное замечание о pnpm исправлено
+  сверкой с executable manifest.
+- `./leinoctl text-check --changed`: 4 файла, issues `[]`; strict UTF-8:
+  4 файла; `git diff --check`: без замечаний; plan-lint: 11 plans,
+  4 active до архивации, 7 archive, 0 issues.
+- Canonical `./leinoctl verify --changed` прошёл на Node 24.14.0. Доступный
+  runner сообщил pnpm 11.9.0 при manifest contract `pnpm@10.8.0`; зависимости
+  не устанавливались, версия runner не канонизирована. Frontend: contracts
+  7/7 tests, web 41/41 tests, lint/typecheck и оба Nuxt production build
+  прошли. Harness: 42/42; leinoctl: 63 passed, 1 platform skip; Bash syntax и
+  `docker compose --parallel 8 config` прошли. Сервисы и browser не запускались.
+- Build вывел non-blocking Vue exports deprecation warning. Ошибок проверки
+  нет.
+- `scope-check`: `ok: true`, `outsideWriteSet: []`,
+  `missingRequiredChecks: []`; 4 exact write-set paths остались в
+  diagnostic `unledgered`, потому что desktop PostToolUse ledger их не записал.
 
 ## Итог
 
-Заполняется после согласования и завершения документации.
+Добавлена Munchkin-owned нормативная frontend engineering specification:
+workspace/data authority, strict TypeScript/Vue/Nuxt rules, async lifecycle,
+semantic/accessibility contract, CSS ownership/tokens, named responsive
+boundaries, testing/review gates и copy-ready Definition of Done. Digiversity
+использован только как read-only source context; его topology, private
+packages, theme и legacy-дефекты не стали зависимостью. Текущие target gaps
+зафиксированы как датированный backlog без изменения runtime code.

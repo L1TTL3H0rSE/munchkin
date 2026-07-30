@@ -3,6 +3,12 @@
 Действуют вместе с корневым `AGENTS.md`. Frontend — один pnpm workspace без
 submodules и вложенных lock-файлов.
 
+Перед любым frontend plan или implementation полностью прочитай
+[`docs/agents/FRONTEND_ENGINEERING_SPEC.md`](../docs/agents/FRONTEND_ENGINEERING_SPEC.md).
+Она задаёт normative engineering rules; при конфликте executable manifests,
+schemas, contracts и tests остаются источниками истины по корневому
+`AGENTS.md`.
+
 - Команды запускай из `frontend/`.
 - Общие версии храни в `pnpm-workspace.yaml` catalog, внутренние зависимости —
   через `workspace:*`.
