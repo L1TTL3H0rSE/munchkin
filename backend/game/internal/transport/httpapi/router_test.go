@@ -579,8 +579,12 @@ func TestCORSPreflightUsesExactAllowlistOrigin(t *testing.T) {
 	request.Header.Set("Access-Control-Request-Headers", "Content-Type")
 	response := httptest.NewRecorder()
 	New(service).ServeHTTP(response, request)
+	allowedHeaders := response.Header().Get("Access-Control-Allow-Headers")
 	if response.Code != http.StatusNoContent ||
-		response.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3000" {
+		response.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3000" ||
+		!strings.Contains(allowedHeaders, "Traceparent") ||
+		!strings.Contains(allowedHeaders, "Tracestate") ||
+		strings.Contains(allowedHeaders, "Baggage") {
 		t.Fatalf(
 			"preflight response: status=%d headers=%v",
 			response.Code,

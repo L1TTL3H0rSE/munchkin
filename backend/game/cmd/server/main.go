@@ -16,6 +16,7 @@ import (
 	"github.com/leinodev/munchkin/backend/game/internal/realtime"
 	"github.com/leinodev/munchkin/backend/game/internal/repository/memory"
 	"github.com/leinodev/munchkin/backend/game/internal/repository/postgres"
+	"github.com/leinodev/munchkin/backend/game/internal/telemetry"
 	"github.com/leinodev/munchkin/backend/game/internal/transport/httpapi"
 )
 
@@ -26,6 +27,23 @@ func main() {
 		log.Fatalf("load content: %v", err)
 	}
 	ctx := context.Background()
+	instrumentation, shutdownTelemetry, telemetryErr := telemetry.New(
+		ctx,
+		telemetry.ConfigFromEnvironment(),
+	)
+	if telemetryErr != nil {
+		log.Printf("telemetry initialization failed; continuing disabled")
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(),
+			3*time.Second,
+		)
+		defer cancel()
+		if err := shutdownTelemetry(shutdownCtx); err != nil {
+			log.Printf("telemetry shutdown incomplete")
+		}
+	}()
 	var store application.Store
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
 		postgresStore, err := postgres.Open(ctx, databaseURL)
@@ -53,12 +71,14 @@ func main() {
 		application.SystemClock{},
 		hub,
 	)
+	service.SetTelemetry(instrumentation)
 	server := &http.Server{
 		Addr: valueOrDefault("SERVER_ADDR", ":8080"),
 		Handler: httpapi.NewWithOptions(service, httpapi.Options{
 			Subscriber:     hub,
 			ContentSetID:   pack.SetID,
 			AssetDirectory: filepath.Join(filepath.Dir(contentPath), "assets"),
+			Telemetry:      instrumentation,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

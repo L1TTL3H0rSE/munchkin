@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/leinodev/munchkin/backend/game/internal/game"
+	"github.com/leinodev/munchkin/backend/game/internal/telemetry"
 )
 
 type SystemClock struct{}
@@ -29,6 +30,7 @@ type Service struct {
 	pack      game.Pack
 	clock     Clock
 	publisher Publisher
+	telemetry telemetry.Recorder
 	random    func([]byte) error
 }
 
@@ -70,10 +72,102 @@ func NewService(store Store, pack game.Pack, clock Clock, publisher Publisher) *
 		pack:      pack,
 		clock:     clock,
 		publisher: publisher,
+		telemetry: telemetry.Noop(),
 		random: func(buffer []byte) error {
 			_, err := rand.Read(buffer)
 			return err
 		},
+	}
+}
+
+func (service *Service) SetTelemetry(recorder telemetry.Recorder) {
+	if recorder == nil {
+		recorder = telemetry.Noop()
+	}
+	service.telemetry = recorder
+}
+
+func (service *Service) observeInteraction(
+	ctx context.Context,
+	kind game.InteractionKind,
+	closeReason game.InteractionCloseReason,
+	outcome string,
+	response string,
+	startedAt time.Time,
+	completedAt time.Time,
+	timeout bool,
+	extended bool,
+	stale bool,
+	retry bool,
+) {
+	telemetry.SafeRecordInteraction(
+		service.telemetry,
+		ctx,
+		telemetry.InteractionSignal{
+			Kind:        string(kind),
+			CloseReason: string(closeReason),
+			Outcome:     outcome,
+			Response:    response,
+			StartedAt:   startedAt,
+			CompletedAt: completedAt,
+			Timeout:     timeout,
+			Extended:    extended,
+			Stale:       stale,
+			Retry:       retry,
+		},
+	)
+}
+
+func interactionOutcome(err error, replay bool) string {
+	if replay {
+		return telemetry.OutcomeReplay
+	}
+	switch {
+	case err == nil:
+		return telemetry.OutcomeSuccess
+	case errors.Is(err, ErrVersionConflict):
+		return telemetry.OutcomeVersionConflict
+	case errors.Is(err, ErrIdempotencyConflict):
+		return telemetry.OutcomeIdempotencyConflict
+	case errors.Is(err, ErrInteractionExpired):
+		return telemetry.OutcomeExpired
+	case errors.Is(err, ErrInteractionAction),
+		errors.Is(err, ErrInteractionClosed),
+		errors.Is(err, ErrUnauthorized):
+		return telemetry.OutcomeRejected
+	case IsRuleError(err):
+		return telemetry.OutcomeRuleViolation
+	default:
+		return telemetry.OutcomeInternalError
+	}
+}
+
+func telemetryOutcomeNoop() string {
+	return telemetry.OutcomeNoop
+}
+
+func interactionResponseClass(
+	intent game.InteractionIntent,
+	timeout bool,
+) string {
+	if timeout {
+		return telemetry.ResponseTimeout
+	}
+	switch intent {
+	case game.InteractionIntentPass:
+		return telemetry.ResponsePass
+	case game.InteractionIntentAccept:
+		return telemetry.ResponseAccept
+	case game.InteractionIntentDecline:
+		return telemetry.ResponseDecline
+	case game.InteractionIntentCancelHelp,
+		game.InteractionIntentCancelOffer:
+		return telemetry.ResponseCancel
+	case game.InteractionIntentRespond,
+		game.InteractionIntentOfferHelp:
+		return telemetry.ResponseMaterial
+	default:
+		return telemetry.ResponseNone
 	}
 }
 

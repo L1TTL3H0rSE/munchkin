@@ -15,6 +15,7 @@ import (
 
 	"github.com/leinodev/munchkin/backend/game/internal/application"
 	"github.com/leinodev/munchkin/backend/game/internal/game"
+	"github.com/leinodev/munchkin/backend/game/internal/telemetry"
 )
 
 type Router struct {
@@ -35,6 +36,7 @@ type Options struct {
 	Subscriber     Subscriber
 	ContentSetID   string
 	AssetDirectory string
+	Telemetry      telemetry.Recorder
 }
 
 func New(service *application.Service, subscribers ...Subscriber) http.Handler {
@@ -113,7 +115,10 @@ func NewWithOptions(service *application.Service, options Options) http.Handler 
 		"POST /api/v1/games/{gameID}/commands/pass-interaction",
 		router.interaction(true),
 	)
-	return withMiddleware(mux, allowedOrigins())
+	return telemetry.WrapHTTP(
+		options.Telemetry,
+		withMiddleware(mux, allowedOrigins()),
+	)
 }
 
 type createRequest struct {
@@ -748,7 +753,7 @@ func withMiddleware(next http.Handler, origins map[string]struct{}) http.Handler
 			writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			writer.Header().Set(
 				"Access-Control-Allow-Headers",
-				"Authorization, Content-Type, Idempotency-Key",
+				"Authorization, Content-Type, Idempotency-Key, Traceparent, Tracestate",
 			)
 			writer.Header().Set("Access-Control-Max-Age", "600")
 		}

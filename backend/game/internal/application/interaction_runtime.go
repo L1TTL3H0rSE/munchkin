@@ -378,6 +378,12 @@ func (service *Service) ExecuteInteraction(
 	var result CommandResult
 	var publish *Invalidation
 	var committedError error
+	var observedKind game.InteractionKind
+	var observedCloseReason game.InteractionCloseReason
+	var observedOpenedAt time.Time
+	var observedCompletedAt time.Time
+	var observedTimeout bool
+	var observedExtension bool
 	err := service.store.WithinGame(ctx, gameID, func(tx Tx) error {
 		state := tx.State()
 		if err := service.ensureContentIdentity(state); err != nil {
@@ -386,6 +392,11 @@ func (service *Service) ExecuteInteraction(
 		actorID, exists := state.ActorByCredentialHash(tokenHash)
 		if !exists {
 			return ErrUnauthorized
+		}
+		window := state.InteractionWindow
+		if window != nil && window.ID == interactionID {
+			observedKind = window.Kind
+			observedOpenedAt = window.OpenedAt
 		}
 		if receipt, exists := tx.FindReceipt(actorID, commandID); exists {
 			if receipt.Fingerprint != fingerprint {
@@ -407,7 +418,6 @@ func (service *Service) ExecuteInteraction(
 		if state.Version != expectedVersion {
 			return ErrVersionConflict
 		}
-		window := state.InteractionWindow
 		if window == nil || window.Status != game.InteractionWindowOpen {
 			return ErrInteractionClosed
 		}
@@ -443,6 +453,9 @@ func (service *Service) ExecuteInteraction(
 				publish = invalidation
 				result.Version = next.Version
 			}
+			observedCompletedAt = acceptedAt
+			observedCloseReason = game.InteractionCloseDeadlineExpired
+			observedTimeout = processed
 			committedError = ErrInteractionExpired
 			return nil
 		}
@@ -575,6 +588,20 @@ func (service *Service) ExecuteInteraction(
 			}
 			events = append(events, choiceEvents...)
 		}
+		observedState, err := applyDomainEvents(state, events)
+		if err != nil {
+			return err
+		}
+		if observedWindow := interactionWindowByID(
+			observedState,
+			window.ID,
+		); observedWindow != nil {
+			observedCloseReason = observedWindow.CloseReason
+			observedExtension =
+				observedWindow.DeadlineRevision >
+					window.DeadlineRevision
+		}
+		observedCompletedAt = acceptedAt
 		events, err = service.appendFollowupInteraction(
 			state,
 			events,
@@ -620,15 +647,81 @@ func (service *Service) ExecuteInteraction(
 		return nil
 	})
 	if err != nil {
+		if observedCompletedAt.IsZero() {
+			observedCompletedAt = time.Now().UTC()
+		}
+		if observedOpenedAt.IsZero() {
+			observedOpenedAt = observedCompletedAt
+		}
+		service.observeInteraction(
+			ctx,
+			observedKind,
+			observedCloseReason,
+			interactionOutcome(err, false),
+			interactionResponseClass(intent, false),
+			observedOpenedAt,
+			observedCompletedAt,
+			false,
+			false,
+			errors.Is(err, ErrVersionConflict),
+			errors.Is(err, ErrIdempotencyConflict),
+		)
 		return CommandResult{}, err
 	}
 	if publish != nil {
 		_ = service.publisher.Publish(ctx, *publish)
 	}
 	if committedError != nil {
+		service.observeInteraction(
+			ctx,
+			observedKind,
+			observedCloseReason,
+			interactionOutcome(committedError, false),
+			interactionResponseClass(intent, observedTimeout),
+			observedOpenedAt,
+			observedCompletedAt,
+			observedTimeout,
+			false,
+			false,
+			false,
+		)
 		return CommandResult{}, committedError
 	}
+	if observedCompletedAt.IsZero() {
+		observedCompletedAt = time.Now().UTC()
+	}
+	if observedOpenedAt.IsZero() {
+		observedOpenedAt = observedCompletedAt
+	}
+	service.observeInteraction(
+		ctx,
+		observedKind,
+		observedCloseReason,
+		interactionOutcome(nil, result.Replayed),
+		interactionResponseClass(intent, false),
+		observedOpenedAt,
+		observedCompletedAt,
+		false,
+		observedExtension,
+		false,
+		result.Replayed,
+	)
 	return result, nil
+}
+
+func interactionWindowByID(
+	state game.State,
+	interactionID string,
+) *game.InteractionWindow {
+	if state.InteractionWindow != nil &&
+		state.InteractionWindow.ID == interactionID {
+		return state.InteractionWindow
+	}
+	if state.SuspendedInteractionWindow != nil &&
+		state.SuspendedInteractionWindow.ID == interactionID {
+		return state.SuspendedInteractionWindow
+	}
+	return nil
 }
 
 func (service *Service) ProposeEconomyOffer(
@@ -1166,6 +1259,10 @@ func (service *Service) ProcessInteractionTimeout(
 ) (bool, error) {
 	var publish *Invalidation
 	processed := false
+	var observed bool
+	var observedKind game.InteractionKind
+	var observedOpenedAt time.Time
+	var observedAt time.Time
 	err := service.store.WithinGame(ctx, candidate.GameID, func(tx Tx) error {
 		state := tx.State()
 		if err := service.ensureContentIdentity(state); err != nil {
@@ -1178,10 +1275,14 @@ func (service *Service) ProcessInteractionTimeout(
 			window.DeadlineRevision != candidate.DeadlineRevision {
 			return nil
 		}
-		observedAt := time.Unix(0, service.clock.Now()).UTC()
-		if observedAt.Before(window.DeadlineAt) {
+		observed = true
+		observedKind = window.Kind
+		observedOpenedAt = window.OpenedAt
+		currentObservedAt := time.Unix(0, service.clock.Now()).UTC()
+		if currentObservedAt.Before(window.DeadlineAt) {
 			return nil
 		}
+		observedAt = currentObservedAt
 		_, invalidation, committed, err := service.timeoutInTransaction(
 			tx,
 			state,
@@ -1197,13 +1298,64 @@ func (service *Service) ProcessInteractionTimeout(
 		return nil
 	})
 	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrVersionConflict) {
+		if observed {
+			if observedAt.IsZero() {
+				observedAt = time.Now().UTC()
+			}
+			service.observeInteraction(
+				ctx,
+				observedKind,
+				"",
+				telemetryOutcomeNoop(),
+				interactionResponseClass("", true),
+				observedOpenedAt,
+				observedAt,
+				false,
+				false,
+				true,
+				true,
+			)
+		}
 		return false, nil
 	}
 	if err != nil {
+		if observed {
+			if observedAt.IsZero() {
+				observedAt = time.Now().UTC()
+			}
+			service.observeInteraction(
+				ctx,
+				observedKind,
+				"",
+				interactionOutcome(err, false),
+				interactionResponseClass("", true),
+				observedOpenedAt,
+				observedAt,
+				false,
+				false,
+				false,
+				false,
+			)
+		}
 		return false, err
 	}
 	if publish != nil {
 		_ = service.publisher.Publish(ctx, *publish)
+	}
+	if processed {
+		service.observeInteraction(
+			ctx,
+			observedKind,
+			game.InteractionCloseDeadlineExpired,
+			interactionOutcome(nil, false),
+			interactionResponseClass("", true),
+			observedOpenedAt,
+			observedAt,
+			true,
+			false,
+			false,
+			false,
+		)
 	}
 	return processed, nil
 }
