@@ -16,6 +16,7 @@ import {
   commandPayloadSchema,
   type ActionDescriptor,
   type ActionType,
+  type ServerActionDescriptor,
   type CommandResult,
   type CommandPayload,
   type Invalidation,
@@ -64,6 +65,13 @@ export interface GameRequestOptions {
 export interface GameCommandOptions extends GameRequestOptions {
   commandID?: string;
 }
+
+const unsupportedActionTypes = new Set<ActionType>([
+  "play_target_effect",
+  "propose_trade",
+  "propose_gift",
+  "attempt_theft",
+]);
 
 export function useGameApi() {
   const config = useRuntimeConfig();
@@ -443,16 +451,23 @@ function clientProjection(response: unknown): Projection {
     ...parsed,
     turn: {
       ...parsed.turn,
-      available_actions: parsed.turn.available_actions.filter(
-        (action): action is ActionDescriptor =>
-          action.type !== "play_target_effect" &&
-          action.type !== "propose_trade" &&
-          action.type !== "propose_gift" &&
-          action.type !== "resolve_charity" &&
-          action.type !== "attempt_theft",
-      ),
+      available_actions: parsed.turn.available_actions.map((action) => {
+        if (!isSupportedAction(action)) {
+          throw new GameApiError(
+            "protocol",
+            safeGameApiMessage("protocol"),
+          );
+        }
+        return action;
+      }),
     },
   };
+}
+
+function isSupportedAction(
+  action: ServerActionDescriptor,
+): action is ActionDescriptor {
+  return !unsupportedActionTypes.has(action.type);
 }
 
 export function parseGameProjection(response: unknown): Projection {

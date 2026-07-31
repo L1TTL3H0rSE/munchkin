@@ -1,15 +1,30 @@
 <script setup lang="ts">
 import type {CardView} from "@munchkin/contracts";
+import {
+  actionLabel,
+  type CardActionBinding,
+  type CardActionState,
+} from "./actionModel";
 
 const props = withDefaults(defineProps<{
   card: CardView;
   contentSetId: string;
   compact?: boolean;
   imageUrl?: string;
+  actionBindings?: CardActionBinding[];
+  actionState?: CardActionState;
+  motionState?: "confirmed";
 }>(), {
   compact: false,
   imageUrl: "",
+  actionBindings: () => [],
+  actionState: "idle" as CardActionState,
+  motionState: undefined,
 });
+
+const emit = defineEmits<{
+  activate: [binding: CardActionBinding];
+}>();
 
 const api = useGameApi();
 const resolvedImageURL = computed(() => {
@@ -20,12 +35,36 @@ const resolvedImageURL = computed(() => {
     ? api.contentAssetURL(props.contentSetId, props.card.image)
     : "";
 });
+
+const activateCopy = computed(() => {
+  const [binding] = props.actionBindings;
+  if (props.actionBindings.length === 1 && binding?.mode === "direct") {
+    return actionLabel(binding.action);
+  }
+  return "Выбрать действие";
+});
+
+const actionButtonDisabled = computed(() =>
+  props.actionState === "disabled" || props.actionState === "pending",
+);
+
+function activate() {
+  const [binding] = props.actionBindings;
+  if (binding && !actionButtonDisabled.value) {
+    emit("activate", binding);
+  }
+}
 </script>
 
 <template>
   <article
     class="game-card"
-    :class="[`game-card--${card.deck}`, {'game-card--compact': compact}]"
+    :class="[
+      `game-card--${card.deck}`,
+      {'game-card--compact': compact},
+    ]"
+    :data-action-state="actionState"
+    :data-motion="motionState"
   >
     <div class="game-card__route" aria-hidden="true">
       <i />
@@ -38,6 +77,29 @@ const resolvedImageURL = computed(() => {
       </span>
       <small>{{ card.kind.replaceAll("_", " ") }}</small>
     </header>
+    <div v-if="actionBindings.length" class="game-card__actions">
+      <button
+        class="game-card__activate"
+        type="button"
+        :disabled="actionButtonDisabled"
+        :aria-label="`${card.name}: ${activateCopy}`"
+        @click="activate"
+      >
+        {{ actionState === "pending" ? "Отправляем…" : activateCopy }}
+      </button>
+      <span
+        v-if="actionState === 'selected'"
+        class="game-card__action-state"
+      >
+        Действия карты открыты ниже
+      </span>
+      <span
+        v-else-if="actionState === 'confirmed'"
+        class="game-card__action-state"
+      >
+        Состояние подтверждено сервером
+      </span>
+    </div>
     <div class="game-card__illustration">
       <img
         v-if="resolvedImageURL"

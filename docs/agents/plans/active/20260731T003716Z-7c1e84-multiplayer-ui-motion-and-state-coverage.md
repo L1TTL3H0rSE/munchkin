@@ -1,7 +1,7 @@
 # PLAN: multiplayer ui motion and state coverage
 
 - **Plan ID:** `20260731T003716Z-7c1e84-multiplayer-ui-motion-and-state-coverage`
-- **Статус:** approved
+- **Статус:** in_progress
 - **Создан:** 2026-07-31 00:37:16 UTC
 - **Обновлён:** 2026-07-31 00:37:16 UTC
 - **Владелец:** Codex session `019fb760-1241-7b61-b9ce-217108b8b38e`
@@ -192,13 +192,13 @@ multiplayer mechanic. Карта должна быть понятной точк
 
 1. [ ] Freeze complete actor fixtures and run baseline semantic/a11y matrix,
    including the current card-to-action discoverability failure.
-2. [ ] Implement server-descriptor-to-card mapping and semantic card states;
+2. [x] Implement server-descriptor-to-card mapping and semantic card states;
    keep `expected_version`, idempotency and actor authority unchanged.
-3. [ ] Implement direct simple card actions plus contextual action
+3. [x] Implement direct simple card actions plus contextual action
    dock/sheet for multi-action and parameterized cards.
-4. [ ] Remove silent valid-action filtering and add negative/recoverable
+4. [x] Remove silent valid-action filtering and add negative/recoverable
    protocol coverage for unsupported action descriptors.
-5. [ ] Apply tokenized visual direction, responsive hand/action layout and
+5. [x] Apply tokenized visual direction, responsive hand/action layout and
    confirmed-delta motion with static/reduced equivalents.
 6. [ ] Fix only evidence-backed layout/a11y/state findings.
 7. [ ] Run complete browser/a11y/visual and real-boundary E2E gates.
@@ -206,20 +206,24 @@ multiplayer mechanic. Карта должна быть понятной точк
 
 ## Проверки
 
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build`
 - [ ] `cd frontend && pnpm test:browser`
 - [ ] `cd frontend && pnpm test:a11y`
 - [ ] `cd frontend && pnpm test:visual`
 - [ ] Full real-boundary player flow smoke
-- [ ] Card click/tap/Enter/Space can execute every eligible simple card action
-  without scrolling to a detached action list
-- [ ] Multi-action cards open contextual controls; target/choice submission
-  preserves server-projected IDs and current expected version
-- [ ] All valid action descriptors survive the client parse boundary or fail
-  closed with a recoverable resync state; no silent action drop
+- [x] Card mapping/payload unit coverage proves eligible simple card actions
+   without scrolling to a detached action list
+- [x] Multi-action mapping and target/choice submission unit coverage
+   preserves server-projected IDs and current expected version
+- [x] All valid action descriptors survive the client parse boundary or fail
+   closed with a recoverable resync state; no silent action drop
+- [ ] Browser click/tap/Enter/Space execution and viewport/a11y evidence
 - [ ] Privacy scan and axe serious/critical gate
 - [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
+- [ ] `./leinoctl verify --changed` (frontend/build checks pass; root
+  `bash -n scripts/dev.sh` is blocked by the local WSL wrapper; the
+  alternate Git Bash/Pnpm subprocess path fails before source checks with
+  `EPERM lstat C:\Users\Maks`)
 - [ ] `./leinoctl scope-check --plan 20260731T003716Z-7c1e84-multiplayer-ui-motion-and-state-coverage`
 - [ ] `git diff --check`
 
@@ -251,8 +255,34 @@ multiplayer mechanic. Карта должна быть понятной точк
 ## Ход выполнения
 
 - Plan расширен card-first contract и конкретными frontend write targets;
-  реализация разрешена, commit и push не разрешены.
+  реализация разрешена; commit явно разрешён текущим пользовательским запросом,
+  push не выполняется.
+- 2026-07-31: current session took over the stale previous owner and selected
+  this plan after a clean baseline.
+- 2026-07-31: implemented pure `source_instance_id`/`instance_ids` mapping,
+  direct card action buttons, contextual persistent dock, stable original
+  descriptor indexes, target-player payload preservation, explicit card
+  idle/available/selected/pending/confirmed/disabled states, confirmed-only
+  motion and reduced-motion/static cues.
+- 2026-07-31: `@munchkin/web` lint, typecheck, 74 tests and production build
+  pass under the available local runtime; repository verify reached all
+  frontend checks and failed only at the environment-owned root bash wrapper.
+- Browser/a11y/visual harness remains unavailable in this checkout because
+  the dependent harness plan is still draft and `frontend/test/browser` plus
+  the related scripts do not exist; no automated browser readiness claim is
+  made.
+- 2026-07-31: bundled Node 24 hooks harness passes `42/42`; separate Git Bash
+  syntax and Compose config checks pass.
+- 2026-07-31: `tools/leinoctl` tests with bundled Node 24 report `66 pass,
+  2 fail, 1 skip`; both failures are existing entrypoint assertions about
+  `--parallel` count, outside this plan write set.
+- 2026-07-31: `scope-check` remains blocked by preserved untracked
+  `.repomixignore` and `repomix-output.md` outside the write set; neither was
+  changed or removed.
 
 ## Итог
 
-Заполняется после реализации.
+Card-first implementation готова к локальному коммиту. Plan остаётся active до
+появления зависимого browser/a11y/visual harness и прохождения полного
+repository scope/verify lifecycle; текущий коммит не является доказательством
+полной browser readiness.
