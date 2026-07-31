@@ -1,15 +1,16 @@
 # PLAN: responsive game table and action dock
 
 - **Plan ID:** `20260731T001853Z-2fc5e2-responsive-game-table-and-action-dock`
-- **Статус:** draft
+- **Статус:** in_progress
 - **Создан:** 2026-07-31 00:18:53 UTC
-- **Обновлён:** 2026-07-31 00:18:53 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 21:00:00 +03:00
+- **Владелец:** Codex session `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
 - **Зависит от:** plans `20260730T134443Z-3ffbc0-frontend-safe-shell-breakpoint-foundation`, `20260731T001853Z-aae2bb-game-session-recovery-controller`.
-- **Блокирует:** `20260731T001853Z-f90fcb-generic-interaction-window-ui`
+- **Блокирует:** `20260731T001853Z-f90fcb-generic-interaction-window-ui`,
+  `20260731T003716Z-7c1e84-multiplayer-ui-motion-and-state-coverage`
 - **Связанные ADR/handoff:** `docs/agents/GAME_UI_UX_SPEC.md`, `docs/agents/FRONTEND_ENGINEERING_SPEC.md`
 
 ## Machine-readable manifest
@@ -26,6 +27,9 @@
     "frontend/applications/web/app/assets/main.css",
     "frontend/applications/web/test/actionModel.test.ts",
     "frontend/applications/web/test/gameTableViewModel.test.ts",
+    "frontend/test/browser/fixtureSupport.ts",
+    "frontend/test/browser/visual.spec.ts",
+    "frontend/test/browser/visual-baselines/chromium/single-combat.png",
     "docs/agents/plans/active/20260731T001853Z-2fc5e2-responsive-game-table-and-action-dock.md",
     "docs/agents/plans/archive/20260731T001853Z-2fc5e2-responsive-game-table-and-action-dock.md"
   ],
@@ -114,6 +118,10 @@ bounded hand с full-hand alternative и persistent server-action dock — бе�
 - Removal of only migrated gameplay CSS from global sheet.
 - Recorded manual browser/a11y evidence using deterministic parsed
   projections or real local backend.
+- A narrow correction to the existing fixture visual precondition and its
+  canonical `single-combat` baseline after review found that the previous
+  snapshot captured a recoverable connection-error state; the capture also
+  excludes the dev-only Nuxt DevTools timing widget.
 
 ### Не входит
 
@@ -158,6 +166,9 @@ bounded hand с full-hand alternative и persistent server-action dock — бе�
 | `frontend/applications/web/app/assets/main.css` | write | Remove migrated gameplay selectors only |
 | `frontend/applications/web/test/actionModel.test.ts` | write | Reconciliation regressions |
 | `frontend/applications/web/test/gameTableViewModel.test.ts` | write | Density/layout view-model fixtures |
+| `frontend/test/browser/fixtureSupport.ts` | write | Reject connection-error states before visual capture |
+| `frontend/test/browser/visual.spec.ts` | write | Assert the canonical fixture is combat before capture |
+| `frontend/test/browser/visual-baselines/chromium/single-combat.png` | write | Regenerate the corrected canonical Chromium baseline |
 | `docs/agents/plans/active/20260731T001853Z-2fc5e2-responsive-game-table-and-action-dock.md` | write | Active lifecycle |
 | `docs/agents/plans/archive/20260731T001853Z-2fc5e2-responsive-game-table-and-action-dock.md` | write | Archived lifecycle |
 
@@ -190,6 +201,7 @@ bounded hand с full-hand alternative и persistent server-action dock — бе�
 ## Проверки
 
 - [ ] `cd frontend && pnpm --filter @munchkin/web test`
+- [ ] `cd frontend && node test/run-playwright.mjs test visual.spec.ts --project=chromium`
 - [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
 - [ ] Browser widths: `320×568`, `360×800`, `374×812`, `375×667`,
   `427×926`, `428×926`, `599×960`, `600×960`, `667×375`, `768×1024`,
@@ -221,18 +233,24 @@ bounded hand с full-hand alternative и persistent server-action dock — бе�
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:18:53 UTC
-- **Подтверждено:** —
+- **Подтверждено:** 2026-07-31 17:28:23 Europe/Moscow
 - **Формулировка/ограничения пользователя:** Пользователь попросил подготовить
-  backend/frontend plans параллельно фоновой Terraform-работе; implementation,
-  selection, commit и push не разрешены.
+  backend/frontend plans параллельно фоновой Terraform-работе. Пользователь
+  отдельно одобрил batch approval queue в указанном порядке и разрешил
+  implementation, verify/scope-check, archive и отдельный local commit после
+  каждого plan; push не выполняется.
 
 ## Ход выполнения
 
 - Draft создан атомарно; реализация не начата.
 - Frontend skill and UI/UX spec fixed responsive, authority, focus and browser
   acceptance without changing production code.
+- User-requested visual hotfix is implemented: fixture readiness rejects the
+  connection-error fallback, the canonical combat assertions require a live
+  encounter/combat state, and the dev-only Nuxt DevTools widget is hidden from
+  capture; Chromium visual regeneration and reread pass.
 
 ## Итог
 

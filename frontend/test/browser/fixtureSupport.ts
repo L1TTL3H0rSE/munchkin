@@ -19,10 +19,41 @@ export async function installFixture(
 ): Promise<UiFixtureDefinition> {
   const fixture = fixtureAdapter.get(fixtureID);
   const projection = fixtureAdapter.getProjection(fixtureID);
+  const invalidation = {
+    type: "game.v1.version_advanced",
+    occurred_at: "2026-07-31T00:00:00.000Z",
+    game_id: projection.game_id,
+    version: projection.version,
+    reason: projection.turn.available_actions[0]?.type ?? "join",
+  };
 
-  await page.addInitScript(({gameID, credential}) => {
+  await page.addInitScript(({gameID, credential, invalidation: fixtureInvalidation}) => {
     sessionStorage.setItem(`munchkin:credential:${gameID}`, credential);
-  }, {gameID: projection.game_id, credential: fixtureCredential});
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const requestURL = typeof input === "string"
+        ? new URL(input, window.location.origin)
+        : new URL(input instanceof Request ? input.url : input.toString(), window.location.origin);
+      if (!requestURL.pathname.endsWith(`/api/v1/games/${encodeURIComponent(gameID)}/events`)) {
+        return nativeFetch(input, init);
+      }
+
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(
+            `data: ${JSON.stringify(fixtureInvalidation)}\n\n`,
+          ));
+          init?.signal?.addEventListener("abort", () => {
+            controller.error(new DOMException("The operation was aborted.", "AbortError"));
+          }, {once: true});
+        },
+      });
+      return new Response(stream, {
+        status: 200,
+        headers: {"Content-Type": "text/event-stream"},
+      });
+    };
+  }, {gameID: projection.game_id, credential: fixtureCredential, invalidation});
 
   await page.route("**/api/v1/games/**", async (route) => {
     await fulfillGameRoute(route, projection);
@@ -96,7 +127,8 @@ export async function openFixture(
   const fixture = await installFixture(page, fixtureID);
   await page.goto(`/game/${encodeURIComponent(fixture.projection.game_id)}`);
   await expect(page.locator("#main-content")).toBeVisible();
-  await expect(page.locator(".game-table, .center-state")).toBeVisible();
+  await expect(page.locator(".game-table")).toBeVisible();
+  await expect(page.locator(".center-state")).toHaveCount(0);
   return fixture;
 }
 
