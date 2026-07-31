@@ -61,6 +61,8 @@ unset \
   TF_PLUGIN_CACHE_DIR \
   TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE \
   TF_VAR_operator_subject \
+  TF_VAR_ssh_ingress_cidrs \
+  TF_VAR_ssh_public_key \
   TF_WORKSPACE
 
 export TF_IN_AUTOMATION=1
@@ -269,7 +271,7 @@ if [[ -z "$bootstrap_locals" ]] ||
   echo "bootstrap must contain exactly one reviewed locals block" >&2
   exit 1
 fi
-require_assignment_count "bootstrap locals" "$bootstrap_locals" 10
+require_assignment_count "bootstrap locals" "$bootstrap_locals" 11
 require_exact_scalar_attribute \
   "bootstrap locals" \
   "$bootstrap_locals" \
@@ -280,6 +282,31 @@ require_exact_scalar_attribute \
   "$bootstrap_locals" \
   "operator_principal_id" \
   'split(":", var.operator_subject)[1]'
+deployer_roles_definition="$(
+  printf '%s\n' "$bootstrap_locals" |
+    awk '
+      /^  deployer_folder_roles = toset\(\[$/ {
+        in_definition = 1
+      }
+      in_definition {
+        print
+      }
+      in_definition && /^  \]\)$/ {
+        exit
+      }
+    '
+)"
+expected_deployer_roles_definition='  deployer_folder_roles = toset([
+    "compute.editor",
+    "container-registry.admin",
+    "vpc.privateAdmin",
+    "vpc.publicAdmin",
+    "vpc.securityGroups.admin",
+  ])'
+if [[ "$deployer_roles_definition" != "$expected_deployer_roles_definition" ]]; then
+  echo "deployer folder roles must contain only the five reviewed service roles" >&2
+  exit 1
+fi
 require_exact_hcl_list \
   "bootstrap locals" \
   "$bootstrap_locals" \
@@ -615,6 +642,164 @@ if [[ "$policy_statement_body" != "$reviewed_statement_body" ]]; then
   exit 1
 fi
 
+if [[ "$(
+  rg -c '^resource "yandex_iam_service_account"' "$policy_source"
+)" != "3" ]]; then
+  echo "bootstrap must manage exactly deployer, state backend and runtime service accounts" >&2
+  exit 1
+fi
+if [[ "$(
+  rg -c '^resource "yandex_resourcemanager_folder_iam_member" "terraform_deployer"' \
+    "$policy_source"
+)" != "1" ]] ||
+  ! rg -q '^[[:space:]]*for_each[[:space:]]*=[[:space:]]*local\.deployer_folder_roles$' \
+    "$policy_source"; then
+  echo "deployer folder IAM must derive only from the reviewed role set" >&2
+  exit 1
+fi
+if [[ "$(
+  rg -c '^resource "yandex_iam_service_account_iam_member"' "$policy_source"
+)" != "2" ]] ||
+  ! rg -q '^[[:space:]]*service_account_id[[:space:]]*=[[:space:]]*yandex_iam_service_account\.runtime\.id$' \
+    "$policy_source" ||
+  ! rg -q '^[[:space:]]*role[[:space:]]*=[[:space:]]*"iam\.serviceAccounts\.user"$' \
+    "$policy_source"; then
+  echo "bootstrap runtime impersonation boundary is incomplete or broader than reviewed" >&2
+  exit 1
+fi
+
+production_root="$terraform_root/environments/production"
+production_variables="$production_root/variables.tf"
+production_iam="$production_root/iam.tf"
+production_network="$production_root/network.tf"
+production_registry="$production_root/registry.tf"
+production_compute="$production_root/compute.tf"
+production_cloud_init="$production_root/cloud-init.yaml.tftpl"
+
+for required_file in \
+  "$production_variables" \
+  "$production_iam" \
+  "$production_network" \
+  "$production_registry" \
+  "$production_compute" \
+  "$production_cloud_init" \
+  "$production_root/outputs.tf"; do
+  if [[ ! -f "$required_file" ]]; then
+    echo "production graph is missing required file: $required_file" >&2
+    exit 1
+  fi
+done
+
+production_resource_count="$(
+  rg --no-filename '^resource "' "$production_root" --glob '*.tf' |
+    wc -l |
+    tr -d '[:space:]'
+)"
+if [[ "$production_resource_count" != "10" ]]; then
+  echo "production graph must contain exactly 10 managed resources; got $production_resource_count" >&2
+  exit 1
+fi
+
+declare -A expected_production_resource_counts=(
+  [yandex_vpc_network]=1
+  [yandex_vpc_subnet]=1
+  [yandex_vpc_security_group]=1
+  [yandex_vpc_address]=1
+  [yandex_container_registry]=1
+  [yandex_container_repository]=2
+  [yandex_container_registry_iam_binding]=1
+  [yandex_compute_disk]=1
+  [yandex_compute_instance]=1
+)
+for resource_type in "${!expected_production_resource_counts[@]}"; do
+  actual_count="$(
+    rg --no-filename "^resource \"$resource_type\"" "$production_root" --glob '*.tf' |
+      wc -l |
+      tr -d '[:space:]'
+  )"
+  if [[ "$actual_count" != "${expected_production_resource_counts[$resource_type]}" ]]; then
+    echo "production graph has unexpected $resource_type count: $actual_count" >&2
+    exit 1
+  fi
+done
+
+production_data_count="$(
+  rg --no-filename '^data "' "$production_root" --glob '*.tf' |
+    wc -l |
+    tr -d '[:space:]'
+)"
+if [[ "$production_data_count" != "2" ]] ||
+  ! rg -q '^data "yandex_iam_service_account" "runtime"' "$production_iam" ||
+  ! rg -q '^data "yandex_compute_image" "ubuntu"' "$production_compute"; then
+  echo "production graph must contain only the runtime and Ubuntu lookups" >&2
+  exit 1
+fi
+
+if ! rg -q '^[[:space:]]*sensitive[[:space:]]*=[[:space:]]*true$' \
+  "$production_variables" ||
+  [[ "$(rg -c '^[[:space:]]*sensitive[[:space:]]*=[[:space:]]*true$' "$production_variables")" != "2" ]] ||
+  ! rg -q 'cidr[[:space:]]*!=[[:space:]]*"0\.0\.0\.0/0"' "$production_variables"; then
+  echo "owner SSH inputs must remain sensitive and reject world-open SSH" >&2
+  exit 1
+fi
+
+if ! rg -q '^[[:space:]]*role[[:space:]]*=[[:space:]]*"container-registry\.images\.puller"$' \
+  "$production_iam" ||
+  ! rg -q 'serviceAccount:\$\{data\.yandex_iam_service_account\.runtime\.id\}' \
+    "$production_iam" ||
+  rg -q 'pusher|scanner|editor|admin' "$production_iam"; then
+  echo "runtime registry access must be one exact pull-only binding" >&2
+  exit 1
+fi
+
+if [[ "$(rg -c '^[[:space:]]*ingress[[:space:]]*\{' "$production_network")" != "3" ]] ||
+  [[ "$(rg -c '^[[:space:]]*egress[[:space:]]*\{' "$production_network")" != "1" ]] ||
+  [[ "$(rg -c '^[[:space:]]*port[[:space:]]*=[[:space:]]*(22|80|443)$' "$production_network")" != "3" ]] ||
+  [[ "$(rg -c '"0\.0\.0\.0/0"' "$production_network")" != "3" ]] ||
+  ! rg -q '^[[:space:]]*v4_cidr_blocks[[:space:]]*=[[:space:]]*var\.ssh_ingress_cidrs$' \
+    "$production_network" ||
+  rg -q 'v6_cidr_blocks|ipv6' "$production_network"; then
+  echo "production security group must expose only owner SSH and public HTTP/HTTPS over IPv4" >&2
+  exit 1
+fi
+
+for expected_compute_setting in \
+  'family    = "ubuntu-2404-lts"' \
+  'platform_id               = "standard-v3"' \
+  'cores         = 2' \
+  'core_fraction = 50' \
+  'memory        = 4' \
+  'size     = 35' \
+  'size        = 20' \
+  'device_name = "munchkin-data"' \
+  'auto_delete = false'; do
+  if ! rg -q -F "$expected_compute_setting" "$production_compute"; then
+    echo "production compute graph is missing reviewed setting: $expected_compute_setting" >&2
+    exit 1
+  fi
+done
+if [[ "$(rg -c 'prevent_destroy[[:space:]]*=[[:space:]]*true' "$production_compute")" != "1" ]]; then
+  echo "only the standalone PostgreSQL data disk must have Terraform prevent_destroy" >&2
+  exit 1
+fi
+
+for expected_cloud_init_setting in \
+  'ssh_pwauth: false' \
+  'PermitRootLogin no' \
+  '"max-size": "10m"' \
+  '"max-file": "3"' \
+  '/dev/disk/by-id/virtio-munchkin-data' \
+  'var/lib/munchkin/bootstrap-success'; do
+  if ! rg -q -F "$expected_cloud_init_setting" "$production_cloud_init"; then
+    echo "cloud-init is missing reviewed host baseline: $expected_cloud_init_setting" >&2
+    exit 1
+  fi
+done
+if rg -q '^[[:space:]]*-[[:space:]]+docker[[:space:]]*$' "$production_cloud_init"; then
+  echo "bootstrap user must not receive root-equivalent Docker group membership" >&2
+  exit 1
+fi
+
 temp_parent="${TMPDIR:-/tmp}"
 mkdir -p -- "$temp_parent"
 temp_parent="$(cd -- "$temp_parent" && pwd -P)"
@@ -669,6 +854,9 @@ copy_configuration() {
   fi
   if [[ -f "$source_root/.terraform.lock.hcl" ]]; then
     cp -- "$source_root/.terraform.lock.hcl" "$destination_root/"
+  fi
+  if [[ -f "$source_root/cloud-init.yaml.tftpl" ]]; then
+    cp -- "$source_root/cloud-init.yaml.tftpl" "$destination_root/"
   fi
 }
 

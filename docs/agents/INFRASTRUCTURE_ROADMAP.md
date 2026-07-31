@@ -2,7 +2,7 @@
 
 ## Статус документа
 
-- **Снимок текущего состояния:** 2026-07-30.
+- **Снимок текущего состояния:** 2026-07-31.
 - **Целевой deadline:** 2026-08-02 23:59 Europe/Moscow.
 - **Назначение:** архитектурная карта и backlog для отдельных implementation
   plans.
@@ -84,7 +84,7 @@ flowchart LR
 | Realtime | Authenticated SSE с heartbeat/version invalidation | Нужен long-lived proxy smoke через Traefik |
 | Studio | Local `.card-studio`, production persistence отсутствует | Оставить выключенной на public deployment |
 | Telemetry | Нет OTel, metrics endpoint, structured logs и dashboards | Реализовать vendor-neutral instrumentation |
-| IaC | Yandex Cloud resources и Terraform configuration отсутствуют | Сначала создать bootstrap/state/IAM boundary |
+| IaC | Bootstrap/state applied; network/registry/compute graph locally validated, cloud apply gated | Завершить два reviewed apply и live host evidence |
 | Delivery | Images не публикуются, VM deployment и rollback отсутствуют | Построить полный GitHub -> Container Registry -> Compute VM path |
 
 ## Неподвижные production-инварианты
@@ -172,6 +172,17 @@ observability stack.
 
 ### INFRA-003 — Yandex Cloud Terraform/Compute bootstrap и host security
 
+**Статус 2026-07-31:** foundation slice применён и проверен. Bootstrap IAM
+добавил keyless runtime identity и exact deployer roles (`7 added`), production
+root создал VPC/subnet/SG/reserved IPv4/private registry с двумя repositories,
+Ubuntu VM и standalone data disk (`10 added`). Remote production state
+существует, `.tflock` освобождён, follow-up plan сообщает `No changes`.
+Owner-side SSH evidence подтвердил host-key pinning, key login,
+`cloud-init=done`, Docker/Compose, отдельный ext4 mount, log limits,
+password/root denial и отсутствие публичных listeners кроме SSH. Automation
+deploy user/root boundary, images, Compose/Traefik, DNS/TLS, reboot recovery,
+backup и telemetry остаются следующими slices.
+
 **Работа**
 
 - Создать reviewed Terraform graph для VPC, subnet, security groups, static
@@ -181,7 +192,9 @@ observability stack.
 - Хранить Terraform state в отдельном private/versioned/KMS-encrypted Object
   Storage bucket и запретить concurrent apply до доказанного locking.
 - Зафиксировать минимальный resource budget и billing notifications.
-- Создать отдельного deploy user; вход только по SSH key.
+- На foundation VM создать trusted human bootstrap user; отдельный automation
+  deploy user и узкая root-owned command boundary выполняются вместе с
+  production deployment slice.
 - Зафиксировать SSH host key VPS в GitHub deploy configuration и запрещать
   `StrictHostKeyChecking=no`.
 - Отключить password login и прямой root login после проверки нового доступа.
@@ -189,7 +202,8 @@ observability stack.
 - Установить security updates, Docker Engine и Compose plugin.
 - Создать отдельные каталоги для Compose config, secrets, Traefik ACME,
   PostgreSQL и backup state с минимальными permissions.
-- Включить запуск Docker/production stack после reboot и проверить его.
+- Включить Docker после reboot; запуск и reboot-recovery production stack
+  проверяются после появления production Compose.
 - Ограничить Docker log size и следить за disk/inode usage.
 - Выбрать честную Docker privilege boundary:
   - предпочтительно root-owned fixed deploy script/systemd unit с узким

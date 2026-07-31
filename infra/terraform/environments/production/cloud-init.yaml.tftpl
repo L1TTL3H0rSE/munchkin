@@ -1,0 +1,134 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - e2fsprogs
+  - unattended-upgrades
+
+users:
+  - name: munchkin-admin
+    gecos: Munchkin owner bootstrap administrator
+    groups:
+      - adm
+    shell: /bin/bash
+    lock_passwd: true
+    sudo:
+      - ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ${jsonencode(ssh_public_key)}
+
+disable_root: true
+ssh_pwauth: false
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/90-munchkin-hardening.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      PubkeyAuthentication yes
+
+  - path: /etc/docker/daemon.json
+    owner: root:root
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root:root
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+  - path: /usr/local/sbin/munchkin-host-bootstrap
+    owner: root:root
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      device="/dev/disk/by-id/virtio-munchkin-data"
+      mountpoint="/srv/munchkin"
+      expected_label="munchkin-data"
+
+      if [[ ! -b "$device" ]]; then
+        echo "expected data disk is missing: $device" >&2
+        exit 1
+      fi
+
+      existing_target="$(findmnt -rn -S "$device" -o TARGET || true)"
+      if [[ -n "$existing_target" && "$existing_target" != "$mountpoint" ]]; then
+        echo "data disk is mounted at unexpected target: $existing_target" >&2
+        exit 1
+      fi
+
+      fs_type="$(blkid -o value -s TYPE "$device" || true)"
+      fs_label="$(blkid -o value -s LABEL "$device" || true)"
+      if [[ -z "$fs_type" ]]; then
+        mkfs.ext4 -L "$expected_label" "$device"
+      elif [[ "$fs_type" != "ext4" || "$fs_label" != "$expected_label" ]]; then
+        echo "data disk has an unexpected filesystem or label" >&2
+        exit 1
+      fi
+
+      uuid="$(blkid -o value -s UUID "$device")"
+      if [[ -z "$uuid" ]]; then
+        echo "data disk UUID is missing" >&2
+        exit 1
+      fi
+
+      install -d -m 0750 -o root -g root "$mountpoint"
+      if awk -v mountpoint="$mountpoint" -v source="UUID=$uuid" '
+        $0 !~ /^[[:space:]]*#/ && NF >= 2 && $2 == mountpoint && $1 != source {
+          exit 1
+        }
+      ' /etc/fstab; then
+        :
+      else
+        echo "fstab contains a conflicting data mount" >&2
+        exit 1
+      fi
+
+      fstab_entry="UUID=$uuid $mountpoint ext4 defaults,nodev,nosuid 0 2"
+      if ! grep -Fqx "$fstab_entry" /etc/fstab; then
+        printf '%s\n' "$fstab_entry" >>/etc/fstab
+      fi
+
+      if ! mountpoint -q "$mountpoint"; then
+        mount "$mountpoint"
+      fi
+
+      mounted_uuid="$(findmnt -rn -M "$mountpoint" -o UUID)"
+      if [[ "$mounted_uuid" != "$uuid" ]]; then
+        echo "mounted data disk UUID does not match" >&2
+        exit 1
+      fi
+
+      install -d -m 0750 -o root -g root \
+        "$mountpoint/compose" \
+        "$mountpoint/traefik"
+      install -d -m 0700 -o root -g root \
+        "$mountpoint/backups" \
+        "$mountpoint/postgres" \
+        "$mountpoint/secrets" \
+        "$mountpoint/traefik/acme"
+      install -d -m 0700 -o root -g root /var/lib/munchkin
+      touch /var/lib/munchkin/bootstrap-success
+
+runcmd:
+  - [systemctl, restart, ssh]
+  - [systemctl, enable, --now, docker]
+  - [/usr/local/sbin/munchkin-host-bootstrap]
+
+final_message: Munchkin host bootstrap completed successfully.

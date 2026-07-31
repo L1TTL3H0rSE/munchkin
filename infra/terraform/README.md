@@ -16,7 +16,9 @@ Terraform plan подтвердил exact backend access и полный lock cr
 cycle. Concurrent race дал `1 planned / 3 blocked`, а post-race plan завершился
 exit `2`; `use_lockfile = true` поэтому закреплён во всех remote backend
 definitions. Bootstrap S3 backend активирован и migration завершена clean
-cloud-authenticated plan; production backend по-прежнему не инициализирован.
+cloud-authenticated plan. Production backend инициализирован 2026-07-31 как
+новый empty state без migration/copy flags; reviewed apply создал exact
+production graph, а follow-up plan вернул `No changes`.
 
 ## Закреплённые версии
 
@@ -32,8 +34,8 @@ cloud-authenticated plan; production backend по-прежнему не иниц
 
 | Root | Backend сейчас | State key | Назначение |
 |---|---|---|---|
-| `bootstrap` | S3 active, `use_lockfile = true`; local activation file ignored | `bootstrap/terraform.tfstate` | Два service account, KMS key, state bucket и scoped access |
-| `environments/production` | S3 skeleton с `use_lockfile = true`; backend ещё не инициализирован, локальные проверки используют `-backend=false` | `environments/production/terraform.tfstate` | Следующие production infrastructure plans |
+| `bootstrap` | S3 active, `use_lockfile = true`; local activation file ignored | `bootstrap/terraform.tfstate` | Deployer/state identities и state foundation; reviewed graph также добавляет keyless runtime identity |
+| `environments/production` | S3 active, `use_lockfile = true`; локальные isolated проверки используют `-backend=false` | `environments/production/terraform.tfstate` | Applied network/registry/compute graph; следующие изменения отдельно gated |
 | `tests/state-lock` | S3 с `use_lockfile = true` | `tests/state-lock/terraform.tfstate` | Только isolated compatibility test |
 
 Workspaces не используются. Каждый root владеет ровно одним state key.
@@ -119,6 +121,78 @@ Runtime/VM identity и deployer не получают доступ к state buck
 удаления обеспечивается `prevent_destroy`, `force_destroy = false`,
 versioning и обязательным review плана.
 
+## Network, registry и Compute graph
+
+Repository graph применён 2026-07-31 после отдельных owner approvals.
+Bootstrap apply завершился exact `7 added / 0 changed / 0 destroyed`:
+
+- один keyless `munchkin-runtime` service account без static/API/authorized
+  keys;
+- пять additive folder members для deployer:
+  `compute.editor`, `container-registry.admin`, `vpc.privateAdmin`,
+  `vpc.publicAdmin`, `vpc.securityGroups.admin`;
+- прямой `iam.serviceAccounts.user` только на runtime service account.
+
+Production apply завершился exact `10 added / 0 changed / 0 destroyed`:
+dedicated network, subnet
+`10.42.0.0/24`, normal security group, protected reserved IPv4, private
+registry, repositories `game`/`web`, authoritative pull-only registry binding
+с единственным runtime member, protected 20 GB data disk и одну VM. Provider
+`0.220.0` не предоставляет additive
+`yandex_container_registry_iam_member`, поэтому новый пустой registry
+использует `yandex_container_registry_iam_binding` с exact единственным
+member. Добавление другого puller вне Terraform будет вытеснено следующим
+apply и требует отдельного HCL review.
+
+Non-secret outputs и live IDs:
+
+| Resource/output | Value |
+|---|---|
+| Runtime service account | `aje84i3qaj2dhkr9q28l` |
+| Network | `enp09n6lb1l950ief4dt` |
+| Subnet | `fl8o10ih9ftnqab0qrj5` |
+| Security group | `enpc8ecqfqoh0puiu2ne` |
+| Reserved address | `fl810u2k1qqnqmclgmhf`, `81.26.187.230` |
+| Container Registry | `crpdnmjudj1usiu90gdn` |
+| Repositories | `crpdnmjudj1usiu90gdn/game`, `crpdnmjudj1usiu90gdn/web` |
+| Compute instance | `fv4eule47h2vqo5ki48k`, `munchkin.ru-central1.internal` |
+| PostgreSQL data disk | `fv4e2cgc448a00vkhps8` |
+| Ubuntu image | `fd83ergat2e815oohe7o` |
+
+Remote state содержит exact десять managed resource addresses и два
+ожидаемых data-source addresses. Signed S3 `HEAD` вернул `200` для state и
+`404` для `.tflock`; полный authenticated production plan завершился exit `0`
+и `No changes`.
+
+VM фиксирует `ru-central1-d`, current family `ubuntu-2404-lts`,
+`standard-v3`, `2 vCPU`, core fraction `50%`, `4 GB RAM`, 35 GB
+`network-ssd` boot disk и standalone 20 GB `network-ssd` data disk.
+Data disk имеет `prevent_destroy`, подключается с
+`device_name = "munchkin-data"` и `auto_delete = false`.
+
+Security group публикует только TCP `80`/`443` в `0.0.0.0/0`; TCP `22`
+принимает required process-only IPv4 CIDR set. IPv6 ingress и остальные
+inbound ports отсутствуют, egress явно разрешён в `0.0.0.0/0`.
+
+Versioned cloud-init создаёт только trusted human user `munchkin-admin` с
+owner ED25519 key и sudo, но без membership в root-equivalent `docker` group.
+Он отключает password/direct-root SSH, устанавливает Ubuntu `docker.io`,
+Compose v2 и unattended upgrades, задаёт bounded `json-file` logs,
+fail-closed форматирует только пустой `virtio-munchkin-data`, монтирует его в
+`/srv/munchkin`, создаёт root-owned каталоги и success marker. Application
+images, Compose/Traefik, DNS/TLS, Lockbox, backup и telemetry не входят в этот
+slice.
+
+Owner-side проверка после apply сверила три SSH host-key fingerprints и public
+keys с authenticated serial output, затем выполнила подключение только с
+`StrictHostKeyChecking=yes`. `cloud-init status --wait` вернул `done`;
+success marker существует. Docker `29.1.3` и Compose `2.40.3` active/enabled,
+data disk виден как `/dev/vdb`, смонтирован в `/srv/munchkin` как `ext4` с
+`nosuid,nodev`. Effective `sshd -T` подтвердил password/keyboard-interactive
+и direct root denial; отдельные attempts завершились exit `255`. Human admin
+не входит в `docker` group. Wildcard TCP listeners содержат только SSH
+`0.0.0.0:22`/`[::]:22`; остальные обнаруженные listeners loopback-only.
+
 ## Credential boundary
 
 Provider/API authentication должна быть short-lived: локальный `YC_TOKEN`, а в
@@ -129,6 +203,16 @@ S3 backend принимает credential только из process environment:
 
 - `AWS_ACCESS_KEY_ID`;
 - `AWS_SECRET_ACCESS_KEY`.
+
+Production root дополнительно принимает только process-local sensitive
+variables:
+
+- `TF_VAR_ssh_public_key` — ровно один public ED25519 key; он попадёт в
+  encrypted remote state и незашифрованный VM metadata `user-data`;
+- `TF_VAR_ssh_ingress_cidrs` — JSON set/list owner IPv4 CIDRs; world-open
+  `0.0.0.0/0` отклоняется validation.
+
+Private key, password, token и runtime secret в Terraform не передаются.
 
 Static S3 key принадлежит только `munchkin-terraform-state`, создан владельцем
 вне Terraform после отдельного подтверждения и никогда не импортируется в
@@ -179,6 +263,9 @@ terraform fmt -check -recursive infra/terraform
 - требует ровно по одному bucket-scoped `storage.configurer` и
   `storage.editor` binding с exact единственным member — state service
   account — и запрещает folder-wide варианты этих roles;
+- проверяет exact пять deployer roles, runtime-SA handoff, ровно `10`
+  production resources, два data lookup, sensitive SSH boundary,
+  IPv4-only ingress, fixed VM/disk profile и cloud-init host baseline;
 - отклоняет tracked state/plan/tfvars/backend artifacts и inline credentials.
 
 Скрипт может скачать pinned provider из Terraform Registry, но не обращается к
@@ -194,14 +281,18 @@ focused check. До отдельного CI/toolchain plan `terraform-check.sh` 
 
 До отдельной явной команды владельца запрещены:
 
-1. инициализация production remote key;
-2. повторная bootstrap migration, `state push`, ручная правка state или
+1. bootstrap apply новых IAM resources до review exact
+   `7 add / 0 change / 0 destroy`;
+2. инициализация production remote key до доказанного отсутствия destination;
+3. production apply до review exact `10 add / 0 change / 0 destroy`,
+   повторного budget confirmation и отдельного owner approval;
+4. повторная bootstrap migration, `state push`, ручная правка state или
    переключение bootstrap обратно на local backend;
-3. создание второго static key, rotation/revoke текущего key без отдельной
+5. создание второго static key, rotation/revoke текущего key без отдельной
    recovery-команды;
-4. direct object mutations и операции вне exact bootstrap/production/test
+6. direct object mutations и операции вне exact bootstrap/production/test
    state и lock keys;
-5. восстановление previous version: versioning включён, но recovery drill ещё
+7. восстановление previous version: versioning включён, но recovery drill ещё
    не доказан.
 
 Authenticated bootstrap plan и reviewed apply уже были отдельно согласованы и

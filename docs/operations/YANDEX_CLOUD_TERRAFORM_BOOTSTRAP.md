@@ -622,6 +622,97 @@ Previous-version recovery остаётся непроверенным: bucket ve
 Попытка начать recovery через operator `yc` была отклонена `403` до создания
 любой state version; непроверенный recovery helper удалён из repository.
 
+### Подготовленный network/registry/compute slice
+
+Approved plan
+`20260730T220518Z-84ffe4-yandex-cloud-network-registry-and-compute`
+реализовал repository graph, но cloud mutation остаётся staged. До первого
+apply live folder по-прежнему содержит только deployer/state identities и не
+содержит production network, registry, VM или disks.
+
+Bootstrap stage добавляет ровно один `munchkin-runtime` service account,
+пять exact additive deployer folder roles и direct
+`iam.serviceAccounts.user` на runtime identity. Он не создаёт static,
+authorized или API key. Production stage после отдельного backend init
+создаёт ровно десять resources:
+
+1. network `munchkin-prod`;
+2. subnet `munchkin-prod-ru-central1-d`, `10.42.0.0/24`;
+3. normal security group;
+4. protected reserved public IPv4;
+5. private registry `munchkin-prod`;
+6. repository `game`;
+7. repository `web`;
+8. exact registry pull binding для runtime service account;
+9. protected standalone 20 GB PostgreSQL data disk;
+10. одну Ubuntu 24.04 LTS VM.
+
+Provider `0.220.0` реализует registry role только через authoritative
+`yandex_container_registry_iam_binding`; новый registry поэтому получает
+единственный reviewed puller. Любой будущий второй puller сначала добавляется
+в HCL отдельным plan.
+
+Owner перед cloud plan заново задаёт только в текущем PowerShell process:
+`YC_TOKEN`, backend `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`,
+`TF_VAR_operator_subject`, `TF_VAR_ssh_public_key` и
+`TF_VAR_ssh_ingress_cidrs`. Последний передаётся как JSON collection exact
+IPv4 CIDRs. Public key и CIDRs не записываются в Git, tfvars, saved plan,
+runbook или transcript; private key Terraform никогда не получает.
+
+Mutation выполняется только в таком порядке:
+
+1. повторить sanitized live inventory zone/image/IAM и всех конфликтующих
+   resource classes; любое неожиданное наличие — stop condition;
+2. выполнить полный bootstrap plan без `-target`, saved plan,
+   `-auto-approve` или отключения lock; допустим только
+   `7 add / 0 change / 0 destroy`;
+3. показать exact address list и отдельно получить owner approval на
+   interactive bootstrap apply;
+4. после apply проверить live IAM/key absence и получить полный bootstrap
+   `No changes`;
+5. доказать отсутствие exact production state object и `.tflock`;
+6. выполнить первый production backend init без `-migrate-state`,
+   `-force-copy` и backend credential arguments;
+7. получить fresh short-lived deployer token, выполнить production plan и
+   требовать только `10 add / 0 change / 0 destroy`;
+8. повторно подтвердить estimate `3607.88 RUB/month` относительно ceiling
+   `5000 RUB`, показать exact address list и отдельно получить owner approval;
+9. выполнить interactive apply, затем live inventory, remote state address
+   check и полный `No changes`;
+10. владелец проверяет SSH host key по serial output, key login,
+    `cloud-init status --wait`, Docker/Compose, mount `/srv/munchkin`,
+    password/root denial и unexpected listeners.
+
+Фактический результат 2026-07-31:
+
+- bootstrap apply: `7 added / 0 changed / 0 destroyed`; follow-up plan
+  `No changes`;
+- production backend впервые инициализирован без migration/copy flags;
+  pre-init state/lock отсутствовали;
+- production apply: `10 added / 0 changed / 0 destroyed`; follow-up plan
+  exit `0`, `No changes`;
+- remote state содержит десять managed resources и два expected data sources;
+  signed `HEAD` после plan вернул state `200`, `.tflock` `404`;
+- VM `fv4eule47h2vqo5ki48k` имеет reserved IPv4 `81.26.187.230`, runtime SA
+  `aje84i3qaj2dhkr9q28l`, registry `crpdnmjudj1usiu90gdn` и standalone data
+  disk `fv4e2cgc448a00vkhps8`;
+- authenticated serial output и temporary owner-only `known_hosts` дали exact
+  equality трёх host-key fingerprints; SSH выполнялся только с
+  `StrictHostKeyChecking=yes`;
+- key login работает; `cloud-init=done`, success marker присутствует,
+  Docker/Compose active, `/dev/vdb` смонтирован в `/srv/munchkin` как `ext4`
+  с `nosuid,nodev`, bounded Docker logs подтверждены;
+- effective SSH config и direct attempts подтвердили отказ root/password/
+  keyboard-interactive; admin не состоит в `docker` group; externally bound
+  TCP listeners содержат только SSH.
+
+CI/WIF, image push/scanning/retention, application Compose/Traefik, DNS/TLS,
+Lockbox, backup, reboot recovery и telemetry этим результатом не реализованы.
+
+Partial apply, timeout или cloud-init failure не разрешает destroy либо
+blind retry. Remote state и paid resources сохраняются; сначала снимается
+sanitized inventory, затем recovery проходит новый review.
+
 Каждый Terraform IAM binding authoritative для своей роли: apply заменяет
 полный список bucket-level role на `members` из HCL, а обычный plan не
 показывает удаление участников, добавленных вне Terraform. Read-only
@@ -786,9 +877,11 @@ target ID.
    - private/versioned/KMS-encrypted state bucket;
    - IAM identities и tested state-lock strategy.
 2. `yandex-cloud-network-registry-and-compute`
-   - VPC/subnet/security groups/static IPv4;
-   - Container Registry;
-   - Compute VM/disks/cloud-init.
+   - repository graph готов и локально validated;
+   - cloud IAM/backend init/apply и live host evidence staged отдельными
+     owner gates;
+   - VPC/subnet/security group/static IPv4, registry/repositories и
+     Compute VM/disks/cloud-init после approved apply.
 3. `github-actions-yandex-images`
    - CI parity;
    - GitHub OIDC/WIF;

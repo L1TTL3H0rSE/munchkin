@@ -8,6 +8,11 @@ output "state_backend_service_account_id" {
   value       = yandex_iam_service_account.state_backend.id
 }
 
+output "runtime_service_account_id" {
+  description = "Keyless service account attached to the production Compute instance."
+  value       = yandex_iam_service_account.runtime.id
+}
+
 output "state_bucket_name" {
   description = "Private, versioned and KMS-encrypted Terraform state bucket."
   value       = yandex_storage_bucket.terraform_state.bucket

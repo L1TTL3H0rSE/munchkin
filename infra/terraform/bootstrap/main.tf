@@ -5,6 +5,13 @@ locals {
   state_bucket_name     = "munchkin-prod-tfstate-b1g55l8i2mtpv23b5ql7"
   operator_principal_id = split(":", var.operator_subject)[1]
 
+  deployer_folder_roles = toset([
+    "compute.editor",
+    "container-registry.admin",
+    "vpc.privateAdmin",
+    "vpc.publicAdmin",
+    "vpc.securityGroups.admin",
+  ])
   state_keys = [
     "bootstrap/terraform.tfstate",
     "environments/production/terraform.tfstate",
@@ -40,6 +47,30 @@ resource "yandex_iam_service_account" "state_backend" {
   lifecycle {
     prevent_destroy = true
   }
+}
+
+resource "yandex_iam_service_account" "runtime" {
+  folder_id   = local.folder_id
+  name        = "munchkin-runtime"
+  description = "Keyless runtime identity attached only to the production Compute instance."
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "yandex_resourcemanager_folder_iam_member" "terraform_deployer" {
+  for_each = local.deployer_folder_roles
+
+  folder_id = local.folder_id
+  role      = each.value
+  member    = "serviceAccount:${yandex_iam_service_account.terraform_deployer.id}"
+}
+
+resource "yandex_iam_service_account_iam_member" "terraform_deployer_can_use_runtime" {
+  service_account_id = yandex_iam_service_account.runtime.id
+  role               = "iam.serviceAccounts.user"
+  member             = "serviceAccount:${yandex_iam_service_account.terraform_deployer.id}"
 }
 
 resource "yandex_iam_service_account_iam_member" "operator_can_impersonate_deployer" {
