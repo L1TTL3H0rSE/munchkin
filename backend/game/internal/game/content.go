@@ -190,6 +190,20 @@ type Effect struct {
 	CanWin     bool         `json:"can_win,omitempty"`
 }
 
+type CombatCapabilityKind string
+
+const (
+	CombatCapabilityAddMonster  CombatCapabilityKind = "add_monster"
+	CombatCapabilityEnhance     CombatCapabilityKind = "enhance_monster"
+	CombatCapabilityCounter     CombatCapabilityKind = "counter_combat_effect"
+	CombatCapabilityForceHelper CombatCapabilityKind = "force_combat_helper"
+)
+
+type CombatCapability struct {
+	Kind   CombatCapabilityKind `json:"kind"`
+	Amount int                  `json:"amount,omitempty"`
+}
+
 type MonsterSpec struct {
 	Strength                int        `json:"strength"`
 	Treasures               int        `json:"treasures"`
@@ -203,22 +217,23 @@ type MonsterSpec struct {
 }
 
 type Card struct {
-	ID               string           `json:"id"`
-	Name             string           `json:"name"`
-	Deck             DeckKind         `json:"deck"`
-	Kind             CardKind         `json:"kind"`
-	Copies           int              `json:"copies"`
-	InteractionScope InteractionScope `json:"interaction_scope"`
-	Monster          *MonsterSpec     `json:"monster,omitempty"`
-	Item             *ItemSpec        `json:"item,omitempty"`
-	Trait            *TraitSpec       `json:"trait,omitempty"`
-	Attachment       *AttachmentSpec  `json:"attachment,omitempty"`
-	Effects          []Effect         `json:"effects,omitempty"`
-	Abilities        []Ability        `json:"abilities,omitempty"`
-	RulesText        string           `json:"rules_text,omitempty"`
-	FlavorText       string           `json:"flavor_text,omitempty"`
-	Image            string           `json:"image,omitempty"`
-	AltText          string           `json:"alt_text,omitempty"`
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	Deck             DeckKind          `json:"deck"`
+	Kind             CardKind          `json:"kind"`
+	Copies           int               `json:"copies"`
+	InteractionScope InteractionScope  `json:"interaction_scope"`
+	Monster          *MonsterSpec      `json:"monster,omitempty"`
+	Item             *ItemSpec         `json:"item,omitempty"`
+	Trait            *TraitSpec        `json:"trait,omitempty"`
+	Attachment       *AttachmentSpec   `json:"attachment,omitempty"`
+	Effects          []Effect          `json:"effects,omitempty"`
+	Abilities        []Ability         `json:"abilities,omitempty"`
+	CombatCapability *CombatCapability `json:"combat_capability,omitempty"`
+	RulesText        string            `json:"rules_text,omitempty"`
+	FlavorText       string            `json:"flavor_text,omitempty"`
+	Image            string            `json:"image,omitempty"`
+	AltText          string            `json:"alt_text,omitempty"`
 }
 
 type Pack struct {
@@ -542,6 +557,9 @@ func validateCard(card Card) error {
 	if err := validateEffects(card.ID, card.Effects); err != nil {
 		return err
 	}
+	if err := validateCombatCapability(card); err != nil {
+		return err
+	}
 	for _, ability := range card.Abilities {
 		if ability.Kind != AbilityDiscardForCombat ||
 			ability.Amount < 1 ||
@@ -570,7 +588,8 @@ func validateCard(card Card) error {
 			card.Trait != nil ||
 			card.Attachment != nil ||
 			len(card.Effects) == 0 ||
-			len(card.Abilities) > 0 {
+			len(card.Abilities) > 0 ||
+			card.CombatCapability != nil {
 			return fmt.Errorf("%w: invalid curse definition %s", ErrInvalidContent, card.ID)
 		}
 		if err := validateCurseEffects(card.ID, card.Effects); err != nil {
@@ -587,7 +606,8 @@ func validateCard(card Card) error {
 			card.Monster != nil ||
 			card.Item != nil ||
 			card.Attachment != nil ||
-			len(card.Effects) > 0 {
+			len(card.Effects) > 0 ||
+			card.CombatCapability != nil {
 			return fmt.Errorf("%w: invalid trait definition %s", ErrInvalidContent, card.ID)
 		}
 		if err := validateTrait(card.ID, *card.Trait); err != nil {
@@ -602,7 +622,8 @@ func validateCard(card Card) error {
 			card.Item != nil ||
 			card.Trait != nil ||
 			len(card.Effects) > 0 ||
-			len(card.Abilities) > 0 {
+			len(card.Abilities) > 0 ||
+			card.CombatCapability != nil {
 			return fmt.Errorf("%w: invalid trait attachment %s", ErrInvalidContent, card.ID)
 		}
 	case CardItem:
@@ -611,7 +632,8 @@ func validateCard(card Card) error {
 			card.Monster != nil ||
 			card.Trait != nil ||
 			card.Attachment != nil ||
-			len(card.Effects) > 0 {
+			len(card.Effects) > 0 ||
+			card.CombatCapability != nil {
 			return fmt.Errorf("%w: invalid item definition %s", ErrInvalidContent, card.ID)
 		}
 		if err := validateItem(card.ID, *card.Item); err != nil {
@@ -639,7 +661,8 @@ func validateCard(card Card) error {
 			len(card.Effects) != 1 ||
 			card.Effects[0].Kind != EffectGainLevel ||
 			card.Effects[0].CanWin ||
-			len(card.Abilities) > 0 {
+			len(card.Abilities) > 0 ||
+			card.CombatCapability != nil {
 			return fmt.Errorf("%w: invalid level-up definition %s", ErrInvalidContent, card.ID)
 		}
 	case CardCheat:
@@ -649,11 +672,68 @@ func validateCard(card Card) error {
 			card.Trait != nil ||
 			card.Attachment != nil ||
 			len(card.Effects) > 0 ||
-			len(card.Abilities) > 0 {
+			len(card.Abilities) > 0 ||
+			card.CombatCapability != nil {
 			return fmt.Errorf("%w: invalid cheat definition %s", ErrInvalidContent, card.ID)
 		}
 	default:
 		return fmt.Errorf("%w: unknown card kind %q", ErrInvalidContent, card.Kind)
+	}
+	return nil
+}
+
+func validateCombatCapability(card Card) error {
+	capability := card.CombatCapability
+	if capability == nil {
+		return nil
+	}
+	if card.InteractionScope != InteractionOtherPlayers {
+		return fmt.Errorf(
+			"%w: combat capability on %s requires other_players scope",
+			ErrInvalidContent,
+			card.ID,
+		)
+	}
+	switch capability.Kind {
+	case CombatCapabilityAddMonster:
+		if card.Kind != CardMonster ||
+			card.Deck != DeckDoor ||
+			capability.Amount != 0 {
+			return fmt.Errorf(
+				"%w: invalid add-monster capability on %s",
+				ErrInvalidContent,
+				card.ID,
+			)
+		}
+	case CombatCapabilityEnhance:
+		if card.Kind != CardOneShot ||
+			card.Deck != DeckTreasure ||
+			capability.Amount < 1 ||
+			capability.Amount > 10 {
+			return fmt.Errorf(
+				"%w: invalid enhancer capability on %s",
+				ErrInvalidContent,
+				card.ID,
+			)
+		}
+	case CombatCapabilityCounter, CombatCapabilityForceHelper:
+		if card.Kind != CardOneShot ||
+			card.Deck != DeckTreasure ||
+			capability.Amount != 0 {
+			return fmt.Errorf(
+				"%w: invalid %s capability on %s",
+				ErrInvalidContent,
+				capability.Kind,
+				card.ID,
+			)
+		}
+	default:
+		return fmt.Errorf(
+			"%w: unknown combat capability %q on %s",
+			ErrInvalidContent,
+			capability.Kind,
+			card.ID,
+		)
 	}
 	return nil
 }

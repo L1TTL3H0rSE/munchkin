@@ -1,10 +1,145 @@
 package game
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 )
+
+func realizedCombatEffectID(
+	interactionID string,
+	actorID string,
+	sourceInstanceID string,
+	revision uint32,
+) string {
+	digest := sha256.Sum256([]byte(
+		interactionID + "\x00" +
+			actorID + "\x00" +
+			sourceInstanceID + "\x00" +
+			strconv.FormatUint(uint64(revision), 10),
+	))
+	return fmt.Sprintf("fx_%x", digest[:16])
+}
+
+func materializeSelectedProfile(
+	pack Pack,
+	profile RulesProfile,
+) (map[string]CardInstance, []string, []string, error) {
+	instances, doors, treasures, err := pack.Materialize()
+	if err != nil || !profile.CombatResponses {
+		return instances, doors, treasures, err
+	}
+	for _, card := range pack.Cards {
+		_, basic := combatInterventionEffect(card)
+		basic = basic && card.CombatCapability == nil
+		advanced := profile.AdvancedCombat &&
+			card.CombatCapability != nil
+		if !basic && !advanced {
+			continue
+		}
+		for copyIndex := 1; copyIndex <= card.Copies; copyIndex++ {
+			instanceID := card.ID + "-" + strconv.Itoa(copyIndex)
+			if _, exists := instances[instanceID]; exists {
+				return nil, nil, nil, fmt.Errorf(
+					"%w: duplicate instance %s",
+					ErrInvalidContent,
+					instanceID,
+				)
+			}
+			instances[instanceID] = CardInstance{
+				ID:           instanceID,
+				DefinitionID: card.ID,
+			}
+			switch card.Deck {
+			case DeckDoor:
+				doors = append(doors, instanceID)
+			case DeckTreasure:
+				treasures = append(treasures, instanceID)
+			default:
+				return nil, nil, nil, fmt.Errorf(
+					"%w: card %s has invalid deck",
+					ErrInvalidContent,
+					card.ID,
+				)
+			}
+		}
+	}
+	return instances, doors, treasures, nil
+}
+
+func encounterMonsterInstanceIDs(encounter Encounter) []string {
+	return append(
+		[]string{encounter.MonsterInstanceID},
+		encounter.AdditionalMonsterInstanceIDs...,
+	)
+}
+
+func encounterMonsterCards(state State, pack Pack) ([]Card, error) {
+	if state.Turn.Encounter == nil {
+		return nil, fmt.Errorf("%w: missing encounter", ErrIllegalCommand)
+	}
+	instanceIDs := encounterMonsterInstanceIDs(*state.Turn.Encounter)
+	cards := make([]Card, 0, len(instanceIDs))
+	for _, instanceID := range instanceIDs {
+		card, _, exists := pack.DefinitionForInstance(state, instanceID)
+		if !exists || card.Monster == nil {
+			return nil, fmt.Errorf(
+				"%w: invalid encounter monster %s",
+				ErrInvalidContent,
+				instanceID,
+			)
+		}
+		cards = append(cards, card)
+	}
+	return cards, nil
+}
+
+func combatHelpRewardMaximumSelected(state State, pack Pack) (int, error) {
+	if state.Turn.Encounter == nil {
+		return 0, fmt.Errorf("%w: missing encounter", ErrIllegalCommand)
+	}
+	playerIndex := state.PlayerIndex(state.Turn.PlayerID)
+	if playerIndex < 0 {
+		return 0, fmt.Errorf("%w: missing combatant", ErrIllegalCommand)
+	}
+	monsterCards, err := encounterMonsterCards(state, pack)
+	if err != nil {
+		return 0, err
+	}
+	modifier, err := treasureRewardModifier(
+		state,
+		playerIndex,
+		pack,
+		monsterCards[0].Monster.Tags,
+	)
+	if err != nil {
+		return 0, err
+	}
+	reward := modifier
+	for _, monsterCard := range monsterCards {
+		reward += monsterCard.Monster.Treasures
+	}
+	return min(
+		max(0, reward),
+		len(state.TreasureDeck)+len(state.TreasureDiscard),
+	), nil
+}
+
+func discardEncounterSet(state *State, pack Pack) error {
+	if state.Turn.Encounter == nil {
+		return nil
+	}
+	instanceIDs := encounterMonsterInstanceIDs(*state.Turn.Encounter)
+	state.Turn.Encounter = nil
+	for _, instanceID := range instanceIDs {
+		if err := appendDiscard(state, instanceID, pack); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func beginEffectSequence(
 	state *State,
@@ -351,7 +486,7 @@ func finalizeEffectSequence(
 		}
 	}
 	if finalize.ClearEncounter {
-		if err := discardEncounter(state, pack); err != nil {
+		if err := discardEncounterSet(state, pack); err != nil {
 			return err
 		}
 	}

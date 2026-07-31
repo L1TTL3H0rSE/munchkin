@@ -65,6 +65,12 @@ export const interactionResponseStateSchema = z.enum([
   "timed_out",
   "auto_resolved",
 ]);
+export const combatCapabilityKindSchema = z.enum([
+  "add_monster",
+  "enhance_monster",
+  "counter_combat_effect",
+  "force_combat_helper",
+]);
 
 export const cardViewSchema = z.object({
   instance_id: z.string().min(1),
@@ -128,8 +134,18 @@ export const combatViewSchema = z.object({
   player_winning: z.boolean(),
   tie_wins: z.boolean(),
   combat_closed: z.boolean(),
+  monsters: z.array(cardViewSchema).default([]),
+  effects: z.array(z.object({
+    effect_id: z.string().regex(/^fx_[a-f0-9]{32}$/),
+    kind: z.enum(["enhance_monster", "counter_combat_effect"]),
+    target_monster_instance_id: z.string().min(1).optional(),
+    target_effect_id: z.string().regex(/^fx_[a-f0-9]{32}$/).optional(),
+    amount: z.number().int().min(1).max(10).optional(),
+    active: z.boolean(),
+  }).strict()).default([]),
   helper_player_id: z.string().min(1).optional(),
   helper_reward_treasures: z.number().int().positive().optional(),
+  helper_forced: z.literal(true).optional(),
   resolution_action: z.object({
     type: z.literal("request_combat_resolution"),
   }).strict().optional(),
@@ -173,9 +189,81 @@ export const interactionActionViewSchema = z.object({
   source_instance_id: z.string().min(1).optional(),
   target: z.enum(["player", "monster"]).optional(),
   combat_delta: z.number().int().refine((value) => value !== 0).optional(),
+  combat_capability: combatCapabilityKindSchema.optional(),
+  target_monster_instance_id: z.string().min(1).optional(),
+  target_effect_id: z.string().regex(/^fx_[a-f0-9]{32}$/).optional(),
   helper_player_id: z.string().min(1).optional(),
   reward_treasures: z.number().int().positive().optional(),
-}).strict();
+}).strict().superRefine((action, context) => {
+  if (action.combat_capability !== undefined &&
+    (action.type !== "respond" || action.source_instance_id === undefined)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "advanced combat capability requires an actor-owned response source",
+    });
+  }
+  switch (action.combat_capability) {
+    case undefined:
+      if (action.target_monster_instance_id !== undefined ||
+        action.target_effect_id !== undefined) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "advanced combat target requires a capability",
+        });
+      }
+      break;
+    case "add_monster":
+      if (action.target !== undefined ||
+        action.target_monster_instance_id !== undefined ||
+        action.target_effect_id !== undefined ||
+        action.helper_player_id !== undefined ||
+        action.combat_delta !== undefined) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "add_monster has no client-selected target",
+        });
+      }
+      break;
+    case "enhance_monster":
+      if (action.target_monster_instance_id === undefined ||
+        action.target !== undefined ||
+        action.target_effect_id !== undefined ||
+        action.helper_player_id !== undefined ||
+        action.combat_delta === undefined ||
+        action.combat_delta < 1 ||
+        action.combat_delta > 10) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "enhance_monster requires one bounded encounter target",
+        });
+      }
+      break;
+    case "counter_combat_effect":
+      if (action.target_effect_id === undefined ||
+        action.target !== undefined ||
+        action.target_monster_instance_id !== undefined ||
+        action.helper_player_id !== undefined ||
+        action.combat_delta !== undefined) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "counter requires one opaque effect target",
+        });
+      }
+      break;
+    case "force_combat_helper":
+      if (action.helper_player_id === undefined ||
+        action.target !== undefined ||
+        action.target_monster_instance_id !== undefined ||
+        action.target_effect_id !== undefined ||
+        action.combat_delta !== undefined) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "forced help requires one server-projected helper",
+        });
+      }
+      break;
+  }
+});
 
 export const interactionViewSchema = z.object({
   interaction_id: z.string().min(1),
@@ -222,6 +310,7 @@ export const projectionSchema = z.object({
   rules_profile_id: z.enum([
     "first-edition-core-v1",
     "lobby-multiplayer-v1",
+    "lobby-multiplayer-v2",
   ]),
   rules_profile_version: z.literal(1),
   interaction: interactionViewSchema.optional(),
@@ -237,6 +326,7 @@ export const lobbySummarySchema = z.object({
   rules_profile_id: z.enum([
     "first-edition-core-v1",
     "lobby-multiplayer-v1",
+    "lobby-multiplayer-v2",
   ]),
   rules_profile_version: z.literal(1),
 }).strict();

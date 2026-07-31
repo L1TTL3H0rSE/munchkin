@@ -67,6 +67,35 @@ ignored `.card-studio/`; guest game credential не является authoring t
 Fake provider работает полностью offline, а каждый вызов real provider
 требует отдельного явного действия и видимого предупреждения о стоимости.
 
+### Advanced combat v3
+
+`sets/moscow/v3/cards.json` — опубликованный immutable pack для нового
+`lobby-multiplayer-v2@1`. Он фиксирует проверяемый digest текущего v2 authoring
+snapshot как `source_digest`, но не меняет и не выдаёт draft v2 за published.
+V3 сохраняет author/license и asset provenance, использует source
+`original-moscow-core-advanced-combat-2026` и digest
+`sha256:5150be9bd21b86ef9f2adf87fec42f89da26264a3519379f04057e7140bbc238`.
+В core остаются 83 active Door и 68 active Treasure slots; 17 definitions
+deferred, из них четыре активируются только advanced-combat profile.
+
+Поле `combat_capability` является закрытым union:
+
+- `add_monster` — только Door Monster без client-selected target;
+- `enhance_monster` — только Treasure one-shot с bounded `amount: 1..10`;
+- `counter_combat_effect` — только Treasure one-shot, runtime target является
+  opaque public `fx_*`;
+- `force_combat_helper` — только Treasure one-shot, helper выбирается из
+  server-projected living noncombatants, награда равна `0`.
+
+Каждая capability требует `interaction_scope: other_players`. Произвольные
+expressions, target paths, чужие hand IDs и незарегистрированные сочетания
+отклоняются JSON Schema, Node validator и Go registry.
+
+```bash
+node content/tools/digest.mjs content/sets/moscow/v3/cards.json
+node content/tools/validate.mjs content/sets/moscow/v3/cards.json
+```
+
 ## Definitions и instances
 
 JSON pack хранит `CardDefinition`. Обязательные поля каждой definition:
@@ -88,6 +117,12 @@ Profile `first-edition-core-v1@1` остаётся immutable compatibility path:
 `other_players` definitions остаются deferred до отдельных domain plans и не
 превращаются в runtime no-op. JSON pack и его digest при активации profile не
 меняются.
+
+Новые lobby, pinned на `moscow-core@3`, используют
+`lobby-multiplayer-v2@1`: он сохраняет v1 combat interventions и дополнительно
+материализует только четыре зарегистрированные advanced-combat capabilities.
+Старые content versions и оба предыдущих profile не активируют эти
+capabilities.
 
 ## Закрытая модель mechanics
 

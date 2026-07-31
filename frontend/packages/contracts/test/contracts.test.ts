@@ -252,6 +252,78 @@ describe("wire contracts", () => {
     });
   });
 
+  it("keeps advanced combat targets closed, opaque, and server-projected", () => {
+    const base = {
+      action_id: "act_dddddddddddddddddddddddddddddddd",
+      interaction_id: "interaction_combat",
+      revision: 3,
+      type: "respond",
+      source_instance_id: "sudden-traffic-jam-1",
+    } as const;
+    expect(interactionActionViewSchema.parse({
+      ...base,
+      combat_capability: "enhance_monster",
+      target_monster_instance_id: "paperwork-hydra-1",
+      combat_delta: 4,
+    })).toMatchObject({
+      combat_capability: "enhance_monster",
+      target_monster_instance_id: "paperwork-hydra-1",
+    });
+    expect(interactionActionViewSchema.parse({
+      ...base,
+      source_instance_id: "anonymous-complaint-1",
+      combat_capability: "counter_combat_effect",
+      target_effect_id: "fx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    }).target_effect_id).toBe("fx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(interactionActionViewSchema.parse({
+      ...base,
+      source_instance_id: "flash-mob-intervention-1",
+      combat_capability: "force_combat_helper",
+      helper_player_id: "player_c",
+    }).helper_player_id).toBe("player_c");
+    expect(() => interactionActionViewSchema.parse({
+      ...base,
+      combat_capability: "enhance_monster",
+      target_monster_instance_id: "paperwork-hydra-1",
+      target_path: "players[1].hand",
+      combat_delta: 4,
+    })).toThrow();
+    expect(() => interactionActionViewSchema.parse({
+      ...base,
+      source_instance_id: "anonymous-complaint-1",
+      combat_capability: "counter_combat_effect",
+      target_effect_id: "sudden-traffic-jam-1",
+    })).toThrow();
+    expect(() => interactionActionViewSchema.parse({
+      ...base,
+      combat_capability: "enhance_monster",
+      target_monster_instance_id: "paperwork-hydra-1",
+      combat_delta: 11,
+    })).toThrow();
+
+    const parsed = projectionSchema.parse({
+      ...projection,
+      rules_profile_id: "lobby-multiplayer-v2",
+    });
+    expect(parsed.rules_profile_id).toBe("lobby-multiplayer-v2");
+
+    const fixture: unknown = JSON.parse(readFileSync(new URL(
+      "../../../../backend/game/internal/transport/httpapi/testdata/"
+        + "advanced-combat-projection-v1.json",
+      import.meta.url,
+    ), "utf8"));
+    const advanced = projectionSchema.parse(fixture);
+    expect(advanced.turn.combat?.monsters).toHaveLength(2);
+    expect(advanced.turn.combat?.effects[0]).toMatchObject({
+      kind: "enhance_monster",
+      active: true,
+    });
+    expect(advanced.interaction?.actions[1]).toMatchObject({
+      combat_capability: "counter_combat_effect",
+      target_effect_id: "fx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+  });
+
   it("keeps combat-help terms server-owned and party-scoped", () => {
     const offer = {
       action_id: "act_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",

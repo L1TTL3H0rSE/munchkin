@@ -314,9 +314,17 @@ func (service *Service) ExecuteInteraction(
 		}
 		if intent == game.InteractionIntentRespond &&
 			action.SourceInstanceID != "" {
-			command.Type = game.CommandPlayCombatIntervention
 			command.InstanceID = action.SourceInstanceID
-			command.TargetInstanceID = string(action.Target)
+			if action.CombatCapability != "" {
+				command.Type = game.CommandPlayAdvancedCombatEffect
+				command.TargetInstanceID =
+					action.TargetMonsterInstanceID
+				command.TargetEffectID = action.TargetEffectID
+				command.HelperPlayerID = action.HelperPlayerID
+			} else {
+				command.Type = game.CommandPlayCombatIntervention
+				command.TargetInstanceID = string(action.Target)
+			}
 		}
 		combatHelpResponse := state.CombatHelpOffer != nil &&
 			state.SuspendedInteractionWindow != nil &&

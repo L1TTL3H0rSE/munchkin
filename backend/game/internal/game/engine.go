@@ -35,6 +35,7 @@ const (
 	CommandTimeoutInteraction       CommandType = "timeout_interaction"
 	CommandCloseInteractionWindow   CommandType = "close_interaction_window"
 	CommandPlayCombatIntervention   CommandType = "play_combat_intervention"
+	CommandPlayAdvancedCombatEffect CommandType = "play_advanced_combat_effect"
 	CommandCompleteCombatResolution CommandType = "complete_combat_resolution"
 	CommandOfferCombatHelp          CommandType = "offer_combat_help"
 	CommandRespondCombatHelp        CommandType = "respond_combat_help"
@@ -64,16 +65,21 @@ type Command struct {
 	InteractionWindow      *InteractionWindow     `json:"-"`
 	ChildInteractionID     string                 `json:"-"`
 	HelperPlayerID         string                 `json:"-"`
+	TargetEffectID         string                 `json:"-"`
 	RewardTreasures        int                    `json:"-"`
 }
 
 func CreateLobby(gameID string, owner Player, pack Pack, seed uint64) (DomainEvent, error) {
+	profile := LobbyMultiplayerProfile()
+	if pack.SetID == "moscow-core" && pack.Version == 3 {
+		profile = AdvancedCombatProfile()
+	}
 	return CreateLobbyWithProfile(
 		gameID,
 		owner,
 		pack,
 		seed,
-		LobbyMultiplayerProfile(),
+		profile,
 	)
 }
 
@@ -181,6 +187,8 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 		return handleCloseInteractionWindow(state, command, pack)
 	case CommandPlayCombatIntervention:
 		return handlePlayCombatIntervention(state, command, pack)
+	case CommandPlayAdvancedCombatEffect:
+		return handlePlayAdvancedCombatEffect(state, command, pack)
 	case CommandCompleteCombatResolution:
 		return handleCompleteCombatResolution(state, command, pack)
 	case CommandOfferCombatHelp:
@@ -586,6 +594,159 @@ func handlePlayCombatIntervention(
 	return []DomainEvent{event}, nil
 }
 
+func handlePlayAdvancedCombatEffect(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	window, err := requireInteractionWindow(state, command.InteractionID)
+	if err != nil {
+		return nil, err
+	}
+	if !profile.AdvancedCombat ||
+		window.Kind != InteractionKindCombatResponse ||
+		window.Parent.SubjectKind != InteractionSubjectEncounter ||
+		state.Turn.Phase != PhaseCombat ||
+		state.Turn.Encounter == nil ||
+		state.Turn.Encounter.CombatClosed ||
+		command.InteractionRevision != window.DeadlineRevision {
+		return nil, fmt.Errorf(
+			"%w: stale advanced combat action",
+			ErrIllegalCommand,
+		)
+	}
+	if _, err := interactionResponseAt(window, command.ActorID); err != nil {
+		return nil, err
+	}
+	playerIndex := state.PlayerIndex(command.ActorID)
+	if playerIndex < 0 ||
+		!slices.Contains(state.Players[playerIndex].Hand, command.InstanceID) {
+		return nil, fmt.Errorf(
+			"%w: advanced combat source is not actor-owned",
+			ErrIllegalCommand,
+		)
+	}
+	card, _, exists := pack.DefinitionForInstance(state, command.InstanceID)
+	if !exists || card.CombatCapability == nil {
+		return nil, fmt.Errorf(
+			"%w: advanced combat source is not registered",
+			ErrIllegalCommand,
+		)
+	}
+	capability := *card.CombatCapability
+	payload := advancedCombatEffectAppliedPayload{
+		InteractionID:    window.ID,
+		PreviousRevision: window.DeadlineRevision,
+		ActorID:          command.ActorID,
+		SourceInstanceID: command.InstanceID,
+		SourceDeck:       card.Deck,
+		Capability:       capability.Kind,
+		Amount:           capability.Amount,
+		AcceptedAt:       command.InteractionAt,
+	}
+	switch capability.Kind {
+	case CombatCapabilityAddMonster:
+		if card.Monster == nil ||
+			command.TargetInstanceID != "" ||
+			command.TargetEffectID != "" ||
+			command.HelperPlayerID != "" {
+			return nil, fmt.Errorf(
+				"%w: invalid additional-monster target",
+				ErrIllegalCommand,
+			)
+		}
+		payload.EncounterOrder = append(
+			encounterMonsterInstanceIDs(*state.Turn.Encounter),
+			command.InstanceID,
+		)
+		payload.MonsterStrength = card.Monster.Strength
+	case CombatCapabilityEnhance:
+		if !slices.Contains(
+			encounterMonsterInstanceIDs(*state.Turn.Encounter),
+			command.TargetInstanceID,
+		) ||
+			command.TargetEffectID != "" ||
+			command.HelperPlayerID != "" {
+			return nil, fmt.Errorf(
+				"%w: invalid enhancement target",
+				ErrIllegalCommand,
+			)
+		}
+		payload.EffectID = realizedCombatEffectID(
+			window.ID,
+			command.ActorID,
+			command.InstanceID,
+			window.DeadlineRevision,
+		)
+		payload.TargetMonsterInstanceID = command.TargetInstanceID
+	case CombatCapabilityCounter:
+		targetIndex := slices.IndexFunc(
+			state.Turn.Encounter.CombatEffects,
+			func(effect CombatEffect) bool {
+				return effect.ID == command.TargetEffectID &&
+					effect.Kind == CombatCapabilityEnhance &&
+					effect.Active
+			},
+		)
+		if targetIndex < 0 ||
+			command.TargetInstanceID != "" ||
+			command.HelperPlayerID != "" {
+			return nil, fmt.Errorf(
+				"%w: stale or invalid combat effect target",
+				ErrIllegalCommand,
+			)
+		}
+		payload.EffectID = realizedCombatEffectID(
+			window.ID,
+			command.ActorID,
+			command.InstanceID,
+			window.DeadlineRevision,
+		)
+		payload.TargetEffectID = command.TargetEffectID
+	case CombatCapabilityForceHelper:
+		helperIndex := state.PlayerIndex(command.HelperPlayerID)
+		if state.Turn.Encounter.CombatHelp != nil ||
+			helperIndex < 0 ||
+			command.HelperPlayerID == state.Turn.PlayerID ||
+			state.Players[helperIndex].Dead ||
+			command.TargetInstanceID != "" ||
+			command.TargetEffectID != "" {
+			return nil, fmt.Errorf(
+				"%w: invalid forced-helper target",
+				ErrIllegalCommand,
+			)
+		}
+		payload.HelperPlayerID = command.HelperPlayerID
+	default:
+		return nil, fmt.Errorf(
+			"%w: unknown advanced combat capability",
+			ErrInvalidContent,
+		)
+	}
+	deadline, revision, budget, err := combatInterventionDeadlineAfter(
+		window,
+		command.InteractionAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	payload.DeadlineAt = deadline
+	payload.DeadlineRevision = revision
+	payload.ExtensionBudgetSeconds = budget
+	event, err := newEvent(EventAdvancedCombatEffectApplied, payload)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := Apply(state, event); err != nil {
+		return nil, err
+	}
+	return []DomainEvent{event}, nil
+}
+
 func handleOfferCombatHelp(
 	state State,
 	command Command,
@@ -651,7 +812,7 @@ func handleOfferCombatHelp(
 			ErrIllegalCommand,
 		)
 	}
-	maxReward, err := combatHelpRewardMaximum(state, pack)
+	maxReward, err := combatHelpRewardMaximumSelected(state, pack)
 	if err != nil {
 		return nil, err
 	}
@@ -727,7 +888,7 @@ func handleRespondCombatHelp(
 	parentRevision := parent.DeadlineRevision
 	parentBudget := parent.ExtensionBudgetSeconds
 	if command.InteractionIntent == InteractionIntentAccept {
-		maxReward, err := combatHelpRewardMaximum(state, pack)
+		maxReward, err := combatHelpRewardMaximumSelected(state, pack)
 		if err != nil {
 			return nil, err
 		}
@@ -1034,7 +1195,7 @@ func handleStart(state State, command Command, pack Pack) ([]DomainEvent, error)
 			profile.MinPlayers,
 		)
 	}
-	instances, doors, treasures, err := materializeForProfile(pack, profile)
+	instances, doors, treasures, err := materializeSelectedProfile(pack, profile)
 	if err != nil {
 		return nil, err
 	}
@@ -1642,13 +1803,11 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 		return nil, err
 	}
 	next := state.Clone()
-	monsterCard, _, exists := pack.DefinitionForInstance(
-		next,
-		next.Turn.Encounter.MonsterInstanceID,
-	)
-	if !exists || monsterCard.Monster == nil {
-		return nil, fmt.Errorf("%w: invalid monster", ErrInvalidContent)
+	monsterCards, err := encounterMonsterCards(next, pack)
+	if err != nil {
+		return nil, err
 	}
+	monsterCard := monsterCards[0]
 	var outcomes []RandomOutcome
 	if totals.PlayerWins {
 		rewardModifier, err := treasureRewardModifier(
@@ -1660,10 +1819,13 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 		if err != nil {
 			return nil, err
 		}
-		rewardCount := max(
-			0,
-			monsterCard.Monster.Treasures+rewardModifier,
-		)
+		rewardCount := rewardModifier
+		levelReward := 0
+		for _, encounteredMonster := range monsterCards {
+			rewardCount += encounteredMonster.Monster.Treasures
+			levelReward += encounteredMonster.Monster.Levels
+		}
+		rewardCount = max(0, rewardCount)
 		rewardCount = min(
 			rewardCount,
 			len(next.TreasureDeck)+len(next.TreasureDiscard),
@@ -1738,9 +1900,9 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 		}
 		next.Players[playerIndex].Level = min(
 			profile.WinningLevel,
-			next.Players[playerIndex].Level+monsterCard.Monster.Levels,
+			next.Players[playerIndex].Level+levelReward,
 		)
-		if err := discardEncounter(&next, pack); err != nil {
+		if err := discardEncounterSet(&next, pack); err != nil {
 			return nil, err
 		}
 		if next.Players[playerIndex].Level >= profile.WinningLevel {
@@ -1788,7 +1950,7 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 	autoEscape := next.Players[playerIndex].Level <= monsterCard.Monster.PursuitMinLevel ||
 		containsAny(tags, monsterCard.Monster.AutoEscapeCharacterTags)
 	if autoEscape {
-		if err := discardEncounter(&next, pack); err != nil {
+		if err := discardEncounterSet(&next, pack); err != nil {
 			return nil, err
 		}
 		setTurnPhase(&next, PhaseCharity)
@@ -1838,7 +2000,7 @@ func handleRunAway(state State, command Command, pack Pack) ([]DomainEvent, erro
 		return nil, err
 	}
 	if roll+bonus >= profile.RunAwayTarget {
-		if err := discardEncounter(&next, pack); err != nil {
+		if err := discardEncounterSet(&next, pack); err != nil {
 			return nil, err
 		}
 		setTurnPhase(&next, PhaseCharity)

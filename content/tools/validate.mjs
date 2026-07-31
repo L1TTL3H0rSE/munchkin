@@ -26,6 +26,7 @@ const CARD_KEYS = new Set([
   "attachment",
   "effects",
   "abilities",
+  "combat_capability",
   "rules_text",
   "flavor_text",
   "image",
@@ -72,6 +73,13 @@ const EFFECT_KEYS = new Set([
   "can_win",
 ]);
 const ABILITY_KEYS = new Set(["kind", "amount", "discard_count"]);
+const COMBAT_CAPABILITY_KEYS = new Set(["kind", "amount"]);
+const COMBAT_CAPABILITY_KINDS = new Set([
+  "add_monster",
+  "enhance_monster",
+  "counter_combat_effect",
+  "force_combat_helper",
+]);
 const CARD_KINDS = new Set([
   "monster",
   "curse",
@@ -480,10 +488,55 @@ function validateTrait(trait, label, expectedGroup) {
 }
 
 function noSpecs(card, label, allowed) {
-  for (const key of ["monster", "item", "trait", "attachment", "effects", "abilities"]) {
+  for (const key of [
+    "monster",
+    "item",
+    "trait",
+    "attachment",
+    "effects",
+    "abilities",
+    "combat_capability",
+  ]) {
     if (!allowed.has(key) && card[key] !== undefined) {
       fail(`${label}.${key} is not allowed for kind ${card.kind}`);
     }
+  }
+}
+
+function validateCombatCapability(card, label) {
+  const capability = card.combat_capability;
+  if (capability === undefined) {
+    return;
+  }
+  rejectUnknown(capability, COMBAT_CAPABILITY_KEYS, `${label}.combat_capability`);
+  enumValue(
+    capability.kind,
+    COMBAT_CAPABILITY_KINDS,
+    `${label}.combat_capability.kind`,
+  );
+  if (card.interaction_scope !== "other_players") {
+    fail(`${label}.combat_capability requires other_players scope`);
+  }
+  switch (capability.kind) {
+    case "add_monster":
+      if (card.kind !== "monster" || card.deck !== "door" ||
+        capability.amount !== undefined) {
+        fail(`${label} has an invalid add_monster capability`);
+      }
+      break;
+    case "enhance_monster":
+      if (card.kind !== "one_shot" || card.deck !== "treasure") {
+        fail(`${label} has an invalid enhance_monster capability`);
+      }
+      integer(capability.amount, `${label}.combat_capability.amount`, 1, 10);
+      break;
+    case "counter_combat_effect":
+    case "force_combat_helper":
+      if (card.kind !== "one_shot" || card.deck !== "treasure" ||
+        capability.amount !== undefined) {
+        fail(`${label} has an invalid ${capability.kind} capability`);
+      }
+      break;
   }
 }
 
@@ -515,12 +568,13 @@ function validateCard(card, index) {
     fail(`${cardID}.image is required with alt_text`);
   }
   validateAbilities(card.abilities, `${cardID}.abilities`);
+  validateCombatCapability(card, cardID);
   switch (card.kind) {
     case "monster":
       if (card.deck !== "door") {
         fail(`${cardID} monster must use door deck`);
       }
-      noSpecs(card, cardID, new Set(["monster"]));
+      noSpecs(card, cardID, new Set(["monster", "combat_capability"]));
       validateMonster(card.monster, `${cardID}.monster`);
       break;
     case "curse":
@@ -574,7 +628,7 @@ function validateCard(card, index) {
       if (card.deck !== "treasure") {
         fail(`${cardID} one-shot must use treasure deck`);
       }
-      noSpecs(card, cardID, new Set(["effects"]));
+      noSpecs(card, cardID, new Set(["effects", "combat_capability"]));
       validateEffects(card.effects, `${cardID}.effects`, true);
       if (card.effects.some((effect) =>
         effect.persistent === true ||

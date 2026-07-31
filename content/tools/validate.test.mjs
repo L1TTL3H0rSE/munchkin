@@ -26,6 +26,13 @@ const moscowV2 = JSON.parse(
 const moscowV2Provenance = JSON.parse(
   fs.readFileSync(path.join(moscowV2Root, "provenance.json"), "utf8"),
 );
+const moscowV3Root = path.join(root, "sets", "moscow", "v3");
+const moscowV3 = JSON.parse(
+  fs.readFileSync(path.join(moscowV3Root, "cards.json"), "utf8"),
+);
+const moscowV3Provenance = JSON.parse(
+  fs.readFileSync(path.join(moscowV3Root, "provenance.json"), "utf8"),
+);
 const powershellProbe = spawnSync(
   "pwsh",
   ["-NoProfile", "-NonInteractive", "-Command", "exit 0"],
@@ -403,6 +410,122 @@ test("moscow-core v2 rejects provenance source and asset digest drift", () => {
       moscowV2Root,
     ),
     /built-in ImageGen provenance/,
+  );
+});
+
+test("moscow-core v3 publishes only the closed advanced-combat capabilities", () => {
+  const result = validatePack(structuredClone(moscowV3));
+  assert.deepEqual(
+    {
+      setID: result.setID,
+      version: result.version,
+      digest: result.digest,
+      definitions: result.definitions,
+      doors: result.doors,
+      treasures: result.treasures,
+      deferred: result.deferred,
+    },
+    {
+      setID: "moscow-core",
+      version: 3,
+      digest: moscowV3.content_digest,
+      definitions: 168,
+      doors: 83,
+      treasures: 68,
+      deferred: 17,
+    },
+  );
+  assert.equal(moscowV3.author, moscowV2.author);
+  assert.equal(moscowV3.license, moscowV2.license);
+  assert.equal(
+    moscowV3.source,
+    "original-moscow-core-advanced-combat-2026",
+  );
+  assert.equal(moscowV3Provenance.status, "published");
+  assert.equal(moscowV3Provenance.source_version, 2);
+  assert.equal(
+    moscowV3Provenance.source_digest,
+    moscowV2.content_digest,
+  );
+  assert.equal(
+    moscowV3Provenance.content_digest,
+    moscowV3.content_digest,
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      moscowV3.cards
+        .filter((card) => card.combat_capability !== undefined)
+        .map((card) => [card.id, card.combat_capability]),
+    ),
+    {
+      "paperwork-hydra": {kind: "add_monster"},
+      "flash-mob-intervention": {kind: "force_combat_helper"},
+      "sudden-traffic-jam": {kind: "enhance_monster", amount: 4},
+      "anonymous-complaint": {kind: "counter_combat_effect"},
+    },
+  );
+  assert.deepEqual(
+    moscowV3.cards
+      .filter((card, index) =>
+        JSON.stringify(card) !== JSON.stringify(moscowV2.cards[index]))
+      .map((card) => card.id),
+    [
+      "paperwork-hydra",
+      "flash-mob-intervention",
+      "sudden-traffic-jam",
+      "anonymous-complaint",
+    ],
+  );
+  const record = moscowV3Provenance.records[0];
+  const assetBytes = fs.readFileSync(path.join(moscowV3Root, record.asset_path));
+  assert.equal(
+    `sha256:${createHash("sha256").update(assetBytes).digest("hex")}`,
+    record.output_sha256,
+  );
+});
+
+test("advanced-combat capability registry rejects unknown fields and combinations", () => {
+  const find = (pack, id) => pack.cards.find((card) => card.id === id);
+
+  const unknownKind = structuredClone(moscowV3);
+  find(unknownKind, "sudden-traffic-jam").combat_capability.kind =
+    "execute_expression";
+  assert.throws(
+    () => validatePack(withDigest(unknownKind)),
+    /combat_capability\.kind/,
+  );
+
+  const rawTarget = structuredClone(moscowV3);
+  find(rawTarget, "sudden-traffic-jam").combat_capability.target_path =
+    "players[1].hand";
+  assert.throws(
+    () => validatePack(withDigest(rawTarget)),
+    /unknown field target_path/,
+  );
+
+  const excessiveEnhancement = structuredClone(moscowV3);
+  find(
+    excessiveEnhancement,
+    "sudden-traffic-jam",
+  ).combat_capability.amount = 11;
+  assert.throws(
+    () => validatePack(withDigest(excessiveEnhancement)),
+    /combat_capability\.amount/,
+  );
+
+  const wrongScope = structuredClone(moscowV3);
+  find(wrongScope, "anonymous-complaint").interaction_scope = "self";
+  assert.throws(
+    () => validatePack(withDigest(wrongScope)),
+    /requires other_players scope/,
+  );
+
+  const wrongCardKind = structuredClone(moscowV3);
+  find(wrongCardKind, "paperwork-hydra").combat_capability.kind =
+    "force_combat_helper";
+  assert.throws(
+    () => validatePack(withDigest(wrongCardKind)),
+    /invalid force_combat_helper capability/,
   );
 });
 
@@ -896,6 +1019,19 @@ test("JSON Schema accepts committed moscow-core v2", {
     : "PowerShell Test-Json is unavailable",
 }, () => {
   assert.equal(schemaAccepts(moscowV2), true);
+});
+
+test("JSON Schema accepts committed moscow-core v3 and rejects raw targets", {
+  skip: powershellProbe.status === 0
+    ? false
+    : "PowerShell Test-Json is unavailable",
+}, () => {
+  assert.equal(schemaAccepts(moscowV3), true);
+  const rawTarget = structuredClone(moscowV3);
+  rawTarget.cards.find(
+    (card) => card.id === "sudden-traffic-jam",
+  ).combat_capability.target_path = "players[1].hand";
+  assert.equal(schemaAccepts(rawTarget), false);
 });
 
 test("unknown fields, effects, selectors and conditions fail closed", () => {

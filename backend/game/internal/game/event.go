@@ -30,6 +30,7 @@ const (
 	EventInteractionResponseRecorded = "game.v1.interaction_response_recorded"
 	EventInteractionWindowClosed     = "game.v1.interaction_window_closed"
 	EventCombatInterventionApplied   = "game.v1.combat_intervention_applied"
+	EventAdvancedCombatEffectApplied = "game.v1.advanced_combat_effect_applied"
 	EventCombatHelpOffered           = "game.v1.combat_help_offered"
 	EventCombatHelpOfferResolved     = "game.v1.combat_help_offer_resolved"
 	EventCombatHelpRewardSettled     = "game.v1.combat_help_reward_settled"
@@ -115,6 +116,26 @@ type combatInterventionAppliedPayload struct {
 	DeadlineAt             time.Time    `json:"deadline_at"`
 	DeadlineRevision       uint32       `json:"deadline_revision"`
 	ExtensionBudgetSeconds int          `json:"extension_budget_seconds"`
+}
+
+type advancedCombatEffectAppliedPayload struct {
+	InteractionID           string               `json:"interaction_id"`
+	PreviousRevision        uint32               `json:"previous_revision"`
+	ActorID                 string               `json:"actor_id"`
+	SourceInstanceID        string               `json:"source_instance_id"`
+	SourceDeck              DeckKind             `json:"source_deck"`
+	Capability              CombatCapabilityKind `json:"capability"`
+	EffectID                string               `json:"effect_id,omitempty"`
+	TargetMonsterInstanceID string               `json:"target_monster_instance_id,omitempty"`
+	TargetEffectID          string               `json:"target_effect_id,omitempty"`
+	HelperPlayerID          string               `json:"helper_player_id,omitempty"`
+	Amount                  int                  `json:"amount,omitempty"`
+	MonsterStrength         int                  `json:"monster_strength,omitempty"`
+	EncounterOrder          []string             `json:"encounter_order,omitempty"`
+	AcceptedAt              time.Time            `json:"accepted_at"`
+	DeadlineAt              time.Time            `json:"deadline_at"`
+	DeadlineRevision        uint32               `json:"deadline_revision"`
+	ExtensionBudgetSeconds  int                  `json:"extension_budget_seconds"`
 }
 
 type combatHelpOfferedPayload struct {
@@ -294,6 +315,20 @@ func Apply(state State, event DomainEvent) (State, error) {
 			return State{}, err
 		}
 		next, err := applyCombatIntervention(state, payload)
+		if err != nil {
+			return State{}, err
+		}
+		next.Version++
+		if err := next.Validate(); err != nil {
+			return State{}, err
+		}
+		return next, nil
+	case EventAdvancedCombatEffectApplied:
+		payload, err := decode[advancedCombatEffectAppliedPayload](event)
+		if err != nil {
+			return State{}, err
+		}
+		next, err := applyAdvancedCombatEffect(state, payload)
 		if err != nil {
 			return State{}, err
 		}
@@ -613,6 +648,217 @@ func applyCombatIntervention(
 			"%w: intervention target",
 			ErrIllegalCommand,
 		)
+	}
+	for _, actorID := range next.InteractionWindow.EligibleActorIDs {
+		response := next.InteractionWindow.Responses[actorID]
+		response.State = InteractionResponsePending
+		response.Intent = ""
+		response.AcceptedAt = time.Time{}
+		next.InteractionWindow.Responses[actorID] = response
+	}
+	next.InteractionWindow.DeadlineAt = payload.DeadlineAt
+	next.InteractionWindow.DeadlineRevision = payload.DeadlineRevision
+	next.InteractionWindow.ExtensionBudgetSeconds =
+		payload.ExtensionBudgetSeconds
+	return next, nil
+}
+
+func applyAdvancedCombatEffect(
+	state State,
+	payload advancedCombatEffectAppliedPayload,
+) (State, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return State{}, err
+	}
+	if !profile.AdvancedCombat ||
+		state.InteractionWindow == nil ||
+		state.InteractionWindow.ID != payload.InteractionID ||
+		state.InteractionWindow.Status != InteractionWindowOpen ||
+		state.InteractionWindow.Kind != InteractionKindCombatResponse ||
+		state.InteractionWindow.Parent.SubjectKind != InteractionSubjectEncounter ||
+		state.InteractionWindow.DeadlineRevision != payload.PreviousRevision ||
+		state.Turn.Phase != PhaseCombat ||
+		state.Turn.Encounter == nil {
+		return State{}, fmt.Errorf(
+			"%w: stale or malformed advanced combat effect",
+			ErrIllegalCommand,
+		)
+	}
+	window := *state.InteractionWindow.clone()
+	if _, err := interactionResponseAt(window, payload.ActorID); err != nil {
+		return State{}, err
+	}
+	playerIndex := state.PlayerIndex(payload.ActorID)
+	if playerIndex < 0 ||
+		!slices.Contains(
+			state.Players[playerIndex].Hand,
+			payload.SourceInstanceID,
+		) {
+		return State{}, fmt.Errorf(
+			"%w: advanced combat source is not actor-owned",
+			ErrIllegalCommand,
+		)
+	}
+	if _, exists := state.Instances[payload.SourceInstanceID]; !exists {
+		return State{}, fmt.Errorf(
+			"%w: advanced combat source instance",
+			ErrUnknownCard,
+		)
+	}
+	deadline, revision, budget, err := combatInterventionDeadlineAfter(
+		window,
+		payload.AcceptedAt,
+	)
+	if err != nil {
+		return State{}, err
+	}
+	if !payload.DeadlineAt.Equal(deadline) ||
+		payload.DeadlineRevision != revision ||
+		payload.ExtensionBudgetSeconds != budget {
+		return State{}, fmt.Errorf(
+			"%w: advanced combat deadline outcome differs",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	player := &next.Players[playerIndex]
+	player.Hand, _ = removeString(player.Hand, payload.SourceInstanceID)
+	switch payload.Capability {
+	case CombatCapabilityAddMonster:
+		expectedOrder := append(
+			encounterMonsterInstanceIDs(*state.Turn.Encounter),
+			payload.SourceInstanceID,
+		)
+		if !slices.Equal(payload.EncounterOrder, expectedOrder) ||
+			payload.SourceDeck != DeckDoor ||
+			payload.EffectID != "" ||
+			payload.TargetMonsterInstanceID != "" ||
+			payload.TargetEffectID != "" ||
+			payload.HelperPlayerID != "" ||
+			payload.Amount != 0 ||
+			payload.MonsterStrength < 1 ||
+			payload.MonsterStrength > 99 {
+			return State{}, fmt.Errorf(
+				"%w: additional-monster outcome differs",
+				ErrIllegalCommand,
+			)
+		}
+		next.Turn.Encounter.AdditionalMonsterInstanceIDs = append(
+			[]string(nil),
+			payload.EncounterOrder[1:]...,
+		)
+		next.Turn.Encounter.MonsterCombatModifier += payload.MonsterStrength
+	case CombatCapabilityEnhance:
+		if payload.SourceDeck != DeckTreasure ||
+			payload.EffectID == "" ||
+			payload.Amount < 1 ||
+			payload.Amount > 10 ||
+			!slices.Contains(
+				encounterMonsterInstanceIDs(*state.Turn.Encounter),
+				payload.TargetMonsterInstanceID,
+			) ||
+			payload.TargetEffectID != "" ||
+			payload.HelperPlayerID != "" ||
+			payload.MonsterStrength != 0 ||
+			len(payload.EncounterOrder) != 0 {
+			return State{}, fmt.Errorf(
+				"%w: monster-enhancement outcome differs",
+				ErrIllegalCommand,
+			)
+		}
+		next.Turn.Encounter.CombatEffects = append(
+			next.Turn.Encounter.CombatEffects,
+			CombatEffect{
+				ID:                      payload.EffectID,
+				Kind:                    CombatCapabilityEnhance,
+				TargetMonsterInstanceID: payload.TargetMonsterInstanceID,
+				Amount:                  payload.Amount,
+				Active:                  true,
+			},
+		)
+		next.Turn.Encounter.MonsterCombatModifier += payload.Amount
+	case CombatCapabilityCounter:
+		targetIndex := slices.IndexFunc(
+			next.Turn.Encounter.CombatEffects,
+			func(effect CombatEffect) bool {
+				return effect.ID == payload.TargetEffectID &&
+					effect.Kind == CombatCapabilityEnhance &&
+					effect.Active
+			},
+		)
+		if payload.SourceDeck != DeckTreasure ||
+			payload.EffectID == "" ||
+			targetIndex < 0 ||
+			payload.TargetMonsterInstanceID != "" ||
+			payload.HelperPlayerID != "" ||
+			payload.Amount != 0 ||
+			payload.MonsterStrength != 0 ||
+			len(payload.EncounterOrder) != 0 {
+			return State{}, fmt.Errorf(
+				"%w: combat-counter outcome differs",
+				ErrIllegalCommand,
+			)
+		}
+		next.Turn.Encounter.MonsterCombatModifier -=
+			next.Turn.Encounter.CombatEffects[targetIndex].Amount
+		next.Turn.Encounter.CombatEffects[targetIndex].Active = false
+		next.Turn.Encounter.CombatEffects = append(
+			next.Turn.Encounter.CombatEffects,
+			CombatEffect{
+				ID:             payload.EffectID,
+				Kind:           CombatCapabilityCounter,
+				TargetEffectID: payload.TargetEffectID,
+				Active:         true,
+			},
+		)
+	case CombatCapabilityForceHelper:
+		helperIndex := next.PlayerIndex(payload.HelperPlayerID)
+		if payload.SourceDeck != DeckTreasure ||
+			state.Turn.Encounter.CombatHelp != nil ||
+			helperIndex < 0 ||
+			payload.HelperPlayerID == state.Turn.PlayerID ||
+			next.Players[helperIndex].Dead ||
+			payload.EffectID != "" ||
+			payload.TargetMonsterInstanceID != "" ||
+			payload.TargetEffectID != "" ||
+			payload.Amount != 0 ||
+			payload.MonsterStrength != 0 ||
+			len(payload.EncounterOrder) != 0 {
+			return State{}, fmt.Errorf(
+				"%w: forced-helper outcome differs",
+				ErrIllegalCommand,
+			)
+		}
+		next.Turn.Encounter.CombatHelp = &CombatHelpAgreement{
+			HelperPlayerID: payload.HelperPlayerID,
+			RewardStatus:   CombatHelpRewardAccepted,
+			Forced:         true,
+		}
+	default:
+		return State{}, fmt.Errorf(
+			"%w: unknown advanced combat capability",
+			ErrInvalidContent,
+		)
+	}
+	if payload.Capability != CombatCapabilityAddMonster {
+		switch payload.SourceDeck {
+		case DeckDoor:
+			next.DoorDiscard = append(
+				next.DoorDiscard,
+				payload.SourceInstanceID,
+			)
+		case DeckTreasure:
+			next.TreasureDiscard = append(
+				next.TreasureDiscard,
+				payload.SourceInstanceID,
+			)
+		default:
+			return State{}, fmt.Errorf(
+				"%w: advanced combat source deck",
+				ErrIllegalCommand,
+			)
+		}
 	}
 	for _, actorID := range next.InteractionWindow.EligibleActorIDs {
 		response := next.InteractionWindow.Responses[actorID]

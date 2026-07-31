@@ -811,6 +811,47 @@ func TestCombatResponseProjectionFixtureIsStrictGoContract(t *testing.T) {
 	}
 }
 
+func TestAdvancedCombatProjectionFixtureIsStrictActorContract(t *testing.T) {
+	raw, err := os.ReadFile("testdata/advanced-combat-projection-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var projection game.Projection
+	if err := decoder.Decode(&projection); err != nil {
+		t.Fatal(err)
+	}
+	if projection.RulesProfileID != game.AdvancedCombatProfileID ||
+		projection.Turn.Combat == nil ||
+		len(projection.Turn.Combat.Monsters) != 2 ||
+		len(projection.Turn.Combat.Effects) != 1 ||
+		projection.Interaction == nil ||
+		len(projection.Interaction.Actions) != 2 {
+		t.Fatalf("invalid advanced combat fixture: %#v", projection)
+	}
+	action := projection.Interaction.Actions[1]
+	if action.CombatCapability != game.CombatCapabilityCounter ||
+		action.TargetEffectID != projection.Turn.Combat.Effects[0].EffectID ||
+		action.TargetEffectID == action.SourceInstanceID {
+		t.Fatalf("invalid opaque counter descriptor: %#v", action)
+	}
+	for _, forbidden := range []string{
+		"eligible_actor_ids",
+		"initiator_actor_id",
+		"deadline_revision",
+		"responses",
+		"credential_hash",
+		"sudden-traffic-jam",
+		"source_event",
+		"target_path",
+	} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatalf("advanced combat fixture leaked %q", forbidden)
+		}
+	}
+}
+
 func TestCombatHelpProjectionFixtureIsStrictPartyContract(t *testing.T) {
 	raw, err := os.ReadFile("testdata/combat-help-projection-v1.json")
 	if err != nil {

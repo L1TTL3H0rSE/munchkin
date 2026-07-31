@@ -91,6 +91,45 @@ func combatApplicationPack(t *testing.T) game.Pack {
 	return pack
 }
 
+func advancedCombatApplicationPack(t *testing.T) game.Pack {
+	t.Helper()
+	pack := combatApplicationPack(t)
+	pack.SetID = "moscow-core"
+	pack.Version = 3
+	pack.Source = "advanced-application-test"
+	pack.Cards = append(pack.Cards, game.Card{
+		ID:               "application-enhancer",
+		Name:             "Application Enhancer",
+		Deck:             game.DeckTreasure,
+		Kind:             game.CardOneShot,
+		Copies:           30,
+		InteractionScope: game.InteractionOtherPlayers,
+		Effects: []game.Effect{{
+			Kind:   game.EffectModifyCombat,
+			Amount: 3,
+			Target: game.EffectTargetMonster,
+		}},
+		CombatCapability: &game.CombatCapability{
+			Kind:   game.CombatCapabilityEnhance,
+			Amount: 3,
+		},
+	})
+	pack.ContentDigest = game.CardsDigest(pack.Cards)
+	if err := pack.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	// The validated filler cards prove the pack shape. Removing their physical
+	// copies here makes the randomized deal deterministic for this application
+	// boundary test without changing the registered definitions.
+	for index := range pack.Cards {
+		if pack.Cards[index].ID != "application-monster" &&
+			pack.Cards[index].ID != "application-enhancer" {
+			pack.Cards[index].Copies = 0
+		}
+	}
+	return pack
+}
+
 type manualClock struct {
 	mu    sync.Mutex
 	value time.Time
@@ -501,6 +540,182 @@ func TestCombatResolutionRequestUsesReceiptAndContinuesAfterPass(t *testing.T) {
 	if result.Projection.Interaction != nil ||
 		result.Projection.Turn.Phase == game.PhaseCombat {
 		t.Fatalf("combat did not continue after pass: %#v", result.Projection)
+	}
+}
+
+func TestAdvancedCombatActionUsesActorProjectionCASAndReceipt(t *testing.T) {
+	ctx := context.Background()
+	openedAt := time.Date(2026, time.July, 31, 4, 15, 0, 0, time.UTC)
+	clock := &manualClock{value: openedAt}
+	service := NewService(
+		memory.New(),
+		advancedCombatApplicationPack(t),
+		clock,
+		NoopPublisher{},
+	)
+	owner, err := service.CreateLobby(ctx, "Alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, err := service.JoinLobby(
+		ctx,
+		owner.GameID,
+		"advanced-responder-credential",
+		"advanced-join",
+		owner.Projection.Version,
+		"Bob",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"advanced-start",
+		responder.Projection.Version,
+		game.Command{Type: game.CommandStart},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setupOwner, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"advanced-setup-owner",
+		started.Version,
+		game.Command{Type: game.CommandFinishSetup},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setupResponder, err := service.Execute(
+		ctx,
+		owner.GameID,
+		responder.Credential,
+		"advanced-setup-responder",
+		setupOwner.Version,
+		game.Command{Type: game.CommandFinishSetup},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"advanced-open-door",
+		setupResponder.Version,
+		game.Command{Type: game.CommandOpenDoor},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requested, err := service.RequestCombatResolution(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"advanced-request",
+		opened.Version,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responderProjection, err := service.Get(
+		ctx,
+		owner.GameID,
+		responder.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var action game.InteractionActionView
+	for _, candidate := range responderProjection.Interaction.Actions {
+		if candidate.CombatCapability == game.CombatCapabilityEnhance {
+			action = candidate
+			break
+		}
+	}
+	if action.ActionID == "" ||
+		action.TargetMonsterInstanceID == "" ||
+		action.CombatDelta != 3 {
+		t.Fatalf("advanced actor descriptor: %#v", action)
+	}
+	if _, err := service.ExecuteInteraction(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"foreign-advanced-action",
+		requested.Version,
+		requested.Projection.Interaction.InteractionID,
+		action.ActionID,
+		action.Type,
+	); !errors.Is(err, ErrInteractionAction) {
+		t.Fatalf("foreign actor used private advanced action: %v", err)
+	}
+
+	clock.Set(openedAt.Add(31 * time.Second))
+	result, err := service.ExecuteInteraction(
+		ctx,
+		owner.GameID,
+		responder.Credential,
+		"advanced-effect",
+		responderProjection.Version,
+		responderProjection.Interaction.InteractionID,
+		action.ActionID,
+		action.Type,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Projection.Interaction == nil ||
+		result.Projection.Interaction.Actions[0].Revision != 2 ||
+		!result.Projection.Interaction.DeadlineAt.Equal(
+			openedAt.Add(70*time.Second),
+		) ||
+		result.Projection.Turn.Combat == nil ||
+		len(result.Projection.Turn.Combat.Effects) != 1 ||
+		result.Projection.Turn.Combat.Effects[0].EffectID == "" {
+		t.Fatalf("advanced CAS outcome: %#v", result.Projection)
+	}
+	replayed, err := service.ExecuteInteraction(
+		ctx,
+		owner.GameID,
+		responder.Credential,
+		"advanced-effect",
+		responderProjection.Version,
+		responderProjection.Interaction.InteractionID,
+		action.ActionID,
+		action.Type,
+	)
+	if err != nil || !replayed.Replayed ||
+		replayed.Version != result.Version {
+		t.Fatalf("advanced receipt replay=%#v err=%v", replayed, err)
+	}
+	if _, err := service.ExecuteInteraction(
+		ctx,
+		owner.GameID,
+		responder.Credential,
+		"advanced-effect",
+		result.Version,
+		result.Projection.Interaction.InteractionID,
+		result.Projection.Interaction.Actions[0].ActionID,
+		game.InteractionIntentPass,
+	); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("advanced receipt accepted another fingerprint: %v", err)
+	}
+	if _, err := service.ExecuteInteraction(
+		ctx,
+		owner.GameID,
+		responder.Credential,
+		"stale-advanced-effect",
+		responderProjection.Version,
+		responderProjection.Interaction.InteractionID,
+		action.ActionID,
+		action.Type,
+	); !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("stale advanced action error: %v", err)
 	}
 }
 

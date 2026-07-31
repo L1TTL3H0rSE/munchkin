@@ -1,0 +1,3732 @@
+{
+  "schema_version": 1,
+  "set_id": "moscow-core",
+  "version": 3,
+  "author": "L1TTL3H0rSE",
+  "license": "All-Rights-Reserved",
+  "source": "original-moscow-core-advanced-combat-2026",
+  "content_digest": "sha256:5150be9bd21b86ef9f2adf87fec42f89da26264a3519379f04057e7140bbc238",
+  "cards": [
+    {
+      "id": "yard-evacuator",
+      "name": "Дворовый эвакуатор",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 1,
+        "treasures": 1,
+        "levels": 1,
+        "tags": [
+          "yard"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, потеряй 1 уровень.",
+      "flavor_text": "Он увозит даже то, что ещё не успело припарковаться.",
+      "image": "assets/yard-evacuator.webp",
+      "alt_text": "Дружелюбный эвакуатор поднимает парковочное место над городским двором."
+    },
+    {
+      "id": "sleepy-turnstile",
+      "name": "Сонный турникет",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 2,
+        "treasures": 1,
+        "levels": 1,
+        "tags": [
+          "transport",
+          "underground"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось 1 карту с руки.",
+      "flavor_text": "Зелёный огонёк ему сегодня не снился."
+    },
+    {
+      "id": "queue-with-elbows",
+      "name": "Очередь с локтями",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 3,
+        "treasures": 1,
+        "levels": 1,
+        "tags": [
+          "crowd"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "newcomer"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "+2 против новичка. Если не сбежишь, потеряй 1 уровень.",
+      "flavor_text": "Последний здесь тот, кто спросил, кто последний."
+    },
+    {
+      "id": "courier-in-elevator",
+      "name": "Курьер в застрявшем лифте",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 4,
+        "treasures": 1,
+        "levels": 1,
+        "tags": [
+          "delivery",
+          "yard"
+        ],
+        "auto_escape_character_tags": [
+          "courier"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Курьер убегает автоматически. Иначе при неудачном побеге сбрось 1 карту с руки.",
+      "flavor_text": "Заказ прибыл, а этаж — пока нет."
+    },
+    {
+      "id": "puddle-by-entrance",
+      "name": "Лужа у подъезда",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 5,
+        "treasures": 1,
+        "levels": 1,
+        "tags": [
+          "weather",
+          "yard"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось 1 предмет экипировки.",
+      "flavor_text": "Глубину измеряют по исчезнувшим бахилам."
+    },
+    {
+      "id": "district-chat",
+      "name": "Домовой чат",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 6,
+        "treasures": 1,
+        "levels": 1,
+        "tags": [
+          "digital",
+          "yard"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "owned_card",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, выбери и сбрось 1 свою карту.",
+      "flavor_text": "За ночь накопилось триста сообщений и ни одного решения."
+    },
+    {
+      "id": "eternal-roadworks",
+      "name": "Вечный ремонт",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 7,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "construction"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "commuter"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "+2 против пассажира. Если не сбежишь, потеряй 1 уровень.",
+      "flavor_text": "Дата окончания работ скрыта под новым слоем плитки."
+    },
+    {
+      "id": "rush-hour-escalator",
+      "name": "Эскалатор в час пик",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 8,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "transport",
+          "underground"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "local"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "change_character_tag",
+            "tag": "confused"
+          }
+        ]
+      },
+      "rules_text": "+2 против неместного. Если не сбежишь, получи метку «растерянный».",
+      "flavor_text": "Стой справа, проходи слева, паникуй по центру."
+    },
+    {
+      "id": "paperwork-hydra",
+      "name": "Гидра из справок",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "combat_capability": {
+        "kind": "add_monster"
+      },
+      "monster": {
+        "strength": 9,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "paperwork"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 2
+          }
+        ]
+      },
+      "rules_text": "Сыграй как дополнительного Монстра в открытый бой. Если не сбежишь, сбрось 2 карты с руки.",
+      "flavor_text": "На место каждой заполненной формы вырастают две новые."
+    },
+    {
+      "id": "parking-inspector",
+      "name": "Парковочный инспектор",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 10,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "official",
+          "transport"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          },
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось 1 предмет экипировки и потеряй 1 уровень.",
+      "flavor_text": "Фотография уже загружена, возражение ещё нет."
+    },
+    {
+      "id": "smart-barrier",
+      "name": "Умный шлагбаум",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 11,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "digital",
+          "yard"
+        ],
+        "auto_defeat_character_tags": [
+          "driver"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 2
+          }
+        ]
+      },
+      "rules_text": "Водитель автоматически проигрывает бой, но может попытаться убежать. При неудачном побеге потеряй 2 уровня.",
+      "flavor_text": "Он узнал номер машины, но не признал владельца."
+    },
+    {
+      "id": "overpriced-coffee",
+      "name": "Кофе за ползарплаты",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 12,
+        "treasures": 3,
+        "levels": 1,
+        "tags": [
+          "service"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "owned_card",
+            "count": 2
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось 2 свои карты.",
+      "flavor_text": "Сироп входит в стоимость. Стакан — нет."
+    },
+    {
+      "id": "winter-slush",
+      "name": "Февральская слякоть",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 13,
+        "treasures": 3,
+        "levels": 1,
+        "tags": [
+          "weather"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 3,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "cyclist"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "+3 против велосипедиста. Если не сбежишь, сбрось 1 предмет экипировки.",
+      "flavor_text": "Она одинаково уверенно лежит и на земле, и в воздухе."
+    },
+    {
+      "id": "service-window-forty-seven",
+      "name": "Окно номер сорок семь",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 14,
+        "treasures": 3,
+        "levels": 1,
+        "pursuit_min_level": 2,
+        "tags": [
+          "official",
+          "paperwork"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          },
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Не преследует героев ниже 3-го уровня. При неудачном побеге потеряй 1 уровень и сбрось 1 карту с руки.",
+      "flavor_text": "Ваш вопрос решается в окне сорок восемь."
+    },
+    {
+      "id": "third-ring-jam",
+      "name": "Пробка на Третьем кольце",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 15,
+        "treasures": 3,
+        "levels": 1,
+        "tags": [
+          "transport",
+          "crowd"
+        ],
+        "auto_escape_character_tags": [
+          "cyclist"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 2
+          }
+        ]
+      },
+      "rules_text": "Велосипедист убегает автоматически. Иначе при неудачном побеге потеряй 2 уровня.",
+      "flavor_text": "Навигатор обещает, что осталось всего вечность и семь минут."
+    },
+    {
+      "id": "renovation-drill",
+      "name": "Перфоратор в семь утра",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 16,
+        "treasures": 4,
+        "levels": 2,
+        "tags": [
+          "construction",
+          "yard"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "death"
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, умри.",
+      "flavor_text": "Сверло знает расписание тишины и принципиально с ним не знакомо."
+    },
+    {
+      "id": "bureaucratic-minotaur",
+      "name": "Минотавр МФЦ",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 17,
+        "treasures": 4,
+        "levels": 2,
+        "tags": [
+          "official",
+          "paperwork"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 3,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "bureaucrat"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "trait",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "+3 против героя без метки «бюрократ». Если не сбежишь, сбрось 1 карту черты.",
+      "flavor_text": "Нить Ариадны принимается только в оригинале и с копией."
+    },
+    {
+      "id": "platform-announcement",
+      "name": "Объявление на платформе",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 18,
+        "treasures": 4,
+        "levels": 2,
+        "tags": [
+          "transport",
+          "underground"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "change_character_tag",
+            "tag": "confused",
+            "replace_tag": "local"
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, потеряй метку «местный» и получи метку «растерянный».",
+      "flavor_text": "Смысл был где-то между эхом и закрывающимися дверями."
+    },
+    {
+      "id": "night-bus-ghost",
+      "name": "Призрак ночного автобуса",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 19,
+        "treasures": 4,
+        "levels": 2,
+        "tags": [
+          "transport",
+          "night"
+        ],
+        "auto_escape_character_tags": [
+          "night-owl"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "death"
+          }
+        ]
+      },
+      "rules_text": "Ночная сова убегает автоматически. Иначе при неудачном побеге умри.",
+      "flavor_text": "Он приходит строго после того, как ты вызвал такси."
+    },
+    {
+      "id": "tower-crane-thinker",
+      "name": "Башенный кран-мыслитель",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 20,
+        "treasures": 5,
+        "levels": 2,
+        "tags": [
+          "construction"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 2
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось 2 предмета экипировки.",
+      "flavor_text": "Поднимает бетон и тяжёлые вопросы о сроках сдачи."
+    },
+    {
+      "id": "delivery-swarm",
+      "name": "Рой доставщиков",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 6,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "delivery",
+          "crowd"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "courier"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 2
+          }
+        ]
+      },
+      "rules_text": "+2 против курьера. Если не сбежишь, сбрось 2 карты с руки.",
+      "flavor_text": "Каждый ищет нужный подъезд, но нашли они тебя."
+    },
+    {
+      "id": "housing-bill-beast",
+      "name": "Квитанция с характером",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 7,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "paperwork",
+          "yard"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "office-worker"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "+2 против героя без метки «офисный работник». Если не сбежишь, потеряй 1 уровень.",
+      "flavor_text": "Перерасчёт возможен, но только в следующей жизни."
+    },
+    {
+      "id": "snowplow-cavalry",
+      "name": "Кавалерия снегоуборщиков",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 8,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "weather",
+          "transport"
+        ],
+        "auto_escape_character_tags": [
+          "night-owl"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Ночная сова убегает автоматически. Иначе при неудачном побеге сбрось 1 предмет экипировки.",
+      "flavor_text": "Днём их никто не видел, зато ночью слышали все."
+    },
+    {
+      "id": "office-pass-system",
+      "name": "Система пропусков",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 9,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "digital",
+          "official"
+        ],
+        "auto_defeat_character_tags": [
+          "newcomer"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "owned_card",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Новичок автоматически проигрывает бой, но может попытаться убежать. При неудачном побеге сбрось 1 свою карту.",
+      "flavor_text": "Ваше лицо распознано как недостаточно корпоративное."
+    },
+    {
+      "id": "lost-navigation",
+      "name": "Навигатор, который знает лучше",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 10,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "digital",
+          "transport"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "digital"
+            }
+          },
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "confused"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "change_character_tag",
+            "tag": "offline",
+            "replace_tag": "digital"
+          }
+        ]
+      },
+      "rules_text": "+2 против цифрового или растерянного героя; оба условия складываются. Если не сбежишь, замени метку «цифровой» на «офлайн».",
+      "flavor_text": "Маршрут перестроен через реку. Мост появится в обновлении."
+    },
+    {
+      "id": "courtyard-boom-gate",
+      "name": "Шлагбаум общего собрания",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 11,
+        "treasures": 3,
+        "levels": 1,
+        "tags": [
+          "yard",
+          "official"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 1
+          },
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось 1 карту с руки и 1 предмет экипировки.",
+      "flavor_text": "За установку проголосовали двадцать квартир из четырёхсот."
+    },
+    {
+      "id": "museum-guard-shadow",
+      "name": "Тень музейного смотрителя",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 12,
+        "treasures": 3,
+        "levels": 1,
+        "tags": [
+          "landmark",
+          "official"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": -2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "guide"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "trait",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "−2 к силе монстра против гида. Если не сбежишь, сбрось 1 карту черты.",
+      "flavor_text": "Не трогать экспонаты. Особенно того, который трогает тебя."
+    },
+    {
+      "id": "tram-wire-knot",
+      "name": "Узел троллейбусных проводов",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 13,
+        "treasures": 3,
+        "levels": 1,
+        "tags": [
+          "transport",
+          "electric"
+        ],
+        "auto_escape_character_tags": [
+          "electrician"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 2
+          }
+        ]
+      },
+      "rules_text": "Электрик убегает автоматически. Иначе при неудачном побеге потеряй 2 уровня.",
+      "flavor_text": "Схему развязки помнит только голубь на опоре."
+    },
+    {
+      "id": "market-barker",
+      "name": "Зазывала у метро",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 14,
+        "treasures": 3,
+        "levels": 1,
+        "tags": [
+          "crowd",
+          "service"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 3,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "tourist"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 2
+          }
+        ]
+      },
+      "rules_text": "+3 против туриста. Если не сбежишь, сбрось 2 карты с руки.",
+      "flavor_text": "Только сегодня, только сейчас и каждое утро с 2009 года."
+    },
+    {
+      "id": "construction-fence-maze",
+      "name": "Забор, ведущий кругами",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 15,
+        "treasures": 4,
+        "levels": 1,
+        "tags": [
+          "construction",
+          "yard"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "pedestrian"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 2
+          }
+        ]
+      },
+      "rules_text": "+2 против пешехода. Если не сбежишь, сбрось 2 предмета экипировки.",
+      "flavor_text": "Обход занимает восемь минут и возвращает к началу."
+    },
+    {
+      "id": "digital-slot-portal",
+      "name": "Портал без свободных слотов",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 16,
+        "treasures": 4,
+        "levels": 2,
+        "tags": [
+          "digital",
+          "official"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 4,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "digital"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "owned_card",
+            "count": 2
+          }
+        ]
+      },
+      "rules_text": "+4 против героя без метки «цифровой». Если не сбежишь, сбрось 2 свои карты.",
+      "flavor_text": "Запись откроется вчера в 03:17."
+    },
+    {
+      "id": "district-chief-rounds",
+      "name": "Начальник района на обходе",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 17,
+        "treasures": 4,
+        "levels": 2,
+        "tags": [
+          "official",
+          "yard"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 3,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "newcomer"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 2
+          },
+          {
+            "kind": "discard",
+            "selector": "trait",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "+3 против новичка. Если не сбежишь, потеряй 2 уровня и сбрось 1 карту черты.",
+      "flavor_text": "Все проблемы уже взяты под личное фотографирование."
+    },
+    {
+      "id": "horizontal-moscow-rain",
+      "name": "Горизонтальный московский дождь",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 18,
+        "treasures": 4,
+        "levels": 2,
+        "tags": [
+          "weather"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 3,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "cyclist"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 2
+          }
+        ]
+      },
+      "rules_text": "+3 против велосипедиста. Если не сбежишь, сбрось 2 предмета экипировки.",
+      "flavor_text": "Зонт открылся. Погода восприняла это как вызов."
+    },
+    {
+      "id": "commuter-centipede",
+      "name": "Сороконожка с проездным",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 19,
+        "treasures": 4,
+        "levels": 2,
+        "tags": [
+          "transport",
+          "underground"
+        ],
+        "auto_defeat_character_tags": [
+          "tourist"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "death"
+          }
+        ]
+      },
+      "rules_text": "Турист автоматически проигрывает бой, но может попытаться убежать. При неудачном побеге умри.",
+      "flavor_text": "Все сорок две ноги стоят на переходе правильно."
+    },
+    {
+      "id": "skyscraper-draft",
+      "name": "Сквозняк между башнями",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "monster": {
+        "strength": 10,
+        "treasures": 3,
+        "levels": 1,
+        "tags": [
+          "weather",
+          "landmark"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Добавь этого монстра в бой выбранного соперника. Если соперник проиграет бой, он отдельно пытается убежать от этого монстра; при неудачном побеге сбрасывает 1 предмет экипировки.",
+      "flavor_text": "На уровне земли штиль, на уровне амбиций — ураган."
+    },
+    {
+      "id": "last-train-no-transfer",
+      "name": "Последний поезд без пересадки",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "monster": {
+        "strength": 20,
+        "treasures": 5,
+        "levels": 2,
+        "tags": [
+          "transport",
+          "night"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "death"
+          }
+        ]
+      },
+      "rules_text": "Добавь этого монстра в бой выбранного соперника. Если соперник проиграет бой, он отдельно пытается убежать от этого монстра; при неудачном побеге умирает.",
+      "flavor_text": "Двери закрываются. Следующая возможность — утром."
+    },
+    {
+      "id": "wet-socks-curse",
+      "name": "Проклятие мокрых носков",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "equipment",
+          "count": 1
+        }
+      ],
+      "rules_text": "Сбрось 1 предмет экипировки.",
+      "flavor_text": "Лужа была маленькая, но очень целеустремлённая."
+    },
+    {
+      "id": "missed-stop-curse",
+      "name": "Проклятие пропущенной остановки",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "lose_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Потеряй 1 уровень.",
+      "flavor_text": "До конечной осталось всего сорок семь минут."
+    },
+    {
+      "id": "dead-phone-curse",
+      "name": "Проклятие разряженного телефона",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "hand",
+          "count": 2
+        }
+      ],
+      "rules_text": "Сбрось 2 карты с руки.",
+      "flavor_text": "Билет внутри, зарядка дома, контролёр рядом."
+    },
+    {
+      "id": "broken-umbrella-curse",
+      "name": "Проклятие вывернутого зонта",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": -1,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −1 к побегу.",
+      "flavor_text": "Теперь он ловит не дождь, а взгляды."
+    },
+    {
+      "id": "renovation-noise-curse",
+      "name": "Проклятие соседского ремонта",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -1,
+          "target": "player",
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −1 к твоей боевой силе.",
+      "flavor_text": "Сверление прекратится сразу после конца времён."
+    },
+    {
+      "id": "tiny-kitchen-curse",
+      "name": "Проклятие крошечной кухни",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_hand_limit",
+          "amount": -1,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −1 к лимиту руки.",
+      "flavor_text": "Чтобы открыть холодильник, выйди в коридор."
+    },
+    {
+      "id": "extra-receipt-curse",
+      "name": "Проклятие лишней квитанции",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "owned_card",
+          "count": 1
+        }
+      ],
+      "rules_text": "Выбери и сбрось 1 свою карту.",
+      "flavor_text": "Услуга не оказана, зато бумага состоялась."
+    },
+    {
+      "id": "registration-loop-curse",
+      "name": "Проклятие регистрационного круга",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "change_character_tag",
+          "tag": "newcomer",
+          "replace_tag": "local"
+        }
+      ],
+      "rules_text": "Замени метку «местный» на метку «новичок».",
+      "flavor_text": "Для подтверждения адреса нужно подтвердить адрес."
+    },
+    {
+      "id": "night-shift-curse",
+      "name": "Проклятие ночной смены",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "change_character_tag",
+          "tag": "night-owl"
+        }
+      ],
+      "rules_text": "Получи метку «ночная сова».",
+      "flavor_text": "Утро начинается после третьего кофе, а не по часам."
+    },
+    {
+      "id": "price-surge-curse",
+      "name": "Проклятие динамической цены",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_treasure_reward",
+          "amount": -1,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Пока Проклятие остаётся у тебя, награда за победу уменьшается на 1 Сокровище, но не ниже 0.",
+      "flavor_text": "Спрос вырос ровно в момент, когда ты нажал кнопку."
+    },
+    {
+      "id": "three-transfers-curse",
+      "name": "Проклятие трёх пересадок",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "lose_level",
+          "amount": 2
+        }
+      ],
+      "rules_text": "Потеряй 2 уровня.",
+      "flavor_text": "Короткий маршрут — это когда переход только один раз ведёт на улицу."
+    },
+    {
+      "id": "frozen-lock-curse",
+      "name": "Проклятие замёрзшего замка",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "equipment",
+          "count": 1
+        }
+      ],
+      "rules_text": "Сбрось 1 предмет экипировки.",
+      "flavor_text": "Ключ подходит идеально, кроме физической реальности."
+    },
+    {
+      "id": "office-lunch-curse",
+      "name": "Проклятие офисного обеда",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "hand",
+          "count": 1
+        },
+        {
+          "kind": "lose_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Сбрось 1 карту с руки и потеряй 1 уровень.",
+      "flavor_text": "Контейнер открылся раньше, чем ты дошёл до кухни."
+    },
+    {
+      "id": "expired-pass-curse",
+      "name": "Проклятие просроченного пропуска",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "owned_card",
+          "count": 1
+        }
+      ],
+      "rules_text": "Выбери и сбрось 1 свою карту.",
+      "flavor_text": "Турникет помнит дату лучше тебя."
+    },
+    {
+      "id": "red-line-closure-curse",
+      "name": "Проклятие закрытого перехода",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": -2,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −2 к побегу.",
+      "flavor_text": "Обход обозначен стрелкой, которая указывает на другую стрелку."
+    },
+    {
+      "id": "faded-sign-curse",
+      "name": "Проклятие выцветшей вывески",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -2,
+          "target": "player",
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −2 к твоей боевой силе.",
+      "flavor_text": "Название ещё читается, если помнить его заранее."
+    },
+    {
+      "id": "no-signal-curse",
+      "name": "Проклятие белого пятна связи",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_hand_limit",
+          "amount": -2,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −2 к лимиту руки.",
+      "flavor_text": "Пять полосок исчезли сразу после важного сообщения."
+    },
+    {
+      "id": "unexpected-audit-curse",
+      "name": "Проклятие внезапной проверки",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "equipment",
+          "count": 2
+        }
+      ],
+      "rules_text": "Сбрось 2 предмета экипировки.",
+      "flavor_text": "Документы в порядке, поэтому проверят карманы."
+    },
+    {
+      "id": "lucky-queue-ticket-curse",
+      "name": "Проклятие счастливого талона",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "tie_wins",
+          "persistent": true
+        }
+      ],
+      "rules_text": "Пока Проклятие остаётся у тебя, ничья в бою считается твоей победой.",
+      "flavor_text": "Номер красивый. Последствия подозрительно выгодные."
+    },
+    {
+      "id": "renamed-street-curse",
+      "name": "Проклятие переименованной улицы",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "change_character_tag",
+          "tag": "confused"
+        }
+      ],
+      "rules_text": "Получи метку «растерянный».",
+      "flavor_text": "Старое название знает таксист, новое — только карта."
+    },
+    {
+      "id": "duplicate-form-curse",
+      "name": "Проклятие формы в трёх экземплярах",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "hand",
+          "count": 3
+        }
+      ],
+      "rules_text": "Сбрось 3 карты с руки.",
+      "flavor_text": "Третий экземпляр подтверждает существование первых двух."
+    },
+    {
+      "id": "heavy-boots-curse",
+      "name": "Проклятие зимних ботинок",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": -1,
+          "persistent": true
+        },
+        {
+          "kind": "modify_combat",
+          "amount": -1,
+          "target": "player",
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −1 к побегу и −1 к твоей боевой силе.",
+      "flavor_text": "Тепло, надёжно и совершенно неподвижно."
+    },
+    {
+      "id": "balcony-pigeon-curse",
+      "name": "Проклятие балконного голубя",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "owned_card",
+          "count": 2
+        }
+      ],
+      "rules_text": "Выбери и сбрось 2 свои карты.",
+      "flavor_text": "Он ничего не украл. Он просто всё переоформил на себя."
+    },
+    {
+      "id": "deadline-yesterday-curse",
+      "name": "Проклятие вчерашнего срока",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "lose_level",
+          "amount": 1
+        },
+        {
+          "kind": "discard",
+          "selector": "hand",
+          "count": 1
+        }
+      ],
+      "rules_text": "Потеряй 1 уровень и сбрось 1 карту с руки.",
+      "flavor_text": "Уведомление пришло вовремя — на следующий день."
+    },
+    {
+      "id": "app-update-curse",
+      "name": "Проклятие обязательного обновления",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "effects": [
+        {
+          "kind": "change_character_tag",
+          "tag": "offline",
+          "replace_tag": "digital"
+        }
+      ],
+      "rules_text": "Наложи на выбранного соперника: тот заменяет метку «цифровой» на метку «офлайн».",
+      "flavor_text": "До завершения осталось две минуты и новое соглашение."
+    },
+    {
+      "id": "magnetic-storm-curse",
+      "name": "Проклятие магнитной бури",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "effects": [
+        {
+          "kind": "modify_treasure_reward",
+          "amount": -2,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Наложи на выбранного соперника. Пока Проклятие остаётся у него, награда за победу уменьшается на 2 Сокровища, но не ниже 0.",
+      "flavor_text": "Компас смотрит на кассу, терминал — в пустоту."
+    },
+    {
+      "id": "neighbor-drill-curse",
+      "name": "Проклятие коллективного перфоратора",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "effects": [
+        {
+          "kind": "modify_hand_limit",
+          "amount": -1,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Наложи на выбранного соперника: у того постоянно −1 к лимиту руки.",
+      "flavor_text": "Сверлит один сосед, просыпается весь подъезд."
+    },
+    {
+      "id": "wrong-entrance-curse",
+      "name": "Проклятие неправильного подъезда",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -3,
+          "target": "player",
+          "persistent": true
+        }
+      ],
+      "rules_text": "Наложи на выбранного соперника: у того постоянно −3 к боевой силе.",
+      "flavor_text": "Номер квартиры верный. Дом решил иначе."
+    },
+    {
+      "id": "group-chat-poll-curse",
+      "name": "Проклятие опроса в домовом чате",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "owned_card",
+          "count": 1
+        }
+      ],
+      "rules_text": "Выбранный соперник выбирает и сбрасывает 1 свою карту.",
+      "flavor_text": "Варианты ответа: «за», «против» и «кто добавил меня сюда»."
+    },
+    {
+      "id": "sudden-inspection-curse",
+      "name": "Проклятие выездной комиссии",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "equipment",
+          "count": 1
+        },
+        {
+          "kind": "discard",
+          "selector": "trait",
+          "count": 1
+        }
+      ],
+      "rules_text": "Выбранный соперник сбрасывает 1 предмет экипировки и 1 карту черты.",
+      "flavor_text": "Комиссия уже у двери и очень рада, что ты не готов."
+    },
+    {
+      "id": "metro-driver-class",
+      "name": "Машинист метро",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "driver"
+        ],
+        "modifiers": [
+          {
+            "target": "escape",
+            "amount": 1,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 2,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "Постоянно +1 к побегу. Сбрось 1 карту с руки: +2 в текущем бою.",
+      "flavor_text": "Он знает, где поезд разворачивается, но не расскажет."
+    },
+    {
+      "id": "bike-courier-class",
+      "name": "Велокурьер",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "courier",
+          "cyclist"
+        ],
+        "modifiers": [
+          {
+            "target": "escape",
+            "amount": 2,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 3,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "Постоянно +2 к побегу. Сбрось 1 карту с руки: +3 в текущем бою.",
+      "flavor_text": "Домофон не отвечает, зато ноги отвечают за всё."
+    },
+    {
+      "id": "mfc-specialist-class",
+      "name": "Специалист МФЦ",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "bureaucrat"
+        ],
+        "tie_wins": true,
+        "modifiers": [
+          {
+            "target": "treasure_reward",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "paperwork"
+            }
+          }
+        ]
+      },
+      "rules_text": "Ничья считается твоей победой. За монстра с меткой «бумаги» получи на 1 Сокровище больше.",
+      "flavor_text": "Любой лабиринт становится коридором, если знать номер окна."
+    },
+    {
+      "id": "night-barista-class",
+      "name": "Ночной бариста",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "night-owl"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "crowd"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 2,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+2 против монстров с меткой «толпа». Сбрось 1 карту с руки: ещё +2 в текущем бою.",
+      "flavor_text": "Различает шесть видов усталости по заказу на кофе."
+    },
+    {
+      "id": "urbanist-class",
+      "name": "Дворовый урбанист",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "urbanist"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "construction"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 против монстров с меткой «стройка».",
+      "flavor_text": "У него есть схема удобного двора и ни одного согласования."
+    },
+    {
+      "id": "sysadmin-class",
+      "name": "Системный администратор",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "digital"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 3,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "digital"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 5,
+          "discard_count": 2
+        }
+      ],
+      "rules_text": "+3 против монстров с меткой «цифровой». Сбрось 2 карты с руки: +5 в текущем бою.",
+      "flavor_text": "Город прислал ему журнал ошибок объёмом с многоэтажку."
+    },
+    {
+      "id": "paramedic-class",
+      "name": "Фельдшер подстанции",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "medic"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "weather"
+            }
+          },
+          {
+            "target": "hand_limit",
+            "amount": 1,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 против монстров с меткой «погода» и постоянно +1 к лимиту руки.",
+      "flavor_text": "Доезжает быстрее слухов и говорит короче сирены."
+    },
+    {
+      "id": "museum-guide-class",
+      "name": "Музейный гид",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "guide"
+        ],
+        "modifiers": [
+          {
+            "target": "treasure_reward",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "landmark"
+            }
+          }
+        ]
+      },
+      "rules_text": "За монстра с меткой «достопримечательность» получи на 1 Сокровище больше.",
+      "flavor_text": "Экскурсия длится сорок минут или до первой закрытой двери."
+    },
+    {
+      "id": "electrician-class",
+      "name": "Аварийный электрик",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "electrician"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 3,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "digital"
+            }
+          }
+        ]
+      },
+      "rules_text": "+3 против монстров с меткой «цифровой».",
+      "flavor_text": "Видит фазу там, где остальные видят только темноту."
+    },
+    {
+      "id": "dispatcher-class",
+      "name": "Диспетчер района",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "dispatcher",
+          "office-worker"
+        ],
+        "modifiers": [
+          {
+            "target": "hand_limit",
+            "amount": 2,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 2,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "Ты считаешься офисным работником. Постоянно +2 к лимиту руки. Сбрось 1 карту с руки: +2 в текущем бою.",
+      "flavor_text": "Ваше обращение принято, пронумеровано и направлено судьбе."
+    },
+    {
+      "id": "caretaker-class",
+      "name": "Смотритель двора",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "caretaker"
+        ],
+        "big_allowance": 1,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "yard"
+            }
+          }
+        ]
+      },
+      "rules_text": "Можно нести на 1 крупный предмет больше. +2 против монстров с меткой «двор».",
+      "flavor_text": "Знает каждый ключ, кота и несанкционированный самокат."
+    },
+    {
+      "id": "street-photographer-class",
+      "name": "Уличный фотограф",
+      "deck": "door",
+      "kind": "class",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "photographer"
+        ],
+        "modifiers": [
+          {
+            "target": "treasure_reward",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "landmark"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 3,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "В бою выбранного соперника можешь сбрасывать по 1 карте: за каждую соперник получает +3 в этом бою. Когда ты сам побеждаешь монстра с меткой «достопримечательность», получи на 1 Сокровище больше.",
+      "flavor_text": "Лучший кадр всегда происходит в чужом бою."
+    },
+    {
+      "id": "native-muscovite-race",
+      "name": "Коренной москвич",
+      "deck": "door",
+      "kind": "race",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "local"
+        ],
+        "big_allowance": 1
+      },
+      "rules_text": "Можно нести на 1 крупный предмет больше.",
+      "flavor_text": "Помнит, что раньше было на месте того, что было раньше."
+    },
+    {
+      "id": "new-muscovite-race",
+      "name": "Новый москвич",
+      "deck": "door",
+      "kind": "race",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "newcomer"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "paperwork"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 против монстров с меткой «бумаги».",
+      "flavor_text": "Ещё верит, что одну справку можно получить за один визит."
+    },
+    {
+      "id": "commuter-race",
+      "name": "Ежедневный пассажир",
+      "deck": "door",
+      "kind": "race",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "commuter"
+        ],
+        "modifiers": [
+          {
+            "target": "escape",
+            "amount": 1,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "rules_text": "Постоянно +1 к побегу.",
+      "flavor_text": "Может уснуть между двумя станциями и проснуться вовремя."
+    },
+    {
+      "id": "night-owl-race",
+      "name": "Городская ночная сова",
+      "deck": "door",
+      "kind": "race",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "night-owl"
+        ],
+        "tie_wins": true
+      },
+      "rules_text": "Ничья в бою считается твоей победой.",
+      "flavor_text": "Знает, где после полуночи есть свет, суп и зарядка."
+    },
+    {
+      "id": "district-patriot-race",
+      "name": "Патриот своего района",
+      "deck": "door",
+      "kind": "race",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "district-local"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "landmark"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 против монстров с меткой «достопримечательность».",
+      "flavor_text": "До центра далеко, зато всё нужное уже здесь."
+    },
+    {
+      "id": "renter-race",
+      "name": "Опытный квартиросъёмщик",
+      "deck": "door",
+      "kind": "race",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "renter"
+        ],
+        "modifiers": [
+          {
+            "target": "hand_limit",
+            "amount": 1,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "rules_text": "Постоянно +1 к лимиту руки.",
+      "flavor_text": "Умеет упаковать жизнь в две сумки и один залог."
+    },
+    {
+      "id": "suburban-visitor-race",
+      "name": "Гость из-за кольца",
+      "deck": "door",
+      "kind": "race",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "suburban",
+          "tourist"
+        ],
+        "modifiers": [
+          {
+            "target": "escape",
+            "amount": 2,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "rules_text": "Ты считаешься туристом. Постоянно +2 к побегу.",
+      "flavor_text": "Последняя электричка воспитала точность лучше школы."
+    },
+    {
+      "id": "pedestrian-race",
+      "name": "Несгибаемый пешеход",
+      "deck": "door",
+      "kind": "race",
+      "copies": 1,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "pedestrian"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "transport"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 против монстров с меткой «транспорт».",
+      "flavor_text": "Десять тысяч шагов — это только дорога до нужного выхода."
+    },
+    {
+      "id": "eternal-student-race",
+      "name": "Вечный студент",
+      "deck": "door",
+      "kind": "race",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "student"
+        ],
+        "modifiers": [
+          {
+            "target": "hand_limit",
+            "amount": 2,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 2,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "В бою выбранного соперника можешь сбрасывать по 1 карте: за каждую соперник получает +2 в этом бою. Твой лимит руки постоянно увеличен на 2.",
+      "flavor_text": "Льгота закончилась, семестр — никогда."
+    },
+    {
+      "id": "two-jobs-attachment",
+      "name": "Две работы",
+      "deck": "door",
+      "kind": "trait_attachment",
+      "copies": 1,
+      "interaction_scope": "self",
+      "attachment": {
+        "group": "class",
+        "extra_traits": 1
+      },
+      "rules_text": "Можно иметь ещё 1 Класс.",
+      "flavor_text": "Одна работа кормит, вторая объясняет, почему некогда есть."
+    },
+    {
+      "id": "shared-flat-attachment",
+      "name": "Общая квартира",
+      "deck": "door",
+      "kind": "trait_attachment",
+      "copies": 1,
+      "interaction_scope": "self",
+      "attachment": {
+        "group": "race",
+        "extra_traits": 1
+      },
+      "rules_text": "Можно иметь ещё 1 Расу.",
+      "flavor_text": "На кухне встречаются культуры, графики и чужая гречка."
+    },
+    {
+      "id": "retraining-attachment",
+      "name": "Профессиональная переподготовка",
+      "deck": "door",
+      "kind": "trait_attachment",
+      "copies": 1,
+      "interaction_scope": "self",
+      "attachment": {
+        "group": "class",
+        "extra_traits": 1
+      },
+      "rules_text": "Можно иметь ещё 1 Класс.",
+      "flavor_text": "Диплом обещали за шесть недель и три жизненных этапа."
+    },
+    {
+      "id": "double-registration-attachment",
+      "name": "Двойная регистрация",
+      "deck": "door",
+      "kind": "trait_attachment",
+      "copies": 1,
+      "interaction_scope": "self",
+      "attachment": {
+        "group": "race",
+        "extra_traits": 1
+      },
+      "rules_text": "Можно иметь ещё 1 Расу.",
+      "flavor_text": "По документам ты живёшь сразу в двух очередях."
+    },
+    {
+      "id": "side-hustle-attachment",
+      "name": "Подработка после работы",
+      "deck": "door",
+      "kind": "trait_attachment",
+      "copies": 1,
+      "interaction_scope": "self",
+      "attachment": {
+        "group": "class",
+        "extra_traits": 1
+      },
+      "rules_text": "Можно иметь ещё 1 Класс.",
+      "flavor_text": "Свободный вечер найден и немедленно монетизирован."
+    },
+    {
+      "id": "district-identity-attachment",
+      "name": "Районная идентичность",
+      "deck": "door",
+      "kind": "trait_attachment",
+      "copies": 1,
+      "interaction_scope": "self",
+      "attachment": {
+        "group": "race",
+        "extra_traits": 1
+      },
+      "rules_text": "Можно иметь ещё 1 Расу.",
+      "flavor_text": "Сначала район выбирает тебя, потом ты споришь за него в сети."
+    },
+    {
+      "id": "second-diploma-attachment",
+      "name": "Второй диплом",
+      "deck": "door",
+      "kind": "trait_attachment",
+      "copies": 1,
+      "interaction_scope": "self",
+      "attachment": {
+        "group": "class",
+        "extra_traits": 1
+      },
+      "rules_text": "Можно иметь ещё 1 Класс.",
+      "flavor_text": "Первый диплом лежит рядом и делает вид, что не ревнует."
+    },
+    {
+      "id": "temporary-registration-attachment",
+      "name": "Временная прописка у знакомых",
+      "deck": "door",
+      "kind": "trait_attachment",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "attachment": {
+        "group": "race",
+        "extra_traits": 1
+      },
+      "rules_text": "Прикрепи к выбранному сопернику: тот может иметь ещё 1 Расу.",
+      "flavor_text": "Хозяин квартиры почти помнит, как тебя зовут."
+    },
+    {
+      "id": "travel-mug",
+      "name": "Кружка для долгой дороги",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 300,
+        "bonus": 1
+      },
+      "rules_text": "+1 к боевой силе. Занимает 1 руку.",
+      "flavor_text": "Крышка держится крепче утренней решимости."
+    },
+    {
+      "id": "folding-scooter",
+      "name": "Складной самокат",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "big",
+        "value": 700,
+        "bonus": 3,
+        "escape_bonus": 1
+      },
+      "rules_text": "+3 к боевой силе и +1 к побегу. Крупный предмет.",
+      "flavor_text": "Складывается за секунду и раскладывает прохожих за две."
+    },
+    {
+      "id": "courtyard-raincoat",
+      "name": "Дворовый дождевик",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "armor",
+        "size": "small",
+        "value": 500,
+        "bonus": 2
+      },
+      "rules_text": "+2 к боевой силе. Занимает слот брони.",
+      "flavor_text": "Цвет выбран так, чтобы грязь считалась узором."
+    },
+    {
+      "id": "heated-hat",
+      "name": "Шапка с подогревом",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "headgear",
+        "size": "small",
+        "value": 300,
+        "bonus": 1,
+        "escape_bonus": 1
+      },
+      "rules_text": "+1 к боевой силе и +1 к побегу. Головной убор.",
+      "flavor_text": "Заряда хватает до первого серьёзного мороза."
+    },
+    {
+      "id": "metro-sneakers",
+      "name": "Кроссовки для переходов",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "footgear",
+        "size": "small",
+        "value": 500,
+        "bonus": 2,
+        "escape_bonus": 1
+      },
+      "rules_text": "+2 к боевой силе и +1 к побегу. Обувь.",
+      "flavor_text": "С ними двести метров по указателю превращаются в сто девяносто."
+    },
+    {
+      "id": "office-lanyard",
+      "name": "Офисный шнурок с пропуском",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 200,
+        "bonus": 1,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "official"
+            }
+          }
+        ]
+      },
+      "rules_text": "+1 к боевой силе и ещё +2 против монстров с меткой «служебный».",
+      "flavor_text": "Имя стёрлось, уверенность осталась."
+    },
+    {
+      "id": "giant-tote-bag",
+      "name": "Безразмерная сумка",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "big",
+        "value": 600,
+        "bonus": 3,
+        "hand_limit_bonus": 1
+      },
+      "rules_text": "+3 к боевой силе и +1 к лимиту руки. Крупный предмет, занимает 1 руку.",
+      "flavor_text": "Внутри есть отделение для ещё одной сумки."
+    },
+    {
+      "id": "electrician-toolbox",
+      "name": "Ящик аварийного электрика",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 2,
+        "size": "big",
+        "value": 800,
+        "bonus": 5,
+        "restrictions": {
+          "required_tags": [
+            "electrician"
+          ]
+        }
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 2,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+5 к боевой силе, только электрику. Крупный предмет, занимает 2 руки. Сбрось 1 карту: +2 в текущем бою.",
+      "flavor_text": "Там есть инструмент для каждой проблемы и чайный пакетик."
+    },
+    {
+      "id": "courier-backpack",
+      "name": "Курьерский рюкзак-куб",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "armor",
+        "size": "big",
+        "value": 700,
+        "bonus": 3,
+        "hand_limit_bonus": 2,
+        "restrictions": {
+          "required_tags": [
+            "courier"
+          ]
+        }
+      },
+      "rules_text": "+3 к боевой силе и +2 к лимиту руки, только курьеру. Крупный предмет, занимает слот брони.",
+      "flavor_text": "Пицца внутри остывает медленнее владельца."
+    },
+    {
+      "id": "museum-audio-guide",
+      "name": "Музейный аудиогид",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "headgear",
+        "size": "small",
+        "value": 400,
+        "bonus": 2,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "landmark"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 к боевой силе и ещё +2 против монстров с меткой «достопримечательность». Головной убор.",
+      "flavor_text": "Дорожка номер восемь объясняет, почему выход закрыт."
+    },
+    {
+      "id": "indestructible-thermos",
+      "name": "Неубиваемый термос",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 300,
+        "bonus": 2
+      },
+      "rules_text": "+2 к боевой силе. Занимает 1 руку.",
+      "flavor_text": "Чай давно остыл, а термос всё ещё готов к бою."
+    },
+    {
+      "id": "snow-shovel",
+      "name": "Лопата первой необходимости",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 2,
+        "size": "big",
+        "value": 700,
+        "bonus": 5,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "weather"
+            }
+          }
+        ]
+      },
+      "rules_text": "+5 к боевой силе и ещё +2 против монстров с меткой «погода». Крупный предмет, занимает 2 руки.",
+      "flavor_text": "Снег убран ровно до следующего взгляда в окно."
+    },
+    {
+      "id": "folding-bicycle",
+      "name": "Складной велосипед",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "big",
+        "value": 900,
+        "bonus": 4,
+        "escape_bonus": 2,
+        "restrictions": {
+          "required_tags": [
+            "cyclist"
+          ]
+        }
+      },
+      "rules_text": "+4 к боевой силе и +2 к побегу, только велосипедисту. Крупный предмет.",
+      "flavor_text": "В сложенном виде занимает всего половину вагона."
+    },
+    {
+      "id": "spare-metro-pass",
+      "name": "Запасной проездной",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 200,
+        "bonus": 1,
+        "escape_bonus": 1
+      },
+      "rules_text": "+1 к боевой силе и +1 к побегу.",
+      "flavor_text": "Баланс неизвестен, зато надежда безлимитна."
+    },
+    {
+      "id": "concierge-keyring",
+      "name": "Связка ключей консьержа",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 500,
+        "bonus": 3,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "yard"
+            }
+          }
+        ]
+      },
+      "rules_text": "+3 к боевой силе и ещё +2 против монстров с меткой «двор». Занимает 1 руку.",
+      "flavor_text": "Один ключ точно подходит. Осталось узнать дверь."
+    },
+    {
+      "id": "balcony-armor",
+      "name": "Броня из балконных рам",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "armor",
+        "size": "big",
+        "value": 800,
+        "bonus": 4
+      },
+      "rules_text": "+4 к боевой силе. Крупный предмет, занимает слот брони.",
+      "flavor_text": "Тепло держит плохо, удар — с неожиданным достоинством."
+    },
+    {
+      "id": "rubber-boots",
+      "name": "Резиновые ботинки межсезонья",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "footgear",
+        "size": "small",
+        "value": 500,
+        "bonus": 2,
+        "escape_bonus": 2
+      },
+      "rules_text": "+2 к боевой силе и +2 к побегу. Обувь.",
+      "flavor_text": "Не скользят, если не проверять."
+    },
+    {
+      "id": "noise-cancel-headphones",
+      "name": "Наушники против ремонта",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "headgear",
+        "size": "small",
+        "value": 600,
+        "bonus": 3,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "crowd"
+            }
+          }
+        ]
+      },
+      "rules_text": "+3 к боевой силе и ещё +2 против монстров с меткой «толпа». Головной убор.",
+      "flavor_text": "Перфоратор не исчез, но теперь у него есть басовая партия."
+    },
+    {
+      "id": "portable-stool",
+      "name": "Складной стул для очереди",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 300,
+        "bonus": 1,
+        "hand_limit_bonus": 1
+      },
+      "rules_text": "+1 к боевой силе и +1 к лимиту руки.",
+      "flavor_text": "Терпение не бесконечно, зато сиденье почти."
+    },
+    {
+      "id": "reliable-power-bank",
+      "name": "Надёжный пауэрбанк",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 400,
+        "bonus": 2,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "digital"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 к боевой силе и ещё +2 против монстров с меткой «цифровой».",
+      "flavor_text": "Показывает четыре деления даже после конца света."
+    },
+    {
+      "id": "document-folder",
+      "name": "Папка с прозрачными файлами",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 300,
+        "bonus": 2,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "bureaucrat"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 к боевой силе и ещё +2, если ты бюрократ. Занимает 1 руку.",
+      "flavor_text": "Каждый лист виден, ни один не находится."
+    },
+    {
+      "id": "red-wool-scarf",
+      "name": "Красный шерстяной шарф",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "headgear",
+        "size": "small",
+        "value": 200,
+        "bonus": 1
+      },
+      "rules_text": "+1 к боевой силе. Головной убор.",
+      "flavor_text": "Обматывает владельца быстрее, чем тот принимает решение."
+    },
+    {
+      "id": "construction-helmet",
+      "name": "Каска с наклейкой «Скоро»",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "headgear",
+        "size": "big",
+        "value": 700,
+        "bonus": 4,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "construction"
+            }
+          }
+        ]
+      },
+      "rules_text": "+4 к боевой силе и ещё +2 против монстров с меткой «стройка». Крупный головной убор.",
+      "flavor_text": "Наклейка пережила три проекта и два переименования."
+    },
+    {
+      "id": "reflective-vest",
+      "name": "Светоотражающий жилет",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "armor",
+        "size": "small",
+        "value": 400,
+        "bonus": 2,
+        "restrictions": {
+          "required_tags": [
+            "cyclist"
+          ]
+        }
+      },
+      "rules_text": "+2 к боевой силе, только велосипедисту. Занимает слот брони.",
+      "flavor_text": "Видно издалека, особенно когда уже поздно."
+    },
+    {
+      "id": "apartment-building-map",
+      "name": "Карта подъездов и арок",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 500,
+        "bonus": 3,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "yard"
+            }
+          }
+        ]
+      },
+      "rules_text": "+3 к боевой силе и ещё +2 против монстров с меткой «двор». Занимает 1 руку.",
+      "flavor_text": "Составлена от руки человеком, который однажды вышел."
+    },
+    {
+      "id": "renovation-crowbar",
+      "name": "Лом для согласованной перепланировки",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 2,
+        "size": "big",
+        "value": 800,
+        "bonus": 5,
+        "restrictions": {
+          "forbidden_tags": [
+            "bureaucrat"
+          ]
+        }
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 2,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+5 к боевой силе, нельзя бюрократу. Крупный предмет, занимает 2 руки. Сбрось 1 карту: +2 в текущем бою.",
+      "flavor_text": "Несущая стена пока не возражала письменно."
+    },
+    {
+      "id": "windproof-umbrella",
+      "name": "Почти непродуваемый зонт",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 400,
+        "bonus": 2,
+        "escape_bonus": 1
+      },
+      "rules_text": "+2 к боевой силе и +1 к побегу. Занимает 1 руку.",
+      "flavor_text": "Слово «почти» напечатано внутри купола."
+    },
+    {
+      "id": "insulated-lunchbox",
+      "name": "Термосумка с гречкой",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 300,
+        "bonus": 1,
+        "hand_limit_bonus": 1
+      },
+      "rules_text": "+1 к боевой силе и +1 к лимиту руки. Занимает 1 руку.",
+      "flavor_text": "Обед переживёт дорогу, совещание и ещё одну дорогу."
+    },
+    {
+      "id": "trolley-bag",
+      "name": "Тележка на несокрушимых колёсиках",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "big",
+        "value": 600,
+        "bonus": 2,
+        "big_allowance": 1
+      },
+      "rules_text": "+2 к боевой силе. Крупный предмет; позволяет нести ещё 1 крупный предмет.",
+      "flavor_text": "Гремит так, будто объявляет собственную станцию."
+    },
+    {
+      "id": "lucky-turnstile-token",
+      "name": "Счастливый жетон турникета",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 100,
+        "bonus": 1,
+        "escape_bonus": 1
+      },
+      "rules_text": "+1 к боевой силе и +1 к побегу.",
+      "flavor_text": "Никто не знает, от какого он метро, но работает уверенно."
+    },
+    {
+      "id": "carsharing-key",
+      "name": "Ключ от каршеринга без царапин",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 500,
+        "bonus": 2,
+        "escape_bonus": 1,
+        "restrictions": {
+          "required_tags": [
+            "driver"
+          ]
+        }
+      },
+      "rules_text": "+2 к боевой силе и +1 к побегу, только водителю.",
+      "flavor_text": "Все повреждения уже были. Даже будущие."
+    },
+    {
+      "id": "night-flashlight",
+      "name": "Фонарь ночного двора",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 300,
+        "bonus": 2,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "night-owl"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 к боевой силе и ещё +2, если ты ночная сова. Занимает 1 руку.",
+      "flavor_text": "Освещает всё, кроме номера нужного дома."
+    },
+    {
+      "id": "receipt-armor",
+      "name": "Броня из кассовых чеков",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "armor",
+        "size": "small",
+        "value": 200,
+        "bonus": 1,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 3,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "paperwork"
+            }
+          }
+        ]
+      },
+      "rules_text": "+1 к боевой силе и ещё +3 против монстров с меткой «бумаги». Занимает слот брони.",
+      "flavor_text": "Гарантия выцвела, защита осталась."
+    },
+    {
+      "id": "station-clock",
+      "name": "Часы со станции пересадки",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "headgear",
+        "size": "small",
+        "value": 500,
+        "bonus": 2,
+        "hand_limit_bonus": 1
+      },
+      "rules_text": "+2 к боевой силе и +1 к лимиту руки. Головной убор.",
+      "flavor_text": "Показывают московское время и личное опоздание."
+    },
+    {
+      "id": "rooftop-antenna",
+      "name": "Антенна с московской крыши",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 2,
+        "size": "big",
+        "value": 900,
+        "bonus": 5,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 3,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "digital"
+            }
+          }
+        ]
+      },
+      "rules_text": "+5 к боевой силе и ещё +3 против монстров с меткой «цифровой». Крупный предмет, занимает 2 руки.",
+      "flavor_text": "Ловит три канала, грозу и чужие планы на выходные."
+    },
+    {
+      "id": "reusable-market-bag",
+      "name": "Многоразовая сумка из супермаркета",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 200,
+        "bonus": 1,
+        "big_allowance": 1
+      },
+      "rules_text": "+1 к боевой силе; позволяет нести ещё 1 крупный предмет. Занимает 1 руку.",
+      "flavor_text": "Выдерживает продукты, переезд и последствия скидок."
+    },
+    {
+      "id": "district-badge",
+      "name": "Значок любимого района",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 400,
+        "bonus": 1,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 3,
+            "condition": {
+              "kind": "character_has_tag",
+              "tag": "local"
+            }
+          }
+        ]
+      },
+      "rules_text": "+1 к боевой силе и ещё +3, если ты местный.",
+      "flavor_text": "На обороте написано, почему остальные районы хуже."
+    },
+    {
+      "id": "coworking-chair",
+      "name": "Эргономичное кресло из коворкинга",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "big",
+        "value": 600,
+        "bonus": 3,
+        "hand_limit_bonus": 2
+      },
+      "rules_text": "+3 к боевой силе и +2 к лимиту руки. Крупный предмет.",
+      "flavor_text": "Регулируется всё, кроме стоимости часа."
+    },
+    {
+      "id": "emergency-charger",
+      "name": "Зарядка из дежурного ларька",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 300,
+        "bonus": 1,
+        "escape_bonus": 1
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 2,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+1 к боевой силе и +1 к побегу. Сбрось 1 карту: +2 в текущем бою.",
+      "flavor_text": "Греется так, будто заряжает весь квартал."
+    },
+    {
+      "id": "shared-power-bank",
+      "name": "Пауэрбанк на всех",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 500,
+        "bonus": 2,
+        "hand_limit_bonus": 1
+      },
+      "rules_text": "Передай выбранному сопернику. Пока предмет у него, его боевая сила увеличена на 2, а лимит руки — на 1.",
+      "flavor_text": "Одного заряда хватает ровно на две чужие срочности."
+    },
+    {
+      "id": "double-espresso",
+      "name": "Двойной эспрессо перед пересадкой",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 3,
+          "target": "player"
+        }
+      ],
+      "rules_text": "Получи +3 в текущем бою.",
+      "flavor_text": "Сердце уже приехало, тело догоняет."
+    },
+    {
+      "id": "courtyard-detour",
+      "name": "Обход через знакомый двор",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -3,
+          "target": "monster"
+        }
+      ],
+      "rules_text": "Монстр получает −3 в текущем бою.",
+      "flavor_text": "Калитка открылась именно потому, что ты не надеялся."
+    },
+    {
+      "id": "night-taxi",
+      "name": "Такси по ночному тарифу",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": 2
+        }
+      ],
+      "rules_text": "Получи +2 к текущей попытке побега.",
+      "flavor_text": "Цена страшная, зато монстр видел ещё страшнее."
+    },
+    {
+      "id": "extra-service-window",
+      "name": "Внезапно открывшееся окно",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_treasure_reward",
+          "amount": 1
+        }
+      ],
+      "rules_text": "После победы в текущем бою получи на 1 Сокровище больше.",
+      "flavor_text": "Оно закроется через минуту. Беги культурно."
+    },
+    {
+      "id": "found-wallet",
+      "name": "Кошелёк под сиденьем",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "draw",
+          "deck": "treasure",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Возьми 1 закрытое Сокровище.",
+      "flavor_text": "Внутри только карта кофейни и хорошая карма."
+    },
+    {
+      "id": "open-side-door",
+      "name": "Открытая боковая дверь",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "draw",
+          "deck": "door",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Возьми 1 закрытую Дверь.",
+      "flavor_text": "Табличка «служебный вход» сегодня смотрит в другую сторону."
+    },
+    {
+      "id": "loud-announcement",
+      "name": "Объявление командным голосом",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 2,
+          "target": "player"
+        },
+        {
+          "kind": "modify_escape",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи +2 в текущем бою и +1 к текущей попытке побега.",
+      "flavor_text": "Слова неразборчивы, но интонация убедила всех."
+    },
+    {
+      "id": "municipal-subsidy",
+      "name": "Городская субсидия за стойкость",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи 1 уровень. Этой картой нельзя получить победный уровень.",
+      "flavor_text": "Заявка одобрена раньше, чем ты забыл пароль."
+    },
+    {
+      "id": "volunteer-cleanup",
+      "name": "Субботник с неожиданным размахом",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -4,
+          "target": "monster"
+        }
+      ],
+      "rules_text": "Монстр получает −4 в текущем бою.",
+      "flavor_text": "Вместе вынесли мусор, лавочку и аргументы монстра."
+    },
+    {
+      "id": "hot-pirozhok",
+      "name": "Горячий пирожок у метро",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 2,
+          "target": "player"
+        }
+      ],
+      "rules_text": "Получи +2 в текущем бою.",
+      "flavor_text": "Начинка не определена, решимость восстановлена."
+    },
+    {
+      "id": "weather-alert",
+      "name": "Точное погодное предупреждение",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": 3
+        }
+      ],
+      "rules_text": "Получи +3 к текущей попытке побега.",
+      "flavor_text": "Дождь начался по расписанию, ты ушёл раньше."
+    },
+    {
+      "id": "lucky-transfer",
+      "name": "Удачная пересадка",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "draw",
+          "deck": "door",
+          "amount": 1
+        },
+        {
+          "kind": "draw",
+          "deck": "treasure",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Возьми 1 закрытую Дверь и 1 закрытое Сокровище.",
+      "flavor_text": "Обе платформы рядом. Так тоже бывает, не пугайся."
+    },
+    {
+      "id": "official-stamp",
+      "name": "Печать нужного оттенка",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_treasure_reward",
+          "amount": 2
+        }
+      ],
+      "rules_text": "После победы в текущем бою получи на 2 Сокровища больше.",
+      "flavor_text": "Круглая, синяя и совершенно не задаёт вопросов."
+    },
+    {
+      "id": "yard-shortcut",
+      "name": "Короткая тропа через двор",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": 2
+        }
+      ],
+      "rules_text": "Получи +2 к текущей попытке побега.",
+      "flavor_text": "На карте её нет, на подошвах — есть."
+    },
+    {
+      "id": "free-wifi-burst",
+      "name": "Вспышка бесплатного вайфая",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 3,
+          "target": "player"
+        },
+        {
+          "kind": "draw",
+          "deck": "door",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи +3 в текущем бою, затем возьми 1 закрытую Дверь.",
+      "flavor_text": "Соглашение прочитано не было, зато маршрут загрузился."
+    },
+    {
+      "id": "matinee-ticket",
+      "name": "Билет на дневной сеанс",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -2,
+          "target": "monster"
+        },
+        {
+          "kind": "modify_treasure_reward",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Монстр получает −2 в текущем бою; после победы получи на 1 Сокровище больше.",
+      "flavor_text": "В зале пусто, скидка полна, монстр растерян."
+    },
+    {
+      "id": "flash-mob-intervention",
+      "name": "Флешмоб внезапной поддержки",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "combat_capability": {
+        "kind": "force_combat_helper"
+      },
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 5,
+          "target": "player"
+        }
+      ],
+      "rules_text": "Сыграй в открытый бой: выбранный допустимый помощник вступает в бой без награды.",
+      "flavor_text": "Никто не репетировал, поэтому получилось искренне."
+    },
+    {
+      "id": "sudden-traffic-jam",
+      "name": "Пробка из ниоткуда",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "combat_capability": {
+        "kind": "enhance_monster",
+        "amount": 4
+      },
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 4,
+          "target": "monster"
+        }
+      ],
+      "rules_text": "Сыграй на выбранного Монстра в открытом бою: он получает +4 до конца боя.",
+      "flavor_text": "Дорога свободна ровно до момента, когда кому-то это важно."
+    },
+    {
+      "id": "anonymous-complaint",
+      "name": "Анонимная жалоба с приложениями",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "combat_capability": {
+        "kind": "counter_combat_effect"
+      },
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "owned_card",
+          "count": 1
+        }
+      ],
+      "rules_text": "Отмени выбранное активное усиление Монстра в открытом бою.",
+      "flavor_text": "Подписи нет, зато фотографий семнадцать."
+    },
+    {
+      "id": "mastered-circle-line",
+      "name": "Освоил кольцевую без подсказок",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи 1 уровень. Этой картой нельзя получить победный уровень.",
+      "flavor_text": "Теперь ты выходишь на нужную сторону хотя бы через раз."
+    },
+    {
+      "id": "survived-mfc-visit",
+      "name": "Пережил визит в МФЦ",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи 1 уровень. Этой картой нельзя получить победный уровень.",
+      "flavor_text": "Все документы приняты, герой временно не верит в чудеса."
+    },
+    {
+      "id": "found-hidden-passage",
+      "name": "Нашёл проход между дворами",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи 1 уровень. Этой картой нельзя получить победный уровень.",
+      "flavor_text": "Маршрут короче, легенда длиннее."
+    },
+    {
+      "id": "learned-moscow-time",
+      "name": "Научился жить по московскому времени",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи 1 уровень. Этой картой нельзя получить победный уровень.",
+      "flavor_text": "Опоздание на семь минут теперь считается пунктуальностью."
+    },
+    {
+      "id": "obtained-permanent-pass",
+      "name": "Получил постоянный пропуск",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи 1 уровень. Этой картой нельзя получить победный уровень.",
+      "flavor_text": "Фотография ужасна, срок действия прекрасен."
+    },
+    {
+      "id": "negotiated-renovation-hours",
+      "name": "Согласовал часы ремонта",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи 1 уровень. Этой картой нельзя получить победный уровень.",
+      "flavor_text": "Тишина длится с 13:00 до 13:07 и строго соблюдается."
+    },
+    {
+      "id": "closed-mortgage-tab",
+      "name": "Закрыл вкладку с ипотечным калькулятором",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи 1 уровень. Этой картой нельзя получить победный уровень.",
+      "flavor_text": "Цифры исчезли, плечи распрямились."
+    },
+    {
+      "id": "caught-last-train",
+      "name": "Успел на последний поезд",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи 1 уровень. Этой картой нельзя получить победный уровень.",
+      "flavor_text": "Двери закрылись за спиной и признали твою победу."
+    },
+    {
+      "id": "remembered-all-exits",
+      "name": "Запомнил все выходы со станции",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 1,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи 1 уровень. Этой картой нельзя получить победный уровень.",
+      "flavor_text": "Номера больше не пугают. Иногда."
+    },
+    {
+      "id": "universal-pass-cheat",
+      "name": "Универсальный пропуск",
+      "deck": "treasure",
+      "kind": "cheat",
+      "copies": 1,
+      "interaction_scope": "self",
+      "rules_text": "Прикрепи к своему предмету: для него не действуют ограничения по меткам героя, размеру и занятым слотам экипировки.",
+      "flavor_text": "Открывает всё, но не снимает вопросов о своём происхождении."
+    },
+    {
+      "id": "stamped-exception-cheat",
+      "name": "Исключение с гербовой печатью",
+      "deck": "treasure",
+      "kind": "cheat",
+      "copies": 1,
+      "interaction_scope": "self",
+      "rules_text": "Прикрепи к своему предмету: для него не действуют ограничения по меткам героя, размеру и занятым слотам экипировки.",
+      "flavor_text": "Правило остаётся правилом, просто сегодня не твоим."
+    },
+    {
+      "id": "friendly-guard-cheat",
+      "name": "Знакомый охранник на смене",
+      "deck": "treasure",
+      "kind": "cheat",
+      "copies": 1,
+      "interaction_scope": "self",
+      "rules_text": "Прикрепи к своему предмету: для него не действуют ограничения по меткам героя, размеру и занятым слотам экипировки.",
+      "flavor_text": "Он тебя точно видел. Возможно, завтра вспомнит, где."
+    },
+    {
+      "id": "borrowed-stamp-cheat",
+      "name": "Одолженная печать",
+      "deck": "treasure",
+      "kind": "cheat",
+      "copies": 1,
+      "interaction_scope": "other_players",
+      "rules_text": "Прикрепи к предмету выбранного соперника: для него не действуют ограничения по меткам героя, размеру и занятым слотам экипировки.",
+      "flavor_text": "Вернуть нужно до того, как кто-нибудь заметит идеальный оттиск."
+    },
+    {
+      "id": "handwritten-permit",
+      "name": "Разрешение от руки",
+      "deck": "treasure",
+      "kind": "cheat",
+      "copies": 1,
+      "interaction_scope": "self",
+      "rules_text": "Прикрепи к своему предмету: для него не действуют ограничения по меткам героя, размеру и занятым слотам экипировки.",
+      "flavor_text": "Подпись похожа на настоящую, особенно издалека."
+    }
+  ]
+}

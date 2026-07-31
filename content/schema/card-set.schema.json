@@ -70,6 +70,7 @@
         "kind",
         "copies",
         "interaction_scope",
+        "combat_capability",
         "rules_text",
         "flavor_text",
         "image",
@@ -636,6 +637,51 @@
         }
       ]
     },
+    "combatCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "add_monster",
+            "enhance_monster",
+            "counter_combat_effect",
+            "force_combat_helper"
+          ]
+        },
+        "amount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "enhance_monster"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "amount"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "amount"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "monster": {
       "type": "object",
       "additionalProperties": false,
@@ -815,6 +861,9 @@
             "$ref": "#/$defs/ability"
           }
         },
+        "combat_capability": {
+          "$ref": "#/$defs/combatCapability"
+        },
         "rules_text": {
           "type": "string",
           "minLength": 1,
@@ -847,6 +896,55 @@
         ]
       },
       "allOf": [
+        {
+          "if": {
+            "required": [
+              "combat_capability"
+            ]
+          },
+          "then": {
+            "properties": {
+              "interaction_scope": {
+                "const": "other_players"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "combat_capability": {
+                      "properties": {
+                        "kind": {
+                          "const": "add_monster"
+                        }
+                      }
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "kind": {
+                      "const": "monster"
+                    },
+                    "deck": {
+                      "const": "door"
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "kind": {
+                      "const": "one_shot"
+                    },
+                    "deck": {
+                      "const": "treasure"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
         {
           "if": {
             "properties": {

@@ -67,9 +67,21 @@ type CombatView struct {
 	PlayerWinning         bool                        `json:"player_winning"`
 	TieWins               bool                        `json:"tie_wins"`
 	CombatClosed          bool                        `json:"combat_closed"`
+	Monsters              []CardView                  `json:"monsters"`
+	Effects               []CombatEffectView          `json:"effects"`
 	HelperPlayerID        string                      `json:"helper_player_id,omitempty"`
 	HelperRewardTreasures int                         `json:"helper_reward_treasures,omitempty"`
+	HelperForced          bool                        `json:"helper_forced,omitempty"`
 	ResolutionAction      *CombatResolutionActionView `json:"resolution_action,omitempty"`
+}
+
+type CombatEffectView struct {
+	EffectID                string               `json:"effect_id"`
+	Kind                    CombatCapabilityKind `json:"kind"`
+	TargetMonsterInstanceID string               `json:"target_monster_instance_id,omitempty"`
+	TargetEffectID          string               `json:"target_effect_id,omitempty"`
+	Amount                  int                  `json:"amount,omitempty"`
+	Active                  bool                 `json:"active"`
 }
 
 type CombatResolutionActionView struct {
@@ -107,15 +119,18 @@ type TurnView struct {
 }
 
 type InteractionActionView struct {
-	ActionID         string            `json:"action_id"`
-	InteractionID    string            `json:"interaction_id"`
-	Revision         uint32            `json:"revision"`
-	Type             InteractionIntent `json:"type"`
-	SourceInstanceID string            `json:"source_instance_id,omitempty"`
-	Target           EffectTarget      `json:"target,omitempty"`
-	CombatDelta      int               `json:"combat_delta,omitempty"`
-	HelperPlayerID   string            `json:"helper_player_id,omitempty"`
-	RewardTreasures  int               `json:"reward_treasures,omitempty"`
+	ActionID                string               `json:"action_id"`
+	InteractionID           string               `json:"interaction_id"`
+	Revision                uint32               `json:"revision"`
+	Type                    InteractionIntent    `json:"type"`
+	SourceInstanceID        string               `json:"source_instance_id,omitempty"`
+	Target                  EffectTarget         `json:"target,omitempty"`
+	CombatDelta             int                  `json:"combat_delta,omitempty"`
+	CombatCapability        CombatCapabilityKind `json:"combat_capability,omitempty"`
+	TargetMonsterInstanceID string               `json:"target_monster_instance_id,omitempty"`
+	TargetEffectID          string               `json:"target_effect_id,omitempty"`
+	HelperPlayerID          string               `json:"helper_player_id,omitempty"`
+	RewardTreasures         int                  `json:"reward_treasures,omitempty"`
 }
 
 type CombatHelpOfferView struct {
@@ -218,10 +233,36 @@ func ProjectForActor(state State, actorID string, pack Pack) (Projection, error)
 				PlayerWinning:   totals.PlayerWins,
 				TieWins:         totals.TieWins,
 				CombatClosed:    state.Turn.Encounter.CombatClosed,
+				Monsters:        []CardView{},
+				Effects:         []CombatEffectView{},
+			}
+			for _, instanceID := range encounterMonsterInstanceIDs(
+				*state.Turn.Encounter,
+			) {
+				monsterView, err := cardViewForInstance(
+					state,
+					instanceID,
+					pack,
+				)
+				if err != nil {
+					return Projection{}, err
+				}
+				combat.Monsters = append(combat.Monsters, monsterView)
+			}
+			for _, effect := range state.Turn.Encounter.CombatEffects {
+				combat.Effects = append(combat.Effects, CombatEffectView{
+					EffectID:                effect.ID,
+					Kind:                    effect.Kind,
+					TargetMonsterInstanceID: effect.TargetMonsterInstanceID,
+					TargetEffectID:          effect.TargetEffectID,
+					Amount:                  effect.Amount,
+					Active:                  effect.Active,
+				})
 			}
 			if help := state.Turn.Encounter.CombatHelp; help != nil {
 				combat.HelperPlayerID = help.HelperPlayerID
 				combat.HelperRewardTreasures = help.RewardTreasures
+				combat.HelperForced = help.Forced
 			}
 			profile, err := state.Profile()
 			if err != nil {
@@ -399,26 +440,39 @@ func projectInteraction(
 						instanceID,
 					)
 				}
-				effect, legal := combatInterventionEffect(card)
-				if !legal {
+				if profile.AdvancedCombat &&
+					card.CombatCapability != nil {
+					actions, err := projectAdvancedCombatActions(
+						state,
+						actorID,
+						instanceID,
+						*card.CombatCapability,
+					)
+					if err != nil {
+						return nil, err
+					}
+					view.Actions = append(view.Actions, actions...)
 					continue
 				}
-				view.Actions = append(view.Actions, InteractionActionView{
-					ActionID: interactionActionID(
-						window.ID,
-						actorID,
-						intent,
-						instanceID,
-						effect.Target,
-						state.Version,
-					),
-					InteractionID:    window.ID,
-					Revision:         window.DeadlineRevision,
-					Type:             intent,
-					SourceInstanceID: instanceID,
-					Target:           effect.Target,
-					CombatDelta:      effect.Amount,
-				})
+				effect, legal := combatInterventionEffect(card)
+				if legal {
+					view.Actions = append(view.Actions, InteractionActionView{
+						ActionID: interactionActionID(
+							window.ID,
+							actorID,
+							intent,
+							instanceID,
+							effect.Target,
+							state.Version,
+						),
+						InteractionID:    window.ID,
+						Revision:         window.DeadlineRevision,
+						Type:             intent,
+						SourceInstanceID: instanceID,
+						Target:           effect.Target,
+						CombatDelta:      effect.Amount,
+					})
+				}
 			}
 			continue
 		}
@@ -443,6 +497,85 @@ func projectInteraction(
 	return view, nil
 }
 
+func projectAdvancedCombatActions(
+	state State,
+	actorID string,
+	sourceInstanceID string,
+	capability CombatCapability,
+) ([]InteractionActionView, error) {
+	window := state.InteractionWindow
+	if window == nil || state.Turn.Encounter == nil {
+		return nil, fmt.Errorf(
+			"%w: advanced combat projection lacks context",
+			ErrIllegalCommand,
+		)
+	}
+	build := func(
+		targetMonsterInstanceID string,
+		targetEffectID string,
+		helperPlayerID string,
+	) InteractionActionView {
+		targetKey := targetMonsterInstanceID + "\x00" +
+			targetEffectID + "\x00" +
+			helperPlayerID
+		return InteractionActionView{
+			ActionID: advancedCombatActionID(
+				window.ID,
+				actorID,
+				sourceInstanceID,
+				capability.Kind,
+				targetKey,
+				state.Version,
+			),
+			InteractionID:           window.ID,
+			Revision:                window.DeadlineRevision,
+			Type:                    InteractionIntentRespond,
+			SourceInstanceID:        sourceInstanceID,
+			CombatCapability:        capability.Kind,
+			TargetMonsterInstanceID: targetMonsterInstanceID,
+			TargetEffectID:          targetEffectID,
+			HelperPlayerID:          helperPlayerID,
+			CombatDelta:             capability.Amount,
+		}
+	}
+	switch capability.Kind {
+	case CombatCapabilityAddMonster:
+		return []InteractionActionView{build("", "", "")}, nil
+	case CombatCapabilityEnhance:
+		instanceIDs := encounterMonsterInstanceIDs(*state.Turn.Encounter)
+		actions := make([]InteractionActionView, 0, len(instanceIDs))
+		for _, instanceID := range instanceIDs {
+			actions = append(actions, build(instanceID, "", ""))
+		}
+		return actions, nil
+	case CombatCapabilityCounter:
+		actions := make([]InteractionActionView, 0)
+		for _, effect := range state.Turn.Encounter.CombatEffects {
+			if effect.Kind == CombatCapabilityEnhance && effect.Active {
+				actions = append(actions, build("", effect.ID, ""))
+			}
+		}
+		return actions, nil
+	case CombatCapabilityForceHelper:
+		if state.Turn.Encounter.CombatHelp != nil {
+			return []InteractionActionView{}, nil
+		}
+		actions := make([]InteractionActionView, 0)
+		for _, player := range state.Players {
+			if player.ID == state.Turn.PlayerID || player.Dead {
+				continue
+			}
+			actions = append(actions, build("", "", player.ID))
+		}
+		return actions, nil
+	default:
+		return nil, fmt.Errorf(
+			"%w: unknown advanced combat capability",
+			ErrInvalidContent,
+		)
+	}
+}
+
 func projectCombatHelpOfferActions(
 	state State,
 	actorID string,
@@ -450,7 +583,7 @@ func projectCombatHelpOfferActions(
 	revision uint32,
 	pack Pack,
 ) ([]InteractionActionView, error) {
-	maxReward, err := combatHelpRewardMaximum(state, pack)
+	maxReward, err := combatHelpRewardMaximumSelected(state, pack)
 	if err != nil {
 		return nil, err
 	}
@@ -509,6 +642,25 @@ func interactionActionID(
 			string(intent) + "\x00" +
 			sourceInstanceID + "\x00" +
 			string(target) + "\x00" +
+			strconv.FormatUint(version, 10),
+	))
+	return fmt.Sprintf("act_%x", digest[:16])
+}
+
+func advancedCombatActionID(
+	interactionID string,
+	actorID string,
+	sourceInstanceID string,
+	capability CombatCapabilityKind,
+	targetKey string,
+	version uint64,
+) string {
+	digest := sha256.Sum256([]byte(
+		interactionID + "\x00" +
+			actorID + "\x00" +
+			sourceInstanceID + "\x00" +
+			string(capability) + "\x00" +
+			targetKey + "\x00" +
 			strconv.FormatUint(version, 10),
 	))
 	return fmt.Sprintf("act_%x", digest[:16])

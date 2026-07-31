@@ -1,10 +1,10 @@
 # PLAN: advanced combat effects and forced help
 
 - **Plan ID:** `20260731T003715Z-1b5b06-advanced-combat-effects-and-forced-help`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:37:15 UTC
-- **Обновлён:** 2026-07-31 00:37:15 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 03:36:54 UTC
+- **Владелец:** Codex /root
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -70,33 +70,35 @@ monster enhancer/counter и typed forced-help эффекты поверх combat
 
 ## Критерии приёмки
 
-- [ ] Новый immutable `moscow-core@3` создаётся из опубликованного v2; v1/v2
-  не изменяются, author/license/source/digest и original-only content
-  проверяются.
-- [ ] Schema и closed registry описывают только минимальные typed capabilities
+- [x] Новый immutable `moscow-core@3` создаётся из проверенного v2 authoring
+  snapshot; v2 остаётся explicit draft, v1/v2 не изменяются,
+  author/license/source/digest и original-only content проверяются.
+- [x] Schema и closed registry описывают только минимальные typed capabilities
   additional Monster/enhancer/counter/forced help; arbitrary expressions и
   raw target paths невозможны.
-- [ ] Actor descriptors содержат только собственный source и server-valid
+- [x] Actor descriptors содержат только собственный source и server-valid
   encounter/side/helper options; чужие hands/capabilities не проецируются.
-- [ ] Material add/enhance/counter атомарно обновляет encounter set/totals,
+- [x] Material add/enhance/counter атомарно обновляет encounter set/totals,
   reset-ит response revision и применяет bounded late `+10s`.
-- [ ] Stable encounter order сохраняется в events и определяет settlement/
+- [x] Stable encounter order сохраняется в events и определяет settlement/
   Run Away continuation; replay не повторяет content lookup как outcome.
-- [ ] Forced help выбирает ровно одного server-legal helper; voluntary accepted
+- [x] Forced help выбирает ровно одного server-legal helper; voluntary accepted
   helper и forced helper одновременно невозможны; typed default reward `0`.
-- [ ] Counter ссылается на opaque public action/effect ID, а не на private
+- [x] Counter ссылается на opaque public action/effect ID, а не на private
   source или event payload.
-- [ ] Unknown capability/effect and old profile fail closed; existing combat/
+- [x] Unknown capability/effect and old profile fail closed; existing combat/
   help fixtures сохраняют observable behavior.
-- [ ] HTTP/Zod/API fixtures and cross-actor tests prove privacy, stale target,
+- [x] HTTP/Zod/API fixtures and cross-actor tests prove privacy, stale target,
   duplicate command, revision reset, hard cap and deterministic replay.
 
 ## Контекст и подтверждённое состояние
 
 - Predecessor plans define combat response, one voluntary helper and exact
   reward settlement.
-- Current content registry supports `modify_combat`, but no explicit forced
-  help/additional-monster capability contract; `moscow-core@2` immutable.
+- Initial content registry supported `modify_combat`, but no explicit forced
+  help/additional-monster capability contract. Repository truth showed
+  `moscow-core@2` is an explicit authoring draft, so published v3 records its
+  validated digest as source without changing or relabelling v2.
 - ADR-0008 assigns all material combat responses the same CAS/deadline/reset
   semantics and forbids client-selected helper/outcome.
 - Terraform plan has no shared paths or contracts.
@@ -173,21 +175,21 @@ monster enhancer/counter и typed forced-help эффекты поверх combat
 
 ## План реализации
 
-1. [ ] Add schema/validator invalid fixtures and immutable v3 pack.
-2. [ ] Implement pure advanced combat transitions/events.
-3. [ ] Add projection/application/HTTP/contracts and cross-actor tests.
-4. [ ] Run validators, Go/frontend checks, verify/scope-check and archive.
+1. [x] Add schema/validator invalid fixtures and immutable v3 pack.
+2. [x] Implement pure advanced combat transitions/events.
+3. [x] Add projection/application/HTTP/contracts and cross-actor tests.
+4. [x] Run validators, Go/frontend checks, verify/scope-check and archive.
 
 ## Проверки
 
-- [ ] `node content/tools/validate.mjs content/sets/moscow/v3/cards.json`
-- [ ] `node --test content/tools/validate.test.mjs`
-- [ ] `cd backend/game && go test ./...`
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T003715Z-1b5b06-advanced-combat-effects-and-forced-help`
-- [ ] `git diff --check`
+- [x] `node content/tools/validate.mjs content/sets/moscow/v3/cards.json`
+- [x] `node --test content/tools/validate.test.mjs`
+- [x] `cd backend/game && go test ./...`
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260731T003715Z-1b5b06-advanced-combat-effects-and-forced-help`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -206,16 +208,43 @@ monster enhancer/counter и typed forced-help эффекты поверх combat
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:37:15 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Подготовить оставшиеся планы;
-  implementation/select/commit/push не разрешены.
+- **Подтверждено:** 2026-07-31
+- **Формулировка/ограничения пользователя:** Пользователь явно подтвердил exact
+  plan ID в очереди из девяти планов, разрешил реализацию и отдельный локальный
+  commit после каждого плана. Push не разрешён.
 
 ## Ход выполнения
 
-- Draft создан атомарно; реализация не начата.
+- Predecessor `20260731T001853Z-015911-combat-helper-reward-settlement`
+  завершён, заархивирован и зафиксирован локальным commit `a8e55a6`.
+- Выполнено read-only исследование текущих content/backend/frontend contracts;
+  plan переведён в `in_progress` для exact approved selection.
+- Создан published `moscow-core@3` с digest
+  `sha256:5150be9bd21b86ef9f2adf87fec42f89da26264a3519379f04057e7140bbc238`;
+  schema/Node/Go принимают только add/enhance/counter/forced-help capability.
+- Новый `lobby-multiplayer-v2@1` активируется только для exact
+  `moscow-core@3`; прежние packs/profiles fail closed и не материализуют v3
+  capabilities.
+- Pure events сохраняют stable encounter order и realized `fx_*` outcomes,
+  replay не читает content для применения события. Multiple-monster settlement
+  суммирует levels/treasures, forced helper получает typed reward `0`.
+- Actor projection, application CAS/receipt, strict Go HTTP fixture и Zod
+  fixture покрывают privacy, stale/duplicate actions, revision reset,
+  deadline extension и counter target opacity.
+- Фактически прошли: v3 validator; 26 content tests; весь Go backend;
+  frontend lint/typecheck, 58 tests и production build; `git diff --check`.
+- После переноса combat helpers в разрешённый `effects.go` выполнен свежий
+  canonical `./leinoctl verify --changed`: все frontend/content/Go, hooks,
+  leinoctl, plan-lint, shell syntax и Compose config gates прошли.
+- Финальный `scope-check` завершился с `outsideWriteSet: []` и exit code `0`;
+  `rules.go` восстановлен byte-for-byte и в итоговый diff не входит.
 
 ## Итог
 
-Заполняется после реализации.
+План завершён. Published `moscow-core@3` и exact
+`lobby-multiplayer-v2@1` активируют replay-safe additional Monster,
+enhancer/counter и forced-help эффекты; actor projection не раскрывает
+private sources, а старые profile/content combinations fail closed. Все
+обязательные проверки и scope-check прошли, plan перенесён в archive.

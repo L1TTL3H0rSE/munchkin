@@ -13,6 +13,8 @@ const (
 	FirstEditionCoreProfileVersion = 1
 	LobbyMultiplayerProfileID      = "lobby-multiplayer-v1"
 	LobbyMultiplayerProfileVersion = 1
+	AdvancedCombatProfileID        = "lobby-multiplayer-v2"
+	AdvancedCombatProfileVersion   = 1
 	MinPlayers                     = 1
 	MaxPlayers                     = 6
 	WinningLevel                   = 10
@@ -38,6 +40,7 @@ type RulesProfile struct {
 	HandLimit            int    `json:"hand_limit"`
 	RunAwayTarget        int    `json:"run_away_target"`
 	CombatResponses      bool   `json:"combat_responses"`
+	AdvancedCombat       bool   `json:"advanced_combat"`
 }
 
 func FirstEditionCoreProfile() RulesProfile {
@@ -62,6 +65,14 @@ func LobbyMultiplayerProfile() RulesProfile {
 	return profile
 }
 
+func AdvancedCombatProfile() RulesProfile {
+	profile := LobbyMultiplayerProfile()
+	profile.ID = AdvancedCombatProfileID
+	profile.Version = AdvancedCombatProfileVersion
+	profile.AdvancedCombat = true
+	return profile
+}
+
 func (profile RulesProfile) Validate() error {
 	expected, ok := rulesProfile(profile.ID, profile.Version)
 	if !ok || profile != expected {
@@ -78,6 +89,9 @@ func rulesProfile(id string, version int) (RulesProfile, bool) {
 	case id == LobbyMultiplayerProfileID &&
 		version == LobbyMultiplayerProfileVersion:
 		return LobbyMultiplayerProfile(), true
+	case id == AdvancedCombatProfileID &&
+		version == AdvancedCombatProfileVersion:
+		return AdvancedCombatProfile(), true
 	default:
 		return RulesProfile{}, false
 	}
@@ -159,13 +173,24 @@ func (player Player) allOwnedZones() [][]string {
 }
 
 type Encounter struct {
-	MonsterInstanceID      string               `json:"monster_instance_id"`
-	PlayerCombatModifier   int                  `json:"player_combat_modifier"`
-	MonsterCombatModifier  int                  `json:"monster_combat_modifier"`
-	EscapeModifier         int                  `json:"escape_modifier"`
-	TreasureRewardModifier int                  `json:"treasure_reward_modifier"`
-	CombatClosed           bool                 `json:"combat_closed"`
-	CombatHelp             *CombatHelpAgreement `json:"combat_help,omitempty"`
+	MonsterInstanceID            string               `json:"monster_instance_id"`
+	AdditionalMonsterInstanceIDs []string             `json:"additional_monster_instance_ids,omitempty"`
+	CombatEffects                []CombatEffect       `json:"combat_effects,omitempty"`
+	PlayerCombatModifier         int                  `json:"player_combat_modifier"`
+	MonsterCombatModifier        int                  `json:"monster_combat_modifier"`
+	EscapeModifier               int                  `json:"escape_modifier"`
+	TreasureRewardModifier       int                  `json:"treasure_reward_modifier"`
+	CombatClosed                 bool                 `json:"combat_closed"`
+	CombatHelp                   *CombatHelpAgreement `json:"combat_help,omitempty"`
+}
+
+type CombatEffect struct {
+	ID                      string               `json:"id"`
+	Kind                    CombatCapabilityKind `json:"kind"`
+	TargetMonsterInstanceID string               `json:"target_monster_instance_id,omitempty"`
+	TargetEffectID          string               `json:"target_effect_id,omitempty"`
+	Amount                  int                  `json:"amount,omitempty"`
+	Active                  bool                 `json:"active"`
 }
 
 type CombatHelpRewardStatus string
@@ -180,6 +205,7 @@ type CombatHelpAgreement struct {
 	HelperPlayerID  string                 `json:"helper_player_id"`
 	RewardTreasures int                    `json:"reward_treasures"`
 	RewardStatus    CombatHelpRewardStatus `json:"reward_status"`
+	Forced          bool                   `json:"forced,omitempty"`
 }
 
 type CombatHelpOffer struct {
@@ -413,6 +439,14 @@ func (state State) Clone() State {
 	clone.Turn.Pending = state.Turn.Pending.clone()
 	if state.Turn.Encounter != nil {
 		encounter := *state.Turn.Encounter
+		encounter.AdditionalMonsterInstanceIDs = append(
+			[]string(nil),
+			state.Turn.Encounter.AdditionalMonsterInstanceIDs...,
+		)
+		encounter.CombatEffects = append(
+			[]CombatEffect(nil),
+			state.Turn.Encounter.CombatEffects...,
+		)
 		if state.Turn.Encounter.CombatHelp != nil {
 			agreement := *state.Turn.Encounter.CombatHelp
 			encounter.CombatHelp = &agreement
@@ -540,6 +574,9 @@ func (state State) Validate() error {
 		return err
 	}
 	if err := state.validateCombatHelp(); err != nil {
+		return err
+	}
+	if err := state.validateAdvancedEncounter(); err != nil {
 		return err
 	}
 	if state.Status != StatusLobby {
@@ -769,7 +806,9 @@ func (state State) validateCombatHelpAgreement() error {
 	helperIndex := state.PlayerIndex(agreement.HelperPlayerID)
 	if helperIndex < 0 ||
 		agreement.HelperPlayerID == state.Turn.PlayerID ||
-		agreement.RewardTreasures < 1 {
+		agreement.RewardTreasures < 0 ||
+		(!agreement.Forced && agreement.RewardTreasures < 1) ||
+		(agreement.Forced && agreement.RewardTreasures != 0) {
 		return fmt.Errorf(
 			"%w: malformed combat-help agreement",
 			ErrIllegalCommand,
@@ -805,6 +844,128 @@ func (state State) validateCombatHelpAgreement() error {
 			"%w: invalid combat-help reward status",
 			ErrIllegalCommand,
 		)
+	}
+	return nil
+}
+
+func (state State) validateAdvancedEncounter() error {
+	encounter := state.Turn.Encounter
+	if encounter == nil {
+		return nil
+	}
+	profile, err := state.Profile()
+	if err != nil {
+		return err
+	}
+	if !profile.AdvancedCombat &&
+		(len(encounter.AdditionalMonsterInstanceIDs) > 0 ||
+			len(encounter.CombatEffects) > 0 ||
+			(encounter.CombatHelp != nil && encounter.CombatHelp.Forced)) {
+		return fmt.Errorf(
+			"%w: advanced encounter state under old profile",
+			ErrIncompatibleState,
+		)
+	}
+	encounterIDs := map[string]struct{}{
+		encounter.MonsterInstanceID: {},
+	}
+	for _, instanceID := range encounter.AdditionalMonsterInstanceIDs {
+		if instanceID == "" {
+			return fmt.Errorf(
+				"%w: empty additional monster instance",
+				ErrIllegalCommand,
+			)
+		}
+		if _, duplicate := encounterIDs[instanceID]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate encounter monster %s",
+				ErrIllegalCommand,
+				instanceID,
+			)
+		}
+		encounterIDs[instanceID] = struct{}{}
+	}
+	effectIDs := make(map[string]struct{}, len(encounter.CombatEffects))
+	for _, effect := range encounter.CombatEffects {
+		if effect.ID == "" {
+			return fmt.Errorf("%w: empty combat effect ID", ErrIllegalCommand)
+		}
+		if _, duplicate := effectIDs[effect.ID]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate combat effect %s",
+				ErrIllegalCommand,
+				effect.ID,
+			)
+		}
+		effectIDs[effect.ID] = struct{}{}
+		switch effect.Kind {
+		case CombatCapabilityEnhance:
+			if effect.Amount < 1 || effect.Amount > 10 ||
+				effect.TargetEffectID != "" {
+				return fmt.Errorf(
+					"%w: malformed monster enhancement",
+					ErrIllegalCommand,
+				)
+			}
+			if _, exists := encounterIDs[effect.TargetMonsterInstanceID]; !exists {
+				return fmt.Errorf(
+					"%w: enhancement target is not in encounter",
+					ErrIllegalCommand,
+				)
+			}
+		case CombatCapabilityCounter:
+			if effect.Amount != 0 ||
+				effect.TargetMonsterInstanceID != "" ||
+				effect.TargetEffectID == "" ||
+				!effect.Active {
+				return fmt.Errorf(
+					"%w: malformed combat counter",
+					ErrIllegalCommand,
+				)
+			}
+		default:
+			return fmt.Errorf(
+				"%w: unsupported realized combat effect %s",
+				ErrIllegalCommand,
+				effect.Kind,
+			)
+		}
+	}
+	counterTargets := make(map[string]int)
+	for _, effect := range encounter.CombatEffects {
+		if effect.Kind != CombatCapabilityCounter {
+			continue
+		}
+		counterTargets[effect.TargetEffectID]++
+		targetIndex := slices.IndexFunc(
+			encounter.CombatEffects,
+			func(candidate CombatEffect) bool {
+				return candidate.ID == effect.TargetEffectID
+			},
+		)
+		if targetIndex < 0 ||
+			encounter.CombatEffects[targetIndex].Kind != CombatCapabilityEnhance ||
+			encounter.CombatEffects[targetIndex].Active {
+			return fmt.Errorf(
+				"%w: counter target outcome differs",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	for _, effect := range encounter.CombatEffects {
+		if effect.Kind != CombatCapabilityEnhance {
+			continue
+		}
+		expectedCounters := 0
+		if !effect.Active {
+			expectedCounters = 1
+		}
+		if counterTargets[effect.ID] != expectedCounters {
+			return fmt.Errorf(
+				"%w: enhancement counter cardinality differs",
+				ErrIllegalCommand,
+			)
+		}
 	}
 	return nil
 }
@@ -1049,9 +1210,13 @@ func (state State) validateInstanceZones() error {
 		return err
 	}
 	if state.Turn.Encounter != nil {
+		encounterInstances := append(
+			[]string{state.Turn.Encounter.MonsterInstanceID},
+			state.Turn.Encounter.AdditionalMonsterInstanceIDs...,
+		)
 		if err := add(
 			"encounter",
-			[]string{state.Turn.Encounter.MonsterInstanceID},
+			encounterInstances,
 		); err != nil {
 			return err
 		}
