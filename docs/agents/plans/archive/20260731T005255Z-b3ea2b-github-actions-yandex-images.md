@@ -75,63 +75,63 @@ references по digest, а не плавающий production tag.
 
 ## Критерии приёмки
 
-- [ ] `.github/workflows/ci.yml` воспроизводит актуальные обязательные
+- [x] `.github/workflows/ci.yml` воспроизводит актуальные обязательные
   GitLab/repository gates: harness/hooks/leinoctl/plan-lint/preflight/
   `ci-impact`, content validator, Go unit, real PostgreSQL contract,
   frontend lint/check/build, Compose config и Docker build smoke.
-- [ ] Pull request jobs и обычные verification jobs имеют только
+- [x] Pull request jobs и обычные verification jobs имеют только
   `contents: read`; `id-token: write` существует только у publish jobs.
   Workflow не получает `packages: write`, cloud token или environment на PR.
-- [ ] Publish запускается только для trusted `push` в `main` или отдельно
+- [x] Publish запускается только для trusted `push` в `main` или отдельно
   подтверждённого `workflow_dispatch`, после всех checks, через protected
   GitHub environment `production-images`; fork PR и arbitrary branch не могут
   получить WIF token или push access.
-- [ ] GitHub Actions и third-party actions pinned на full commit SHA.
+- [x] GitHub Actions и third-party actions pinned на full commit SHA.
   Reusable workflow privilege escalation, unsafe `pull_request_target`,
   untrusted `workflow_run`, mutable action tags и shell interpolation
   attacker-controlled context отсутствуют.
-- [ ] Bootstrap Terraform создаёт отдельный keyless service account
+- [x] Bootstrap Terraform создаёт отдельный keyless service account
   `munchkin-github-images`, GitHub OIDC workload identity federation и ровно
   одну federated credential для exact external subject. Ни один static/API/
   authorized key для CI account не создаётся.
-- [ ] Trust использует issuer
+- [x] Trust использует issuer
   `https://token.actions.githubusercontent.com`, exact audience и observed
   subject. Для созданного 2026-07-29 repository ожидается immutable subject
   `repo:L1TTL3H0rSE@32160016/munchkin@1316069622:environment:production-images`;
   Terraform apply запрещён, пока claim-probe не подтвердит точные
   `iss`/`aud`/`sub`, `repository_id=1316069622`,
   `repository_owner_id=32160016` и environment.
-- [ ] Claim-probe никогда не печатает/сохраняет raw JWT или token: в evidence
+- [x] Claim-probe никогда не печатает/сохраняет raw JWT или token: в evidence
   разрешены только decoded non-secret claims. После создания federation
   отдельный smoke обменивает JWT на short-lived IAM token и не логирует его.
-- [ ] CI service account получает только
+- [x] CI service account получает только
   `container-registry.images.pusher` на exact registry
   `crpdnmjudj1usiu90gdn`; folder-wide editor/admin, runtime-SA access,
   Terraform state access, Compute/VPC/Lockbox roles и puller binding не
   добавляются. Authoritative registry bindings инвентаризируются до apply.
-- [ ] `game` и `web` строятся из repository Dockerfiles после checks, получают
+- [x] `game` и `web` строятся из repository Dockerfiles после checks, получают
   OCI labels `source`, `revision`, `created` и `licenses`, push-ятся только в
   `cr.yandex/crpdnmjudj1usiu90gdn/game` и
   `cr.yandex/crpdnmjudj1usiu90gdn/web`.
-- [ ] SHA tag равен полному lowercase Git commit SHA и никогда не
+- [x] SHA tag равен полному lowercase Git commit SHA и никогда не
   перезаписывается: существующий tag является stop condition. Authoritative
   handoff содержит две digest-pinned ссылки
   `cr.yandex/.../game@sha256:...` и `cr.yandex/.../web@sha256:...`,
   commit SHA, workflow run/attempt и build timestamps.
-- [ ] Частично опубликованный image не считается release: pair manifest
+- [x] Частично опубликованный image не считается release: pair manifest
   появляется только после успешных push/remote digest verification обоих
   images. Следующий deploy plan принимает только эту verified pair.
-- [ ] WIF exchange и `docker login` используют masked ephemeral process
+- [x] WIF exchange и `docker login` используют masked ephemeral process
   values/`--password-stdin`; OIDC JWT, IAM token и Docker auth не попадают в
   command trace, artifacts, cache, workflow summary или repository.
-- [ ] Registry cache/CI artifacts ограничены по размеру и retention; никакой
+- [x] Registry cache/CI artifacts ограничены по размеру и retention; никакой
   paid vulnerability scanning или destructive image cleanup не включается без
   отдельной тарификации и security plan.
-- [ ] Bootstrap и production Terraform applies каждый выполняются только
+- [x] Bootstrap и production Terraform applies каждый выполняются только
   после отдельного owner approval exact sanitized plan. Unexpected
   add/change/destroy, provider upgrade, IAM replacement или изменение
   runtime puller binding останавливают работу.
-- [ ] После apply доказаны clean Terraform plans, exact WIF/federated
+- [x] После apply доказаны clean Terraform plans, exact WIF/federated
   credential/SA/registry IAM inventory, `0` static keys и успешная первая
   publication. Repository docs содержат runbook revoke/diagnose/rotate trust.
 - [x] Focused checks, canonical `./leinoctl verify --changed`, plan-lint,

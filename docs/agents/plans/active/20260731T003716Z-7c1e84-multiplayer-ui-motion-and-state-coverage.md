@@ -1,10 +1,10 @@
 # PLAN: multiplayer ui motion and state coverage
 
 - **Plan ID:** `20260731T003716Z-7c1e84-multiplayer-ui-motion-and-state-coverage`
-- **Статус:** draft
+- **Статус:** approved
 - **Создан:** 2026-07-31 00:37:16 UTC
 - **Обновлён:** 2026-07-31 00:37:16 UTC
-- **Владелец:** —
+- **Владелец:** Codex session `019fb760-1241-7b61-b9ce-217108b8b38e`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** exclusive
@@ -19,10 +19,17 @@
   "schemaVersion": 1,
   "paths": [
     "frontend/applications/web/app/assets/main.css",
+    "frontend/applications/web/app/pages/game/[id].vue",
+    "frontend/applications/web/app/composables/useGameApi.ts",
+    "frontend/applications/web/app/components/GameCard.vue",
+    "frontend/applications/web/app/components/ActionPanel.vue",
+    "frontend/applications/web/app/components/actionModel.ts",
     "frontend/applications/web/app/components/lobby/**",
     "frontend/applications/web/app/components/game/**",
     "frontend/applications/web/app/components/interaction/**",
     "frontend/applications/web/test/fixtures/**",
+    "frontend/applications/web/test/actionModel.test.ts",
+    "frontend/applications/web/test/gameCardInteraction.test.ts",
     "frontend/test/browser/**",
     "frontend/test/browser/visual-baselines/**",
     "docs/agents/plans/active/20260731T003716Z-7c1e84-multiplayer-ui-motion-and-state-coverage.md",
@@ -33,6 +40,7 @@
   ],
   "contracts": [
     "frontend:browser-a11y-harness-v1",
+    "frontend:card-first-action-surface-v1",
     "frontend:responsive-lobby-entry-v1",
     "frontend:death-loot-priority-v1",
     "game:multiplayer-balance-signals-v1"
@@ -52,15 +60,32 @@
 
 ## Цель
 
-Выполнить финальный player-facing UI readiness pass: tokenized tactical-street
-visual direction, confirmed-delta motion with static/reduced equivalents and
-complete automated state/viewport/privacy coverage across lobby and every
-multiplayer mechanic.
+Выполнить финальный player-facing UI readiness pass: перевести игровой
+интерфейс на card-first interaction model, завершить tokenized tactical-street
+visual direction, confirmed-delta motion со static/reduced equivalents и
+полное automated state/viewport/privacy coverage across lobby and every
+multiplayer mechanic. Карта должна быть понятной точкой входа в действие, а не
+декоративным элементом, который требует поиска отдельной верхней кнопки.
 
 ## Критерии приёмки
 
 - [ ] All 20+ representative fixtures decode strict contracts and contain no
   foreign private data/credentials/raw events.
+- [ ] Every actor-owned card is mapped to server-projected legal actions by
+  `source_instance_id`/`instance_ids`; an eligible simple `play_card` or
+  `equip_item` card action is activatable from the card itself without finding
+  a detached global action button.
+- [ ] A card with multiple legal actions or required choices opens a contextual
+  action surface adjacent to the selected card or in the mobile bottom sheet;
+  target, cost and choice controls remain server-described and version-bound.
+- [ ] Card interaction uses semantic keyboard/touch controls with visible
+  `idle`, `available`, `selected`, `pending`, `confirmed` and `disabled`
+  states. Drag or double-click is never the only way to perform an action.
+- [ ] The action dock is persistent and discoverable near the hand on desktop
+  and as a bottom sheet/dock on mobile; the top action region is reserved for
+  global turn actions and status, not the only path to play a card.
+- [ ] Valid action types are not silently removed at the client boundary;
+  unsupported or unknown actions produce a recoverable protocol/resync state.
 - [ ] Complete dense fixture N-1/N/N+1 matrix and representative all-state
   viewport tier pass with `scrollWidth <= clientWidth`.
 - [ ] Loading/empty/error/offline/retrying/stale/expired/mandatory/victory
@@ -94,6 +119,10 @@ multiplayer mechanic.
 
 ### Входит
 
+- Card-first action mapping and interaction surfaces for the own hand,
+  equipped/carried card areas and supported action states.
+- Persistent desktop/mobile action dock or contextual sheet, including
+  selection, parameter, target, pending and confirmed states.
 - Final visual/motion token polish, full fixture expansion, automated
   browser/a11y/visual/real-boundary readiness evidence.
 
@@ -104,16 +133,22 @@ multiplayer mechanic.
 
 ## Архитектурный подход
 
-1. Freeze contracts/fixtures before polish and change only presentation.
-2. Animate confirmed delta with one interruptible owner and reduced fallback.
-3. Apply semantic tokens component-locally; keep global sheet foundation-only.
-4. Treat complete automated matrix as release gate, not screenshot decoration.
+1. Freeze existing projection/action contracts and build a pure mapping from
+   server descriptors to card-owned action affordances; do not derive legal
+   actions locally.
+2. Make an unambiguous simple card action executable from the card itself and
+   route multi-action/parameterized cases through one contextual surface.
+3. Keep pending/confirmed ownership in the session controller; card motion is
+   triggered only by a newer server projection.
+4. Animate confirmed delta with one interruptible owner and reduced fallback.
+5. Apply semantic tokens component-locally; keep global sheet foundation-only.
+6. Treat complete automated matrix as release gate, not screenshot decoration.
 
 ## Затронутые компоненты и контракты
 
 | Компонент | Изменение | Публичный контракт/данные |
 |---|---|---|
-| player UI | Final tokens/motion/states | Existing projection only |
+| player UI | Card-first actions, contextual surfaces, final tokens/motion/states | Existing projection/action descriptors only |
 | browser harness | Complete matrix/baselines/E2E | Readiness evidence |
 
 ## Координация с другими планами
@@ -123,10 +158,17 @@ multiplayer mechanic.
 | Путь/ресурс | Режим | Причина |
 |---|---|---|
 | `frontend/applications/web/app/assets/main.css` | write | Foundation token cleanup |
+| `frontend/applications/web/app/pages/game/[id].vue` | write | Card/action surface composition |
+| `frontend/applications/web/app/composables/useGameApi.ts` | write | Preserve all valid action descriptors and recoverable protocol handling |
+| `frontend/applications/web/app/components/GameCard.vue` | write | Semantic card interaction and states |
+| `frontend/applications/web/app/components/ActionPanel.vue` | write | Contextual action dock/sheet |
+| `frontend/applications/web/app/components/actionModel.ts` | write | Card-to-action mapping and payload view model |
 | `frontend/applications/web/app/components/lobby/**` | write | Final states/motion |
 | `frontend/applications/web/app/components/game/**` | write | Final states/motion |
 | `frontend/applications/web/app/components/interaction/**` | write | Final states/motion |
 | `frontend/applications/web/test/fixtures/**` | write | Complete state matrix |
+| `frontend/applications/web/test/actionModel.test.ts` | write | Card/action mapping and authority-preserving payload tests |
+| `frontend/applications/web/test/gameCardInteraction.test.ts` | write | Semantic card interaction state tests |
 | `frontend/test/browser/**` | write | Readiness gates/E2E |
 | `frontend/test/browser/visual-baselines/**` | generated | Reviewed final baselines |
 | `docs/agents/plans/active/20260731T003716Z-7c1e84-multiplayer-ui-motion-and-state-coverage.md` | write | Active lifecycle |
@@ -148,11 +190,19 @@ multiplayer mechanic.
 
 ## План реализации
 
-1. [ ] Freeze complete actor fixtures and run baseline semantic/a11y matrix.
-2. [ ] Apply tokenized visual direction and confirmed-delta motion.
-3. [ ] Fix only evidence-backed layout/a11y/state findings.
-4. [ ] Run complete browser/a11y/visual and real-boundary E2E gates.
-5. [ ] Run canonical verify/scope-check, archive and publish readiness evidence.
+1. [ ] Freeze complete actor fixtures and run baseline semantic/a11y matrix,
+   including the current card-to-action discoverability failure.
+2. [ ] Implement server-descriptor-to-card mapping and semantic card states;
+   keep `expected_version`, idempotency and actor authority unchanged.
+3. [ ] Implement direct simple card actions plus contextual action
+   dock/sheet for multi-action and parameterized cards.
+4. [ ] Remove silent valid-action filtering and add negative/recoverable
+   protocol coverage for unsupported action descriptors.
+5. [ ] Apply tokenized visual direction, responsive hand/action layout and
+   confirmed-delta motion with static/reduced equivalents.
+6. [ ] Fix only evidence-backed layout/a11y/state findings.
+7. [ ] Run complete browser/a11y/visual and real-boundary E2E gates.
+8. [ ] Run canonical verify/scope-check, archive and publish readiness evidence.
 
 ## Проверки
 
@@ -161,6 +211,12 @@ multiplayer mechanic.
 - [ ] `cd frontend && pnpm test:a11y`
 - [ ] `cd frontend && pnpm test:visual`
 - [ ] Full real-boundary player flow smoke
+- [ ] Card click/tap/Enter/Space can execute every eligible simple card action
+  without scrolling to a detached action list
+- [ ] Multi-action cards open contextual controls; target/choice submission
+  preserves server-projected IDs and current expected version
+- [ ] All valid action descriptors survive the client parse boundary or fail
+  closed with a recoverable resync state; no silent action drop
 - [ ] Privacy scan and axe serious/critical gate
 - [ ] `node .codex/hooks/plan-lint.mjs`
 - [ ] `./leinoctl verify --changed`
@@ -177,20 +233,25 @@ multiplayer mechanic.
 
 ## Открытые вопросы
 
-- Scope-changing вопросов нет; sound/haptics and external UI skill remain
-  optional future layers.
+- Sound/haptics and external UI skill remain optional future layers.
+- Exact card sheet visual placement is an implementation detail: desktop may
+  use an adjacent dock and mobile uses a bottom sheet, but both must satisfy
+  the same card-first action contract and keyboard/touch gates.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:37:16 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Подготовить оставшиеся планы;
-  implementation/select/commit/push не разрешены.
+- **Подтверждено:** пользователь подтвердил обновлённый card-first scope и
+  разрешил реализацию без commit/push в текущем сообщении сессии.
+- **Формулировка/ограничения пользователя:** сначала показать обновлённый
+  scope; implementation разрешена после подтверждения, commit и push требуют
+  отдельного приказа.
 
 ## Ход выполнения
 
-- Draft создан атомарно; реализация не начата.
+- Plan расширен card-first contract и конкретными frontend write targets;
+  реализация разрешена, commit и push не разрешены.
 
 ## Итог
 
