@@ -13,6 +13,36 @@ output "runtime_service_account_id" {
   value       = yandex_iam_service_account.runtime.id
 }
 
+output "github_images_service_account_id" {
+  description = "Keyless service account used by the protected GitHub image publisher."
+  value       = yandex_iam_service_account.github_images.id
+}
+
+output "github_actions_federation_id" {
+  description = "GitHub Actions OIDC federation ID."
+  value       = yandex_iam_workload_identity_oidc_federation.github_actions.id
+}
+
+output "github_actions_federated_credential_id" {
+  description = "Exact production-images federated credential ID."
+  value       = yandex_iam_workload_identity_federated_credential.github_images.id
+}
+
+output "github_actions_oidc_issuer" {
+  description = "Issuer accepted by the GitHub Actions federation."
+  value       = local.github_oidc_issuer
+}
+
+output "github_actions_oidc_audience" {
+  description = "Exact audience accepted by the GitHub Actions federation."
+  value       = local.github_oidc_audience
+}
+
+output "github_actions_oidc_subject" {
+  description = "Exact immutable subject accepted by the GitHub Actions federation."
+  value       = local.github_oidc_subject
+}
+
 output "state_bucket_name" {
   description = "Private, versioned and KMS-encrypted Terraform state bucket."
   value       = yandex_storage_bucket.terraform_state.bucket

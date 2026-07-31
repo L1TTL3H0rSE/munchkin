@@ -3,9 +3,27 @@ output "runtime_service_account_id" {
   value       = data.yandex_iam_service_account.runtime.id
 }
 
+output "github_images_service_account_id" {
+  description = "Keyless service account used by the protected GitHub image publisher."
+  value       = data.yandex_iam_service_account.github_images.id
+}
+
 output "container_registry_id" {
   description = "Private registry used by future immutable image pipelines."
   value       = yandex_container_registry.production.id
+}
+
+output "container_registry_endpoint" {
+  description = "Yandex Container Registry endpoint used by immutable image publication."
+  value       = "cr.yandex"
+}
+
+output "container_image_prefixes" {
+  description = "Exact image repositories published by the protected workflow."
+  value = {
+    game = "cr.yandex/${yandex_container_registry.production.id}/game"
+    web  = "cr.yandex/${yandex_container_registry.production.id}/web"
+  }
 }
 
 output "container_repository_names" {

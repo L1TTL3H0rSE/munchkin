@@ -1,10 +1,10 @@
 # PLAN: GitHub Actions, Yandex Cloud WIF and immutable images
 
 - **Plan ID:** `20260731T005255Z-b3ea2b-github-actions-yandex-images`
-- **Статус:** draft
+- **Статус:** in_progress
 - **Создан:** 2026-07-31 00:52:55 UTC
-- **Обновлён:** 2026-07-31 00:59:00 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 12:40:00 UTC
+- **Владелец:** Codex / `019fb760-1241-7b61-b9ce-217108b8b38e`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся по указанию владельца
 - **Режим параллельности:** exclusive
@@ -134,7 +134,7 @@ references по digest, а не плавающий production tag.
 - [ ] После apply доказаны clean Terraform plans, exact WIF/federated
   credential/SA/registry IAM inventory, `0` static keys и успешная первая
   publication. Repository docs содержат runbook revoke/diagnose/rotate trust.
-- [ ] Focused checks, canonical `./leinoctl verify --changed`, plan-lint,
+- [x] Focused checks, canonical `./leinoctl verify --changed`, plan-lint,
   strict UTF-8/secret scan, diff review и scope-check проходят. Commit/push,
   GitHub environment mutation и cloud apply не выполняются без отдельных
   разрешений владельца.
@@ -329,23 +329,23 @@ repository.
 
 ## План реализации
 
-1. [ ] Повторить `git status`, `leinoctl context`, active-plan conflict scan и
+1. [x] Повторить `git status`, `leinoctl context`, active-plan conflict scan и
    прочитать актуальные GitLab/Docker/Terraform contracts.
-2. [ ] Изолированно проверить provider `0.220.0` schemas для WIF resources и
+2. [x] Изолированно проверить provider `0.220.0` schemas для WIF resources и
    официальные token-exchange/registry-login contracts; mismatch остановить
    без provider upgrade.
-3. [ ] Подготовить GitHub parity workflow без OIDC use; pin actions by commit,
+3. [x] Подготовить GitHub parity workflow без OIDC use; pin actions by commit,
    запустить local-equivalent checks и проверить fork/PR permissions.
 4. [ ] По отдельному owner approval создать/configure GitHub environment и
    выполнить безопасный claim-probe; записать только allowlisted claims.
-5. [ ] Реализовать Terraform CI SA/federation/credential и registry pusher
+5. [x] Реализовать Terraform CI SA/federation/credential и registry pusher
    binding с exact immutable subject/assertions.
 6. [ ] Выполнить local Terraform fmt/init-readonly/validate/tests и показать
    отдельно bootstrap/production plan summaries/addresses. Для каждого apply
    получить отдельный owner approval.
 7. [ ] После approved applies доказать clean plans, exact live IAM/WIF/registry
    graph и `0` static/API/authorized keys.
-8. [ ] Добавить fail-closed WIF exchange, masked Docker login, full-SHA
+8. [x] Добавить fail-closed WIF exchange, masked Docker login, full-SHA
    no-overwrite checks, dual image build/push и digest-pair artifact.
 9. [ ] Запустить first trusted main publication только по отдельному разрешению;
    проверить remote labels/tags/digests и отсутствие leaked credentials.
@@ -354,29 +354,29 @@ repository.
 
 ## Проверки
 
-- [ ] `node --test --test-isolation=none .codex/hooks/test/*.test.mjs`
-- [ ] `(cd tools/leinoctl && node --test)`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl preflight`
-- [ ] `./leinoctl ci-impact --base <merge-base> --head HEAD`
-- [ ] `node content/tools/validate.mjs content/sets/moscow/v1/cards.json`
-- [ ] `cd backend/game && go test ./...`
-- [ ] Real PostgreSQL contract job equivalent
-- [ ] `pnpm --dir frontend lint`
-- [ ] `pnpm --dir frontend check`
-- [ ] `pnpm --dir frontend build`
-- [ ] `./leinoctl compose config`
-- [ ] Local `game`/`web` Docker image build smoke
-- [ ] `terraform fmt -check` and validation for bootstrap/production roots
-- [ ] `scripts/terraform-check.sh`
+- [x] `node --test --test-isolation=none .codex/hooks/test/*.test.mjs`
+- [x] `(cd tools/leinoctl && node --test)`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl preflight`
+- [x] `./scripts/ci-impact.sh`
+- [x] `node content/tools/validate.mjs content/sets/demo/cards.json`
+- [x] `cd backend/game && go test ./...`
+- [x] Real PostgreSQL contract job equivalent
+- [x] `cd frontend && pnpm lint`
+- [x] `cd frontend && pnpm check`
+- [x] `cd frontend && pnpm build`
+- [x] `docker compose --parallel 8 -f docker-compose.yml config`
+- [x] Local `game`/`web` Docker image build smoke
+- [x] `terraform fmt -check` and validation for bootstrap/production roots
+- [x] `scripts/terraform-check.sh`
 - [ ] OIDC claim allowlist/exact-subject test; raw JWT absent from logs
 - [ ] WIF exchange + masked registry login/read smoke; static-key inventory `0`
 - [ ] GitHub PR permission test: no environment, OIDC exchange or push
 - [ ] Full-SHA no-overwrite test and remote digest/OCI-label verification
 - [ ] Image-pair artifact schema test with two `@sha256` references
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T005255Z-b3ea2b-github-actions-yandex-images`
-- [ ] `git diff --check`, strict UTF-8/text check and focused secret scan
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260731T005255Z-b3ea2b-github-actions-yandex-images`
+- [x] `git diff --check`, strict UTF-8/text check and focused secret scan
 
 ## Риски и откат
 
@@ -411,10 +411,15 @@ repository.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:59:00 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** составить plan для GitHub
+- **Подтверждено:** 2026-07-31 08:55:11 UTC
+- **Формулировка/ограничения пользователя:** «Approve plan
+  20260731T005255Z-b3ea2b-github-actions-yandex-images». Это разрешает
+  implementation только в пределах exact plan scope; commit/push, GitHub
+  environment mutation, cloud apply и first image publication остаются
+  отдельными owner gates, явно указанными в плане.
+  Составить plan для GitHub
   Actions + Yandex Cloud WIF и build/push immutable `game`/`web` images в
   registry `crpdnmjudj1usiu90gdn`; никаких static cloud keys; после plan ждать
   approval. Одновременно разрешено создать остальные infra plans заранее, но
@@ -425,8 +430,17 @@ repository.
 - Read-only исследование roadmap, current CI/Docker/Terraform contracts,
   completed foundation evidence, active plan manifests, public GitHub metadata
   и актуальных official GitHub/Yandex WIF contracts выполнено.
-- Draft создан и заполнен; workflow/Terraform/Docker/runtime/cloud state не
-  изменялись. Plan не selected, approval не записан.
+- Plan approved, claimed/taken over by the current session and selected.
+- Repository implementation completed inside the write set: GitHub parity and
+  gated publish workflow, fail-closed WIF helper, Docker provenance labels,
+  keyless Terraform trust graph, exact registry pusher assertions, runbook and
+  roadmap evidence.
+- Focused Terraform check passed with provider `0.220.0`; canonical
+  `verify --changed`, hooks, leinoctl, plan-lint, preflight, ci-impact, real
+  PostgreSQL contract, frontend gates, Compose config and Docker image smoke
+  passed; strict text/secret scan, diff review and scope-check also passed. No
+  commit, push, GitHub environment mutation, cloud apply, WIF exchange or
+  image publication was performed.
 
 ## Итог
 

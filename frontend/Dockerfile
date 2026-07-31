@@ -13,7 +13,18 @@ RUN pnpm build
 
 FROM node:24-alpine
 
+ARG OCI_SOURCE="https://github.com/L1TTL3H0rSE/munchkin"
+ARG OCI_REVISION="unknown"
+ARG OCI_CREATED="1970-01-01T00:00:00Z"
+ARG OCI_LICENSES="MIT"
+
 WORKDIR /app
+
+LABEL org.opencontainers.image.source="${OCI_SOURCE}" \
+      org.opencontainers.image.revision="${OCI_REVISION}" \
+      org.opencontainers.image.created="${OCI_CREATED}" \
+      org.opencontainers.image.licenses="${OCI_LICENSES}"
+
 COPY --from=build --chown=node:node /app/applications/web/.output ./.output
 
 ENV HOST=0.0.0.0 \
