@@ -206,3 +206,138 @@ function isPlayerTarget(action: ActionDescriptor, targetID: string) {
     </div>
   </aside>
 </template>
+
+<style scoped>
+.action-dock {
+  min-width: 0;
+  display: grid;
+  gap: .85rem;
+}
+
+.action-dock__header {
+  min-width: 0;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .5rem .65rem 0;
+}
+
+.action-dock__header h2 {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 1.25rem;
+}
+
+.action-dock__hint,
+.action-dock__empty {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.action-dock__hint {
+  max-width: 60ch;
+  margin-top: .35rem;
+  font-size: .84rem;
+}
+
+.action-dock__empty {
+  border: 1px dashed var(--line);
+  padding: .75rem;
+}
+
+.action-dock__close {
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  border-color: var(--line);
+  color: var(--ink);
+  background: transparent;
+}
+
+.action-list {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: .75rem;
+}
+
+.action-choice {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: .7rem;
+  border: 1px solid var(--line);
+  background: #15160f;
+  padding: .8rem;
+}
+
+.action-choice > strong {
+  color: var(--acid);
+  font-size: .78rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.action-choice__source {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.action-options {
+  display: grid;
+  gap: .4rem;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.selection-option {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.selection-option input {
+  width: auto;
+  margin: 0;
+}
+
+.target-select {
+  display: grid;
+  gap: .4rem;
+}
+
+.target-select select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #10110c;
+  color: var(--ink);
+  padding: .65rem;
+}
+
+.action-choice__submit {
+  width: 100%;
+  min-height: 2.75rem;
+}
+
+@media (width <= 599px) {
+  .action-list {
+    max-height: min(64dvh, 36rem);
+    overflow-y: auto;
+    padding: .1rem;
+  }
+
+  .action-dock__header {
+    padding-inline: .4rem;
+  }
+
+  .action-dock__header h2 {
+    font-size: 1.05rem;
+  }
+}
+</style>

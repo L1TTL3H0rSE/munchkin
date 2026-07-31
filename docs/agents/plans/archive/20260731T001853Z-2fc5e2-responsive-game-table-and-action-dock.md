@@ -1,9 +1,9 @@
 # PLAN: responsive game table and action dock
 
 - **Plan ID:** `20260731T001853Z-2fc5e2-responsive-game-table-and-action-dock`
-- **Статус:** in_progress
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:18:53 UTC
-- **Обновлён:** 2026-07-31 21:00:00 +03:00
+- **Обновлён:** 2026-07-31 22:16:00 +03:00
 - **Владелец:** Codex session `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc`
 - **Workspace:** shared
 - **Ветка:** current
@@ -59,38 +59,38 @@ bounded hand с full-hand alternative и persistent server-action dock — бе�
 
 ## Критерии приёмки
 
-- [ ] Game route делегирует presentation отдельным cohesive components; page
+- [x] Game route делегирует presentation отдельным cohesive components; page
   не возвращает transport/reconnect logic после controller plan.
-- [ ] На `320px` default layout single-column, document overflow отсутствует,
+- [x] На `320px` default layout single-column, document overflow отсутствует,
   encounter/context and critical action остаются доступны без horizontal page
   scroll.
-- [ ] На tablet/desktop regions переходят только на canonical content-driven
+- [x] На tablet/desktop regions переходят только на canonical content-driven
   boundaries; каждый реально используемый N проверен на `N-1/N/N+1`.
-- [ ] 1–6 opponents имеют stable density: compact public summary never leaks
+- [x] 1–6 opponents имеют stable density: compact public summary never leaks
   hand contents; detailed public zones открываются semantic button/disclosure
   or sheet, not hover-only UI.
-- [ ] Encounter/combat totals/phase and current actor form one stable context
+- [x] Encounter/combat totals/phase and current actor form one stable context
   hierarchy; long Russian copy, missing art and large values wrap without
   clipping.
-- [ ] Own hand uses bounded rail with visible continuation affordance and
+- [x] Own hand uses bounded rail with visible continuation affordance and
   keyboard/touch navigation plus `Показать всю руку` grid/sheet alternative
   using the same card instances and selection state.
-- [ ] Equipped/carried/traits remain separate semantic zones; empty states do
+- [x] Equipped/carried/traits remain separate semantic zones; empty states do
   not collapse headings/focus unpredictably.
-- [ ] Action dock consumes only server `available_actions`, remains reachable
+- [x] Action dock consumes only server `available_actions`, remains reachable
   after long content, respects safe-area/virtual keyboard and never ranks or
   invents multiple actions.
-- [ ] Pending action has explicit status separate from invalid/disabled;
+- [x] Pending action has explicit status separate from invalid/disabled;
   duplicate submit blocked and focus returns to stable action/context after
   projection replacement.
-- [ ] Selection reconciliation survives action descriptor replacement and
+- [x] Selection reconciliation survives action descriptor replacement and
   removes stale source/target IDs without mutating server projection.
-- [ ] Compact sheet/dialog patterns implement initial focus, trap, close,
+- [x] Compact sheet/dialog patterns implement initial focus, trap, close,
   return focus and resize preservation; mandatory server decisions are not
   dismissible unless descriptor permits.
-- [ ] Component styles are scoped/feature-owned; old gameplay selectors are
+- [x] Component styles are scoped/feature-owned; old gameplay selectors are
   removed from global `main.css` without unrelated Studio reformat.
-- [ ] Browser evidence covers viewport matrix, 1/3/6 players, long copy,
+- [x] Browser evidence covers viewport matrix, 1/3/6 players, long copy,
   keyboard, coarse pointer, fine hover, 200% zoom, reduced motion, forced
   colors and short landscape.
 
@@ -190,30 +190,35 @@ bounded hand с full-hand alternative и persistent server-action dock — бе�
 
 ## План реализации
 
-1. [ ] Add deterministic view models/fixtures for 1/3/6 players and long copy.
-2. [ ] Split responsive table/context/opponent/own-zone components.
-3. [ ] Implement bounded hand + full-hand sheet with shared selection.
-4. [ ] Implement persistent action dock and pending/focus semantics.
-5. [ ] Migrate gameplay styles from global sheet to component ownership.
-6. [ ] Run unit/full frontend gates and complete recorded browser matrix.
-7. [ ] Canonical verify/scope-check and archive.
+1. [x] Add deterministic view models/fixtures for 1/3/6 players and long copy.
+2. [x] Split responsive table/context/opponent/own-zone components.
+3. [x] Implement bounded hand + full-hand sheet with shared selection.
+4. [x] Implement persistent action dock and pending/focus semantics.
+5. [x] Migrate gameplay styles from global sheet to component ownership.
+6. [x] Run unit/full frontend gates and complete recorded browser matrix.
+7. [x] Canonical verify/scope-check and archive.
 
 ## Проверки
 
-- [ ] `cd frontend && pnpm --filter @munchkin/web test`
-- [ ] `cd frontend && node test/run-playwright.mjs test visual.spec.ts --project=chromium`
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] Browser widths: `320×568`, `360×800`, `374×812`, `375×667`,
+- [x] `cd frontend && pnpm --filter @munchkin/web test` — 81 tests passed.
+- [x] `cd frontend && node test/run-playwright.mjs test visual.spec.ts --project=chromium` — 1 passed; baseline reread passed.
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build` — lint, typecheck, 81 tests and production build passed.
+- [x] Browser widths: `320×568`, `360×800`, `374×812`, `375×667`,
   `427×926`, `428×926`, `599×960`, `600×960`, `667×375`, `768×1024`,
-  `1024×768`, `1280×720`, `1440×900`, `1900×1080`
-- [ ] Browser N-1/N/N+1 for every used breakpoint; assert
-  `scrollWidth <= clientWidth`
-- [ ] Keyboard/full-hand/action focus, coarse touch, fine hover, reduced
-  motion, forced colors, 200% zoom and safe-area/virtual-keyboard smoke
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T001853Z-2fc5e2-responsive-game-table-and-action-dock`
-- [ ] `git diff --check`
+  `1024×768`, `1280×720`, `1440×900`, `1900×1080` — 42/42 smoke cases passed
+  on 1/3/6-player fixtures with `scrollWidth <= clientWidth`.
+- [x] Browser N-1/N/N+1 for every used breakpoint; assert
+  `scrollWidth <= clientWidth` — `598/599/600` and `766/767/768` passed.
+- [x] Keyboard/full-hand/action focus, coarse touch, fine hover, reduced
+  motion, forced colors, 200% zoom and safe-area/virtual-keyboard smoke —
+  player-ui 75/75 and axe 66/66 passed across desktop/tablet/mobile; raw
+  320px hand-sheet focus, coarse-touch, fine-hover and 200% CSS-zoom guards
+  passed; action dock keeps safe-area padding and avoids bottom overlay.
+- [x] `node .codex/hooks/plan-lint.mjs` — `plans=49 active=17 archive=32 issues=0`.
+- [x] `./leinoctl verify --changed` — passed with Node 24, Git Bash and Docker
+  Compose config check.
+- [x] `./leinoctl scope-check --plan 20260731T001853Z-2fc5e2-responsive-game-table-and-action-dock` — recovery-session scope audit: `ok=true`, `outsideWriteSet=[]`, `missingRequiredChecks=[]`.
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -244,14 +249,29 @@ bounded hand с full-hand alternative и persistent server-action dock — бе�
 
 ## Ход выполнения
 
-- Draft создан атомарно; реализация не начата.
 - Frontend skill and UI/UX spec fixed responsive, authority, focus and browser
-  acceptance without changing production code.
+  acceptance; backend contracts and controller boundary remain unchanged.
+- Added feature-owned table, context, roster, own-board, card-zone and hand
+  browser components with readonly projection view-model helpers. Opponent
+  projections expose only public zones and hand counts.
+- Added bounded hand rail and native full-hand dialog with shared card IDs,
+  initial/return focus, keyboard-focusable scroll regions and responsive
+  disclosure semantics. Action selection remains descriptor-driven and
+  reconciles stale source/target IDs without mutating the projection.
+- Moved migrated gameplay CSS into scoped components. The action dock is
+  top-sticky within the long table so it remains reachable without covering the
+  encounter/context on the first viewport.
 - User-requested visual hotfix is implemented: fixture readiness rejects the
-  connection-error fallback, the canonical combat assertions require a live
-  encounter/combat state, and the dev-only Nuxt DevTools widget is hidden from
-  capture; Chromium visual regeneration and reread pass.
+  connection-error fallback, canonical assertions require live combat state,
+  and the dev-only Nuxt DevTools widget is hidden from capture. The corrected
+  baseline was visually reread and no longer contains the reconnect screen.
+- After the workstation restart, the selected lifecycle was explicitly taken
+  over by recovery session `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc-recovery` so
+  the already-created hotfix commit was part of the new baseline. Explicit
+  canonical verify on the approved frontend write set passed; the recovery
+  scope-check returned `ok=true` with no outside or missing checks.
 
 ## Итог
 
-Заполняется после реализации.
+Implementation and verification are complete; lifecycle scope-check passed and
+the plan is ready for archive, release and its separate local commit.

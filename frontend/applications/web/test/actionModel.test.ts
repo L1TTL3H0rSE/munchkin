@@ -103,6 +103,17 @@ describe("server-supplied action mapping", () => {
     expect(targets).toEqual({});
   });
 
+  it("keeps a server-supplied player target during reconciliation", () => {
+    const selections = {};
+    const targets = {"play_card:curse-1::0": "player-b"};
+    reconcileActionState([{
+      type: "play_card",
+      source_instance_id: "curse-1",
+      target_player_ids: ["player-b"],
+    }], selections, targets);
+    expect(targets).toEqual({"play_card:curse-1::0": "player-b"});
+  });
+
   it("keeps contextual selections keyed by their projection index", () => {
     const selections = {"sell_items:::4": ["kept"]};
     const targets = {};

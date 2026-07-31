@@ -121,7 +121,11 @@ export function reconcileActionState(
       selections[key] = selections[key].filter((id) => options.has(id));
     }
     const target = targets[key];
-    if (target && !(action.target_instance_ids ?? []).includes(target)) {
+    const targetOptions = new Set([
+      ...(action.target_instance_ids ?? []),
+      ...(action.target_player_ids ?? []),
+    ]);
+    if (target && !targetOptions.has(target)) {
       Reflect.deleteProperty(targets, key);
     }
   });
