@@ -1,9 +1,9 @@
 # PLAN: GitHub Actions, Yandex Cloud WIF and immutable images
 
 - **Plan ID:** `20260731T005255Z-b3ea2b-github-actions-yandex-images`
-- **Статус:** in_progress
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:52:55 UTC
-- **Обновлён:** 2026-07-31 12:40:00 UTC
+- **Обновлён:** 2026-07-31 13:02:17 UTC
 - **Владелец:** Codex / `019fb760-1241-7b61-b9ce-217108b8b38e`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся по указанию владельца
@@ -336,20 +336,20 @@ repository.
    без provider upgrade.
 3. [x] Подготовить GitHub parity workflow без OIDC use; pin actions by commit,
    запустить local-equivalent checks и проверить fork/PR permissions.
-4. [ ] По отдельному owner approval создать/configure GitHub environment и
+4. [x] По отдельному owner approval создать/configure GitHub environment и
    выполнить безопасный claim-probe; записать только allowlisted claims.
 5. [x] Реализовать Terraform CI SA/federation/credential и registry pusher
    binding с exact immutable subject/assertions.
-6. [ ] Выполнить local Terraform fmt/init-readonly/validate/tests и показать
+6. [x] Выполнить local Terraform fmt/init-readonly/validate/tests и показать
    отдельно bootstrap/production plan summaries/addresses. Для каждого apply
    получить отдельный owner approval.
-7. [ ] После approved applies доказать clean plans, exact live IAM/WIF/registry
+7. [x] После approved applies доказать clean plans, exact live IAM/WIF/registry
    graph и `0` static/API/authorized keys.
 8. [x] Добавить fail-closed WIF exchange, masked Docker login, full-SHA
    no-overwrite checks, dual image build/push и digest-pair artifact.
-9. [ ] Запустить first trusted main publication только по отдельному разрешению;
+9. [x] Запустить first trusted main publication только по отдельному разрешению;
    проверить remote labels/tags/digests и отсутствие leaked credentials.
-10. [ ] Обновить runbook/roadmap, выполнить canonical verify/scope-check,
+10. [x] Обновить runbook/roadmap, выполнить canonical verify/scope-check,
     зафиксировать evidence и перенести тот же plan в archive.
 
 ## Проверки
@@ -369,11 +369,11 @@ repository.
 - [x] Local `game`/`web` Docker image build smoke
 - [x] `terraform fmt -check` and validation for bootstrap/production roots
 - [x] `scripts/terraform-check.sh`
-- [ ] OIDC claim allowlist/exact-subject test; raw JWT absent from logs
-- [ ] WIF exchange + masked registry login/read smoke; static-key inventory `0`
-- [ ] GitHub PR permission test: no environment, OIDC exchange or push
-- [ ] Full-SHA no-overwrite test and remote digest/OCI-label verification
-- [ ] Image-pair artifact schema test with two `@sha256` references
+- [x] OIDC claim allowlist/exact-subject test; raw JWT absent from logs
+- [x] WIF exchange + masked registry login/read smoke; static-key inventory `0`
+- [x] GitHub PR permission test: no environment, OIDC exchange or push
+- [x] Full-SHA no-overwrite test and remote digest/OCI-label verification
+- [x] Image-pair artifact schema test with two `@sha256` references
 - [x] `./leinoctl verify --changed`
 - [x] `./leinoctl scope-check --plan 20260731T005255Z-b3ea2b-github-actions-yandex-images`
 - [x] `git diff --check`, strict UTF-8/text check and focused secret scan
@@ -438,9 +438,26 @@ repository.
 - Focused Terraform check passed with provider `0.220.0`; canonical
   `verify --changed`, hooks, leinoctl, plan-lint, preflight, ci-impact, real
   PostgreSQL contract, frontend gates, Compose config and Docker image smoke
-  passed; strict text/secret scan, diff review and scope-check also passed. No
-  commit, push, GitHub environment mutation, cloud apply, WIF exchange or
-  image publication was performed.
+  passed; strict text/secret scan, diff review and scope-check also passed.
+- GitHub environment `production-images` was configured as protected for
+  `main`; the allowlisted OIDC claim probe matched the exact issuer, audience,
+  subject, repository IDs and environment without exposing a raw token.
+- Bootstrap apply completed with `3 added / 0 changed / 0 destroyed`; outputs
+  created CI service account `ajecee5up8ka9j3rk1k6`, federation
+  `aje59lfbinrpposh9s9t` and federated credential `ajeco3uphqg05upkvsig`.
+  Bootstrap follow-up plan returned `No changes`.
+- Production apply completed with `1 added / 0 changed / 0 destroyed` for the
+  exact registry-scoped pusher binding; production follow-up plan returned
+  `No changes` and preserved the runtime puller.
+- First trusted publication succeeded in workflow run `30626403355`, attempt
+  `1`, for commit `6b461ebdb3742d2511f908e193417cea1407ef14`. The pair artifact
+  contains both full-SHA references, remote digests and digest-pinned images:
+  `game@sha256:519ad993f644f30c380f415049f465a8059e23afaa7a0503aeb286624b35e99f`
+  and
+  `web@sha256:e79531e3dfa1e642b7f8d4f029bde2f5d048382dd0c5aa80c8da271ea03444bb`.
+- No `latest` tag, cleanup, tag overwrite or token-bearing artifact was
+  reported. The plan's implementation and all remote acceptance gates are
+  complete; future deployment consumes only the verified digest pair.
 
 ## Итог
 
