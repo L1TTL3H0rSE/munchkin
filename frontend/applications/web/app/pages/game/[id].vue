@@ -3,7 +3,6 @@ import type {
   ActionDescriptor,
   CardView,
   CommandPayload,
-  Projection,
 } from "@munchkin/contracts";
 
 const route = useRoute();
@@ -11,16 +10,23 @@ const router = useRouter();
 const api = useGameApi();
 const session = useGameSession();
 const gameID = computed(() => String(route.params.id));
-const projection = ref<Projection | null>(null);
-const loading = ref(true);
-const actionBusy = ref(false);
-const errorMessage = ref("");
-const realtimeState = ref<"connecting" | "connected" | "resyncing" | "offline">("connecting");
-let stopStream: (() => void) | undefined;
-let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
-let disposed = false;
+const controller = useGameSessionController({
+  gameID,
+  api,
+  credentials: session,
+  navigateToLobby: async () => {
+    await router.replace("/");
+  },
+});
+const {
+  projection,
+  loading,
+  actionBusy,
+  errorMessage,
+  connectionState,
+  isBusy,
+} = controller;
 
-const credential = computed(() => session.read(gameID.value));
 const currentPlayerName = computed(() => projection.value?.players
   .find((player) => player.player_id === projection.value?.turn.player_id)?.name ?? "другого игрока");
 const visibleCards = computed(() => {
@@ -52,123 +58,28 @@ const visibleCards = computed(() => {
   return [...new Map(cards.map((card) => [card.instance_id, card])).values()];
 });
 
-async function refresh() {
-  const token = credential.value;
-  if (!token) {
-    await router.replace("/");
-    return;
-  }
-  const next = await api.getGame(gameID.value, token);
-  if (!projection.value || next.version >= projection.value.version) {
-    projection.value = next;
-  }
-}
-
-const resyncController = createVersionedResync({
-  getVersion: () => projection.value?.version,
-  refresh,
-});
-
-async function runAction(
+function runAction(
   action: ActionDescriptor,
   payload: CommandPayload,
-) {
-  const token = credential.value;
-  const current = projection.value;
-  if (!token || !current) {
-    return;
-  }
-  actionBusy.value = true;
-  errorMessage.value = "";
-  try {
-    const result = await api.command(
-      gameID.value,
-      token,
-      action.type,
-      current.version,
-      payload,
-    );
-    if (!projection.value || result.projection.version >= projection.value.version) {
-      projection.value = result.projection;
-    }
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Команда не выполнена";
-    await resync().catch(() => scheduleRealtimeRecovery());
-  } finally {
-    actionBusy.value = false;
-  }
+): void {
+  void controller.submitAction(action, payload);
 }
-
-function resync(requiredVersion?: number) {
-  realtimeState.value = "resyncing";
-  return resyncController.request(requiredVersion);
-}
-
-function scheduleRealtimeRecovery() {
-  realtimeState.value = "offline";
-  stopStream?.();
-  stopStream = undefined;
-  if (disposed || reconnectTimer) {
-    return;
-  }
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = undefined;
-    void resync()
-      .then(() => connect())
-      .catch(() => scheduleRealtimeRecovery());
-  }, 1000);
-}
-
-async function connect() {
-  if (disposed) {
-    return;
-  }
-  const token = credential.value;
-  if (!token) {
-    return;
-  }
-  stopStream?.();
-  realtimeState.value = "connecting";
-  stopStream = api.stream(
-    gameID.value,
-    token,
-    (event) => {
-      if (!projection.value || event.version > projection.value.version) {
-        void resync(event.version).then(() => {
-          realtimeState.value = "connected";
-        }).catch(() => scheduleRealtimeRecovery());
-      }
-    },
-    () => {
-      scheduleRealtimeRecovery();
-    },
-  );
-  realtimeState.value = "connected";
-}
-
-onMounted(async () => {
-  try {
-    await refresh();
-    await connect();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Не удалось загрузить игру";
-  } finally {
-    loading.value = false;
-  }
-});
-
-onBeforeUnmount(() => {
-  disposed = true;
-  stopStream?.();
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-  }
-});
 </script>
 
 <template>
-  <section v-if="loading" class="center-state">Загружаем состояние игры…</section>
-  <section v-else-if="projection" class="game-table">
+  <section v-if="loading" class="center-state" aria-busy="true">
+    <p role="status">Загружаем состояние игры…</p>
+    <GameConnectionStatus
+      :state="connectionState"
+      :error-message="errorMessage"
+      @retry="controller.retry"
+    />
+  </section>
+  <section
+    v-else-if="projection"
+    class="game-table"
+    :aria-busy="isBusy"
+  >
     <div class="game-meta">
       <div>
         <p class="eyebrow">КОМНАТА</p>
@@ -178,9 +89,14 @@ onBeforeUnmount(() => {
         <span>v{{ projection.version }}</span>
         <span>{{ projection.status }}</span>
         <span>{{ projection.rules_profile_id }}</span>
-        <span :data-state="realtimeState">{{ realtimeState }}</span>
       </div>
     </div>
+
+    <GameConnectionStatus
+      :state="connectionState"
+      :error-message="errorMessage"
+      @retry="controller.retry"
+    />
 
     <div class="opponents">
       <article
@@ -324,10 +240,14 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
   </section>
-  <section v-else class="center-state">
-    <p>{{ errorMessage || "Состояние игры недоступно." }}</p>
+  <section v-else class="center-state" :aria-busy="isBusy">
+    <GameConnectionStatus
+      :state="connectionState"
+      :error-message="errorMessage"
+      @retry="controller.retry"
+    />
+    <p v-if="!errorMessage">Состояние игры недоступно.</p>
     <NuxtLink to="/">Вернуться в лобби</NuxtLink>
   </section>
 </template>

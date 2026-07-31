@@ -15,12 +15,12 @@ export function useGameSession() {
     return sessionStorage.getItem(storageKey(gameID));
   }
 
-  function clear(gameID: string) {
+  function clearCurrentGame(gameID: string) {
     if (!import.meta.client) {
       return;
     }
     sessionStorage.removeItem(storageKey(gameID));
   }
 
-  return {save, read, clear};
+  return {save, read, clearCurrentGame};
 }

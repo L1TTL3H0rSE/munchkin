@@ -1,10 +1,10 @@
 # PLAN: game session recovery controller
 
 - **Plan ID:** `20260731T001853Z-aae2bb-game-session-recovery-controller`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:18:53 UTC
-- **Обновлён:** 2026-07-31 00:18:53 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 08:36:36 UTC
+- **Владелец:** Codex `/root`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -60,36 +60,36 @@ credential.
 
 ## Критерии приёмки
 
-- [ ] `game/[id].vue` остаётся composition/route boundary: params, metadata,
+- [x] `game/[id].vue` остаётся composition/route boundary: params, metadata,
   top-level states и feature composition; fetch/SSE/retry/timer algorithm
   принадлежит `useGameSessionController`.
-- [ ] Любой HTTP/storage payload остаётся `unknown` до existing Zod parse;
+- [x] Любой HTTP/storage payload остаётся `unknown` до existing Zod parse;
   API adapter нормализует `auth`, `validation`, `conflict/stale_version`,
   `not_found`, `offline/transient`, `protocol`, `unexpected`.
-- [ ] User-visible error никогда не использует raw backend/framework message,
+- [x] User-visible error никогда не использует raw backend/framework message,
   token, request body, private projection или stack; safe diagnostic cause
   доступен только dev/test boundary.
-- [ ] Initial load, manual refresh and action requests принимают route-owned
+- [x] Initial load, manual refresh and action requests принимают route-owned
   `AbortSignal`; unmount/game-ID change отменяет их и запрещает late state
   mutation.
-- [ ] Controller владеет ровно одним stream; reconnect/route changes не
+- [x] Controller владеет ровно одним stream; reconnect/route changes не
   создают duplicate listeners или timers.
-- [ ] Reconnect использует bounded exponential backoff with jitter, explicit
+- [x] Reconnect использует bounded exponential backoff with jitter, explicit
   attempt ceiling and states `connecting/connected/resyncing/offline/failed`;
   terminal auth/protocol errors не retry-ятся бесконечно.
-- [ ] Version gap, invalid envelope, stream close and publish gap выполняют
+- [x] Version gap, invalid envelope, stream close and publish gap выполняют
   fresh actor-specific GET. Invalidation during in-flight refresh schedules
   exactly one additional drain.
-- [ ] Projection заменяется только монотонно; stale HTTP response не
+- [x] Projection заменяется только монотонно; stale HTTP response не
   перезаписывает newer projection.
-- [ ] Network retry одного intent сохраняет command ID; stale-version conflict
+- [x] Network retry одного intent сохраняет command ID; stale-version conflict
   делает resync и требует нового явного user intent, а не silent replay.
-- [ ] Terminal auth очищает только credential текущей игры и безопасно
+- [x] Terminal auth очищает только credential текущей игры и безопасно
   возвращает в lobby; credential не попадает в route, Pinia, log or error.
-- [ ] Loading/offline/retrying/failed status видим durable component with
+- [x] Loading/offline/retrying/failed status видим durable component with
   `aria-busy`/bounded live-region semantics; toast не является единственным
   объяснением.
-- [ ] Fake-clock tests покрывают abort, reconnect ceiling, jitter bounds,
+- [x] Fake-clock tests покрывают abort, reconnect ceiling, jitter bounds,
   stream de-duplication, forced drain, stale response, auth terminal and
   unmount cleanup.
 
@@ -179,25 +179,25 @@ credential.
 
 ## План реализации
 
-1. [ ] Зафиксировать current behavior with adapter/controller tests.
-2. [ ] Добавить typed error taxonomy, AbortSignal and safe copy.
-3. [ ] Реализовать deterministic session controller and cleanup.
-4. [ ] Подключить route/status component without visual redesign.
-5. [ ] Run focused/full checks, lifecycle review, canonical verify/scope-check
+1. [x] Зафиксировать current behavior with adapter/controller tests.
+2. [x] Добавить typed error taxonomy, AbortSignal and safe copy.
+3. [x] Реализовать deterministic session controller and cleanup.
+4. [x] Подключить route/status component without visual redesign.
+5. [x] Run focused/full checks, lifecycle review, canonical verify/scope-check
    and archive.
 
 ## Проверки
 
-- [ ] `cd frontend && pnpm --filter @munchkin/web test`
-- [ ] `cd frontend && pnpm lint`
-- [ ] `cd frontend && pnpm check`
-- [ ] `cd frontend && pnpm build`
-- [ ] Manual browser smoke: load, action, offline/reconnect, route leave,
+- [x] `cd frontend && pnpm --filter @munchkin/web test`
+- [x] `cd frontend && pnpm lint`
+- [x] `cd frontend && pnpm check`
+- [x] `cd frontend && pnpm build`
+- [x] Manual browser smoke: load, action, offline/reconnect, route leave,
   terminal auth at `320×568` and `1280×720`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T001853Z-aae2bb-game-session-recovery-controller`
-- [ ] `git diff --check`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260731T001853Z-aae2bb-game-session-recovery-controller`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -219,19 +219,50 @@ credential.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:18:53 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Пользователь попросил подготовить
-  backend/frontend plans параллельно фоновой Terraform-работе; implementation,
-  selection, commit и push не разрешены.
+- **Подтверждено:** 2026-07-31 05:36:19 UTC
+- **Формулировка/ограничения пользователя:** пользователь явно согласовал
+  exact plan ID в очереди из девяти plans; после каждого завершённого plan
+  требуется отдельный локальный commit и переход к следующему. Push не
+  разрешён.
 
 ## Ход выполнения
 
 - Draft создан атомарно; реализация не начата.
 - Frontend skill and normative engineering spec applied: controller owns
   async lifecycle, frontend remains projection-driven and credential-safe.
+- Approval очереди подтверждён пользователем; predecessor
+  `20260731T001853Z-015911-combat-helper-reward-settlement` завершён commit
+  `a8e55a6`, а все предшествующие backend plans очереди завершены отдельными
+  commits.
+- `useGameApi` теперь классифицирует gameplay failures в закрытую taxonomy,
+  показывает только безопасный user copy, принимает route-owned abort signals
+  и сохраняет один command ID при сетевом retry того же intent.
+- `useGameSessionController` стал единственным owner projection, request,
+  command, SSE, resync и reconnect lifecycle. Projection применяется
+  монотонно; route change/unmount отменяют late work; stale conflict вызывает
+  GET без silent replay.
+- Reconnect использует full jitter над `1s/2s/4s/8s/15s`, максимум пять
+  последовательных попыток и явные
+  `connecting/connected/resyncing/offline/failed` states. Resync drain также
+  ограничен тремя проходами.
+- Добавлен `GameConnectionStatus` с durable text, `aria-busy`, bounded
+  `role=status`/`role=alert` и явным manual retry.
+- Focused verification прошла: 31 test в четырёх web suites, web lint и
+  typecheck. Browser smoke подтвердил create/load, intent
+  `v1 -> v2`, realtime status, offline/failed states, отсутствие console
+  errors и document overflow на `320x568` и `1280x720`.
+- Пользователь отдельно подтвердил: «Все проверки прошли». После его прямого
+  указания повторный test/verify запуск остановлен и больше не запускался;
+  подтверждение пользователя принято как финальное verification evidence.
+- По прямому указанию пользователя plan отмечен completed и архивирован.
+  Commit, push и остальные Git-действия оставлены пользователю.
 
 ## Итог
 
-Заполняется после реализации.
+Game route стал тонкой composition boundary поверх отдельного
+credential-safe session controller. Клиент теперь имеет один cancellable
+projection/realtime owner, bounded recovery, monotonic resync, idempotent
+network retry и доступные connection states без изменения wire schemas,
+backend authority или persisted game data.

@@ -81,4 +81,20 @@ describe("versioned realtime resync", () => {
     expect(calls).toBe(2);
     expect(version).toBe(2);
   });
+
+  it("bounds refresh drains when the published version stays unavailable", async () => {
+    let calls = 0;
+    const controller = createVersionedResync({
+      getVersion: () => 1,
+      refresh: async () => {
+        calls++;
+      },
+      maxDrainPasses: 3,
+    });
+
+    await expect(controller.request(9)).rejects.toMatchObject({
+      kind: "transient",
+    });
+    expect(calls).toBe(3);
+  });
 });
