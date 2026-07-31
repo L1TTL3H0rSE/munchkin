@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 )
 
@@ -36,6 +37,141 @@ func AddressedInteractionDeadlinePolicy() InteractionDeadlinePolicy {
 		BaseSeconds: 30,
 		MaxSeconds:  30,
 	}
+}
+
+func materializeForProfile(
+	pack Pack,
+	profile RulesProfile,
+) (map[string]CardInstance, []string, []string, error) {
+	instances, doors, treasures, err := pack.Materialize()
+	if err != nil || !profile.CombatResponses {
+		return instances, doors, treasures, err
+	}
+	for _, card := range pack.Cards {
+		if _, ok := combatInterventionEffect(card); !ok {
+			continue
+		}
+		for copyIndex := 1; copyIndex <= card.Copies; copyIndex++ {
+			instanceID := card.ID + "-" + strconv.Itoa(copyIndex)
+			if _, exists := instances[instanceID]; exists {
+				return nil, nil, nil, fmt.Errorf(
+					"%w: duplicate instance %s",
+					ErrInvalidContent,
+					instanceID,
+				)
+			}
+			instances[instanceID] = CardInstance{
+				ID:           instanceID,
+				DefinitionID: card.ID,
+			}
+			switch card.Deck {
+			case DeckDoor:
+				doors = append(doors, instanceID)
+			case DeckTreasure:
+				treasures = append(treasures, instanceID)
+			default:
+				return nil, nil, nil, fmt.Errorf(
+					"%w: card %s has invalid deck",
+					ErrInvalidContent,
+					card.ID,
+				)
+			}
+		}
+	}
+	return instances, doors, treasures, nil
+}
+
+func combatInterventionEffect(card Card) (Effect, bool) {
+	if card.InteractionScope != InteractionOtherPlayers ||
+		card.Kind != CardOneShot ||
+		len(card.Effects) != 1 {
+		return Effect{}, false
+	}
+	effect := card.Effects[0]
+	if effect.Kind != EffectModifyCombat ||
+		effect.Persistent ||
+		(effect.Target != EffectTargetPlayer &&
+			effect.Target != EffectTargetMonster) {
+		return Effect{}, false
+	}
+	return effect, true
+}
+
+func combatResponseActors(state State) []string {
+	actorIDs := make([]string, 0, len(state.Players)-1)
+	for _, player := range state.Players {
+		if player.ID != state.Turn.PlayerID && !player.Dead {
+			actorIDs = append(actorIDs, player.ID)
+		}
+	}
+	return actorIDs
+}
+
+func combatResponseWindow(
+	state State,
+	interactionID string,
+	openedAt time.Time,
+) *InteractionWindow {
+	actorIDs := combatResponseActors(state)
+	if len(actorIDs) == 0 || state.Turn.Encounter == nil {
+		return nil
+	}
+	responses := make(map[string]InteractionResponse, len(actorIDs))
+	for _, actorID := range actorIDs {
+		responses[actorID] = InteractionResponse{
+			Requirement:   InteractionResponseOptional,
+			TimeoutIntent: InteractionIntentPass,
+			State:         InteractionResponsePending,
+		}
+	}
+	policy := CollectiveInteractionDeadlinePolicy()
+	return &InteractionWindow{
+		ID:   interactionID,
+		Kind: InteractionKindCombatResponse,
+		Parent: InteractionParent{
+			Phase:       PhaseCombat,
+			SubjectKind: InteractionSubjectEncounter,
+			SubjectID:   state.Turn.Encounter.MonsterInstanceID,
+		},
+		InitiatorActorID:  state.Turn.PlayerID,
+		EligibilityPolicy: InteractionEligibilityOpaquePublicSet,
+		AllowedIntents: []InteractionIntent{
+			InteractionIntentPass,
+			InteractionIntentRespond,
+		},
+		EligibleActorIDs:       actorIDs,
+		OpenedAt:               openedAt,
+		DeadlineAt:             openedAt.Add(time.Duration(policy.BaseSeconds) * time.Second),
+		DeadlineRevision:       1,
+		DeadlinePolicy:         policy,
+		ExtensionBudgetSeconds: policy.MaxSeconds - policy.BaseSeconds,
+		Responses:              responses,
+		Status:                 InteractionWindowOpen,
+	}
+}
+
+func combatInterventionDeadlineAfter(
+	window InteractionWindow,
+	acceptedAt time.Time,
+) (time.Time, uint32, int, error) {
+	deadline, revision, budget, err := interactionDeadlineAfter(
+		window,
+		acceptedAt,
+		InteractionIntentRespond,
+	)
+	if err != nil {
+		return time.Time{}, 0, 0, err
+	}
+	if revision == window.DeadlineRevision {
+		if revision == ^uint32(0) {
+			return time.Time{}, 0, 0, fmt.Errorf(
+				"%w: interaction deadline revision overflow",
+				ErrIllegalCommand,
+			)
+		}
+		revision++
+	}
+	return deadline, revision, budget, nil
 }
 
 func interactionResponseStateForIntent(

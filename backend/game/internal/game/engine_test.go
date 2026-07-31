@@ -63,7 +63,7 @@ func startedState(
 	playerCount int,
 ) (State, []EventEnvelope) {
 	t.Helper()
-	created, err := CreateLobby("game", Player{
+	created, err := CreateLegacyLobby("game", Player{
 		ID:             "player-a",
 		Name:           "Alice",
 		Level:          1,

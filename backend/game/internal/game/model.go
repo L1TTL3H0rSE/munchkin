@@ -11,6 +11,8 @@ import (
 const (
 	FirstEditionCoreProfileID      = "first-edition-core-v1"
 	FirstEditionCoreProfileVersion = 1
+	LobbyMultiplayerProfileID      = "lobby-multiplayer-v1"
+	LobbyMultiplayerProfileVersion = 1
 	MinPlayers                     = 1
 	MaxPlayers                     = 6
 	WinningLevel                   = 10
@@ -35,6 +37,7 @@ type RulesProfile struct {
 	WinningLevel         int    `json:"winning_level"`
 	HandLimit            int    `json:"hand_limit"`
 	RunAwayTarget        int    `json:"run_away_target"`
+	CombatResponses      bool   `json:"combat_responses"`
 }
 
 func FirstEditionCoreProfile() RulesProfile {
@@ -51,19 +54,33 @@ func FirstEditionCoreProfile() RulesProfile {
 	}
 }
 
+func LobbyMultiplayerProfile() RulesProfile {
+	profile := FirstEditionCoreProfile()
+	profile.ID = LobbyMultiplayerProfileID
+	profile.Version = LobbyMultiplayerProfileVersion
+	profile.CombatResponses = true
+	return profile
+}
+
 func (profile RulesProfile) Validate() error {
-	if profile.ID != FirstEditionCoreProfileID ||
-		profile.Version != FirstEditionCoreProfileVersion ||
-		profile.MinPlayers != MinPlayers ||
-		profile.MaxPlayers != MaxPlayers ||
-		profile.InitialDoorCards != 4 ||
-		profile.InitialTreasureCards != 4 ||
-		profile.WinningLevel != WinningLevel ||
-		profile.HandLimit != DefaultHandLimit ||
-		profile.RunAwayTarget != 5 {
+	expected, ok := rulesProfile(profile.ID, profile.Version)
+	if !ok || profile != expected {
 		return fmt.Errorf("%w: unsupported rules profile", ErrIncompatibleState)
 	}
 	return nil
+}
+
+func rulesProfile(id string, version int) (RulesProfile, bool) {
+	switch {
+	case id == FirstEditionCoreProfileID &&
+		version == FirstEditionCoreProfileVersion:
+		return FirstEditionCoreProfile(), true
+	case id == LobbyMultiplayerProfileID &&
+		version == LobbyMultiplayerProfileVersion:
+		return LobbyMultiplayerProfile(), true
+	default:
+		return RulesProfile{}, false
+	}
 }
 
 type Status string
@@ -399,9 +416,11 @@ func (state State) ActorByCredentialHash(hash string) (string, bool) {
 }
 
 func (state State) Profile() (RulesProfile, error) {
-	profile := FirstEditionCoreProfile()
-	if state.RulesProfileID != profile.ID ||
-		state.RulesProfileVersion != profile.Version {
+	profile, ok := rulesProfile(
+		state.RulesProfileID,
+		state.RulesProfileVersion,
+	)
+	if !ok {
 		return RulesProfile{}, fmt.Errorf(
 			"%w: rules profile %q v%d",
 			ErrIncompatibleState,

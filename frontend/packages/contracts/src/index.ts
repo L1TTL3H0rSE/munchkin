@@ -124,6 +124,9 @@ export const combatViewSchema = z.object({
   player_winning: z.boolean(),
   tie_wins: z.boolean(),
   combat_closed: z.boolean(),
+  resolution_action: z.object({
+    type: z.literal("request_combat_resolution"),
+  }).strict().optional(),
 }).strict();
 
 export const decisionViewSchema = z.object({
@@ -159,12 +162,16 @@ export const turnViewSchema = z.object({
 export const interactionActionViewSchema = z.object({
   action_id: z.string().regex(/^act_[a-f0-9]{32}$/),
   interaction_id: z.string().min(1),
+  revision: z.number().int().positive(),
   type: interactionIntentSchema,
+  source_instance_id: z.string().min(1).optional(),
+  target: z.enum(["player", "monster"]).optional(),
+  combat_delta: z.number().int().refine((value) => value !== 0).optional(),
 }).strict();
 
 export const interactionViewSchema = z.object({
   interaction_id: z.string().min(1),
-  public_kind: z.literal("response_window"),
+  public_kind: z.enum(["response_window", "combat_response"]),
   parent_phase: phaseSchema,
   public_subject: z.enum([
     "current_turn",
@@ -196,7 +203,10 @@ export const projectionSchema = z.object({
   winner_player_id: z.string().optional(),
   content_set_id: z.string().min(1),
   content_version: z.number().int().positive(),
-  rules_profile_id: z.literal("first-edition-core-v1"),
+  rules_profile_id: z.enum([
+    "first-edition-core-v1",
+    "lobby-multiplayer-v1",
+  ]),
   rules_profile_version: z.literal(1),
   interaction: interactionViewSchema.optional(),
 }).strict();
@@ -208,7 +218,10 @@ export const lobbySummarySchema = z.object({
   player_count: z.number().int().positive(),
   min_players: z.literal(1),
   max_players: z.literal(6),
-  rules_profile_id: z.literal("first-edition-core-v1"),
+  rules_profile_id: z.enum([
+    "first-edition-core-v1",
+    "lobby-multiplayer-v1",
+  ]),
   rules_profile_version: z.literal(1),
 }).strict();
 
@@ -233,6 +246,10 @@ export const commandPayloadSchema = z.object({
   instance_ids: z.array(z.string().min(1)).optional(),
   choice_ids: z.array(z.string().min(1)).optional(),
   ability_index: z.number().int().nonnegative().optional(),
+}).strict();
+
+export const combatResolutionRequestSchema = z.object({
+  expected_version: z.number().int().nonnegative(),
 }).strict();
 
 export const interactionCommandRequestSchema = z.object({
@@ -400,6 +417,9 @@ export type Invalidation = z.infer<typeof invalidationSchema>;
 export type ActionDescriptor = z.infer<typeof actionViewSchema>;
 export type ActionType = z.infer<typeof actionTypeSchema>;
 export type CommandPayload = z.infer<typeof commandPayloadSchema>;
+export type CombatResolutionRequest = z.infer<
+  typeof combatResolutionRequestSchema
+>;
 export type InteractionIntent = z.infer<typeof interactionIntentSchema>;
 export type InteractionView = z.infer<typeof interactionViewSchema>;
 export type InteractionCommandRequest = z.infer<

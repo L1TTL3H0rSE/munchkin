@@ -1,5 +1,6 @@
 import {
   commandResultSchema,
+  combatResolutionRequestSchema,
   interactionCommandRequestSchema,
   invalidationSchema,
   lobbyResultSchema,
@@ -125,6 +126,28 @@ export function useGameApi() {
     return commandResultSchema.parse(response);
   }
 
+  async function requestCombatResolution(
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+  ) {
+    const request = combatResolutionRequestSchema.parse({
+      expected_version: expectedVersion,
+    });
+    const response = await $fetch(
+      `${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/commands/request-combat-resolution`,
+      {
+        method: "POST",
+        headers: {
+          ...authorization(credential),
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: request,
+      },
+    );
+    return commandResultSchema.parse(response);
+  }
+
   function stream(
     gameID: string,
     credential: string,
@@ -156,6 +179,7 @@ export function useGameApi() {
     getGame,
     command,
     interaction,
+    requestCombatResolution,
     stream,
     contentAssetURL,
   };

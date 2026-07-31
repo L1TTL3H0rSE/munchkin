@@ -62,11 +62,16 @@ type OtherPlayerView struct {
 }
 
 type CombatView struct {
-	PlayerStrength  int  `json:"player_strength"`
-	MonsterStrength int  `json:"monster_strength"`
-	PlayerWinning   bool `json:"player_winning"`
-	TieWins         bool `json:"tie_wins"`
-	CombatClosed    bool `json:"combat_closed"`
+	PlayerStrength   int                         `json:"player_strength"`
+	MonsterStrength  int                         `json:"monster_strength"`
+	PlayerWinning    bool                        `json:"player_winning"`
+	TieWins          bool                        `json:"tie_wins"`
+	CombatClosed     bool                        `json:"combat_closed"`
+	ResolutionAction *CombatResolutionActionView `json:"resolution_action,omitempty"`
+}
+
+type CombatResolutionActionView struct {
+	Type CommandType `json:"type"`
 }
 
 type DecisionView struct {
@@ -100,9 +105,13 @@ type TurnView struct {
 }
 
 type InteractionActionView struct {
-	ActionID      string            `json:"action_id"`
-	InteractionID string            `json:"interaction_id"`
-	Type          InteractionIntent `json:"type"`
+	ActionID         string            `json:"action_id"`
+	InteractionID    string            `json:"interaction_id"`
+	Revision         uint32            `json:"revision"`
+	Type             InteractionIntent `json:"type"`
+	SourceInstanceID string            `json:"source_instance_id,omitempty"`
+	Target           EffectTarget      `json:"target,omitempty"`
+	CombatDelta      int               `json:"combat_delta,omitempty"`
 }
 
 type InteractionView struct {
@@ -193,13 +202,26 @@ func ProjectForActor(state State, actorID string, pack Pack) (Projection, error)
 			if err != nil {
 				return Projection{}, err
 			}
-			projection.Turn.Combat = &CombatView{
+			combat := &CombatView{
 				PlayerStrength:  totals.PlayerStrength,
 				MonsterStrength: totals.MonsterStrength,
 				PlayerWinning:   totals.PlayerWins,
 				TieWins:         totals.TieWins,
 				CombatClosed:    state.Turn.Encounter.CombatClosed,
 			}
+			profile, err := state.Profile()
+			if err != nil {
+				return Projection{}, err
+			}
+			if profile.CombatResponses &&
+				actorID == state.Turn.PlayerID &&
+				(state.InteractionWindow == nil ||
+					state.InteractionWindow.Status != InteractionWindowOpen) {
+				combat.ResolutionAction = &CombatResolutionActionView{
+					Type: CommandRequestCombatResolution,
+				}
+			}
+			projection.Turn.Combat = combat
 		}
 	}
 	projection.Turn.Resolving, err = cardViews(state, state.Turn.Resolving, pack)
@@ -220,18 +242,36 @@ func ProjectForActor(state State, actorID string, pack Pack) (Projection, error)
 		return Projection{}, err
 	}
 	projection.Turn.AvailableActions = actions
-	projection.Interaction = projectInteraction(state, actorID)
+	projection.Interaction, err = projectInteraction(state, actorID, pack)
+	if err != nil {
+		return Projection{}, err
+	}
 	return projection, nil
 }
 
-func projectInteraction(state State, actorID string) *InteractionView {
+func projectInteraction(
+	state State,
+	actorID string,
+	pack Pack,
+) (*InteractionView, error) {
 	window := state.InteractionWindow
 	if window == nil || window.Status != InteractionWindowOpen {
-		return nil
+		return nil, nil
+	}
+	publicKind := "response_window"
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	domainCombatResponse := profile.CombatResponses &&
+		window.Kind == InteractionKindCombatResponse &&
+		window.Parent.SubjectKind == InteractionSubjectEncounter
+	if domainCombatResponse {
+		publicKind = "combat_response"
 	}
 	view := &InteractionView{
 		InteractionID: window.ID,
-		PublicKind:    "response_window",
+		PublicKind:    publicKind,
 		ParentPhase:   window.Parent.Phase,
 		PublicSubject: publicInteractionSubject(window.Parent.SubjectKind),
 		Status:        window.Status,
@@ -240,26 +280,73 @@ func projectInteraction(state State, actorID string) *InteractionView {
 	}
 	response, eligible := window.Responses[actorID]
 	if !eligible {
-		return view
+		return view, nil
 	}
 	view.MyResponseState = response.State
 	view.ResponseRequiredForYou = response.State == InteractionResponsePending
 	if !view.ResponseRequiredForYou {
-		return view
+		return view, nil
 	}
 	for _, intent := range window.AllowedIntents {
-		if intent == InteractionIntentAutoResolve ||
-			(window.EligibilityPolicy == InteractionEligibilityOpaquePublicSet &&
-				intent != InteractionIntentPass) {
+		if intent == InteractionIntentAutoResolve {
+			continue
+		}
+		if intent == InteractionIntentRespond && domainCombatResponse {
+			playerIndex := state.PlayerIndex(actorID)
+			for _, instanceID := range state.Players[playerIndex].Hand {
+				card, _, exists := pack.DefinitionForInstance(
+					state,
+					instanceID,
+				)
+				if !exists {
+					return nil, fmt.Errorf(
+						"%w: interaction source %s",
+						ErrUnknownCard,
+						instanceID,
+					)
+				}
+				effect, legal := combatInterventionEffect(card)
+				if !legal {
+					continue
+				}
+				view.Actions = append(view.Actions, InteractionActionView{
+					ActionID: interactionActionID(
+						window.ID,
+						actorID,
+						intent,
+						instanceID,
+						effect.Target,
+						state.Version,
+					),
+					InteractionID:    window.ID,
+					Revision:         window.DeadlineRevision,
+					Type:             intent,
+					SourceInstanceID: instanceID,
+					Target:           effect.Target,
+					CombatDelta:      effect.Amount,
+				})
+			}
+			continue
+		}
+		if window.EligibilityPolicy == InteractionEligibilityOpaquePublicSet &&
+			intent != InteractionIntentPass {
 			continue
 		}
 		view.Actions = append(view.Actions, InteractionActionView{
-			ActionID:      interactionActionID(window.ID, actorID, intent, state.Version),
+			ActionID: interactionActionID(
+				window.ID,
+				actorID,
+				intent,
+				"",
+				"",
+				state.Version,
+			),
 			InteractionID: window.ID,
+			Revision:      window.DeadlineRevision,
 			Type:          intent,
 		})
 	}
-	return view
+	return view, nil
 }
 
 func publicInteractionSubject(kind InteractionSubjectKind) string {
@@ -281,12 +368,16 @@ func interactionActionID(
 	interactionID string,
 	actorID string,
 	intent InteractionIntent,
+	sourceInstanceID string,
+	target EffectTarget,
 	version uint64,
 ) string {
 	digest := sha256.Sum256([]byte(
 		interactionID + "\x00" +
 			actorID + "\x00" +
 			string(intent) + "\x00" +
+			sourceInstanceID + "\x00" +
+			string(target) + "\x00" +
 			strconv.FormatUint(version, 10),
 	))
 	return fmt.Sprintf("act_%x", digest[:16])
@@ -484,6 +575,10 @@ func projectActions(
 			Maximum:     state.Turn.Pending.Maximum,
 		}}, nil
 	}
+	if state.InteractionWindow != nil &&
+		state.InteractionWindow.Status == InteractionWindowOpen {
+		return []ActionView{}, nil
+	}
 	player := state.Players[playerIndex]
 	var actions []ActionView
 	addManagementActions := func(includeSell bool) error {
@@ -668,7 +763,13 @@ func projectActions(
 				}
 			}
 		}
-		actions = append(actions, ActionView{Type: CommandResolveCombat})
+		profile, err := state.Profile()
+		if err != nil {
+			return nil, err
+		}
+		if !profile.CombatResponses {
+			actions = append(actions, ActionView{Type: CommandResolveCombat})
+		}
 	case PhaseRunAway:
 		actions = append(actions, ActionView{Type: CommandRunAway})
 	case PhaseCharity:

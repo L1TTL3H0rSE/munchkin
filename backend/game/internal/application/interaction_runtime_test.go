@@ -3,6 +3,7 @@ package application_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +12,84 @@ import (
 	"github.com/leinodev/munchkin/backend/game/internal/game"
 	"github.com/leinodev/munchkin/backend/game/internal/repository/memory"
 )
+
+func combatApplicationPack(t *testing.T) game.Pack {
+	t.Helper()
+	cards := []game.Card{
+		{
+			ID:               "application-monster",
+			Name:             "Application Monster",
+			Deck:             game.DeckDoor,
+			Kind:             game.CardMonster,
+			Copies:           25,
+			InteractionScope: game.InteractionNone,
+			Monster: &game.MonsterSpec{
+				Strength:  2,
+				Treasures: 1,
+				Levels:    1,
+				BadStuff: []game.Effect{{
+					Kind:   game.EffectLoseLevel,
+					Amount: 1,
+				}},
+			},
+		},
+		{
+			ID:               "application-item",
+			Name:             "Application Item",
+			Deck:             game.DeckTreasure,
+			Kind:             game.CardItem,
+			Copies:           25,
+			InteractionScope: game.InteractionSelf,
+			Item: &game.ItemSpec{
+				Slot:  game.SlotNone,
+				Size:  game.SizeSmall,
+				Value: 100,
+			},
+		},
+		{
+			ID:               "application-intervention",
+			Name:             "Application Intervention",
+			Deck:             game.DeckTreasure,
+			Kind:             game.CardOneShot,
+			Copies:           4,
+			InteractionScope: game.InteractionOtherPlayers,
+			Effects: []game.Effect{{
+				Kind:   game.EffectModifyCombat,
+				Amount: 2,
+				Target: game.EffectTargetPlayer,
+			}},
+		},
+	}
+	for index := 0; index < 10; index++ {
+		cards = append(cards, game.Card{
+			ID:               fmt.Sprintf("application-item-%02d", index),
+			Name:             fmt.Sprintf("Application Item %02d", index),
+			Deck:             game.DeckTreasure,
+			Kind:             game.CardItem,
+			Copies:           1,
+			InteractionScope: game.InteractionSelf,
+			Item: &game.ItemSpec{
+				Slot:  game.SlotNone,
+				Size:  game.SizeSmall,
+				Value: 100,
+			},
+		})
+	}
+	pack := game.Pack{
+		SchemaVersion: 1,
+		SetID:         "combat-application-test",
+		Version:       1,
+		Author:        "tests",
+		License:       "CC0-1.0",
+		Source:        "test-fixture",
+		Cards:         cards,
+	}
+	pack.ContentDigest = game.CardsDigest(pack.Cards)
+	if err := pack.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	return pack
+}
 
 type manualClock struct {
 	mu    sync.Mutex
@@ -271,6 +350,157 @@ func TestInteractionPlayerCommandReceiptAndPrivacy(t *testing.T) {
 	}
 	if got := fixture.publisher.events[len(fixture.publisher.events)-1].Reason; got != "interaction_changed" {
 		t.Fatalf("sensitive invalidation reason: %q", got)
+	}
+}
+
+func TestCombatResolutionRequestUsesReceiptAndContinuesAfterPass(t *testing.T) {
+	ctx := context.Background()
+	clock := &manualClock{
+		value: time.Date(2026, time.July, 31, 4, 0, 0, 0, time.UTC),
+	}
+	service := NewService(
+		memory.New(),
+		combatApplicationPack(t),
+		clock,
+		NoopPublisher{},
+	)
+	owner, err := service.CreateLobby(ctx, "Alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, err := service.JoinLobby(
+		ctx,
+		owner.GameID,
+		"combat-responder-credential",
+		"combat-join",
+		owner.Projection.Version,
+		"Bob",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-start",
+		responder.Projection.Version,
+		game.Command{Type: game.CommandStart},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setupOwner, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-setup-owner",
+		started.Version,
+		game.Command{Type: game.CommandFinishSetup},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setupResponder, err := service.Execute(
+		ctx,
+		owner.GameID,
+		responder.Credential,
+		"combat-setup-responder",
+		setupOwner.Version,
+		game.Command{Type: game.CommandFinishSetup},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-open-door",
+		setupResponder.Version,
+		game.Command{Type: game.CommandOpenDoor},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opened.Projection.Turn.Phase != game.PhaseCombat {
+		t.Fatalf("fixture phase: %s", opened.Projection.Turn.Phase)
+	}
+	if _, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-direct-resolve",
+		opened.Version,
+		game.Command{Type: game.CommandResolveCombat},
+	); !errors.Is(err, game.ErrIllegalCommand) {
+		t.Fatalf("direct resolution error: %v", err)
+	}
+
+	requested, err := service.RequestCombatResolution(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-request",
+		opened.Version,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requested.Projection.Interaction == nil ||
+		requested.Projection.Interaction.PublicKind != "combat_response" {
+		t.Fatalf("combat response projection: %#v", requested.Projection.Interaction)
+	}
+	replayed, err := service.RequestCombatResolution(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-request",
+		opened.Version,
+	)
+	if err != nil || !replayed.Replayed ||
+		replayed.Version != requested.Version {
+		t.Fatalf("combat request replay=%#v err=%v", replayed, err)
+	}
+	if _, err := service.RequestCombatResolution(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-request",
+		requested.Version,
+	); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("changed combat request reused receipt: %v", err)
+	}
+
+	responderProjection, err := service.Get(
+		ctx,
+		owner.GameID,
+		responder.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pass := interactionActionForTest(
+		t,
+		responderProjection,
+		game.InteractionIntentPass,
+	)
+	result, err := service.ExecuteInteraction(
+		ctx,
+		owner.GameID,
+		responder.Credential,
+		fmt.Sprintf("combat-pass-%d", responderProjection.Version),
+		responderProjection.Version,
+		responderProjection.Interaction.InteractionID,
+		pass.ActionID,
+		game.InteractionIntentPass,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Projection.Interaction != nil ||
+		result.Projection.Turn.Phase == game.PhaseCombat {
+		t.Fatalf("combat did not continue after pass: %#v", result.Projection)
 	}
 }
 

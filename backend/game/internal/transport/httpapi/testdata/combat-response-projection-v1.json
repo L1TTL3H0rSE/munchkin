@@ -1,0 +1,133 @@
+{
+  "game_id": "game_combat_fixture",
+  "version": 12,
+  "status": "active",
+  "is_owner": false,
+  "you": {
+    "player_id": "player_b",
+    "name": "Bob",
+    "level": 1,
+    "combat_strength": 1,
+    "escape_bonus": 0,
+    "hand_limit": 5,
+    "character_tags": [],
+    "hand": [
+      {
+        "instance_id": "flash-mob-intervention-1",
+        "definition_id": "flash-mob-intervention",
+        "name": "Флешмоб поддержки",
+        "deck": "treasure",
+        "kind": "one_shot",
+        "rules_text": "Добавь +5 к силе игрока в чужом бою."
+      }
+    ],
+    "carried": [],
+    "equipped": [],
+    "traits": [],
+    "attachments": [],
+    "persistent_curses": [],
+    "setup_done": true,
+    "dead": false,
+    "needs_redraw": false
+  },
+  "players": [
+    {
+      "player_id": "player_a",
+      "name": "Alice",
+      "level": 1,
+      "hand_count": 7,
+      "carried": [],
+      "equipped": [],
+      "traits": [],
+      "attachments": [],
+      "persistent_curses": [],
+      "setup_done": true,
+      "dead": false
+    },
+    {
+      "player_id": "player_b",
+      "name": "Bob",
+      "level": 1,
+      "hand_count": 1,
+      "carried": [],
+      "equipped": [],
+      "traits": [],
+      "attachments": [],
+      "persistent_curses": [],
+      "setup_done": true,
+      "dead": false
+    },
+    {
+      "player_id": "player_c",
+      "name": "Cara",
+      "level": 1,
+      "hand_count": 8,
+      "carried": [],
+      "equipped": [],
+      "traits": [],
+      "attachments": [],
+      "persistent_curses": [],
+      "setup_done": true,
+      "dead": false
+    }
+  ],
+  "turn": {
+    "player_id": "player_a",
+    "phase": "combat",
+    "encounter": {
+      "instance_id": "courtyard-pigeon-1",
+      "definition_id": "courtyard-pigeon",
+      "name": "Дворовый голубь",
+      "deck": "door",
+      "kind": "monster",
+      "combat_strength": 1,
+      "treasure_count": 1,
+      "levels_reward": 1
+    },
+    "resolving": [],
+    "combat": {
+      "player_strength": 1,
+      "monster_strength": 1,
+      "player_winning": false,
+      "tie_wins": false,
+      "combat_closed": false
+    },
+    "available_actions": []
+  },
+  "door_deck_count": 80,
+  "door_discard_count": 0,
+  "treasure_deck_count": 64,
+  "treasure_discard_count": 0,
+  "content_set_id": "moscow-core",
+  "content_version": 1,
+  "rules_profile_id": "lobby-multiplayer-v1",
+  "rules_profile_version": 1,
+  "interaction": {
+    "interaction_id": "interaction_combat_0123456789",
+    "public_kind": "combat_response",
+    "parent_phase": "combat",
+    "public_subject": "current_encounter",
+    "status": "open",
+    "deadline_at": "2026-07-31T04:01:00Z",
+    "server_time": "2026-07-31T04:00:31Z",
+    "my_response_state": "pending",
+    "response_required_for_you": true,
+    "actions": [
+      {
+        "action_id": "act_cccccccccccccccccccccccccccccccc",
+        "interaction_id": "interaction_combat_0123456789",
+        "revision": 1,
+        "type": "pass"
+      },
+      {
+        "action_id": "act_dddddddddddddddddddddddddddddddd",
+        "interaction_id": "interaction_combat_0123456789",
+        "revision": 1,
+        "type": "respond",
+        "source_instance_id": "flash-mob-intervention-1",
+        "target": "player",
+        "combat_delta": 5
+      }
+    ]
+  }
+}

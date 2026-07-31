@@ -2,7 +2,9 @@ import {readFileSync} from "node:fs";
 import {describe, expect, it} from "vitest";
 import {
   actionViewSchema,
+  combatResolutionRequestSchema,
   commandPayloadSchema,
+  interactionActionViewSchema,
   interactionCommandRequestSchema,
   invalidationSchema,
   projectionSchema,
@@ -195,6 +197,58 @@ describe("wire contracts", () => {
       ...request,
       intent: "auto_resolve",
     })).toThrow();
+    expect(combatResolutionRequestSchema.parse({
+      expected_version: 7,
+    }).expected_version).toBe(7);
+    expect(() => combatResolutionRequestSchema.parse({
+      expected_version: 7,
+      actor_id: "player_a",
+    })).toThrow();
+  });
+
+  it("accepts only actor-owned combat response descriptors", () => {
+    const action = {
+      action_id: "act_cccccccccccccccccccccccccccccccc",
+      interaction_id: "interaction_combat",
+      revision: 2,
+      type: "respond",
+      source_instance_id: "flash-mob-intervention-1",
+      target: "player",
+      combat_delta: 5,
+    };
+    expect(interactionActionViewSchema.parse(action).revision).toBe(2);
+    expect(() => interactionActionViewSchema.parse({
+      ...action,
+      actor_id: "player_b",
+    })).toThrow();
+    expect(() => interactionActionViewSchema.parse({
+      ...action,
+      target: "arbitrary_player_id",
+    })).toThrow();
+    expect(() => interactionActionViewSchema.parse({
+      ...action,
+      realized_modifier: 999,
+    })).toThrow();
+
+    const parsed = projectionSchema.parse({
+      ...projection,
+      rules_profile_id: "lobby-multiplayer-v1",
+    });
+    expect(parsed.rules_profile_id).toBe("lobby-multiplayer-v1");
+
+    const fixture: unknown = JSON.parse(readFileSync(new URL(
+      "../../../../backend/game/internal/transport/httpapi/testdata/"
+        + "combat-response-projection-v1.json",
+      import.meta.url,
+    ), "utf8"));
+    const combat = projectionSchema.parse(fixture);
+    expect(combat.interaction?.public_kind).toBe("combat_response");
+    expect(combat.interaction?.actions[1]).toMatchObject({
+      revision: 1,
+      source_instance_id: "flash-mob-intervention-1",
+      target: "player",
+      combat_delta: 5,
+    });
   });
 
   it("keeps Card Studio generation requests closed and path-free", () => {

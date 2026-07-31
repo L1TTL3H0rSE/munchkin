@@ -72,6 +72,10 @@ func NewWithOptions(service *application.Service, options Options) http.Handler 
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/loot-room", router.command(game.CommandLootRoom))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/use-ability", router.command(game.CommandUseAbility))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/resolve-combat", router.command(game.CommandResolveCombat))
+	mux.HandleFunc(
+		"POST /api/v1/games/{gameID}/commands/request-combat-resolution",
+		router.requestCombatResolution,
+	)
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/run-away", router.command(game.CommandRunAway))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/choose-effect", router.command(game.CommandChooseEffect))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/resolve-charity", router.command(game.CommandResolveCharity))
@@ -112,6 +116,10 @@ type interactionRequest struct {
 	InteractionID   string                 `json:"interaction_id"`
 	ActionID        string                 `json:"action_id"`
 	Intent          game.InteractionIntent `json:"intent"`
+}
+
+type versionedRequest struct {
+	ExpectedVersion uint64 `json:"expected_version"`
 }
 
 func (router *Router) health(writer http.ResponseWriter, _ *http.Request) {
@@ -300,6 +308,39 @@ func (router *Router) command(commandType game.CommandType) http.HandlerFunc {
 		}
 		writeJSON(writer, http.StatusOK, result)
 	}
+}
+
+func (router *Router) requestCombatResolution(
+	writer http.ResponseWriter,
+	request *http.Request,
+) {
+	var body versionedRequest
+	if err := decodeJSON(writer, request, &body); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	commandID := strings.TrimSpace(request.Header.Get("Idempotency-Key"))
+	if commandID == "" || len(commandID) > 128 {
+		writeError(
+			writer,
+			http.StatusBadRequest,
+			"idempotency_key_required",
+			"Idempotency-Key is required",
+		)
+		return
+	}
+	result, err := router.service.RequestCombatResolution(
+		request.Context(),
+		request.PathValue("gameID"),
+		bearerToken(request),
+		commandID,
+		body.ExpectedVersion,
+	)
+	if err != nil {
+		router.mapError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, result)
 }
 
 func (router *Router) interaction(pass bool) http.HandlerFunc {

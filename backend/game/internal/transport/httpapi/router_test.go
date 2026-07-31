@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -37,15 +38,87 @@ func routerPack(t *testing.T) game.Pack {
 
 func testRouter(t *testing.T) (*application.Service, *httptest.Server) {
 	t.Helper()
+	return testRouterWithPack(t, routerPack(t))
+}
+
+func testRouterWithPack(
+	t *testing.T,
+	pack game.Pack,
+) (*application.Service, *httptest.Server) {
+	t.Helper()
 	service := application.NewService(
 		memory.New(),
-		routerPack(t),
+		pack,
 		application.SystemClock{},
 		application.NoopPublisher{},
 	)
 	server := httptest.NewServer(New(service))
 	t.Cleanup(server.Close)
 	return service, server
+}
+
+func routerCombatPack(t *testing.T) game.Pack {
+	t.Helper()
+	cards := make([]game.Card, 0, 13)
+	for index := 0; index < 6; index++ {
+		cards = append(cards, game.Card{
+			ID:               fmt.Sprintf("router-monster-%d", index),
+			Name:             fmt.Sprintf("Router Monster %d", index),
+			Deck:             game.DeckDoor,
+			Kind:             game.CardMonster,
+			Copies:           5,
+			InteractionScope: game.InteractionNone,
+			Monster: &game.MonsterSpec{
+				Strength:  2,
+				Treasures: 1,
+				Levels:    1,
+				BadStuff: []game.Effect{{
+					Kind:   game.EffectLoseLevel,
+					Amount: 1,
+				}},
+			},
+		})
+		cards = append(cards, game.Card{
+			ID:               fmt.Sprintf("router-item-%d", index),
+			Name:             fmt.Sprintf("Router Item %d", index),
+			Deck:             game.DeckTreasure,
+			Kind:             game.CardItem,
+			Copies:           5,
+			InteractionScope: game.InteractionSelf,
+			Item: &game.ItemSpec{
+				Slot:  game.SlotNone,
+				Size:  game.SizeSmall,
+				Value: 100,
+			},
+		})
+	}
+	cards = append(cards, game.Card{
+		ID:               "router-intervention",
+		Name:             "Router Intervention",
+		Deck:             game.DeckTreasure,
+		Kind:             game.CardOneShot,
+		Copies:           2,
+		InteractionScope: game.InteractionOtherPlayers,
+		Effects: []game.Effect{{
+			Kind:   game.EffectModifyCombat,
+			Amount: 2,
+			Target: game.EffectTargetPlayer,
+		}},
+	})
+	pack := game.Pack{
+		SchemaVersion: 1,
+		SetID:         "router-combat-test",
+		Version:       1,
+		Author:        "tests",
+		License:       "CC0-1.0",
+		Source:        "test-fixture",
+		Cards:         cards,
+	}
+	pack.ContentDigest = game.CardsDigest(pack.Cards)
+	if err := pack.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	return pack
 }
 
 func TestCreateGetAndForgedCredential(t *testing.T) {
@@ -66,7 +139,7 @@ func TestCreateGetAndForgedCredential(t *testing.T) {
 	decodeResponse(t, createResponse, &created)
 	if created.Credential == "" ||
 		created.GameID == "" ||
-		created.Projection.RulesProfileID != game.FirstEditionCoreProfileID {
+		created.Projection.RulesProfileID != game.LobbyMultiplayerProfileID {
 		t.Fatalf("missing identity result: %#v", created)
 	}
 
@@ -133,7 +206,7 @@ func TestLobbySummaryAndJoinAreBrowserSafe(t *testing.T) {
 	decodeResponse(t, summaryResponse, &summary)
 	if summary.MinPlayers != 1 ||
 		summary.MaxPlayers != 6 ||
-		summary.RulesProfileID != game.FirstEditionCoreProfileID {
+		summary.RulesProfileID != game.LobbyMultiplayerProfileID {
 		t.Fatalf("rules profile missing from summary: %#v", summary)
 	}
 
@@ -435,6 +508,126 @@ func TestInteractionRoutesUseActorProjectionAndRejectAuthorityFields(t *testing.
 	unknownAuthority.Body.Close()
 }
 
+func TestCombatResolutionRequestRouteIsStrictAndServerAuthoritative(t *testing.T) {
+	service, server := testRouterWithPack(t, routerCombatPack(t))
+	ctx := context.Background()
+	owner, err := service.CreateLobby(ctx, "Alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, err := service.JoinLobby(
+		ctx,
+		owner.GameID,
+		"router-combat-responder-credential",
+		"router-combat-join",
+		owner.Projection.Version,
+		"Bob",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"router-combat-start",
+		responder.Projection.Version,
+		game.Command{Type: game.CommandStart},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setupOwner, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"router-combat-setup-owner",
+		started.Version,
+		game.Command{Type: game.CommandFinishSetup},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setupResponder, err := service.Execute(
+		ctx,
+		owner.GameID,
+		responder.Credential,
+		"router-combat-setup-responder",
+		setupOwner.Version,
+		game.Command{Type: game.CommandFinishSetup},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"router-combat-open",
+		setupResponder.Version,
+		game.Command{Type: game.CommandOpenDoor},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opened.Projection.Turn.Phase != game.PhaseCombat {
+		t.Fatalf("fixture phase: %s", opened.Projection.Turn.Phase)
+	}
+
+	direct := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+"/commands/resolve-combat",
+		owner.Credential,
+		"router-combat-direct",
+		map[string]any{"expected_version": opened.Version},
+	)
+	if direct.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("direct resolve status %d", direct.StatusCode)
+	}
+	direct.Body.Close()
+
+	forged := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/request-combat-resolution",
+		owner.Credential,
+		"router-combat-forged",
+		map[string]any{
+			"expected_version":   opened.Version,
+			"source_instance_id": "forged",
+		},
+	)
+	if forged.StatusCode != http.StatusBadRequest {
+		t.Fatalf("forged combat request status %d", forged.StatusCode)
+	}
+	forged.Body.Close()
+
+	response := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/request-combat-resolution",
+		owner.Credential,
+		"router-combat-request",
+		map[string]any{"expected_version": opened.Version},
+	)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("combat request status %d", response.StatusCode)
+	}
+	var result application.CommandResult
+	decodeResponse(t, response, &result)
+	if result.Projection.Interaction == nil ||
+		result.Projection.Interaction.PublicKind != "combat_response" ||
+		result.Projection.RulesProfileID != game.LobbyMultiplayerProfileID {
+		t.Fatalf("combat response result: %#v", result.Projection)
+	}
+}
+
 func TestInteractionProjectionFixtureIsStrictGoContract(t *testing.T) {
 	raw, err := os.ReadFile("testdata/interaction-projection-v1.json")
 	if err != nil {
@@ -459,6 +652,38 @@ func TestInteractionProjectionFixtureIsStrictGoContract(t *testing.T) {
 	} {
 		if strings.Contains(string(raw), forbidden) {
 			t.Fatalf("fixture leaked %q", forbidden)
+		}
+	}
+}
+
+func TestCombatResponseProjectionFixtureIsStrictGoContract(t *testing.T) {
+	raw, err := os.ReadFile("testdata/combat-response-projection-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var projection game.Projection
+	if err := decoder.Decode(&projection); err != nil {
+		t.Fatal(err)
+	}
+	if projection.RulesProfileID != game.LobbyMultiplayerProfileID ||
+		projection.Interaction == nil ||
+		projection.Interaction.PublicKind != "combat_response" ||
+		len(projection.Interaction.Actions) != 2 ||
+		projection.Interaction.Actions[1].SourceInstanceID == "" ||
+		projection.Interaction.Actions[1].Target != game.EffectTargetPlayer {
+		t.Fatalf("invalid combat fixture: %#v", projection.Interaction)
+	}
+	for _, forbidden := range []string{
+		"eligible_actor_ids",
+		"initiator_actor_id",
+		"deadline_revision",
+		"responses",
+		"credential_hash",
+	} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatalf("combat fixture leaked %q", forbidden)
 		}
 	}
 }

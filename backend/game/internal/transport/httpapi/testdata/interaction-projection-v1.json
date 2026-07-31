@@ -77,11 +77,13 @@
       {
         "action_id": "act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "interaction_id": "interaction_0123456789abcdef",
+        "revision": 1,
         "type": "pass"
       },
       {
         "action_id": "act_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "interaction_id": "interaction_0123456789abcdef",
+        "revision": 1,
         "type": "respond"
       }
     ]

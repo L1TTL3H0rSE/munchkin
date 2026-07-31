@@ -93,6 +93,113 @@ func (service *Service) OpenInteraction(
 	return interactionID, nil
 }
 
+func (service *Service) RequestCombatResolution(
+	ctx context.Context,
+	gameID string,
+	credential string,
+	commandID string,
+	expectedVersion uint64,
+) (CommandResult, error) {
+	gameID = strings.TrimSpace(gameID)
+	commandID = strings.TrimSpace(commandID)
+	if gameID == "" || credential == "" || commandID == "" {
+		return CommandResult{}, ErrUnauthorized
+	}
+	fingerprint := commandFingerprint(
+		game.Command{Type: game.CommandRequestCombatResolution},
+		expectedVersion,
+	)
+	tokenHash := hashCredential(credential)
+	var result CommandResult
+	var publish *Invalidation
+	err := service.store.WithinGame(ctx, gameID, func(tx Tx) error {
+		state := tx.State()
+		if err := service.ensureContentIdentity(state); err != nil {
+			return err
+		}
+		actorID, exists := state.ActorByCredentialHash(tokenHash)
+		if !exists {
+			return ErrUnauthorized
+		}
+		if receipt, exists := tx.FindReceipt(actorID, commandID); exists {
+			if receipt.Fingerprint != fingerprint {
+				return ErrIdempotencyConflict
+			}
+			var projection game.Projection
+			if err := json.Unmarshal(receipt.Projection, &projection); err != nil {
+				return err
+			}
+			result = CommandResult{
+				GameID:     gameID,
+				CommandID:  commandID,
+				Version:    receipt.Version,
+				Replayed:   true,
+				Projection: projection,
+			}
+			return nil
+		}
+		if state.Version != expectedVersion {
+			return ErrVersionConflict
+		}
+		acceptedAt := time.Unix(0, service.clock.Now()).UTC()
+		interactionID, err := service.randomID("interaction")
+		if err != nil {
+			return err
+		}
+		events, err := game.Handle(state, game.Command{
+			Type:          game.CommandRequestCombatResolution,
+			ActorID:       actorID,
+			InteractionID: interactionID,
+			InteractionAt: acceptedAt,
+		}, service.pack)
+		if err != nil {
+			return err
+		}
+		envelopes, next, err := service.applyAt(
+			state,
+			commandID,
+			events,
+			acceptedAt,
+		)
+		if err != nil {
+			return err
+		}
+		projection, err := service.projectForActor(next, actorID, acceptedAt)
+		if err != nil {
+			return err
+		}
+		rawProjection, err := json.Marshal(projection)
+		if err != nil {
+			return err
+		}
+		receipt := Receipt{
+			ActorID:     actorID,
+			CommandID:   commandID,
+			Fingerprint: fingerprint,
+			Version:     next.Version,
+			Projection:  rawProjection,
+		}
+		if err := tx.Save(state.Version, next, envelopes, &receipt); err != nil {
+			return err
+		}
+		result = CommandResult{
+			GameID:     gameID,
+			CommandID:  commandID,
+			Version:    next.Version,
+			Projection: projection,
+		}
+		publish = interactionInvalidation(gameID, next.Version, acceptedAt)
+		return nil
+	})
+	if err != nil {
+		return CommandResult{}, err
+	}
+	if publish != nil {
+		_ = service.publisher.Publish(ctx, *publish)
+	}
+	return result, nil
+}
+
 func (service *Service) ExecuteInteraction(
 	ctx context.Context,
 	gameID string,
@@ -165,7 +272,13 @@ func (service *Service) ExecuteInteraction(
 		if err != nil {
 			return err
 		}
-		if !projectedInteractionAction(projected, interactionID, actionID, intent) {
+		action, available := projectedInteractionAction(
+			projected,
+			interactionID,
+			actionID,
+			intent,
+		)
+		if !available {
 			return ErrInteractionAction
 		}
 		acceptedAt := time.Unix(0, service.clock.Now()).UTC()
@@ -192,11 +305,18 @@ func (service *Service) ExecuteInteraction(
 			commandType = game.CommandPassInteraction
 		}
 		command := game.Command{
-			Type:              commandType,
-			ActorID:           actorID,
-			InteractionID:     interactionID,
-			InteractionIntent: intent,
-			InteractionAt:     acceptedAt,
+			Type:                commandType,
+			ActorID:             actorID,
+			InteractionID:       interactionID,
+			InteractionIntent:   intent,
+			InteractionAt:       acceptedAt,
+			InteractionRevision: action.Revision,
+		}
+		if intent == game.InteractionIntentRespond &&
+			action.SourceInstanceID != "" {
+			command.Type = game.CommandPlayCombatIntervention
+			command.InstanceID = action.SourceInstanceID
+			command.TargetInstanceID = string(action.Target)
 		}
 		events, err := game.Handle(state, command, service.pack)
 		if err != nil {
@@ -497,19 +617,19 @@ func projectedInteractionAction(
 	interactionID string,
 	actionID string,
 	intent game.InteractionIntent,
-) bool {
+) (game.InteractionActionView, bool) {
 	if projection.Interaction == nil ||
 		projection.Interaction.InteractionID != interactionID {
-		return false
+		return game.InteractionActionView{}, false
 	}
 	for _, action := range projection.Interaction.Actions {
 		if action.ActionID == actionID &&
 			action.InteractionID == interactionID &&
 			action.Type == intent {
-			return true
+			return action, true
 		}
 	}
-	return false
+	return game.InteractionActionView{}, false
 }
 
 func playerInteractionIntent(intent game.InteractionIntent) bool {

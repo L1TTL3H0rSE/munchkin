@@ -79,10 +79,15 @@ JSON pack хранит `CardDefinition`. Обязательные поля ка�
 копии. Instance ID перемещается между ровно одной из zones; definition и её
 presentation/mechanics при этом не дублируются в state.
 
-Profile `first-edition-core-v1` не поддерживает вмешательство в чужой ход.
-Definition с `interaction_scope: other_players` валидируется и может оставаться
-в pack для будущего профиля, но сейчас не материализуется в deck. Она не должна
-превращаться в доступную карту без эффекта.
+Profile `first-edition-core-v1@1` остаётся immutable compatibility path: ни
+одна definition с `interaction_scope: other_players` в нём не
+материализуется. Новые lobby используют `lobby-multiplayer-v1@1`; этот profile
+из того же immutable pack материализует только `one_shot` definitions с
+единственным непостоянным typed effect `modify_combat` для `player` или
+`monster`. В `moscow-core@1` это две combat-intervention cards. Остальные
+`other_players` definitions остаются deferred до отдельных domain plans и не
+превращаются в runtime no-op. JSON pack и его digest при активации profile не
+меняются.
 
 ## Закрытая модель mechanics
 

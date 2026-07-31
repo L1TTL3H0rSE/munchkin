@@ -3,6 +3,7 @@ package game
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -27,6 +28,7 @@ const (
 	EventInteractionWindowOpened     = "game.v1.interaction_window_opened"
 	EventInteractionResponseRecorded = "game.v1.interaction_response_recorded"
 	EventInteractionWindowClosed     = "game.v1.interaction_window_closed"
+	EventCombatInterventionApplied   = "game.v1.combat_intervention_applied"
 
 	legacyEventPlayerJoined    = "game.v1.player_joined"
 	legacyEventGameStarted     = "game.v1.game_started"
@@ -94,6 +96,20 @@ type interactionWindowClosedPayload struct {
 	InteractionID string                 `json:"interaction_id"`
 	Reason        InteractionCloseReason `json:"reason"`
 	ClosedAt      time.Time              `json:"closed_at"`
+}
+
+type combatInterventionAppliedPayload struct {
+	InteractionID          string       `json:"interaction_id"`
+	PreviousRevision       uint32       `json:"previous_revision"`
+	ActorID                string       `json:"actor_id"`
+	SourceInstanceID       string       `json:"source_instance_id"`
+	SourceDeck             DeckKind     `json:"source_deck"`
+	Target                 EffectTarget `json:"target"`
+	Amount                 int          `json:"amount"`
+	AcceptedAt             time.Time    `json:"accepted_at"`
+	DeadlineAt             time.Time    `json:"deadline_at"`
+	DeadlineRevision       uint32       `json:"deadline_revision"`
+	ExtensionBudgetSeconds int          `json:"extension_budget_seconds"`
 }
 
 func newEvent(eventType string, payload any) (DomainEvent, error) {
@@ -247,6 +263,20 @@ func Apply(state State, event DomainEvent) (State, error) {
 			return State{}, err
 		}
 		return next, nil
+	case EventCombatInterventionApplied:
+		payload, err := decode[combatInterventionAppliedPayload](event)
+		if err != nil {
+			return State{}, err
+		}
+		next, err := applyCombatIntervention(state, payload)
+		if err != nil {
+			return State{}, err
+		}
+		next.Version++
+		if err := next.Validate(); err != nil {
+			return State{}, err
+		}
+		return next, nil
 	case EventInteractionWindowClosed:
 		payload, err := decode[interactionWindowClosedPayload](event)
 		if err != nil {
@@ -285,6 +315,102 @@ func Apply(state State, event DomainEvent) (State, error) {
 	default:
 		return State{}, fmt.Errorf("%w: unknown event %s", ErrIllegalCommand, event.Type)
 	}
+}
+
+func applyCombatIntervention(
+	state State,
+	payload combatInterventionAppliedPayload,
+) (State, error) {
+	if state.InteractionWindow == nil ||
+		state.InteractionWindow.ID != payload.InteractionID ||
+		state.InteractionWindow.Status != InteractionWindowOpen ||
+		state.InteractionWindow.Kind != InteractionKindCombatResponse ||
+		state.InteractionWindow.Parent.SubjectKind != InteractionSubjectEncounter ||
+		state.InteractionWindow.DeadlineRevision != payload.PreviousRevision ||
+		state.Turn.Phase != PhaseCombat ||
+		state.Turn.Encounter == nil ||
+		payload.Amount == 0 {
+		return State{}, fmt.Errorf(
+			"%w: stale or malformed combat intervention",
+			ErrIllegalCommand,
+		)
+	}
+	window := *state.InteractionWindow.clone()
+	if _, err := interactionResponseAt(window, payload.ActorID); err != nil {
+		return State{}, err
+	}
+	playerIndex := state.PlayerIndex(payload.ActorID)
+	if playerIndex < 0 ||
+		!slices.Contains(
+			state.Players[playerIndex].Hand,
+			payload.SourceInstanceID,
+		) {
+		return State{}, fmt.Errorf(
+			"%w: intervention source is not actor-owned",
+			ErrIllegalCommand,
+		)
+	}
+	if _, exists := state.Instances[payload.SourceInstanceID]; !exists {
+		return State{}, fmt.Errorf(
+			"%w: intervention source instance",
+			ErrUnknownCard,
+		)
+	}
+	deadline, revision, budget, err := combatInterventionDeadlineAfter(
+		window,
+		payload.AcceptedAt,
+	)
+	if err != nil {
+		return State{}, err
+	}
+	if !payload.DeadlineAt.Equal(deadline) ||
+		payload.DeadlineRevision != revision ||
+		payload.ExtensionBudgetSeconds != budget {
+		return State{}, fmt.Errorf(
+			"%w: combat intervention deadline outcome differs",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	player := &next.Players[playerIndex]
+	player.Hand, _ = removeString(player.Hand, payload.SourceInstanceID)
+	switch payload.SourceDeck {
+	case DeckDoor:
+		next.DoorDiscard = append(next.DoorDiscard, payload.SourceInstanceID)
+	case DeckTreasure:
+		next.TreasureDiscard = append(
+			next.TreasureDiscard,
+			payload.SourceInstanceID,
+		)
+	default:
+		return State{}, fmt.Errorf(
+			"%w: intervention source deck",
+			ErrIllegalCommand,
+		)
+	}
+	switch payload.Target {
+	case EffectTargetPlayer:
+		next.Turn.Encounter.PlayerCombatModifier += payload.Amount
+	case EffectTargetMonster:
+		next.Turn.Encounter.MonsterCombatModifier += payload.Amount
+	default:
+		return State{}, fmt.Errorf(
+			"%w: intervention target",
+			ErrIllegalCommand,
+		)
+	}
+	for _, actorID := range next.InteractionWindow.EligibleActorIDs {
+		response := next.InteractionWindow.Responses[actorID]
+		response.State = InteractionResponsePending
+		response.Intent = ""
+		response.AcceptedAt = time.Time{}
+		next.InteractionWindow.Responses[actorID] = response
+	}
+	next.InteractionWindow.DeadlineAt = payload.DeadlineAt
+	next.InteractionWindow.DeadlineRevision = payload.DeadlineRevision
+	next.InteractionWindow.ExtensionBudgetSeconds =
+		payload.ExtensionBudgetSeconds
+	return next, nil
 }
 
 func applyInteractionResponse(

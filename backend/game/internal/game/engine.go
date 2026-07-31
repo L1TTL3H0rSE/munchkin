@@ -10,29 +10,32 @@ import (
 type CommandType string
 
 const (
-	CommandJoin           CommandType = "join"
-	CommandStart          CommandType = "start"
-	CommandFinishSetup    CommandType = "finish_setup"
-	CommandPlayCard       CommandType = "play_card"
-	CommandEquipItem      CommandType = "equip_item"
-	CommandUnequipItem    CommandType = "unequip_item"
-	CommandDiscardCard    CommandType = "discard_card"
-	CommandSellItems      CommandType = "sell_items"
-	CommandOpenDoor       CommandType = "open_door"
-	CommandLookForTrouble CommandType = "look_for_trouble"
-	CommandLootRoom       CommandType = "loot_room"
-	CommandUseAbility     CommandType = "use_ability"
-	CommandResolveCombat  CommandType = "resolve_combat"
-	CommandRunAway        CommandType = "run_away"
-	CommandChooseEffect   CommandType = "choose_effect"
-	CommandResolveCharity CommandType = "resolve_charity"
-	CommandEndTurn        CommandType = "end_turn"
+	CommandJoin                    CommandType = "join"
+	CommandStart                   CommandType = "start"
+	CommandFinishSetup             CommandType = "finish_setup"
+	CommandPlayCard                CommandType = "play_card"
+	CommandEquipItem               CommandType = "equip_item"
+	CommandUnequipItem             CommandType = "unequip_item"
+	CommandDiscardCard             CommandType = "discard_card"
+	CommandSellItems               CommandType = "sell_items"
+	CommandOpenDoor                CommandType = "open_door"
+	CommandLookForTrouble          CommandType = "look_for_trouble"
+	CommandLootRoom                CommandType = "loot_room"
+	CommandUseAbility              CommandType = "use_ability"
+	CommandResolveCombat           CommandType = "resolve_combat"
+	CommandRequestCombatResolution CommandType = "request_combat_resolution"
+	CommandRunAway                 CommandType = "run_away"
+	CommandChooseEffect            CommandType = "choose_effect"
+	CommandResolveCharity          CommandType = "resolve_charity"
+	CommandEndTurn                 CommandType = "end_turn"
 
-	CommandOpenInteractionWindow  CommandType = "open_interaction_window"
-	CommandRespondInteraction     CommandType = "respond_interaction"
-	CommandPassInteraction        CommandType = "pass_interaction"
-	CommandTimeoutInteraction     CommandType = "timeout_interaction"
-	CommandCloseInteractionWindow CommandType = "close_interaction_window"
+	CommandOpenInteractionWindow    CommandType = "open_interaction_window"
+	CommandRespondInteraction       CommandType = "respond_interaction"
+	CommandPassInteraction          CommandType = "pass_interaction"
+	CommandTimeoutInteraction       CommandType = "timeout_interaction"
+	CommandCloseInteractionWindow   CommandType = "close_interaction_window"
+	CommandPlayCombatIntervention   CommandType = "play_combat_intervention"
+	CommandCompleteCombatResolution CommandType = "complete_combat_resolution"
 
 	// Bootstrap aliases remain parseable, but use the new deterministic paths.
 	CommandFight CommandType = "fight"
@@ -59,13 +62,46 @@ type Command struct {
 }
 
 func CreateLobby(gameID string, owner Player, pack Pack, seed uint64) (DomainEvent, error) {
+	return CreateLobbyWithProfile(
+		gameID,
+		owner,
+		pack,
+		seed,
+		LobbyMultiplayerProfile(),
+	)
+}
+
+func CreateLegacyLobby(
+	gameID string,
+	owner Player,
+	pack Pack,
+	seed uint64,
+) (DomainEvent, error) {
+	return CreateLobbyWithProfile(
+		gameID,
+		owner,
+		pack,
+		seed,
+		FirstEditionCoreProfile(),
+	)
+}
+
+func CreateLobbyWithProfile(
+	gameID string,
+	owner Player,
+	pack Pack,
+	seed uint64,
+	profile RulesProfile,
+) (DomainEvent, error) {
 	if gameID == "" ||
 		owner.ID == "" ||
 		strings.TrimSpace(owner.Name) == "" ||
 		owner.CredentialHash == "" {
 		return DomainEvent{}, fmt.Errorf("%w: create lobby fields", ErrIllegalCommand)
 	}
-	profile := FirstEditionCoreProfile()
+	if err := profile.Validate(); err != nil {
+		return DomainEvent{}, err
+	}
 	return newEvent(EventLobbyCreated, lobbyCreatedPayload{
 		GameID:              gameID,
 		Owner:               owner,
@@ -117,6 +153,8 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 		return handleUseAbility(state, command, pack)
 	case CommandResolveCombat, CommandFight:
 		return handleResolveCombat(state, command, pack)
+	case CommandRequestCombatResolution:
+		return handleRequestCombatResolution(state, command, pack)
 	case CommandRunAway:
 		return handleRunAway(state, command, pack)
 	case CommandChooseEffect:
@@ -132,9 +170,13 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 	case CommandPassInteraction:
 		return handlePassInteraction(state, command)
 	case CommandTimeoutInteraction:
-		return handleTimeoutInteraction(state, command)
+		return handleTimeoutInteraction(state, command, pack)
 	case CommandCloseInteractionWindow:
-		return handleCloseInteractionWindow(state, command)
+		return handleCloseInteractionWindow(state, command, pack)
+	case CommandPlayCombatIntervention:
+		return handlePlayCombatIntervention(state, command, pack)
+	case CommandCompleteCombatResolution:
+		return handleCompleteCombatResolution(state, command, pack)
 	default:
 		return nil, fmt.Errorf("%w: unknown command %s", ErrIllegalCommand, command.Type)
 	}
@@ -230,6 +272,20 @@ func recordInteractionResponse(
 	if err != nil {
 		return nil, err
 	}
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	if !timeout &&
+		profile.CombatResponses &&
+		window.Kind == InteractionKindCombatResponse &&
+		window.Parent.SubjectKind == InteractionSubjectEncounter &&
+		command.InteractionRevision != window.DeadlineRevision {
+		return nil, fmt.Errorf(
+			"%w: stale combat response revision",
+			ErrIllegalCommand,
+		)
+	}
 	current, err := interactionResponseAt(window, command.ActorID)
 	if err != nil {
 		return nil, err
@@ -309,6 +365,7 @@ func recordInteractionResponse(
 func handleTimeoutInteraction(
 	state State,
 	command Command,
+	pack Pack,
 ) ([]DomainEvent, error) {
 	if command.ActorID != "" {
 		return nil, fmt.Errorf(
@@ -370,15 +427,18 @@ func handleTimeoutInteraction(
 	if err != nil {
 		return nil, err
 	}
-	if _, err := Apply(next, closeEvent); err != nil {
+	events = append(events, closeEvent)
+	next, err = Apply(next, closeEvent)
+	if err != nil {
 		return nil, err
 	}
-	return append(events, closeEvent), nil
+	return appendCombatContinuation(next, events, command.InteractionAt, pack)
 }
 
 func handleCloseInteractionWindow(
 	state State,
 	command Command,
+	pack Pack,
 ) ([]DomainEvent, error) {
 	window, err := requireInteractionWindow(state, command.InteractionID)
 	if err != nil {
@@ -421,10 +481,121 @@ func handleCloseInteractionWindow(
 	if err != nil {
 		return nil, err
 	}
+	next, err := Apply(state, event)
+	if err != nil {
+		return nil, err
+	}
+	return appendCombatContinuation(
+		next,
+		[]DomainEvent{event},
+		command.InteractionAt,
+		pack,
+	)
+}
+
+func handlePlayCombatIntervention(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	window, err := requireInteractionWindow(state, command.InteractionID)
+	if err != nil {
+		return nil, err
+	}
+	if !profile.CombatResponses ||
+		window.Kind != InteractionKindCombatResponse ||
+		window.Parent.SubjectKind != InteractionSubjectEncounter ||
+		state.Turn.Phase != PhaseCombat ||
+		state.Turn.Encounter == nil ||
+		state.Turn.Encounter.CombatClosed ||
+		command.InteractionRevision != window.DeadlineRevision {
+		return nil, fmt.Errorf(
+			"%w: stale combat response action",
+			ErrIllegalCommand,
+		)
+	}
+	if _, err := interactionResponseAt(window, command.ActorID); err != nil {
+		return nil, err
+	}
+	playerIndex := state.PlayerIndex(command.ActorID)
+	if playerIndex < 0 ||
+		!slices.Contains(state.Players[playerIndex].Hand, command.InstanceID) {
+		return nil, fmt.Errorf(
+			"%w: intervention source is not actor-owned",
+			ErrIllegalCommand,
+		)
+	}
+	card, _, exists := pack.DefinitionForInstance(state, command.InstanceID)
+	effect, legal := combatInterventionEffect(card)
+	if !exists || !legal || string(effect.Target) != command.TargetInstanceID {
+		return nil, fmt.Errorf(
+			"%w: intervention source or target is not legal",
+			ErrIllegalCommand,
+		)
+	}
+	deadline, revision, budget, err := combatInterventionDeadlineAfter(
+		window,
+		command.InteractionAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	event, err := newEvent(
+		EventCombatInterventionApplied,
+		combatInterventionAppliedPayload{
+			InteractionID:          window.ID,
+			PreviousRevision:       window.DeadlineRevision,
+			ActorID:                command.ActorID,
+			SourceInstanceID:       command.InstanceID,
+			SourceDeck:             card.Deck,
+			Target:                 effect.Target,
+			Amount:                 effect.Amount,
+			AcceptedAt:             command.InteractionAt,
+			DeadlineAt:             deadline,
+			DeadlineRevision:       revision,
+			ExtensionBudgetSeconds: budget,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := Apply(state, event); err != nil {
 		return nil, err
 	}
 	return []DomainEvent{event}, nil
+}
+
+func appendCombatContinuation(
+	state State,
+	events []DomainEvent,
+	acceptedAt time.Time,
+	pack Pack,
+) ([]DomainEvent, error) {
+	window := state.InteractionWindow
+	if window == nil ||
+		window.Status != InteractionWindowClosed ||
+		window.Kind != InteractionKindCombatResponse ||
+		window.Parent.SubjectKind != InteractionSubjectEncounter {
+		return events, nil
+	}
+	continued, err := handleCompleteCombatResolution(
+		state,
+		Command{
+			Type:          CommandCompleteCombatResolution,
+			ActorID:       window.InitiatorActorID,
+			InteractionID: window.ID,
+			InteractionAt: acceptedAt,
+		},
+		pack,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return append(events, continued...), nil
 }
 
 func requireInteractionWindow(
@@ -541,7 +712,7 @@ func handleStart(state State, command Command, pack Pack) ([]DomainEvent, error)
 			profile.MinPlayers,
 		)
 	}
-	instances, doors, treasures, err := pack.Materialize()
+	instances, doors, treasures, err := materializeForProfile(pack, profile)
 	if err != nil {
 		return nil, err
 	}
@@ -1059,6 +1230,84 @@ func handleUseAbility(state State, command Command, pack Pack) ([]DomainEvent, e
 }
 
 func handleResolveCombat(state State, command Command, pack Pack) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	if profile.CombatResponses {
+		return nil, fmt.Errorf(
+			"%w: multiplayer combat requires resolution request",
+			ErrIllegalCommand,
+		)
+	}
+	return resolveCombatNow(state, command, pack)
+}
+
+func handleRequestCombatResolution(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	if _, err := requirePhase(state, command, PhaseCombat); err != nil {
+		return nil, err
+	}
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	if !profile.CombatResponses ||
+		state.Turn.Encounter == nil ||
+		state.Turn.Encounter.CombatClosed ||
+		state.InteractionWindow != nil &&
+			state.InteractionWindow.Status == InteractionWindowOpen ||
+		strings.TrimSpace(command.InteractionID) == "" ||
+		command.InteractionAt.IsZero() {
+		return nil, fmt.Errorf(
+			"%w: combat response window cannot be requested",
+			ErrIllegalCommand,
+		)
+	}
+	window := combatResponseWindow(
+		state,
+		command.InteractionID,
+		command.InteractionAt,
+	)
+	if window == nil {
+		return resolveCombatNow(state, command, pack)
+	}
+	return handleOpenInteractionWindow(state, Command{
+		Type:              CommandOpenInteractionWindow,
+		ActorID:           command.ActorID,
+		InteractionWindow: window,
+	})
+}
+
+func handleCompleteCombatResolution(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	window := state.InteractionWindow
+	if !profile.CombatResponses ||
+		window == nil ||
+		window.ID != command.InteractionID ||
+		window.Status != InteractionWindowClosed ||
+		window.Kind != InteractionKindCombatResponse ||
+		window.Parent.SubjectKind != InteractionSubjectEncounter ||
+		window.InitiatorActorID != command.ActorID {
+		return nil, fmt.Errorf(
+			"%w: combat response continuation is not available",
+			ErrIllegalCommand,
+		)
+	}
+	return resolveCombatNow(state, command, pack)
+}
+
+func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, error) {
 	playerIndex, err := requirePhase(state, command, PhaseCombat)
 	if err != nil {
 		return nil, err

@@ -1,10 +1,10 @@
 # PLAN: combat response domain activation
 
 - **Plan ID:** `20260731T001853Z-be25a0-combat-response-domain-activation`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:18:53 UTC
-- **Обновлён:** 2026-07-31 00:18:53 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 02:31:02 UTC
+- **Владелец:** Codex `/root`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -60,37 +60,37 @@ interaction runtime: combatant вместо немедленного `resolve_co
 
 ## Критерии приёмки
 
-- [ ] Сохранённые игры профиля `first-edition-core-v1@1` продолжают replay и
+- [x] Сохранённые игры профиля `first-edition-core-v1@1` продолжают replay и
   прежний single-actor combat без новых окон и без изменения JSON.
-- [ ] Новый immutable rules profile `lobby-multiplayer-v1@1` использует тот же
+- [x] Новый immutable rules profile `lobby-multiplayer-v1@1` использует тот же
   versioned content pack, но новые lobby создаются с ним явно и projection
   сообщает exact profile identity.
-- [ ] В combat server-supplied action `request_combat_resolution` заменяет
+- [x] В combat server-supplied action `request_combat_resolution` заменяет
   прямой client-selected outcome и открывает `combat_response` на 60 секунд.
-- [ ] Responder set вычисляется из публичного roster всех живых
+- [x] Responder set вычисляется из публичного roster всех живых
   non-combatants. Окно открывается opaque даже когда ни у кого нет hidden
   intervention; internal eligibility и чужие response states не проецируются.
-- [ ] Actor получает только `pass` и descriptors для собственных
+- [x] Actor получает только `pass` и descriptors для собственных
   `interaction_scope: other_players` one-shot/effect sources с server-owned
   target allowlist; source чужой карты и отсутствие capability не видны.
-- [ ] Material intervention атомарно перемещает source card, применяет closed
+- [x] Material intervention атомарно перемещает source card, применяет closed
   typed `modify_combat` effect, фиксирует realized public delta, сбрасывает
   latest-revision responses в `pending` и только после late threshold может
   добавить `+10s` в пределах hard cap `90s`.
-- [ ] Pass относится только к current revision. Duplicate/retry/rejected/pass
+- [x] Pass относится только к current revision. Duplicate/retry/rejected/pass
   не продлевают deadline и не создают material event.
-- [ ] Когда latest revision не имеет pending responders, либо timeout
+- [x] Когда latest revision не имеет pending responders, либо timeout
   auto-pass-ит их, engine одним deterministic sequence закрывает window и
   выполняет прежний victory/run-away transition.
-- [ ] Actor authority, action/window/version binding и idempotency повторно
+- [x] Actor authority, action/window/version binding и idempotency повторно
   проверяются под per-game transaction; transport не принимает actor,
   deadline, revision, target вне descriptor или realized modifier.
-- [ ] New event payloads полностью replay-safe; `Apply` не читает clock/RNG и
+- [x] New event payloads полностью replay-safe; `Apply` не читает clock/RNG и
   legacy snapshots/events не мигрируют догадками.
-- [ ] Go-owned fixtures, strict Zod schemas и typed API adapter принимают
+- [x] Go-owned fixtures, strict Zod schemas и typed API adapter принимают
   только новый profile/action/interaction payload и отклоняют private/unknown
   fields.
-- [ ] Engine/application/HTTP/privacy/conformance tests покрывают no-action
+- [x] Engine/application/HTTP/privacy/conformance tests покрывают no-action
   opaque window, two responders, stale pass after intervention, late `+10`,
   hard cap, timeout, duplicate command и legacy profile regression.
 
@@ -200,27 +200,27 @@ interaction runtime: combatant вместо немедленного `resolve_co
 
 ## План реализации
 
-1. [ ] Зафиксировать compatibility tests и registry двух profiles.
-2. [ ] Реализовать pure request/open/material/reset/close/continuation events.
-3. [ ] Добавить actor-private descriptors и adversarial privacy tests.
-4. [ ] Подключить application CAS/idempotency/deadline transaction.
-5. [ ] Расширить HTTP/Go fixture/Zod/API adapter contract.
-6. [ ] Выполнить focused/full checks, review privacy/replay/concurrency,
+1. [x] Зафиксировать compatibility tests и registry двух profiles.
+2. [x] Реализовать pure request/open/material/reset/close/continuation events.
+3. [x] Добавить actor-private descriptors и adversarial privacy tests.
+4. [x] Подключить application CAS/idempotency/deadline transaction.
+5. [x] Расширить HTTP/Go fixture/Zod/API adapter contract.
+6. [x] Выполнить focused/full checks, review privacy/replay/concurrency,
    canonical verify и scope-check; архивировать plan.
 
 ## Проверки
 
-- [ ] `cd backend/game && go test ./internal/game -run 'Combat|Interaction|Profile' -count=1`
-- [ ] `cd backend/game && go test ./internal/application -run Interaction -count=1`
-- [ ] `cd backend/game && go test ./internal/transport/httpapi -run 'Combat|Interaction' -count=1`
-- [ ] `cd backend/game && go test ./...`
-- [ ] `cd frontend && pnpm --filter @munchkin/contracts test`
-- [ ] `cd frontend && pnpm --filter @munchkin/web test`
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T001853Z-be25a0-combat-response-domain-activation`
-- [ ] `git diff --check`
+- [x] `cd backend/game && go test ./internal/game -run 'Combat|Interaction|Profile' -count=1`
+- [x] `cd backend/game && go test ./internal/application -run Interaction -count=1`
+- [x] `cd backend/game && go test ./internal/transport/httpapi -run 'Combat|Interaction' -count=1`
+- [x] `cd backend/game && go test ./...`
+- [x] `cd frontend && pnpm --filter @munchkin/contracts test`
+- [x] `cd frontend && pnpm --filter @munchkin/web test`
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260731T001853Z-be25a0-combat-response-domain-activation`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -244,19 +244,38 @@ interaction runtime: combatant вместо немедленного `resolve_co
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:18:53 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Пользователь попросил подготовить
-  backend/frontend plans параллельно фоновой Terraform-работе; implementation,
-  selection, commit и push не разрешены.
+- **Подтверждено:** 2026-07-31
+- **Формулировка/ограничения пользователя:** Пользователь явно согласовал exact
+  plan ID в очереди из девяти plans, разрешил начать выполнение и потребовал
+  отдельный commit после каждого завершённого plan. Push не разрешён.
 
 ## Ход выполнения
 
 - Draft создан атомарно; реализация не начата.
 - Read-only audit подтвердил completed generic runtime, dormant combat domain
   и отсутствие Terraform write-set overlap.
+- Approval записан; plan переведён в `in_progress` перед выбором.
+- Добавлен immutable `lobby-multiplayer-v1@1`, при этом legacy profile оставлен
+  на прежнем прямом combat flow и покрыт compatibility tests.
+- Реализованы request/open/intervention/reset/pass/timeout/continuation,
+  actor-private descriptors, replay-safe realized events и transactional
+  HTTP/application boundary с idempotency.
+- Go-owned fixture синхронизирован со strict Zod contract и web API adapter;
+  direct client-selected combat outcome в multiplayer profile отклоняется.
+- Focused tests, полный `go test ./...`, contracts (10 tests), web (45 tests),
+  frontend lint/typecheck/build, plan lint, `git diff --check` и canonical
+  `./leinoctl verify --changed` завершились успешно.
+- Expanded lifecycle verify также выполнил codex harness tests и полный
+  `tools/leinoctl` test suite; финальный scope-check подтвердил
+  `outsideWriteSet: []`, `missingRequiredChecks: []`.
 
 ## Итог
 
-Заполняется после реализации.
+Новый multiplayer lobby profile активирует opaque collective combat response
+window и разрешает бой только через server-authoritative continuation.
+Responder privacy, source ownership, revision/deadline binding, hard cap,
+timeout и legacy replay зафиксированы тестами. Content JSON/digest не менялись;
+использованы только уже существующие typed `other_players + modify_combat`
+definitions. Push не выполнялся.
