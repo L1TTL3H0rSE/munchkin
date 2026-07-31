@@ -42,6 +42,7 @@ type RulesProfile struct {
 	CombatResponses      bool   `json:"combat_responses"`
 	AdvancedCombat       bool   `json:"advanced_combat"`
 	TargetAndRunAway     bool   `json:"target_and_run_away"`
+	PlayerEconomy        bool   `json:"player_economy"`
 }
 
 func FirstEditionCoreProfile() RulesProfile {
@@ -72,6 +73,7 @@ func AdvancedCombatProfile() RulesProfile {
 	profile.Version = AdvancedCombatProfileVersion
 	profile.AdvancedCombat = true
 	profile.TargetAndRunAway = true
+	profile.PlayerEconomy = true
 	return profile
 }
 
@@ -231,6 +233,8 @@ const (
 	InteractionKindPrivateChoice     InteractionKind = "private_choice"
 	InteractionKindTargetResponse    InteractionKind = "target_response"
 	InteractionKindRunAwayResponse   InteractionKind = "run_away_response"
+	InteractionKindEconomyOffer      InteractionKind = "economy_offer"
+	InteractionKindCharityTransfer   InteractionKind = "charity_transfer"
 )
 
 type InteractionSubjectKind string
@@ -260,6 +264,7 @@ const (
 	InteractionIntentAutoResolve InteractionIntent = "auto_resolve"
 	InteractionIntentOfferHelp   InteractionIntent = "offer_help"
 	InteractionIntentCancelHelp  InteractionIntent = "cancel_help"
+	InteractionIntentCancelOffer InteractionIntent = "cancel_offer"
 )
 
 type InteractionResponseRequirement string
@@ -342,6 +347,73 @@ type InteractionWindow struct {
 	Status                 InteractionWindowStatus        `json:"status"`
 	CloseReason            InteractionCloseReason         `json:"close_reason,omitempty"`
 	ClosedAt               time.Time                      `json:"closed_at,omitempty"`
+}
+
+type EconomyOfferKind string
+
+const (
+	EconomyOfferTrade EconomyOfferKind = "trade"
+	EconomyOfferGift  EconomyOfferKind = "gift"
+)
+
+type EconomyOffer struct {
+	ID                   string           `json:"offer_id"`
+	Kind                 EconomyOfferKind `json:"kind"`
+	OffererPlayerID      string           `json:"offerer_player_id"`
+	RecipientPlayerID    string           `json:"recipient_player_id"`
+	ParentPhase          Phase            `json:"parent_phase"`
+	OfferedInstanceIDs   []string         `json:"offered_instance_ids"`
+	RequestedInstanceIDs []string         `json:"requested_instance_ids,omitempty"`
+}
+
+func (offer EconomyOffer) clone() *EconomyOffer {
+	clone := offer
+	clone.OfferedInstanceIDs = append(
+		[]string(nil),
+		offer.OfferedInstanceIDs...,
+	)
+	clone.RequestedInstanceIDs = append(
+		[]string(nil),
+		offer.RequestedInstanceIDs...,
+	)
+	return &clone
+}
+
+type CharityAllocation struct {
+	InstanceID        string `json:"instance_id"`
+	RecipientPlayerID string `json:"recipient_player_id,omitempty"`
+}
+
+type CharityTransfer struct {
+	InteractionID        string              `json:"interaction_id"`
+	AllocatorPlayerID    string              `json:"allocator_player_id"`
+	Excess               int                 `json:"excess"`
+	StableHandOrder      []string            `json:"stable_hand_order"`
+	EligibleRecipientIDs []string            `json:"eligible_recipient_ids"`
+	Allocations          []CharityAllocation `json:"allocations,omitempty"`
+	DiscardedInstanceIDs []string            `json:"discarded_instance_ids,omitempty"`
+	Completed            bool                `json:"completed"`
+}
+
+func (transfer CharityTransfer) clone() *CharityTransfer {
+	clone := transfer
+	clone.StableHandOrder = append(
+		[]string(nil),
+		transfer.StableHandOrder...,
+	)
+	clone.EligibleRecipientIDs = append(
+		[]string(nil),
+		transfer.EligibleRecipientIDs...,
+	)
+	clone.Allocations = append(
+		[]CharityAllocation(nil),
+		transfer.Allocations...,
+	)
+	clone.DiscardedInstanceIDs = append(
+		[]string(nil),
+		transfer.DiscardedInstanceIDs...,
+	)
+	return &clone
 }
 
 func (window InteractionWindow) clone() *InteractionWindow {
@@ -494,6 +566,8 @@ type State struct {
 	InteractionWindow          *InteractionWindow      `json:"interaction_window,omitempty"`
 	SuspendedInteractionWindow *InteractionWindow      `json:"suspended_interaction_window,omitempty"`
 	CombatHelpOffer            *CombatHelpOffer        `json:"combat_help_offer,omitempty"`
+	EconomyOffer               *EconomyOffer           `json:"economy_offer,omitempty"`
+	CharityTransfer            *CharityTransfer        `json:"charity_transfer,omitempty"`
 }
 
 func (state State) Clone() State {
@@ -546,6 +620,12 @@ func (state State) Clone() State {
 	if state.CombatHelpOffer != nil {
 		offer := *state.CombatHelpOffer
 		clone.CombatHelpOffer = &offer
+	}
+	if state.EconomyOffer != nil {
+		clone.EconomyOffer = state.EconomyOffer.clone()
+	}
+	if state.CharityTransfer != nil {
+		clone.CharityTransfer = state.CharityTransfer.clone()
 	}
 	return clone
 }
@@ -667,10 +747,196 @@ func (state State) Validate() error {
 	if err := state.validateTargetAndRunAway(); err != nil {
 		return err
 	}
+	if err := state.validatePlayerEconomy(); err != nil {
+		return err
+	}
 	if state.Status != StatusLobby {
 		if err := state.validateInstanceZones(); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (state State) validatePlayerEconomy() error {
+	profile, err := state.Profile()
+	if err != nil {
+		return err
+	}
+	if !profile.PlayerEconomy {
+		if state.EconomyOffer != nil || state.CharityTransfer != nil {
+			return fmt.Errorf(
+				"%w: player economy requires an enabled profile",
+				ErrIllegalCommand,
+			)
+		}
+		return nil
+	}
+	window := state.InteractionWindow
+	if state.EconomyOffer != nil {
+		offer := state.EconomyOffer
+		offererIndex := state.PlayerIndex(offer.OffererPlayerID)
+		recipientIndex := state.PlayerIndex(offer.RecipientPlayerID)
+		if offer.ID == "" ||
+			offererIndex < 0 ||
+			recipientIndex < 0 ||
+			offererIndex == recipientIndex ||
+			state.Players[recipientIndex].Dead ||
+			(offer.ParentPhase != PhasePreparation &&
+				offer.ParentPhase != PhaseCharity) ||
+			offer.ParentPhase != state.Turn.Phase ||
+			offer.OffererPlayerID != state.Turn.PlayerID ||
+			len(offer.OfferedInstanceIDs) == 0 ||
+			!uniqueStrings(offer.OfferedInstanceIDs) ||
+			!uniqueStrings(offer.RequestedInstanceIDs) ||
+			(offer.Kind == EconomyOfferGift &&
+				len(offer.RequestedInstanceIDs) != 0) ||
+			(offer.Kind == EconomyOfferTrade &&
+				len(offer.RequestedInstanceIDs) == 0) ||
+			(offer.Kind != EconomyOfferGift &&
+				offer.Kind != EconomyOfferTrade) ||
+			window == nil ||
+			window.Status != InteractionWindowOpen ||
+			window.ID != offer.ID ||
+			window.Kind != InteractionKindEconomyOffer ||
+			window.InitiatorActorID != offer.OffererPlayerID ||
+			len(window.EligibleActorIDs) != 1 ||
+			window.EligibleActorIDs[0] != offer.RecipientPlayerID {
+			return fmt.Errorf(
+				"%w: malformed economy offer state",
+				ErrIllegalCommand,
+			)
+		}
+		for _, instanceID := range offer.OfferedInstanceIDs {
+			if !slices.Contains(state.Players[offererIndex].Carried, instanceID) {
+				return fmt.Errorf(
+					"%w: offered card is no longer transferable",
+					ErrIllegalCommand,
+				)
+			}
+		}
+		for _, instanceID := range offer.RequestedInstanceIDs {
+			if !slices.Contains(state.Players[recipientIndex].Carried, instanceID) {
+				return fmt.Errorf(
+					"%w: requested card is no longer transferable",
+					ErrIllegalCommand,
+				)
+			}
+		}
+	} else if window != nil &&
+		window.Status == InteractionWindowOpen &&
+		window.Kind == InteractionKindEconomyOffer {
+		return fmt.Errorf(
+			"%w: economy offer window lacks clauses",
+			ErrIllegalCommand,
+		)
+	}
+	if state.CharityTransfer == nil {
+		if window != nil &&
+			window.Status == InteractionWindowOpen &&
+			window.Kind == InteractionKindCharityTransfer {
+			return fmt.Errorf(
+				"%w: charity window lacks allocation state",
+				ErrIllegalCommand,
+			)
+		}
+		return nil
+	}
+	transfer := state.CharityTransfer
+	allocatorIndex := state.PlayerIndex(transfer.AllocatorPlayerID)
+	if transfer.InteractionID == "" ||
+		allocatorIndex < 0 ||
+		transfer.Excess < 0 ||
+		len(transfer.StableHandOrder) < transfer.Excess ||
+		!uniqueStrings(transfer.StableHandOrder) ||
+		!uniqueStrings(transfer.EligibleRecipientIDs) {
+		return fmt.Errorf(
+			"%w: malformed charity transfer state",
+			ErrIllegalCommand,
+		)
+	}
+	for _, recipientID := range transfer.EligibleRecipientIDs {
+		if recipientID == transfer.AllocatorPlayerID ||
+			state.PlayerIndex(recipientID) < 0 {
+			return fmt.Errorf(
+				"%w: invalid charity recipient",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	if !transfer.Completed {
+		if state.Turn.Phase != PhaseCharity ||
+			state.Turn.PlayerID != transfer.AllocatorPlayerID ||
+			window == nil ||
+			window.Status != InteractionWindowOpen ||
+			window.ID != transfer.InteractionID ||
+			window.Kind != InteractionKindCharityTransfer ||
+			len(window.EligibleActorIDs) != 1 ||
+			window.EligibleActorIDs[0] != transfer.AllocatorPlayerID ||
+			len(transfer.Allocations) != 0 ||
+			len(transfer.DiscardedInstanceIDs) != 0 {
+			return fmt.Errorf(
+				"%w: malformed active charity transfer",
+				ErrIllegalCommand,
+			)
+		}
+		for _, instanceID := range transfer.StableHandOrder {
+			if !slices.Contains(
+				state.Players[allocatorIndex].Hand,
+				instanceID,
+			) {
+				return fmt.Errorf(
+					"%w: charity hand snapshot drifted",
+					ErrIllegalCommand,
+				)
+			}
+		}
+		return nil
+	}
+	if window == nil ||
+		window.ID != transfer.InteractionID ||
+		window.Status != InteractionWindowClosed ||
+		len(transfer.Allocations)+len(transfer.DiscardedInstanceIDs) !=
+			transfer.Excess {
+		return fmt.Errorf(
+			"%w: malformed completed charity transfer",
+			ErrIllegalCommand,
+		)
+	}
+	seen := make(map[string]struct{}, transfer.Excess)
+	for _, allocation := range transfer.Allocations {
+		if allocation.InstanceID == "" ||
+			!slices.Contains(
+				transfer.EligibleRecipientIDs,
+				allocation.RecipientPlayerID,
+			) {
+			return fmt.Errorf(
+				"%w: invalid persisted charity allocation",
+				ErrIllegalCommand,
+			)
+		}
+		if _, exists := seen[allocation.InstanceID]; exists {
+			return fmt.Errorf(
+				"%w: duplicate persisted charity card",
+				ErrIllegalCommand,
+			)
+		}
+		seen[allocation.InstanceID] = struct{}{}
+	}
+	for _, instanceID := range transfer.DiscardedInstanceIDs {
+		if instanceID == "" {
+			return fmt.Errorf(
+				"%w: invalid persisted charity discard",
+				ErrIllegalCommand,
+			)
+		}
+		if _, exists := seen[instanceID]; exists {
+			return fmt.Errorf(
+				"%w: duplicate persisted charity card",
+				ErrIllegalCommand,
+			)
+		}
+		seen[instanceID] = struct{}{}
 	}
 	return nil
 }
@@ -1462,7 +1728,9 @@ func validInteractionKind(kind InteractionKind) bool {
 		InteractionKindAddressedResponse,
 		InteractionKindPrivateChoice,
 		InteractionKindTargetResponse,
-		InteractionKindRunAwayResponse:
+		InteractionKindRunAwayResponse,
+		InteractionKindEconomyOffer,
+		InteractionKindCharityTransfer:
 		return true
 	default:
 		return false
@@ -1498,7 +1766,8 @@ func validInteractionIntent(intent InteractionIntent) bool {
 		InteractionIntentRespond,
 		InteractionIntentAccept,
 		InteractionIntentDecline,
-		InteractionIntentAutoResolve:
+		InteractionIntentAutoResolve,
+		InteractionIntentCancelOffer:
 		return true
 	default:
 		return false

@@ -43,6 +43,8 @@ export const actionTypeSchema = z.enum([
   "run_away",
   "choose_effect",
   "resolve_charity",
+  "propose_trade",
+  "propose_gift",
   "end_turn",
   "fight",
   "loot",
@@ -52,6 +54,7 @@ export const interactionIntentSchema = z.enum([
   "respond",
   "accept",
   "decline",
+  "cancel_offer",
 ]);
 export const interactionActionTypeSchema = interactionIntentSchema.or(z.enum([
   "offer_help",
@@ -165,6 +168,7 @@ export const actionViewSchema = z.object({
   source_instance_id: z.string().min(1).optional(),
   instance_ids: z.array(z.string().min(1)).optional(),
   target_instance_ids: z.array(z.string().min(1)).optional(),
+  requested_instance_ids: z.array(z.string().min(1)).optional(),
   target_player_ids: z.array(z.string().min(1)).optional(),
   minimum: z.number().int().nonnegative().optional(),
   maximum: z.number().int().nonnegative().optional(),
@@ -337,6 +341,8 @@ export const interactionViewSchema = z.object({
     "target_response",
     "run_away_response",
     "private_choice",
+    "economy_offer",
+    "charity_transfer",
   ]),
   parent_phase: phaseSchema,
   public_subject: z.enum([
@@ -357,6 +363,18 @@ export const interactionViewSchema = z.object({
     reward_treasures: z.number().int().positive(),
   }).strict().optional(),
   target_player_id: z.string().min(1).optional(),
+  economy_offer: z.object({
+    kind: z.enum(["trade", "gift"]),
+    offerer_player_id: z.string().min(1),
+    recipient_player_id: z.string().min(1),
+    offered: z.array(cardViewSchema).min(1),
+    requested: z.array(cardViewSchema),
+  }).strict().optional(),
+  charity_transfer: z.object({
+    excess: z.number().int().positive(),
+    instance_ids: z.array(z.string().min(1)),
+    eligible_recipient_ids: z.array(z.string().min(1)),
+  }).strict().optional(),
 }).strict();
 
 export const projectionSchema = z.object({
@@ -436,6 +454,24 @@ export const interactionCommandRequestSchema = z.object({
   interaction_id: z.string().min(1),
   action_id: z.string().regex(/^act_[a-f0-9]{32}$/),
   intent: interactionIntentSchema,
+}).strict();
+
+export const economyOfferRequestSchema = z.object({
+  expected_version: z.number().int().nonnegative(),
+  recipient_player_id: z.string().min(1),
+  offered_instance_ids: z.array(z.string().min(1)).min(1),
+  requested_instance_ids: z.array(z.string().min(1)).optional(),
+}).strict();
+
+export const charityAllocationSchema = z.object({
+  instance_id: z.string().min(1),
+  recipient_player_id: z.string().min(1).optional(),
+}).strict();
+
+export const charityRequestSchema = z.object({
+  expected_version: z.number().int().nonnegative(),
+  instance_ids: z.array(z.string().min(1)).optional(),
+  allocations: z.array(charityAllocationSchema).optional(),
 }).strict();
 
 export const invalidationSchema = z.object({
@@ -594,7 +630,10 @@ export type ActionType = z.infer<typeof actionTypeSchema>;
 export type ServerActionDescriptor = z.infer<typeof actionViewSchema>;
 export type ActionDescriptor =
   Omit<ServerActionDescriptor, "type"> & {
-    type: Exclude<ActionType, "play_target_effect">;
+    type: Exclude<
+      ActionType,
+      "play_target_effect" | "propose_trade" | "propose_gift"
+    >;
   };
 type ServerProjection = z.infer<typeof projectionSchema>;
 export type Projection = Omit<ServerProjection, "turn"> & {
@@ -620,6 +659,9 @@ export type InteractionView = z.infer<typeof interactionViewSchema>;
 export type InteractionCommandRequest = z.infer<
   typeof interactionCommandRequestSchema
 >;
+export type EconomyOfferRequest = z.infer<typeof economyOfferRequestSchema>;
+export type CharityRequest = z.infer<typeof charityRequestSchema>;
+export type CharityAllocation = z.infer<typeof charityAllocationSchema>;
 export type StudioArtBrief = z.infer<typeof studioArtBriefSchema>;
 export type StudioGenerationSettings = z.infer<
   typeof studioGenerationSettingsSchema

@@ -1,10 +1,10 @@
 # PLAN: trade gift and charity transfer
 
 - **Plan ID:** `20260731T003716Z-5adc34-trade-gift-and-charity-transfer`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:37:16 UTC
-- **Обновлён:** 2026-07-31 00:37:16 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 04:59:43 UTC
+- **Владелец:** Codex /root
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -60,23 +60,23 @@ privacy and deterministic anti-stall timeout.
 
 ## Критерии приёмки
 
-- [ ] Trade/gift доступны только в server-allowed parent phases and blocked by
+- [x] Trade/gift доступны только в server-allowed parent phases and blocked by
   combat/mandatory decisions.
-- [ ] Offerer selects only descriptor-owned transferable cards/clauses and one
+- [x] Offerer selects only descriptor-owned transferable cards/clauses and one
   legal recipient; no arbitrary hand IDs/free-text obligations.
-- [ ] Exact offer visible only to parties; observers see public zone/count
+- [x] Exact offer visible only to parties; observers see public zone/count
   delta only after committed transfer.
-- [ ] Accept revalidates ownership/loadout/capacity under CAS and transfers all
+- [x] Accept revalidates ownership/loadout/capacity under CAS and transfers all
   clauses atomically; decline/cancel/timeout moves nothing.
-- [ ] One pending addressed offer, stable IDs, 30-second deadline and
+- [x] One pending addressed offer, stable IDs, 30-second deadline and
   idempotent retry semantics.
-- [ ] Charity derives lowest-level recipients from public state and requires
+- [x] Charity derives lowest-level recipients from public state and requires
   exactly excess cards.
-- [ ] Charity timeout uses persisted stable hand order and round-robin seat
+- [x] Charity timeout uses persisted stable hand order and round-robin seat
   order; absent recipients cause deterministic deck-kind discard.
-- [ ] Allocation event stores exact recipient/card mapping; replay does not
+- [x] Allocation event stores exact recipient/card mapping; replay does not
   recompute current levels/order.
-- [ ] Cross-actor projection/HTTP/Zod tests reject foreign cards, partial
+- [x] Cross-actor projection/HTTP/Zod tests reject foreign cards, partial
   transfer, stale version and privacy leaks.
 
 ## Контекст и подтверждённое состояние
@@ -149,19 +149,19 @@ privacy and deterministic anti-stall timeout.
 
 ## План реализации
 
-1. [ ] Add trade/gift/charity models and replay/privacy fixtures.
-2. [ ] Implement CAS/system timeout and strict projections/routes.
-3. [ ] Add Zod/API consumers and concurrency tests.
-4. [ ] Run full checks, verify/scope-check and archive.
+1. [x] Add trade/gift/charity models and replay/privacy fixtures.
+2. [x] Implement CAS/system timeout and strict projections/routes.
+3. [x] Add Zod/API consumers and concurrency tests.
+4. [x] Run full checks, verify/scope-check and archive.
 
 ## Проверки
 
-- [ ] `cd backend/game && go test ./...`
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T003716Z-5adc34-trade-gift-and-charity-transfer`
-- [ ] `git diff --check`
+- [x] `cd backend/game && go test ./...`
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260731T003716Z-5adc34-trade-gift-and-charity-transfer`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -178,16 +178,42 @@ privacy and deterministic anti-stall timeout.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:37:16 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Подготовить оставшиеся планы;
-  implementation/select/commit/push не разрешены.
+- **Подтверждено:** 2026-07-31
+- **Формулировка/ограничения пользователя:** Пользователь явно подтвердил exact
+  plan ID в очереди из девяти планов, разрешил реализацию и отдельный локальный
+  commit после каждого плана. Push не разрешён.
 
 ## Ход выполнения
 
-- Draft создан атомарно; реализация не начата.
+- Predecessor
+  `20260731T003716Z-81b06c-target-effects-and-run-away-interactions`
+  завершён, заархивирован и зафиксирован локальным commit `96996ac`.
+- Получен свежий impact/context для engine, application, HTTP и frontend
+  contracts; перечитаны scoped instructions, ADR-0008 и interaction protocol.
+- После подтверждённого завершения исходной planning-session выполнен explicit
+  takeover; plan выбран session
+  `019fb5dd-0f28-7241-a45d-5acf3255717a`.
+- Добавлен profile-gated player economy: carried-item trade/gift clauses,
+  addressed accept/decline/cancel lifecycle, 30-секундный timeout и атомарная
+  повторная проверка ownership/loadout/Big-item capacity под CAS.
+- Добавлена обязательная charity transfer: lowest-level recipients,
+  persisted hand/seat order, manual exact allocation, round-robin timeout и
+  deterministic deck-kind discard при отсутствии получателей.
+- Exact clauses доступны только сторонам offer; observer projection сохраняет
+  только coarse interaction kind. Legacy charity `instance_ids` HTTP contract
+  сохранён для старых rules profiles.
+- Канонический `./leinoctl verify --changed` прошёл 16 checks: весь Go backend,
+  frontend lint/typecheck, 62 Vitest tests, два Nuxt production builds,
+  42 hook tests, 68/69 leinoctl tests (1 platform skip), plan-lint, Bash syntax
+  и `docker compose --parallel 8 config`.
 
 ## Итог
 
-Заполняется после реализации.
+Player economy v1 завершён. Trade/gift выполняются только из серверных
+descriptor-owned carried items и коммитятся целиком либо не меняют ownership.
+Charity хранит точную allocation mapping в событии и не пересчитывает её при
+replay; timeout стабилен относительно persisted hand/seat order. Scoped Go,
+HTTP, application, Zod и cross-actor privacy tests зелёные; canonical verify
+и final scope-check прошли.

@@ -3,6 +3,7 @@ package application_test
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -1649,6 +1650,73 @@ func newTwoPlayerRuntimeFixture(
 				start,
 			)
 		}
+		if pack.Source == "economy-runtime-test" ||
+			pack.Source == "charity-runtime-test" {
+			economyBase := candidate.Clone()
+			validEconomyHands := true
+			for playerIndex := range candidate.Players {
+				itemIndex := -1
+				for handIndex, instanceID := range candidate.Players[playerIndex].Hand {
+					card, _, exists := pack.DefinitionForInstance(
+						candidate,
+						instanceID,
+					)
+					if exists && card.Item != nil {
+						itemIndex = handIndex
+						break
+					}
+				}
+				if itemIndex < 0 {
+					validEconomyHands = false
+					break
+				}
+				instanceID := candidate.Players[playerIndex].Hand[itemIndex]
+				candidate.Players[playerIndex].Hand = append(
+					candidate.Players[playerIndex].Hand[:itemIndex],
+					candidate.Players[playerIndex].Hand[itemIndex+1:]...,
+				)
+				candidate.Players[playerIndex].Carried = append(
+					candidate.Players[playerIndex].Carried,
+					instanceID,
+				)
+			}
+			if !validEconomyHands {
+				continue
+			}
+			if pack.Source == "charity-runtime-test" {
+				candidate.Turn.Phase = game.PhaseCharity
+				candidate.Turn.ActionWindow = game.ActionWindow{
+					Kind: string(game.PhaseCharity),
+					EligibleActorIDs: []string{
+						candidate.Turn.PlayerID,
+					},
+				}
+			}
+			if err := candidate.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := json.Marshal(struct {
+				Reason game.CommandType `json:"reason"`
+				State  game.State       `json:"state"`
+			}{
+				Reason: game.CommandPlayCard,
+				State:  candidate,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			candidate, candidateEvents = applyRuntimeEvents(
+				t,
+				economyBase,
+				candidateEvents,
+				"runtime-economy-fixture",
+				[]game.DomainEvent{{
+					Type:    game.EventEquipmentChanged,
+					Payload: raw,
+				}},
+				start,
+			)
+		}
 		if pack.Source == "target-runtime-test" &&
 			!playerHasCardKind(candidate, ownerID, game.CardCurse, pack) {
 			continue
@@ -1746,6 +1814,210 @@ func playerHasCardKind(
 		}
 	}
 	return false
+}
+
+func economyRuntimePack(t *testing.T, charity bool) game.Pack {
+	t.Helper()
+	pack := targetRuntimePack(t)
+	if charity {
+		pack.Source = "charity-runtime-test"
+	} else {
+		pack.Source = "economy-runtime-test"
+	}
+	return pack
+}
+
+func TestEconomyRuntimeReceiptsCASAndPartyActions(t *testing.T) {
+	ctx := context.Background()
+	fixture := newTwoPlayerRuntimeFixture(
+		t,
+		economyRuntimePack(t, false),
+		time.Date(2026, time.July, 31, 10, 0, 0, 0, time.UTC),
+	)
+	ownerCardID := fixture.owner.Projection.You.Carried[0].InstanceID
+	otherCardID := fixture.other.Projection.You.Carried[0].InstanceID
+	opened, err := fixture.service.ProposeEconomyOffer(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"economy-open",
+		fixture.current.Version,
+		game.EconomyOfferTrade,
+		fixture.other.PlayerID,
+		[]string{ownerCardID},
+		[]string{otherCardID},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opened.Projection.Interaction == nil ||
+		opened.Projection.Interaction.EconomyOffer == nil ||
+		opened.Projection.Interaction.EconomyOffer.Kind !=
+			game.EconomyOfferTrade {
+		t.Fatalf("owner economy projection=%#v", opened.Projection.Interaction)
+	}
+	replayed, err := fixture.service.ProposeEconomyOffer(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"economy-open",
+		fixture.current.Version,
+		game.EconomyOfferTrade,
+		fixture.other.PlayerID,
+		[]string{ownerCardID},
+		[]string{otherCardID},
+	)
+	if err != nil || !replayed.Replayed || replayed.Version != opened.Version {
+		t.Fatalf("economy replay=%#v err=%v", replayed, err)
+	}
+	if _, err := fixture.service.ProposeEconomyOffer(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"economy-open",
+		fixture.current.Version,
+		game.EconomyOfferGift,
+		fixture.other.PlayerID,
+		[]string{ownerCardID},
+		nil,
+	); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("economy fingerprint conflict=%v", err)
+	}
+	recipientProjection, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accept := interactionActionForTest(
+		t,
+		recipientProjection,
+		game.InteractionIntentAccept,
+	)
+	accepted, err := fixture.service.ExecuteInteraction(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+		"economy-accept",
+		opened.Version,
+		recipientProjection.Interaction.InteractionID,
+		accept.ActionID,
+		game.InteractionIntentAccept,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if accepted.Projection.Interaction != nil ||
+		len(accepted.Projection.You.Carried) == 0 ||
+		accepted.Projection.You.Carried[0].InstanceID != ownerCardID {
+		t.Fatalf("accepted economy projection=%#v", accepted.Projection)
+	}
+	if _, err := fixture.service.ExecuteInteraction(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+		"economy-stale-decline",
+		opened.Version,
+		recipientProjection.Interaction.InteractionID,
+		accept.ActionID,
+		game.InteractionIntentDecline,
+	); !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("stale economy response=%v", err)
+	}
+}
+
+func TestCharityRuntimeManualAndTimeoutUseStableAllocation(t *testing.T) {
+	for _, automatic := range []bool{false, true} {
+		t.Run(fmt.Sprintf("automatic=%t", automatic), func(t *testing.T) {
+			ctx := context.Background()
+			fixture := newTwoPlayerRuntimeFixture(
+				t,
+				economyRuntimePack(t, true),
+				time.Date(2026, time.July, 31, 10, 30, 0, 0, time.UTC),
+			)
+			opened, err := fixture.service.ResolveCharity(
+				ctx,
+				fixture.owner.GameID,
+				fixture.owner.Credential,
+				"charity-open",
+				fixture.current.Version,
+				nil,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			view := opened.Projection.Interaction
+			if view == nil ||
+				view.CharityTransfer == nil ||
+				view.CharityTransfer.Excess < 1 {
+				t.Fatalf("charity projection=%#v", view)
+			}
+			if automatic {
+				fixture.clock.Set(view.DeadlineAt)
+				processed, err := fixture.service.SweepDueInteractions(
+					ctx,
+					10,
+				)
+				if err != nil || processed != 1 {
+					t.Fatalf("charity sweep=%d err=%v", processed, err)
+				}
+				projection, err := fixture.service.Get(
+					ctx,
+					fixture.owner.GameID,
+					fixture.owner.Credential,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if projection.Turn.Phase != game.PhaseEndTurn ||
+					projection.Interaction != nil {
+					t.Fatalf("timed charity projection=%#v", projection)
+				}
+				return
+			}
+			allocations := make(
+				[]game.CharityAllocation,
+				view.CharityTransfer.Excess,
+			)
+			for index := range allocations {
+				allocations[index] = game.CharityAllocation{
+					InstanceID: view.CharityTransfer.InstanceIDs[index],
+					RecipientPlayerID: view.CharityTransfer.EligibleRecipientIDs[index%len(
+						view.CharityTransfer.EligibleRecipientIDs,
+					)],
+				}
+			}
+			resolved, err := fixture.service.ResolveCharity(
+				ctx,
+				fixture.owner.GameID,
+				fixture.owner.Credential,
+				"charity-resolve",
+				opened.Version,
+				nil,
+				allocations,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			replayed, err := fixture.service.ResolveCharity(
+				ctx,
+				fixture.owner.GameID,
+				fixture.owner.Credential,
+				"charity-resolve",
+				opened.Version,
+				nil,
+				allocations,
+			)
+			if err != nil ||
+				!replayed.Replayed ||
+				replayed.Version != resolved.Version {
+				t.Fatalf("charity replay=%#v err=%v", replayed, err)
+			}
+		})
+	}
 }
 
 func TestTargetEffectTimeoutRestoresSameDeadlineAndUsesStableDefault(

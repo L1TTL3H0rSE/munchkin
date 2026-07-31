@@ -246,6 +246,169 @@ func TestCreateGetAndForgedCredential(t *testing.T) {
 	forged.Body.Close()
 }
 
+func TestEconomyHTTPRejectsForeignClauseAndHidesOfferFromObserver(
+	t *testing.T,
+) {
+	ctx := context.Background()
+	service, server := testRouterWithPack(t, routerTargetPack(t))
+	owner, err := service.CreateLobby(ctx, "Alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, err := service.JoinLobby(
+		ctx,
+		owner.GameID,
+		"router-economy-bob-credential-0001",
+		"router-economy-join-bob",
+		owner.Projection.Version,
+		"Bob",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cara, err := service.JoinLobby(
+		ctx,
+		owner.GameID,
+		"router-economy-cara-credential-001",
+		"router-economy-join-cara",
+		bob.Projection.Version,
+		"Cara",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"router-economy-start",
+		cara.Projection.Version,
+		game.Command{Type: game.CommandStart},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, participant := range []application.LobbyResult{
+		owner,
+		bob,
+		cara,
+	} {
+		current, err = service.Execute(
+			ctx,
+			owner.GameID,
+			participant.Credential,
+			fmt.Sprintf("router-economy-setup-%d", index),
+			current.Version,
+			game.Command{Type: game.CommandFinishSetup},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	ownerProjection, err := service.Get(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	giftCandidateID := ""
+	for _, card := range ownerProjection.You.Hand {
+		if card.Kind == game.CardItem {
+			giftCandidateID = card.InstanceID
+			break
+		}
+	}
+	if giftCandidateID == "" {
+		t.Fatal("owner has no gift candidate")
+	}
+	played, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"router-economy-carry",
+		current.Version,
+		game.Command{
+			Type:       game.CommandPlayCard,
+			InstanceID: giftCandidateID,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bobProjection, err := service.Get(
+		ctx,
+		owner.GameID,
+		bob.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreign := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/propose-gift",
+		owner.Credential,
+		"router-economy-foreign",
+		map[string]any{
+			"expected_version":    played.Version,
+			"recipient_player_id": bob.PlayerID,
+			"offered_instance_ids": []string{
+				bobProjection.You.Hand[0].InstanceID,
+			},
+		},
+	)
+	if foreign.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("foreign economy status=%d", foreign.StatusCode)
+	}
+	valid := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/propose-gift",
+		owner.Credential,
+		"router-economy-valid",
+		map[string]any{
+			"expected_version":    played.Version,
+			"recipient_player_id": bob.PlayerID,
+			"offered_instance_ids": []string{
+				played.Projection.You.Carried[0].InstanceID,
+			},
+		},
+	)
+	if valid.StatusCode != http.StatusOK {
+		t.Fatalf("valid economy status=%d", valid.StatusCode)
+	}
+	var opened application.CommandResult
+	decodeResponse(t, valid, &opened)
+	observer := requestJSON(
+		t,
+		server.Client(),
+		http.MethodGet,
+		server.URL+"/api/v1/games/"+owner.GameID,
+		cara.Credential,
+		"",
+		nil,
+	)
+	if observer.StatusCode != http.StatusOK {
+		t.Fatalf("observer economy status=%d", observer.StatusCode)
+	}
+	var observerProjection game.Projection
+	decodeResponse(t, observer, &observerProjection)
+	if observerProjection.Interaction == nil ||
+		observerProjection.Interaction.PublicKind != "economy_offer" ||
+		observerProjection.Interaction.EconomyOffer != nil {
+		t.Fatalf(
+			"observer economy leak=%#v",
+			observerProjection.Interaction,
+		)
+	}
+}
+
 func TestLobbySummaryAndJoinAreBrowserSafe(t *testing.T) {
 	_, server := testRouter(t)
 	createResponse := requestJSON(

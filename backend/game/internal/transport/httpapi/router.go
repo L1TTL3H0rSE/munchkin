@@ -86,7 +86,18 @@ func NewWithOptions(service *application.Service, options Options) http.Handler 
 	)
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/run-away", router.command(game.CommandRunAway))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/choose-effect", router.command(game.CommandChooseEffect))
-	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/resolve-charity", router.command(game.CommandResolveCharity))
+	mux.HandleFunc(
+		"POST /api/v1/games/{gameID}/commands/propose-trade",
+		router.economyOffer(game.EconomyOfferTrade),
+	)
+	mux.HandleFunc(
+		"POST /api/v1/games/{gameID}/commands/propose-gift",
+		router.economyOffer(game.EconomyOfferGift),
+	)
+	mux.HandleFunc(
+		"POST /api/v1/games/{gameID}/commands/resolve-charity",
+		router.resolveCharity,
+	)
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/end-turn", router.command(game.CommandEndTurn))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/fight", router.command(game.CommandFight))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/loot", router.command(game.CommandLoot))
@@ -134,6 +145,19 @@ type versionedRequest struct {
 type combatHelpRequest struct {
 	ExpectedVersion uint64 `json:"expected_version"`
 	ActionID        string `json:"action_id"`
+}
+
+type economyOfferRequest struct {
+	ExpectedVersion      uint64   `json:"expected_version"`
+	RecipientPlayerID    string   `json:"recipient_player_id"`
+	OfferedInstanceIDs   []string `json:"offered_instance_ids"`
+	RequestedInstanceIDs []string `json:"requested_instance_ids,omitempty"`
+}
+
+type charityRequest struct {
+	ExpectedVersion uint64                   `json:"expected_version"`
+	InstanceIDs     []string                 `json:"instance_ids,omitempty"`
+	Allocations     []game.CharityAllocation `json:"allocations,omitempty"`
 }
 
 func (router *Router) health(writer http.ResponseWriter, _ *http.Request) {
@@ -444,6 +468,93 @@ func (router *Router) interaction(pass bool) http.HandlerFunc {
 	}
 }
 
+func (router *Router) economyOffer(
+	kind game.EconomyOfferKind,
+) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var body economyOfferRequest
+		if err := decodeJSON(writer, request, &body); err != nil {
+			writeError(
+				writer,
+				http.StatusBadRequest,
+				"invalid_request",
+				err.Error(),
+			)
+			return
+		}
+		commandID := strings.TrimSpace(
+			request.Header.Get("Idempotency-Key"),
+		)
+		if commandID == "" || len(commandID) > 128 {
+			writeError(
+				writer,
+				http.StatusBadRequest,
+				"idempotency_key_required",
+				"Idempotency-Key is required",
+			)
+			return
+		}
+		result, err := router.service.ProposeEconomyOffer(
+			request.Context(),
+			request.PathValue("gameID"),
+			bearerToken(request),
+			commandID,
+			body.ExpectedVersion,
+			kind,
+			body.RecipientPlayerID,
+			body.OfferedInstanceIDs,
+			body.RequestedInstanceIDs,
+		)
+		if err != nil {
+			router.mapError(writer, err)
+			return
+		}
+		writeJSON(writer, http.StatusOK, result)
+	}
+}
+
+func (router *Router) resolveCharity(
+	writer http.ResponseWriter,
+	request *http.Request,
+) {
+	var body charityRequest
+	if err := decodeJSON(writer, request, &body); err != nil {
+		writeError(
+			writer,
+			http.StatusBadRequest,
+			"invalid_request",
+			err.Error(),
+		)
+		return
+	}
+	commandID := strings.TrimSpace(
+		request.Header.Get("Idempotency-Key"),
+	)
+	if commandID == "" || len(commandID) > 128 {
+		writeError(
+			writer,
+			http.StatusBadRequest,
+			"idempotency_key_required",
+			"Idempotency-Key is required",
+		)
+		return
+	}
+	result, err := router.service.ResolveCharity(
+		request.Context(),
+		request.PathValue("gameID"),
+		bearerToken(request),
+		commandID,
+		body.ExpectedVersion,
+		body.InstanceIDs,
+		body.Allocations,
+	)
+	if err != nil {
+		router.mapError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, result)
+}
+
 func (router *Router) combatHelp(
 	writer http.ResponseWriter,
 	request *http.Request,
@@ -482,7 +593,8 @@ func respondInteractionIntent(intent game.InteractionIntent) bool {
 	switch intent {
 	case game.InteractionIntentRespond,
 		game.InteractionIntentAccept,
-		game.InteractionIntentDecline:
+		game.InteractionIntentDecline,
+		game.InteractionIntentCancelOffer:
 		return true
 	default:
 		return false

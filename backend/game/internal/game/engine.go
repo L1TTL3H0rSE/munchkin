@@ -46,6 +46,11 @@ const (
 	CommandPlayRunAwayModifier      CommandType = "play_run_away_modifier"
 	CommandCounterRunAwayEffect     CommandType = "counter_run_away_effect"
 	CommandResolveRunAwayStep       CommandType = "resolve_run_away_step"
+	CommandProposeTrade             CommandType = "propose_trade"
+	CommandProposeGift              CommandType = "propose_gift"
+	CommandRespondEconomyOffer      CommandType = "respond_economy_offer"
+	CommandCancelEconomyOffer       CommandType = "cancel_economy_offer"
+	CommandBeginCharityTransfer     CommandType = "begin_charity_transfer"
 
 	// Bootstrap aliases remain parseable, but use the new deterministic paths.
 	CommandFight CommandType = "fight"
@@ -61,6 +66,8 @@ type Command struct {
 	InstanceID             string                 `json:"instance_id,omitempty"`
 	TargetInstanceID       string                 `json:"target_instance_id,omitempty"`
 	InstanceIDs            []string               `json:"instance_ids,omitempty"`
+	RequestedInstanceIDs   []string               `json:"requested_instance_ids,omitempty"`
+	CharityAllocations     []CharityAllocation    `json:"charity_allocations,omitempty"`
 	ChoiceIDs              []string               `json:"choice_ids,omitempty"`
 	AbilityIndex           int                    `json:"ability_index,omitempty"`
 	InteractionID          string                 `json:"-"`
@@ -216,6 +223,14 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 		return handleCounterRunAwayEffect(state, command, pack)
 	case CommandResolveRunAwayStep:
 		return handleResolveRunAwayStep(state, command, pack)
+	case CommandProposeTrade, CommandProposeGift:
+		return handleProposeEconomyOffer(state, command, pack)
+	case CommandRespondEconomyOffer:
+		return handleRespondEconomyOffer(state, command, pack)
+	case CommandCancelEconomyOffer:
+		return handleCancelEconomyOffer(state, command)
+	case CommandBeginCharityTransfer:
+		return handleBeginCharityTransfer(state, command, pack)
 	default:
 		return nil, fmt.Errorf("%w: unknown command %s", ErrIllegalCommand, command.Type)
 	}
@@ -437,6 +452,12 @@ func handleTimeoutInteraction(
 		state.SuspendedInteractionWindow != nil &&
 		window.ID == state.CombatHelpOffer.ID {
 		return handleTimeoutCombatHelp(state, command, pack)
+	}
+	if window.Kind == InteractionKindEconomyOffer {
+		return handleTimeoutEconomyOffer(state, command)
+	}
+	if window.Kind == InteractionKindCharityTransfer {
+		return resolveCharityTransfer(state, command, pack, true)
 	}
 	next := state.Clone()
 	events := make([]DomainEvent, 0, len(window.EligibleActorIDs)+1)
@@ -2632,7 +2653,485 @@ func handleChooseEffect(state State, command Command, pack Pack) ([]DomainEvent,
 	return transition(EventEffectResolved, command, next, outcomes)
 }
 
+func handleProposeEconomyOffer(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	offererIndex, err := requirePhase(
+		state,
+		command,
+		PhasePreparation,
+		PhaseCharity,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !profile.PlayerEconomy ||
+		state.InteractionWindow != nil &&
+			state.InteractionWindow.Status == InteractionWindowOpen ||
+		state.EconomyOffer != nil ||
+		state.CharityTransfer != nil &&
+			!state.CharityTransfer.Completed ||
+		command.InteractionID == "" ||
+		command.InteractionAt.IsZero() ||
+		command.TargetPlayerID == "" ||
+		command.TargetPlayerID == command.ActorID {
+		return nil, fmt.Errorf(
+			"%w: economy offer is not available",
+			ErrIllegalCommand,
+		)
+	}
+	recipientIndex := state.PlayerIndex(command.TargetPlayerID)
+	if recipientIndex < 0 || state.Players[recipientIndex].Dead {
+		return nil, fmt.Errorf(
+			"%w: economy recipient is not available",
+			ErrIllegalCommand,
+		)
+	}
+	kind := EconomyOfferTrade
+	if command.Type == CommandProposeGift {
+		kind = EconomyOfferGift
+	}
+	if len(command.InstanceIDs) == 0 ||
+		!uniqueStrings(command.InstanceIDs) ||
+		!uniqueStrings(command.RequestedInstanceIDs) ||
+		(kind == EconomyOfferTrade &&
+			len(command.RequestedInstanceIDs) == 0) ||
+		(kind == EconomyOfferGift &&
+			len(command.RequestedInstanceIDs) != 0) {
+		return nil, fmt.Errorf(
+			"%w: economy offer clauses are incomplete",
+			ErrIllegalCommand,
+		)
+	}
+	offererTransferable, err := transferableCarriedInstances(
+		state,
+		offererIndex,
+		pack,
+	)
+	if err != nil {
+		return nil, err
+	}
+	recipientTransferable, err := transferableCarriedInstances(
+		state,
+		recipientIndex,
+		pack,
+	)
+	if err != nil {
+		return nil, err
+	}
+	for _, instanceID := range command.InstanceIDs {
+		if !slices.Contains(offererTransferable, instanceID) {
+			return nil, fmt.Errorf(
+				"%w: offered card is not server-transferable",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	for _, instanceID := range command.RequestedInstanceIDs {
+		if !slices.Contains(recipientTransferable, instanceID) {
+			return nil, fmt.Errorf(
+				"%w: requested card is not server-transferable",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	offer := EconomyOffer{
+		ID:                 command.InteractionID,
+		Kind:               kind,
+		OffererPlayerID:    command.ActorID,
+		RecipientPlayerID:  command.TargetPlayerID,
+		ParentPhase:        state.Turn.Phase,
+		OfferedInstanceIDs: append([]string(nil), command.InstanceIDs...),
+		RequestedInstanceIDs: append(
+			[]string(nil),
+			command.RequestedInstanceIDs...,
+		),
+	}
+	window, err := economyOfferWindow(state, offer, command.InteractionAt)
+	if err != nil {
+		return nil, err
+	}
+	next := state.Clone()
+	next.EconomyOffer = offer.clone()
+	next.InteractionWindow = window
+	return transition(EventEconomyOfferOpened, command, next, nil)
+}
+
+func handleRespondEconomyOffer(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	window, offer, err := requireEconomyOffer(
+		state,
+		command.InteractionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if command.ActorID != offer.RecipientPlayerID ||
+		command.InteractionRevision != window.DeadlineRevision ||
+		(command.InteractionIntent != InteractionIntentAccept &&
+			command.InteractionIntent != InteractionIntentDecline) ||
+		command.InteractionAt.IsZero() ||
+		!command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: stale economy offer response",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	if command.InteractionIntent == InteractionIntentAccept {
+		offererIndex := next.PlayerIndex(offer.OffererPlayerID)
+		recipientIndex := next.PlayerIndex(offer.RecipientPlayerID)
+		if err := transferCarriedInstances(
+			&next,
+			offererIndex,
+			recipientIndex,
+			offer.OfferedInstanceIDs,
+			pack,
+		); err != nil {
+			return nil, err
+		}
+		if len(offer.RequestedInstanceIDs) > 0 {
+			if err := transferCarriedInstances(
+				&next,
+				recipientIndex,
+				offererIndex,
+				offer.RequestedInstanceIDs,
+				pack,
+			); err != nil {
+				return nil, err
+			}
+		}
+		if err := reconcileLoadout(&next, offererIndex, pack); err != nil {
+			return nil, err
+		}
+		if err := reconcileLoadout(&next, recipientIndex, pack); err != nil {
+			return nil, err
+		}
+	}
+	response := next.InteractionWindow.Responses[command.ActorID]
+	response.Intent = command.InteractionIntent
+	response.AcceptedAt = command.InteractionAt
+	closeReason := InteractionCloseDeclined
+	if command.InteractionIntent == InteractionIntentAccept {
+		response.State = InteractionResponseAccepted
+		closeReason = InteractionCloseAccepted
+	} else {
+		response.State = InteractionResponseDeclined
+	}
+	next.InteractionWindow.Responses[command.ActorID] = response
+	next.InteractionWindow.Status = InteractionWindowClosed
+	next.InteractionWindow.CloseReason = closeReason
+	next.InteractionWindow.ClosedAt = command.InteractionAt
+	next.EconomyOffer = nil
+	return transition(EventEconomyOfferResolved, command, next, nil)
+}
+
+func handleCancelEconomyOffer(
+	state State,
+	command Command,
+) ([]DomainEvent, error) {
+	window, offer, err := requireEconomyOffer(
+		state,
+		command.InteractionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if command.ActorID != offer.OffererPlayerID ||
+		command.InteractionRevision != window.DeadlineRevision ||
+		command.InteractionAt.IsZero() ||
+		!command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: stale economy offer cancellation",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	next.InteractionWindow.Status = InteractionWindowClosed
+	next.InteractionWindow.CloseReason = InteractionCloseCancelled
+	next.InteractionWindow.ClosedAt = command.InteractionAt
+	next.EconomyOffer = nil
+	return transition(EventEconomyOfferResolved, command, next, nil)
+}
+
+func handleTimeoutEconomyOffer(
+	state State,
+	command Command,
+) ([]DomainEvent, error) {
+	window, offer, err := requireEconomyOffer(
+		state,
+		command.InteractionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if command.InteractionRevision != window.DeadlineRevision ||
+		command.InteractionAt.IsZero() ||
+		command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: economy offer deadline has not expired",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	response := next.InteractionWindow.Responses[offer.RecipientPlayerID]
+	response.State = InteractionResponseAutoResolved
+	response.Intent = InteractionIntentDecline
+	response.AcceptedAt = command.InteractionAt
+	next.InteractionWindow.Responses[offer.RecipientPlayerID] = response
+	next.InteractionWindow.Status = InteractionWindowClosed
+	next.InteractionWindow.CloseReason = InteractionCloseDeadlineExpired
+	next.InteractionWindow.ClosedAt = command.InteractionAt
+	next.EconomyOffer = nil
+	return transition(EventEconomyOfferResolved, command, next, nil)
+}
+
+func requireEconomyOffer(
+	state State,
+	interactionID string,
+) (InteractionWindow, EconomyOffer, error) {
+	window, err := requireInteractionWindow(state, interactionID)
+	if err != nil {
+		return InteractionWindow{}, EconomyOffer{}, err
+	}
+	if window.Kind != InteractionKindEconomyOffer ||
+		state.EconomyOffer == nil ||
+		state.EconomyOffer.ID != window.ID {
+		return InteractionWindow{}, EconomyOffer{}, fmt.Errorf(
+			"%w: economy offer is not active",
+			ErrIllegalCommand,
+		)
+	}
+	return window, *state.EconomyOffer.clone(), nil
+}
+
+func handleBeginCharityTransfer(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	playerIndex, err := requirePhase(state, command, PhaseCharity)
+	if err != nil {
+		return nil, err
+	}
+	if !profile.PlayerEconomy ||
+		state.CharityTransfer != nil ||
+		state.InteractionWindow != nil &&
+			state.InteractionWindow.Status == InteractionWindowOpen ||
+		command.InteractionID == "" ||
+		command.InteractionAt.IsZero() {
+		return nil, fmt.Errorf(
+			"%w: charity transfer cannot start",
+			ErrIllegalCommand,
+		)
+	}
+	limit, err := handLimit(state, playerIndex, pack)
+	if err != nil {
+		return nil, err
+	}
+	excess := max(0, len(state.Players[playerIndex].Hand)-limit)
+	if excess == 0 {
+		next := state.Clone()
+		setTurnPhase(&next, PhaseEndTurn)
+		return transition(EventCharityAllocated, command, next, nil)
+	}
+	window, err := charityTransferWindow(
+		state,
+		command.InteractionID,
+		command.InteractionAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	next := state.Clone()
+	next.CharityTransfer = (&CharityTransfer{
+		InteractionID:     command.InteractionID,
+		AllocatorPlayerID: command.ActorID,
+		Excess:            excess,
+		StableHandOrder: append(
+			[]string(nil),
+			state.Players[playerIndex].Hand...,
+		),
+		EligibleRecipientIDs: charityRecipientIDs(state, playerIndex),
+	}).clone()
+	next.InteractionWindow = window
+	return transition(EventCharityTransferStarted, command, next, nil)
+}
+
+func resolveCharityTransfer(
+	state State,
+	command Command,
+	pack Pack,
+	automatic bool,
+) ([]DomainEvent, error) {
+	transfer := state.CharityTransfer
+	window, err := requireInteractionWindow(state, command.InteractionID)
+	if err != nil {
+		return nil, err
+	}
+	if transfer == nil ||
+		transfer.Completed ||
+		window.Kind != InteractionKindCharityTransfer ||
+		window.ID != transfer.InteractionID ||
+		command.InteractionRevision != window.DeadlineRevision {
+		return nil, fmt.Errorf(
+			"%w: charity transfer is stale",
+			ErrIllegalCommand,
+		)
+	}
+	if automatic {
+		if command.ActorID != "" ||
+			command.InteractionAt.IsZero() ||
+			command.InteractionAt.Before(window.DeadlineAt) {
+			return nil, fmt.Errorf(
+				"%w: charity timeout is premature",
+				ErrIllegalCommand,
+			)
+		}
+	} else if command.ActorID != transfer.AllocatorPlayerID ||
+		command.InteractionAt.IsZero() ||
+		!command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: charity allocation is stale",
+			ErrIllegalCommand,
+		)
+	}
+	allocations := append(
+		[]CharityAllocation(nil),
+		command.CharityAllocations...,
+	)
+	if automatic {
+		allocations = make([]CharityAllocation, transfer.Excess)
+		for index, instanceID := range transfer.StableHandOrder[:transfer.Excess] {
+			allocations[index].InstanceID = instanceID
+			if len(transfer.EligibleRecipientIDs) > 0 {
+				allocations[index].RecipientPlayerID =
+					transfer.EligibleRecipientIDs[index%len(
+						transfer.EligibleRecipientIDs,
+					)]
+			}
+		}
+	}
+	if len(allocations) != transfer.Excess {
+		return nil, fmt.Errorf(
+			"%w: charity requires exactly %d cards",
+			ErrIllegalCommand,
+			transfer.Excess,
+		)
+	}
+	seen := make(map[string]struct{}, len(allocations))
+	allocatorIndex := state.PlayerIndex(transfer.AllocatorPlayerID)
+	for _, allocation := range allocations {
+		if !slices.Contains(
+			transfer.StableHandOrder,
+			allocation.InstanceID,
+		) ||
+			!slices.Contains(
+				state.Players[allocatorIndex].Hand,
+				allocation.InstanceID,
+			) {
+			return nil, fmt.Errorf(
+				"%w: charity card is not allocator-owned",
+				ErrIllegalCommand,
+			)
+		}
+		if _, duplicate := seen[allocation.InstanceID]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: duplicate charity card",
+				ErrIllegalCommand,
+			)
+		}
+		seen[allocation.InstanceID] = struct{}{}
+		if len(transfer.EligibleRecipientIDs) == 0 {
+			if allocation.RecipientPlayerID != "" {
+				return nil, fmt.Errorf(
+					"%w: charity has no recipient",
+					ErrIllegalCommand,
+				)
+			}
+		} else if !slices.Contains(
+			transfer.EligibleRecipientIDs,
+			allocation.RecipientPlayerID,
+		) {
+			return nil, fmt.Errorf(
+				"%w: charity recipient is not eligible",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	next := state.Clone()
+	next.CharityTransfer.Allocations = nil
+	next.CharityTransfer.DiscardedInstanceIDs = nil
+	for _, allocation := range allocations {
+		next.Players[allocatorIndex].Hand, _ = removeString(
+			next.Players[allocatorIndex].Hand,
+			allocation.InstanceID,
+		)
+		if allocation.RecipientPlayerID == "" {
+			if err := appendDiscard(
+				&next,
+				allocation.InstanceID,
+				pack,
+			); err != nil {
+				return nil, err
+			}
+			next.CharityTransfer.DiscardedInstanceIDs = append(
+				next.CharityTransfer.DiscardedInstanceIDs,
+				allocation.InstanceID,
+			)
+			continue
+		}
+		recipientIndex := next.PlayerIndex(allocation.RecipientPlayerID)
+		next.Players[recipientIndex].Hand = append(
+			next.Players[recipientIndex].Hand,
+			allocation.InstanceID,
+		)
+		next.CharityTransfer.Allocations = append(
+			next.CharityTransfer.Allocations,
+			allocation,
+		)
+	}
+	response := next.InteractionWindow.Responses[transfer.AllocatorPlayerID]
+	response.AcceptedAt = command.InteractionAt
+	closeReason := InteractionCloseAllResponded
+	if automatic {
+		response.State = InteractionResponseAutoResolved
+		response.Intent = InteractionIntentAutoResolve
+		closeReason = InteractionCloseDeadlineExpired
+	} else {
+		response.State = InteractionResponseActed
+		response.Intent = InteractionIntentRespond
+	}
+	next.InteractionWindow.Responses[transfer.AllocatorPlayerID] = response
+	next.InteractionWindow.Status = InteractionWindowClosed
+	next.InteractionWindow.CloseReason = closeReason
+	next.InteractionWindow.ClosedAt = command.InteractionAt
+	next.CharityTransfer.Completed = true
+	setTurnPhase(&next, PhaseEndTurn)
+	return transition(EventCharityAllocated, command, next, nil)
+}
+
 func handleResolveCharity(state State, command Command, pack Pack) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	if profile.PlayerEconomy {
+		return resolveCharityTransfer(state, command, pack, false)
+	}
 	playerIndex, err := requirePhase(state, command, PhaseCharity)
 	if err != nil {
 		return nil, err
@@ -2671,6 +3170,7 @@ func handleEndTurn(state State, command Command, pack Pack) ([]DomainEvent, erro
 		return nil, err
 	}
 	next := state.Clone()
+	next.CharityTransfer = nil
 	nextPlayerIndex := (playerIndex + 1) % len(next.Players)
 	next.Turn = Turn{PlayerID: next.Players[nextPlayerIndex].ID}
 	var outcomes []RandomOutcome

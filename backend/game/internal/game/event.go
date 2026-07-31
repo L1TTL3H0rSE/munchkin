@@ -40,6 +40,10 @@ const (
 	EventTargetEffectResolved        = "game.v1.target_effect_resolved"
 	EventRunAwayResponseApplied      = "game.v1.run_away_response_applied"
 	EventRunAwayStepResolved         = "game.v1.run_away_step_resolved"
+	EventEconomyOfferOpened          = "game.v1.economy_offer_opened"
+	EventEconomyOfferResolved        = "game.v1.economy_offer_resolved"
+	EventCharityTransferStarted      = "game.v1.charity_transfer_started"
+	EventCharityAllocated            = "game.v1.charity_allocated"
 
 	legacyEventPlayerJoined    = "game.v1.player_joined"
 	legacyEventGameStarted     = "game.v1.game_started"
@@ -232,6 +236,10 @@ func Apply(state State, event DomainEvent) (State, error) {
 		EventTargetEffectResolved,
 		EventRunAwayResponseApplied,
 		EventRunAwayStepResolved,
+		EventEconomyOfferOpened,
+		EventEconomyOfferResolved,
+		EventCharityTransferStarted,
+		EventCharityAllocated,
 		EventRunAwayResolved,
 		EventEffectResolved,
 		EventCharityResolved,

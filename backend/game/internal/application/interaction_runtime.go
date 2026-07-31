@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -499,11 +500,24 @@ func (service *Service) ExecuteInteraction(
 				intent == game.InteractionIntentDecline) {
 			command.Type = game.CommandRespondCombatHelp
 		}
+		economyResponse := state.EconomyOffer != nil &&
+			window.Kind == game.InteractionKindEconomyOffer
+		if economyResponse {
+			switch intent {
+			case game.InteractionIntentAccept,
+				game.InteractionIntentDecline:
+				command.Type = game.CommandRespondEconomyOffer
+			case game.InteractionIntentCancelOffer:
+				command.Type = game.CommandCancelEconomyOffer
+			default:
+				return ErrInteractionAction
+			}
+		}
 		events, err := game.Handle(state, command, service.pack)
 		if err != nil {
 			return err
 		}
-		if !combatHelpResponse {
+		if !combatHelpResponse && !economyResponse {
 			events, err = appendInteractionClose(
 				state,
 				events,
@@ -591,6 +605,309 @@ func (service *Service) ExecuteInteraction(
 		return CommandResult{}, committedError
 	}
 	return result, nil
+}
+
+func (service *Service) ProposeEconomyOffer(
+	ctx context.Context,
+	gameID string,
+	credential string,
+	commandID string,
+	expectedVersion uint64,
+	kind game.EconomyOfferKind,
+	recipientPlayerID string,
+	offeredInstanceIDs []string,
+	requestedInstanceIDs []string,
+) (CommandResult, error) {
+	commandType := game.CommandProposeTrade
+	if kind == game.EconomyOfferGift {
+		commandType = game.CommandProposeGift
+	} else if kind != game.EconomyOfferTrade {
+		return CommandResult{}, ErrInteractionAction
+	}
+	command := game.Command{
+		Type:           commandType,
+		TargetPlayerID: strings.TrimSpace(recipientPlayerID),
+		InstanceIDs:    append([]string(nil), offeredInstanceIDs...),
+		RequestedInstanceIDs: append(
+			[]string(nil),
+			requestedInstanceIDs...,
+		),
+	}
+	if len(command.RequestedInstanceIDs) == 0 {
+		command.RequestedInstanceIDs = nil
+	}
+	fingerprint := economyCommandFingerprint(command, expectedVersion)
+	return service.executeTimedEconomyCommand(
+		ctx,
+		gameID,
+		credential,
+		commandID,
+		expectedVersion,
+		fingerprint,
+		func(state game.State, actorID string, acceptedAt time.Time) (game.Command, error) {
+			projected, err := game.ProjectForActor(state, actorID, service.pack)
+			if err != nil {
+				return game.Command{}, err
+			}
+			var descriptor *game.ActionView
+			for index := range projected.Turn.AvailableActions {
+				action := &projected.Turn.AvailableActions[index]
+				if action.Type == commandType &&
+					len(action.TargetPlayerIDs) == 1 &&
+					action.TargetPlayerIDs[0] == command.TargetPlayerID {
+					descriptor = action
+					break
+				}
+			}
+			if descriptor == nil ||
+				!allStringsAllowed(
+					command.InstanceIDs,
+					descriptor.InstanceIDs,
+				) ||
+				len(command.RequestedInstanceIDs) > 0 &&
+					!allStringsAllowed(
+						command.RequestedInstanceIDs,
+						descriptor.RequestedInstanceIDs,
+					) {
+				return game.Command{}, ErrInteractionAction
+			}
+			interactionID, err := service.randomID("interaction")
+			if err != nil {
+				return game.Command{}, err
+			}
+			command.ActorID = actorID
+			command.InteractionID = interactionID
+			command.InteractionAt = acceptedAt
+			return command, nil
+		},
+	)
+}
+
+func (service *Service) ResolveCharity(
+	ctx context.Context,
+	gameID string,
+	credential string,
+	commandID string,
+	expectedVersion uint64,
+	legacyInstanceIDs []string,
+	allocations []game.CharityAllocation,
+) (CommandResult, error) {
+	if len(legacyInstanceIDs) == 0 {
+		legacyInstanceIDs = nil
+	}
+	if len(allocations) == 0 {
+		allocations = nil
+	}
+	fingerprint := charityFingerprint(
+		expectedVersion,
+		legacyInstanceIDs,
+		allocations,
+	)
+	return service.executeTimedEconomyCommand(
+		ctx,
+		gameID,
+		credential,
+		commandID,
+		expectedVersion,
+		fingerprint,
+		func(state game.State, actorID string, acceptedAt time.Time) (game.Command, error) {
+			profile, err := state.Profile()
+			if err != nil {
+				return game.Command{}, err
+			}
+			if !profile.PlayerEconomy {
+				if len(allocations) != 0 {
+					return game.Command{}, ErrInteractionAction
+				}
+				return game.Command{
+					Type:    game.CommandResolveCharity,
+					ActorID: actorID,
+					InstanceIDs: append(
+						[]string(nil),
+						legacyInstanceIDs...,
+					),
+				}, nil
+			}
+			if len(legacyInstanceIDs) != 0 {
+				return game.Command{}, ErrInteractionAction
+			}
+			if state.CharityTransfer == nil {
+				if len(allocations) != 0 {
+					return game.Command{}, ErrInteractionAction
+				}
+				interactionID, err := service.randomID("interaction")
+				if err != nil {
+					return game.Command{}, err
+				}
+				return game.Command{
+					Type:          game.CommandBeginCharityTransfer,
+					ActorID:       actorID,
+					InteractionID: interactionID,
+					InteractionAt: acceptedAt,
+				}, nil
+			}
+			window := state.InteractionWindow
+			transfer := state.CharityTransfer
+			if transfer.Completed ||
+				window == nil ||
+				window.Status != game.InteractionWindowOpen ||
+				window.ID != transfer.InteractionID ||
+				actorID != transfer.AllocatorPlayerID {
+				return game.Command{}, ErrInteractionAction
+			}
+			for _, allocation := range allocations {
+				if !slices.Contains(
+					transfer.StableHandOrder,
+					allocation.InstanceID,
+				) {
+					return game.Command{}, ErrInteractionAction
+				}
+				if len(transfer.EligibleRecipientIDs) == 0 {
+					if allocation.RecipientPlayerID != "" {
+						return game.Command{}, ErrInteractionAction
+					}
+				} else if !slices.Contains(
+					transfer.EligibleRecipientIDs,
+					allocation.RecipientPlayerID,
+				) {
+					return game.Command{}, ErrInteractionAction
+				}
+			}
+			return game.Command{
+				Type:                game.CommandResolveCharity,
+				ActorID:             actorID,
+				InteractionID:       window.ID,
+				InteractionAt:       acceptedAt,
+				InteractionRevision: window.DeadlineRevision,
+				CharityAllocations: append(
+					[]game.CharityAllocation(nil),
+					allocations...,
+				),
+			}, nil
+		},
+	)
+}
+
+type timedEconomyCommandBuilder func(
+	game.State,
+	string,
+	time.Time,
+) (game.Command, error)
+
+func (service *Service) executeTimedEconomyCommand(
+	ctx context.Context,
+	gameID string,
+	credential string,
+	commandID string,
+	expectedVersion uint64,
+	fingerprint string,
+	build timedEconomyCommandBuilder,
+) (CommandResult, error) {
+	gameID = strings.TrimSpace(gameID)
+	commandID = strings.TrimSpace(commandID)
+	if gameID == "" || credential == "" || commandID == "" {
+		return CommandResult{}, ErrUnauthorized
+	}
+	tokenHash := hashCredential(credential)
+	var result CommandResult
+	var publish *Invalidation
+	err := service.store.WithinGame(ctx, gameID, func(tx Tx) error {
+		state := tx.State()
+		if err := service.ensureContentIdentity(state); err != nil {
+			return err
+		}
+		actorID, exists := state.ActorByCredentialHash(tokenHash)
+		if !exists {
+			return ErrUnauthorized
+		}
+		if receipt, exists := tx.FindReceipt(actorID, commandID); exists {
+			if receipt.Fingerprint != fingerprint {
+				return ErrIdempotencyConflict
+			}
+			var projection game.Projection
+			if err := json.Unmarshal(receipt.Projection, &projection); err != nil {
+				return err
+			}
+			result = CommandResult{
+				GameID:     gameID,
+				CommandID:  commandID,
+				Version:    receipt.Version,
+				Replayed:   true,
+				Projection: projection,
+			}
+			return nil
+		}
+		if state.Version != expectedVersion {
+			return ErrVersionConflict
+		}
+		acceptedAt := time.Unix(0, service.clock.Now()).UTC()
+		command, err := build(state, actorID, acceptedAt)
+		if err != nil {
+			return err
+		}
+		events, err := game.Handle(state, command, service.pack)
+		if err != nil {
+			return err
+		}
+		envelopes, next, err := service.applyAt(
+			state,
+			commandID,
+			events,
+			acceptedAt,
+		)
+		if err != nil {
+			return err
+		}
+		projection, err := service.projectForActor(next, actorID, acceptedAt)
+		if err != nil {
+			return err
+		}
+		rawProjection, err := json.Marshal(projection)
+		if err != nil {
+			return err
+		}
+		receipt := Receipt{
+			ActorID:     actorID,
+			CommandID:   commandID,
+			Fingerprint: fingerprint,
+			Version:     next.Version,
+			Projection:  rawProjection,
+		}
+		if err := tx.Save(state.Version, next, envelopes, &receipt); err != nil {
+			return err
+		}
+		result = CommandResult{
+			GameID:     gameID,
+			CommandID:  commandID,
+			Version:    next.Version,
+			Projection: projection,
+		}
+		publish = interactionInvalidation(
+			gameID,
+			next.Version,
+			acceptedAt,
+		)
+		return nil
+	})
+	if err != nil {
+		return CommandResult{}, err
+	}
+	if publish != nil {
+		_ = service.publisher.Publish(ctx, *publish)
+	}
+	return result, nil
+}
+
+func allStringsAllowed(selected []string, allowed []string) bool {
+	if len(selected) == 0 {
+		return false
+	}
+	for _, value := range selected {
+		if !slices.Contains(allowed, value) {
+			return false
+		}
+	}
+	return true
 }
 
 func (service *Service) ExecuteCombatHelpAction(
@@ -1195,7 +1512,8 @@ func playerInteractionIntent(intent game.InteractionIntent) bool {
 	case game.InteractionIntentPass,
 		game.InteractionIntentRespond,
 		game.InteractionIntentAccept,
-		game.InteractionIntentDecline:
+		game.InteractionIntentDecline,
+		game.InteractionIntentCancelOffer:
 		return true
 	default:
 		return false
@@ -1246,6 +1564,53 @@ func targetEffectFingerprint(
 	})
 	if err != nil {
 		panic(fmt.Sprintf("marshal target-effect fingerprint: %v", err))
+	}
+	digest := sha256.Sum256(raw)
+	return hex.EncodeToString(digest[:])
+}
+
+func economyCommandFingerprint(
+	command game.Command,
+	expectedVersion uint64,
+) string {
+	raw, err := json.Marshal(struct {
+		Type                 game.CommandType `json:"type"`
+		ExpectedVersion      uint64           `json:"expected_version"`
+		RecipientPlayerID    string           `json:"recipient_player_id"`
+		OfferedInstanceIDs   []string         `json:"offered_instance_ids"`
+		RequestedInstanceIDs []string         `json:"requested_instance_ids"`
+	}{
+		Type:                 command.Type,
+		ExpectedVersion:      expectedVersion,
+		RecipientPlayerID:    command.TargetPlayerID,
+		OfferedInstanceIDs:   command.InstanceIDs,
+		RequestedInstanceIDs: command.RequestedInstanceIDs,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("marshal economy fingerprint: %v", err))
+	}
+	digest := sha256.Sum256(raw)
+	return hex.EncodeToString(digest[:])
+}
+
+func charityFingerprint(
+	expectedVersion uint64,
+	legacyInstanceIDs []string,
+	allocations []game.CharityAllocation,
+) string {
+	raw, err := json.Marshal(struct {
+		Type            game.CommandType         `json:"type"`
+		ExpectedVersion uint64                   `json:"expected_version"`
+		InstanceIDs     []string                 `json:"instance_ids"`
+		Allocations     []game.CharityAllocation `json:"allocations"`
+	}{
+		Type:            game.CommandResolveCharity,
+		ExpectedVersion: expectedVersion,
+		InstanceIDs:     legacyInstanceIDs,
+		Allocations:     allocations,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("marshal charity fingerprint: %v", err))
 	}
 	digest := sha256.Sum256(raw)
 	return hex.EncodeToString(digest[:])

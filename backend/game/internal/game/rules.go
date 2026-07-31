@@ -39,6 +39,186 @@ func AddressedInteractionDeadlinePolicy() InteractionDeadlinePolicy {
 	}
 }
 
+func economyOfferWindow(
+	state State,
+	offer EconomyOffer,
+	openedAt time.Time,
+) (*InteractionWindow, error) {
+	if offer.ID == "" ||
+		offer.OffererPlayerID == "" ||
+		offer.RecipientPlayerID == "" ||
+		openedAt.IsZero() {
+		return nil, fmt.Errorf(
+			"%w: incomplete economy offer window",
+			ErrIllegalCommand,
+		)
+	}
+	policy := AddressedInteractionDeadlinePolicy()
+	return &InteractionWindow{
+		ID:   offer.ID,
+		Kind: InteractionKindEconomyOffer,
+		Parent: InteractionParent{
+			Phase:       offer.ParentPhase,
+			SubjectKind: InteractionSubjectTurn,
+			SubjectID:   state.Turn.PlayerID,
+		},
+		InitiatorActorID:  offer.OffererPlayerID,
+		EligibilityPolicy: InteractionEligibilityActorPrivate,
+		AllowedIntents: []InteractionIntent{
+			InteractionIntentAccept,
+			InteractionIntentDecline,
+		},
+		EligibleActorIDs: []string{offer.RecipientPlayerID},
+		OpenedAt:         openedAt,
+		DeadlineAt: openedAt.Add(
+			time.Duration(policy.BaseSeconds) * time.Second,
+		),
+		DeadlineRevision: 1,
+		DeadlinePolicy:   policy,
+		Responses: map[string]InteractionResponse{
+			offer.RecipientPlayerID: {
+				Requirement:   InteractionResponseMandatory,
+				TimeoutIntent: InteractionIntentDecline,
+				State:         InteractionResponsePending,
+			},
+		},
+		Status: InteractionWindowOpen,
+	}, nil
+}
+
+func charityRecipientIDs(state State, allocatorIndex int) []string {
+	minimumLevel := 0
+	for index, player := range state.Players {
+		if index == allocatorIndex || player.Dead {
+			continue
+		}
+		if minimumLevel == 0 || player.Level < minimumLevel {
+			minimumLevel = player.Level
+		}
+	}
+	if minimumLevel == 0 {
+		return nil
+	}
+	recipients := make([]string, 0, len(state.Players)-1)
+	for offset := 1; offset < len(state.Players); offset++ {
+		index := (allocatorIndex + offset) % len(state.Players)
+		player := state.Players[index]
+		if !player.Dead && player.Level == minimumLevel {
+			recipients = append(recipients, player.ID)
+		}
+	}
+	return recipients
+}
+
+func charityTransferWindow(
+	state State,
+	interactionID string,
+	openedAt time.Time,
+) (*InteractionWindow, error) {
+	if interactionID == "" ||
+		openedAt.IsZero() ||
+		state.Turn.PlayerID == "" {
+		return nil, fmt.Errorf(
+			"%w: incomplete charity window",
+			ErrIllegalCommand,
+		)
+	}
+	policy := AddressedInteractionDeadlinePolicy()
+	return &InteractionWindow{
+		ID:   interactionID,
+		Kind: InteractionKindCharityTransfer,
+		Parent: InteractionParent{
+			Phase:       PhaseCharity,
+			SubjectKind: InteractionSubjectTurn,
+			SubjectID:   state.Turn.PlayerID,
+		},
+		InitiatorActorID:  state.Turn.PlayerID,
+		EligibilityPolicy: InteractionEligibilityActorPrivate,
+		AllowedIntents: []InteractionIntent{
+			InteractionIntentRespond,
+			InteractionIntentAutoResolve,
+		},
+		EligibleActorIDs: []string{state.Turn.PlayerID},
+		OpenedAt:         openedAt,
+		DeadlineAt: openedAt.Add(
+			time.Duration(policy.BaseSeconds) * time.Second,
+		),
+		DeadlineRevision: 1,
+		DeadlinePolicy:   policy,
+		Responses: map[string]InteractionResponse{
+			state.Turn.PlayerID: {
+				Requirement:   InteractionResponseMandatory,
+				TimeoutIntent: InteractionIntentAutoResolve,
+				State:         InteractionResponsePending,
+			},
+		},
+		Status: InteractionWindowOpen,
+	}, nil
+}
+
+func transferableCarriedInstances(
+	state State,
+	playerIndex int,
+	pack Pack,
+) ([]string, error) {
+	player := state.Players[playerIndex]
+	ids := make([]string, 0, len(player.Carried))
+	for _, instanceID := range player.Carried {
+		card, _, exists := pack.DefinitionForInstance(state, instanceID)
+		if !exists || card.Item == nil {
+			return nil, fmt.Errorf(
+				"%w: carried card is not an item",
+				ErrInvalidContent,
+			)
+		}
+		if isCheated(player, instanceID) {
+			continue
+		}
+		ids = append(ids, instanceID)
+	}
+	return ids, nil
+}
+
+func transferCarriedInstances(
+	state *State,
+	fromIndex int,
+	toIndex int,
+	instanceIDs []string,
+	pack Pack,
+) error {
+	if fromIndex < 0 ||
+		toIndex < 0 ||
+		fromIndex == toIndex ||
+		len(instanceIDs) == 0 ||
+		!uniqueStrings(instanceIDs) {
+		return fmt.Errorf(
+			"%w: malformed transfer clause",
+			ErrIllegalCommand,
+		)
+	}
+	from := &state.Players[fromIndex]
+	for _, instanceID := range instanceIDs {
+		card, _, exists := pack.DefinitionForInstance(*state, instanceID)
+		if !exists ||
+			card.Item == nil ||
+			!slices.Contains(from.Carried, instanceID) ||
+			isCheated(*from, instanceID) {
+			return fmt.Errorf(
+				"%w: card is not transferable",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	for _, instanceID := range instanceIDs {
+		from.Carried, _ = removeString(from.Carried, instanceID)
+		state.Players[toIndex].Carried = append(
+			state.Players[toIndex].Carried,
+			instanceID,
+		)
+	}
+	return nil
+}
+
 func targetResponseActors(state State, initiatorID string) []string {
 	actorIDs := make([]string, 0, len(state.Players)-1)
 	for _, player := range state.Players {

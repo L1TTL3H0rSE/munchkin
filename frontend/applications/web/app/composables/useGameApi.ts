@@ -2,6 +2,8 @@ import {
   commandResultSchema,
   combatHelpRequestSchema,
   combatResolutionRequestSchema,
+  economyOfferRequestSchema,
+  charityRequestSchema,
   interactionCommandRequestSchema,
   invalidationSchema,
   lobbyResultSchema,
@@ -14,6 +16,7 @@ import {
   type CommandPayload,
   type Invalidation,
   type InteractionIntent,
+  type CharityAllocation,
   type LobbyResult,
   type Projection,
 } from "@munchkin/contracts";
@@ -176,6 +179,61 @@ export function useGameApi() {
     return clientCommandResult(response);
   }
 
+  async function economyOffer(
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    kind: "trade" | "gift",
+    recipientPlayerID: string,
+    offeredInstanceIDs: string[],
+    requestedInstanceIDs: string[] = [],
+  ) {
+    const request = economyOfferRequestSchema.parse({
+      expected_version: expectedVersion,
+      recipient_player_id: recipientPlayerID,
+      offered_instance_ids: offeredInstanceIDs,
+      ...(kind === "trade"
+        ? {requested_instance_ids: requestedInstanceIDs}
+        : {}),
+    });
+    const response = await $fetch(
+      `${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/commands/propose-${kind}`,
+      {
+        method: "POST",
+        headers: {
+          ...authorization(credential),
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: request,
+      },
+    );
+    return clientCommandResult(response);
+  }
+
+  async function resolveCharity(
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    allocations: CharityAllocation[] = [],
+  ) {
+    const request = charityRequestSchema.parse({
+      expected_version: expectedVersion,
+      ...(allocations.length > 0 ? {allocations} : {}),
+    });
+    const response = await $fetch(
+      `${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/commands/resolve-charity`,
+      {
+        method: "POST",
+        headers: {
+          ...authorization(credential),
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: request,
+      },
+    );
+    return clientCommandResult(response);
+  }
+
   function stream(
     gameID: string,
     credential: string,
@@ -209,6 +267,8 @@ export function useGameApi() {
     interaction,
     requestCombatResolution,
     combatHelp,
+    economyOffer,
+    resolveCharity,
     stream,
     contentAssetURL,
   };
@@ -238,7 +298,10 @@ function clientProjection(response: unknown): Projection {
       ...parsed.turn,
       available_actions: parsed.turn.available_actions.filter(
         (action): action is ActionDescriptor =>
-          action.type !== "play_target_effect",
+          action.type !== "play_target_effect" &&
+          action.type !== "propose_trade" &&
+          action.type !== "propose_gift" &&
+          action.type !== "resolve_charity",
       ),
     },
   };

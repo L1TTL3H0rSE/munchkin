@@ -97,16 +97,17 @@ type DecisionView struct {
 }
 
 type ActionView struct {
-	Type              CommandType    `json:"type"`
-	SourceInstanceID  string         `json:"source_instance_id,omitempty"`
-	InstanceIDs       []string       `json:"instance_ids,omitempty"`
-	TargetInstanceIDs []string       `json:"target_instance_ids,omitempty"`
-	TargetPlayerIDs   []string       `json:"target_player_ids,omitempty"`
-	Minimum           int            `json:"minimum,omitempty"`
-	Maximum           int            `json:"maximum,omitempty"`
-	MinimumTotal      int            `json:"minimum_total,omitempty"`
-	InstanceValues    map[string]int `json:"instance_values,omitempty"`
-	AbilityIndex      int            `json:"ability_index,omitempty"`
+	Type                 CommandType    `json:"type"`
+	SourceInstanceID     string         `json:"source_instance_id,omitempty"`
+	InstanceIDs          []string       `json:"instance_ids,omitempty"`
+	TargetInstanceIDs    []string       `json:"target_instance_ids,omitempty"`
+	RequestedInstanceIDs []string       `json:"requested_instance_ids,omitempty"`
+	TargetPlayerIDs      []string       `json:"target_player_ids,omitempty"`
+	Minimum              int            `json:"minimum,omitempty"`
+	Maximum              int            `json:"maximum,omitempty"`
+	MinimumTotal         int            `json:"minimum_total,omitempty"`
+	InstanceValues       map[string]int `json:"instance_values,omitempty"`
+	AbilityIndex         int            `json:"ability_index,omitempty"`
 }
 
 type TurnView struct {
@@ -169,6 +170,20 @@ type CombatHelpOfferView struct {
 	RewardTreasures int    `json:"reward_treasures"`
 }
 
+type EconomyOfferView struct {
+	Kind              EconomyOfferKind `json:"kind"`
+	OffererPlayerID   string           `json:"offerer_player_id"`
+	RecipientPlayerID string           `json:"recipient_player_id"`
+	Offered           []CardView       `json:"offered"`
+	Requested         []CardView       `json:"requested"`
+}
+
+type CharityTransferView struct {
+	Excess               int      `json:"excess"`
+	InstanceIDs          []string `json:"instance_ids"`
+	EligibleRecipientIDs []string `json:"eligible_recipient_ids"`
+}
+
 type InteractionView struct {
 	InteractionID          string                   `json:"interaction_id"`
 	PublicKind             string                   `json:"public_kind"`
@@ -182,6 +197,8 @@ type InteractionView struct {
 	Actions                []InteractionActionView  `json:"actions"`
 	CombatHelpOffer        *CombatHelpOfferView     `json:"combat_help_offer,omitempty"`
 	TargetPlayerID         string                   `json:"target_player_id,omitempty"`
+	EconomyOffer           *EconomyOfferView        `json:"economy_offer,omitempty"`
+	CharityTransfer        *CharityTransferView     `json:"charity_transfer,omitempty"`
 }
 
 type Projection struct {
@@ -439,6 +456,19 @@ func projectInteraction(
 	if domainPrivateChoice {
 		publicKind = "private_choice"
 	}
+	domainEconomyOffer := profile.PlayerEconomy &&
+		window.Kind == InteractionKindEconomyOffer &&
+		state.EconomyOffer != nil
+	if domainEconomyOffer {
+		publicKind = "economy_offer"
+	}
+	domainCharityTransfer := profile.PlayerEconomy &&
+		window.Kind == InteractionKindCharityTransfer &&
+		state.CharityTransfer != nil &&
+		!state.CharityTransfer.Completed
+	if domainCharityTransfer {
+		publicKind = "charity_transfer"
+	}
 	view := &InteractionView{
 		InteractionID: window.ID,
 		PublicKind:    publicKind,
@@ -450,6 +480,68 @@ func projectInteraction(
 	}
 	if domainTargetResponse {
 		view.TargetPlayerID = state.Turn.TargetEffect.TargetPlayerID
+	}
+	if domainEconomyOffer {
+		offer := state.EconomyOffer
+		if actorID == offer.OffererPlayerID ||
+			actorID == offer.RecipientPlayerID {
+			offered, err := cardViews(
+				state,
+				offer.OfferedInstanceIDs,
+				pack,
+			)
+			if err != nil {
+				return nil, err
+			}
+			requested, err := cardViews(
+				state,
+				offer.RequestedInstanceIDs,
+				pack,
+			)
+			if err != nil {
+				return nil, err
+			}
+			view.EconomyOffer = &EconomyOfferView{
+				Kind:              offer.Kind,
+				OffererPlayerID:   offer.OffererPlayerID,
+				RecipientPlayerID: offer.RecipientPlayerID,
+				Offered:           offered,
+				Requested:         requested,
+			}
+		}
+		if actorID == offer.OffererPlayerID {
+			view.Actions = append(
+				view.Actions,
+				InteractionActionView{
+					ActionID: interactionActionID(
+						window.ID,
+						actorID,
+						InteractionIntentCancelOffer,
+						"",
+						"",
+						state.Version,
+					),
+					InteractionID: window.ID,
+					Revision:      window.DeadlineRevision,
+					Type:          InteractionIntentCancelOffer,
+				},
+			)
+			return view, nil
+		}
+	}
+	if domainCharityTransfer &&
+		actorID == state.CharityTransfer.AllocatorPlayerID {
+		view.CharityTransfer = &CharityTransferView{
+			Excess: state.CharityTransfer.Excess,
+			InstanceIDs: append(
+				[]string(nil),
+				state.CharityTransfer.StableHandOrder...,
+			),
+			EligibleRecipientIDs: append(
+				[]string(nil),
+				state.CharityTransfer.EligibleRecipientIDs...,
+			),
+		}
 	}
 	if domainCombatHelp {
 		offer := state.CombatHelpOffer
@@ -532,6 +624,9 @@ func projectInteraction(
 				ChoiceIDs:     choiceIDs,
 			})
 		}
+		return view, nil
+	}
+	if domainCharityTransfer {
 		return view, nil
 	}
 	if domainTargetResponse &&
@@ -1324,6 +1419,56 @@ func projectActions(
 		}
 		return nil
 	}
+	addEconomyActions := func() error {
+		if !profile.PlayerEconomy {
+			return nil
+		}
+		offered, err := transferableCarriedInstances(
+			state,
+			playerIndex,
+			pack,
+		)
+		if err != nil {
+			return err
+		}
+		if len(offered) == 0 {
+			return nil
+		}
+		for recipientIndex, recipient := range state.Players {
+			if recipientIndex == playerIndex || recipient.Dead {
+				continue
+			}
+			requested, err := transferableCarriedInstances(
+				state,
+				recipientIndex,
+				pack,
+			)
+			if err != nil {
+				return err
+			}
+			actions = append(actions, ActionView{
+				Type:            CommandProposeGift,
+				InstanceIDs:     append([]string(nil), offered...),
+				TargetPlayerIDs: []string{recipient.ID},
+				Minimum:         1,
+				Maximum:         len(offered),
+			})
+			if len(requested) > 0 {
+				actions = append(actions, ActionView{
+					Type:        CommandProposeTrade,
+					InstanceIDs: append([]string(nil), offered...),
+					RequestedInstanceIDs: append(
+						[]string(nil),
+						requested...,
+					),
+					TargetPlayerIDs: []string{recipient.ID},
+					Minimum:         1,
+					Maximum:         len(offered),
+				})
+			}
+		}
+		return nil
+	}
 	switch state.Turn.Phase {
 	case PhaseSetup:
 		if err := addManagementActions(false); err != nil {
@@ -1332,6 +1477,9 @@ func projectActions(
 		actions = append(actions, ActionView{Type: CommandFinishSetup})
 	case PhasePreparation:
 		if err := addManagementActions(true); err != nil {
+			return nil, err
+		}
+		if err := addEconomyActions(); err != nil {
 			return nil, err
 		}
 		actions = append(actions, ActionView{Type: CommandOpenDoor})
@@ -1400,17 +1548,27 @@ func projectActions(
 		if err := addManagementActions(true); err != nil {
 			return nil, err
 		}
+		if err := addEconomyActions(); err != nil {
+			return nil, err
+		}
 		limit, err := handLimit(state, playerIndex, pack)
 		if err != nil {
 			return nil, err
 		}
 		excess := max(0, len(player.Hand)-limit)
-		actions = append(actions, ActionView{
+		charityAction := ActionView{
 			Type:        CommandResolveCharity,
 			InstanceIDs: append([]string(nil), player.Hand...),
 			Minimum:     excess,
 			Maximum:     excess,
-		})
+		}
+		if profile.PlayerEconomy {
+			charityAction.TargetPlayerIDs = charityRecipientIDs(
+				state,
+				playerIndex,
+			)
+		}
+		actions = append(actions, charityAction)
 	case PhaseEndTurn:
 		actions = append(actions, ActionView{Type: CommandEndTurn})
 	}

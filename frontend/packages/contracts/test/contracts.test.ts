@@ -4,6 +4,8 @@ import {
   actionViewSchema,
   combatHelpRequestSchema,
   combatResolutionRequestSchema,
+  economyOfferRequestSchema,
+  charityRequestSchema,
   commandPayloadSchema,
   interactionActionViewSchema,
   interactionCommandRequestSchema,
@@ -135,6 +137,106 @@ describe("wire contracts", () => {
       ability_index: 0,
     }).instance_ids).toEqual(["two", "one"]);
     expect(() => actionViewSchema.parse({type: "eval_card"})).toThrow();
+    expect(actionViewSchema.parse({
+      type: "propose_trade",
+      instance_ids: ["offer-a"],
+      requested_instance_ids: ["request-b"],
+      target_player_ids: ["player_b"],
+      minimum: 1,
+      maximum: 1,
+    }).requested_instance_ids).toEqual(["request-b"]);
+  });
+
+  it("keeps economy clauses typed and charity mappings authority-free", () => {
+    expect(economyOfferRequestSchema.parse({
+      expected_version: 12,
+      recipient_player_id: "player_b",
+      offered_instance_ids: ["item-a"],
+      requested_instance_ids: ["item-b"],
+    }).offered_instance_ids).toEqual(["item-a"]);
+    expect(() => economyOfferRequestSchema.parse({
+      expected_version: 12,
+      recipient_player_id: "player_b",
+      offered_instance_ids: ["item-a"],
+      obligation: "pay later",
+    })).toThrow();
+    expect(charityRequestSchema.parse({
+      expected_version: 13,
+      allocations: [{
+        instance_id: "item-a",
+        recipient_player_id: "player_b",
+      }],
+    }).allocations).toHaveLength(1);
+    expect(() => charityRequestSchema.parse({
+      expected_version: 13,
+      allocations: [{
+        instance_id: "item-a",
+        recipient_player_id: "player_b",
+        recipient_hand: ["secret"],
+      }],
+    })).toThrow();
+  });
+
+  it("parses party-only economy and charity interaction DTOs strictly", () => {
+    const economy = projectionSchema.parse({
+      ...projection,
+      rules_profile_id: "lobby-multiplayer-v2",
+      interaction: {
+        interaction_id: "interaction-economy",
+        public_kind: "economy_offer",
+        parent_phase: "preparation",
+        public_subject: "current_turn",
+        status: "open",
+        deadline_at: "2026-07-31T10:00:30.000Z",
+        server_time: "2026-07-31T10:00:00.000Z",
+        response_required_for_you: false,
+        actions: [{
+          action_id: `act_${"a".repeat(32)}`,
+          interaction_id: "interaction-economy",
+          revision: 1,
+          type: "cancel_offer",
+        }],
+        economy_offer: {
+          kind: "gift",
+          offerer_player_id: "player_a",
+          recipient_player_id: "player_b",
+          offered: [item],
+          requested: [],
+        },
+      },
+    });
+    expect(economy.interaction?.economy_offer?.kind).toBe("gift");
+    expect(() => projectionSchema.parse({
+      ...economy,
+      interaction: {
+        ...economy.interaction,
+        offered_instance_ids: ["private-clause"],
+      },
+    })).toThrow();
+
+    const charity = projectionSchema.parse({
+      ...projection,
+      rules_profile_id: "lobby-multiplayer-v2",
+      turn: {...projection.turn, phase: "charity"},
+      interaction: {
+        interaction_id: "interaction-charity",
+        public_kind: "charity_transfer",
+        parent_phase: "charity",
+        public_subject: "current_turn",
+        status: "open",
+        deadline_at: "2026-07-31T10:00:30.000Z",
+        server_time: "2026-07-31T10:00:00.000Z",
+        my_response_state: "pending",
+        response_required_for_you: true,
+        actions: [],
+        charity_transfer: {
+          excess: 1,
+          instance_ids: ["item-a"],
+          eligible_recipient_ids: ["player_b"],
+        },
+      },
+    });
+    expect(charity.interaction?.charity_transfer?.excess).toBe(1);
   });
 
   it("accepts version-only invalidation and rejects payload state", () => {
