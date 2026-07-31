@@ -141,15 +141,10 @@ code { overflow-wrap: anywhere; color: var(--acid); }
   font-size: .7rem;
   text-transform: uppercase;
 }
-.landing { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; padding: 7vh 0 5rem; }
-.hero-copy { max-width: 850px; }
 .eyebrow { color: var(--acid); letter-spacing: .18em; font-size: .7rem; font-weight: 800; }
-h1 { font-size: clamp(3rem, 8vw, 7rem); line-height: .9; margin: 1.5rem 0; letter-spacing: -.06em; }
 h1 em { color: var(--orange); font-style: normal; }
 .lede { color: var(--muted); max-width: 60ch; font-size: 1.1rem; }
-.lobby-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 5rem; }
 .panel { border: 1px solid var(--line); background: color-mix(in srgb, var(--panel), transparent 8%); padding: 1.5rem; display: grid; gap: 1rem; }
-.panel-number { color: var(--orange); font-size: .72rem; }
 .panel h2 { margin: 0 0 .5rem; font-size: 2rem; }
 .error-banner { border-left: 4px solid var(--orange); background: #381c13; padding: 1rem; }
 
@@ -434,8 +429,6 @@ h1 em { color: var(--orange); font-style: normal; }
     gap: 1rem;
   }
   .status-pill { display: none; }
-  .landing { padding-top: 3rem; }
-  .lobby-grid { grid-template-columns: 1fr; margin-top: 3rem; }
   .studio { width: min(100% - 1rem, 1680px); padding-top: 2rem; }
   .studio-hero { align-items: stretch; flex-direction: column; }
   .studio-provider { min-width: 0; }
