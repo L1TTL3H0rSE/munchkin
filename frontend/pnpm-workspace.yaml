@@ -2,7 +2,13 @@ packages:
   - applications/*
   - packages/*
 
+allowBuilds:
+  esbuild: set this to true or false
+  unrs-resolver: set this to true or false
+
 catalog:
+  '@axe-core/playwright': 4.10.2
+  '@playwright/test': 1.52.0
   typescript: ^6.0.3
   '@types/node': ^25.9.1
   nuxt: ^4.4.6

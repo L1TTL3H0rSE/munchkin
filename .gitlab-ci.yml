@@ -92,6 +92,49 @@ frontend:
     - pnpm check
     - pnpm build
 
+frontend-browser:
+  stage: test
+  image: mcr.microsoft.com/playwright:v1.52.0-noble
+  cache:
+    key:
+      files:
+        - frontend/pnpm-lock.yaml
+    paths:
+      - frontend/.pnpm-store
+  before_script:
+    - corepack enable
+    - corepack prepare pnpm@10.8.0 --activate
+    - cd frontend
+    - pnpm config set store-dir .pnpm-store
+    - pnpm install --frozen-lockfile
+  script:
+    - |
+      set -eu
+      export NUXT_PUBLIC_API_BASE="http://127.0.0.1:4173"
+      pnpm --filter @munchkin/web dev --host 127.0.0.1 --port 4173 > .playwright-server.log 2>&1 &
+      server_pid=$!
+      cleanup() {
+        kill "$server_pid" 2>/dev/null || true
+      }
+      trap cleanup EXIT
+      for attempt in $(seq 1 60); do
+        if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+          break
+        fi
+        sleep 1
+      done
+      curl --fail --silent http://127.0.0.1:4173/ > /dev/null
+      pnpm test:browser
+      pnpm test:a11y
+      pnpm test:visual
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - frontend/test/browser/artifacts/
+      - frontend/test/browser/report/
+      - frontend/test/browser/test-results/
+
 compose-config:
   stage: test
   image: docker:28-cli
