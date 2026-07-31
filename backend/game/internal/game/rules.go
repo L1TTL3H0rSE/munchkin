@@ -7,6 +7,29 @@ import (
 	"time"
 )
 
+func deathLootSeatOrder(state State, deadPlayerIndex int) []string {
+	order := make([]string, 0, len(state.Players)-1)
+	for offset := 1; offset < len(state.Players); offset++ {
+		index := (deadPlayerIndex + offset) % len(state.Players)
+		if state.Players[index].Dead {
+			continue
+		}
+		order = append(order, state.Players[index].ID)
+	}
+	return order
+}
+
+func currentDeathLootActor(loot *DeathLoot) (string, bool) {
+	if loot == nil ||
+		loot.Completed ||
+		len(loot.Pool) == 0 ||
+		loot.SeatIndex < 0 ||
+		loot.SeatIndex >= len(loot.SeatOrder) {
+		return "", false
+	}
+	return loot.SeatOrder[loot.SeatIndex], true
+}
+
 type CombatTotals struct {
 	PlayerStrength  int
 	MonsterStrength int

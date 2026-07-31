@@ -607,6 +607,12 @@ func advanceRunAwaySequence(state *State, pack Pack) error {
 
 func killPlayer(state *State, playerIndex int, pack Pack) error {
 	player := &state.Players[playerIndex]
+	if player.Dead {
+		return fmt.Errorf(
+			"%w: player is already dead",
+			ErrIllegalCommand,
+		)
+	}
 	toDiscard := append([]string(nil), player.Hand...)
 	toDiscard = append(toDiscard, player.Carried...)
 	toDiscard = append(toDiscard, player.Equipped...)
@@ -627,13 +633,42 @@ func killPlayer(state *State, playerIndex int, pack Pack) error {
 	player.Equipped = nil
 	player.Attachments = keptAttachments
 	player.CheatTargets = nil
-	for _, instanceID := range toDiscard {
-		if err := appendDiscard(state, instanceID, pack); err != nil {
-			return err
-		}
-	}
 	player.Dead = true
 	player.NeedsRedraw = true
+	profile, err := state.Profile()
+	if err != nil {
+		return err
+	}
+	if !profile.DeathLoot {
+		for _, instanceID := range toDiscard {
+			if err := appendDiscard(state, instanceID, pack); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	loot := &DeathLoot{
+		DeadPlayerID: player.ID,
+		InitialCount: len(toDiscard),
+		Pool:         append([]string(nil), toDiscard...),
+		SeatOrder:    deathLootSeatOrder(*state, playerIndex),
+	}
+	if len(loot.Pool) == 0 {
+		loot.Completed = true
+	} else if len(loot.SeatOrder) == 0 {
+		for _, instanceID := range loot.Pool {
+			if err := appendDiscard(state, instanceID, pack); err != nil {
+				return err
+			}
+		}
+		loot.DiscardedInstanceIDs = append(
+			[]string(nil),
+			loot.Pool...,
+		)
+		loot.Pool = nil
+		loot.Completed = true
+	}
+	state.DeathLoot = loot
 	return nil
 }
 

@@ -365,6 +365,7 @@ export const interactionViewSchema = z.object({
     "economy_offer",
     "charity_transfer",
     "theft_response",
+    "death_loot_priority",
   ]),
   parent_phase: phaseSchema,
   public_subject: z.enum([
@@ -397,6 +398,14 @@ export const interactionViewSchema = z.object({
     instance_ids: z.array(z.string().min(1)),
     eligible_recipient_ids: z.array(z.string().min(1)),
   }).strict().optional(),
+  death_loot: z.object({
+    dead_player_id: z.string().min(1),
+    initial_count: z.number().int().nonnegative(),
+    remaining_count: z.number().int().nonnegative(),
+    picked_count: z.number().int().nonnegative(),
+    discarded_count: z.number().int().nonnegative(),
+    options: z.array(cardViewSchema),
+  }).strict().optional(),
 }).strict();
 
 export const projectionSchema = z.object({
@@ -419,6 +428,7 @@ export const projectionSchema = z.object({
     "lobby-multiplayer-v1",
     "lobby-multiplayer-v2",
     "lobby-multiplayer-v3",
+    "lobby-multiplayer-v4",
   ]),
   rules_profile_version: z.literal(1),
   interaction: interactionViewSchema.optional(),
@@ -436,6 +446,7 @@ export const lobbySummarySchema = z.object({
     "lobby-multiplayer-v1",
     "lobby-multiplayer-v2",
     "lobby-multiplayer-v3",
+    "lobby-multiplayer-v4",
   ]),
   rules_profile_version: z.literal(1),
 }).strict();

@@ -230,6 +230,88 @@ describe("wire contracts", () => {
     })).toThrow();
   });
 
+  it("keeps death loot options private and descriptor-owned", () => {
+    const deathLoot = projectionSchema.parse({
+      ...projection,
+      rules_profile_id: "lobby-multiplayer-v4",
+      turn: {...projection.turn, phase: "charity"},
+      interaction: {
+        interaction_id: "interaction-death-loot",
+        public_kind: "death_loot_priority",
+        parent_phase: "charity",
+        public_subject: "current_turn",
+        status: "open",
+        deadline_at: "2026-07-31T10:00:30.000Z",
+        server_time: "2026-07-31T10:00:00.000Z",
+        my_response_state: "pending",
+        response_required_for_you: true,
+        actions: [
+          {
+            action_id: `act_${"c".repeat(32)}`,
+            interaction_id: "interaction-death-loot",
+            revision: 1,
+            type: "respond",
+            choice_ids: [item.instance_id],
+          },
+          {
+            action_id: `act_${"d".repeat(32)}`,
+            interaction_id: "interaction-death-loot",
+            revision: 1,
+            type: "pass",
+          },
+        ],
+        death_loot: {
+          dead_player_id: "player_b",
+          initial_count: 3,
+          remaining_count: 3,
+          picked_count: 0,
+          discarded_count: 0,
+          options: [item],
+        },
+      },
+    });
+    expect(deathLoot.interaction?.death_loot?.options).toHaveLength(1);
+    const observer = projectionSchema.parse({
+      ...deathLoot,
+      interaction: {
+        ...deathLoot.interaction,
+        my_response_state: undefined,
+        response_required_for_you: false,
+        actions: [],
+        death_loot: {
+          ...deathLoot.interaction?.death_loot,
+          options: [],
+        },
+      },
+    });
+    expect(observer.interaction?.death_loot?.remaining_count).toBe(3);
+    expect(observer.interaction?.death_loot?.options).toEqual([]);
+    expect(() => projectionSchema.parse({
+      ...observer,
+      interaction: {
+        ...observer.interaction,
+        death_loot: {
+          ...observer.interaction?.death_loot,
+          pool: ["foreign-hidden-card"],
+        },
+      },
+    })).toThrow();
+    expect(() => projectionSchema.parse({
+      ...observer,
+      interaction: {
+        ...observer.interaction,
+        seat_order: ["player_a"],
+      },
+    })).toThrow();
+    expect(() => interactionCommandRequestSchema.parse({
+      expected_version: deathLoot.version,
+      interaction_id: "interaction-death-loot",
+      action_id: `act_${"c".repeat(32)}`,
+      intent: "respond",
+      instance_id: item.instance_id,
+    })).toThrow();
+  });
+
   it("parses party-only economy and charity interaction DTOs strictly", () => {
     const economy = projectionSchema.parse({
       ...projection,

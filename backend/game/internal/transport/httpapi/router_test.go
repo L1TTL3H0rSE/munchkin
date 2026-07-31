@@ -927,6 +927,29 @@ func TestInteractionRoutesUseActorProjectionAndRejectAuthorityFields(t *testing.
 		t.Fatalf("authority field status %d", unknownAuthority.StatusCode)
 	}
 	unknownAuthority.Body.Close()
+	hiddenLootAuthority := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/respond-interaction",
+		joined.Credential,
+		"interaction-http-hidden-loot",
+		map[string]any{
+			"expected_version": projection.Version,
+			"interaction_id":   interactionID,
+			"action_id":        action.ActionID,
+			"intent":           game.InteractionIntentRespond,
+			"instance_id":      "foreign-hidden-loot-card",
+		},
+	)
+	if hiddenLootAuthority.StatusCode != http.StatusBadRequest {
+		t.Fatalf(
+			"hidden loot authority status %d",
+			hiddenLootAuthority.StatusCode,
+		)
+	}
+	hiddenLootAuthority.Body.Close()
 }
 
 func TestCombatResolutionRequestRouteIsStrictAndServerAuthoritative(t *testing.T) {

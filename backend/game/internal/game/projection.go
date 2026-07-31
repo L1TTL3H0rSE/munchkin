@@ -185,6 +185,15 @@ type CharityTransferView struct {
 	EligibleRecipientIDs []string `json:"eligible_recipient_ids"`
 }
 
+type DeathLootView struct {
+	DeadPlayerID   string     `json:"dead_player_id"`
+	InitialCount   int        `json:"initial_count"`
+	RemainingCount int        `json:"remaining_count"`
+	PickedCount    int        `json:"picked_count"`
+	DiscardedCount int        `json:"discarded_count"`
+	Options        []CardView `json:"options"`
+}
+
 type InteractionView struct {
 	InteractionID          string                   `json:"interaction_id"`
 	PublicKind             string                   `json:"public_kind"`
@@ -200,6 +209,7 @@ type InteractionView struct {
 	TargetPlayerID         string                   `json:"target_player_id,omitempty"`
 	EconomyOffer           *EconomyOfferView        `json:"economy_offer,omitempty"`
 	CharityTransfer        *CharityTransferView     `json:"charity_transfer,omitempty"`
+	DeathLoot              *DeathLootView           `json:"death_loot,omitempty"`
 }
 
 type Projection struct {
@@ -476,6 +486,13 @@ func projectInteraction(
 	if domainTheftResponse {
 		publicKind = "theft_response"
 	}
+	domainDeathLoot := profile.DeathLoot &&
+		window.Kind == InteractionKindDeathLootPriority &&
+		state.DeathLoot != nil &&
+		!state.DeathLoot.Completed
+	if domainDeathLoot {
+		publicKind = "death_loot_priority"
+	}
 	view := &InteractionView{
 		InteractionID: window.ID,
 		PublicKind:    publicKind,
@@ -548,6 +565,25 @@ func projectInteraction(
 				[]string(nil),
 				state.CharityTransfer.EligibleRecipientIDs...,
 			),
+		}
+	}
+	if domainDeathLoot {
+		loot := state.DeathLoot
+		view.DeathLoot = &DeathLootView{
+			DeadPlayerID:   loot.DeadPlayerID,
+			InitialCount:   loot.InitialCount,
+			RemainingCount: len(loot.Pool),
+			PickedCount:    len(loot.Picks),
+			DiscardedCount: len(loot.DiscardedInstanceIDs),
+			Options:        []CardView{},
+		}
+		currentActorID, current := currentDeathLootActor(loot)
+		if current && actorID == currentActorID {
+			options, err := cardViews(state, loot.Pool, pack)
+			if err != nil {
+				return nil, err
+			}
+			view.DeathLoot.Options = options
 		}
 	}
 	if domainCombatHelp {
@@ -631,6 +667,41 @@ func projectInteraction(
 				ChoiceIDs:     choiceIDs,
 			})
 		}
+		return view, nil
+	}
+	if domainDeathLoot {
+		currentActorID, current := currentDeathLootActor(state.DeathLoot)
+		if !current || actorID != currentActorID {
+			return view, nil
+		}
+		for _, instanceID := range state.DeathLoot.Pool {
+			choiceIDs := []string{instanceID}
+			view.Actions = append(view.Actions, InteractionActionView{
+				ActionID: choiceInteractionActionID(
+					window.ID,
+					actorID,
+					choiceIDs,
+					state.Version,
+				),
+				InteractionID: window.ID,
+				Revision:      window.DeadlineRevision,
+				Type:          InteractionIntentRespond,
+				ChoiceIDs:     choiceIDs,
+			})
+		}
+		view.Actions = append(view.Actions, InteractionActionView{
+			ActionID: interactionActionID(
+				window.ID,
+				actorID,
+				InteractionIntentPass,
+				"",
+				"",
+				state.Version,
+			),
+			InteractionID: window.ID,
+			Revision:      window.DeadlineRevision,
+			Type:          InteractionIntentPass,
+		})
 		return view, nil
 	}
 	if domainCharityTransfer {

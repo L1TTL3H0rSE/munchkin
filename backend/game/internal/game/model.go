@@ -17,6 +17,8 @@ const (
 	AdvancedCombatProfileVersion   = 1
 	TheftProfileID                 = "lobby-multiplayer-v3"
 	TheftProfileVersion            = 1
+	DeathLootProfileID             = "lobby-multiplayer-v4"
+	DeathLootProfileVersion        = 1
 	MinPlayers                     = 1
 	MaxPlayers                     = 6
 	WinningLevel                   = 10
@@ -46,6 +48,7 @@ type RulesProfile struct {
 	TargetAndRunAway     bool   `json:"target_and_run_away"`
 	PlayerEconomy        bool   `json:"player_economy"`
 	Theft                bool   `json:"theft"`
+	DeathLoot            bool   `json:"death_loot"`
 }
 
 func FirstEditionCoreProfile() RulesProfile {
@@ -88,6 +91,14 @@ func TheftProfile() RulesProfile {
 	return profile
 }
 
+func DeathLootProfile() RulesProfile {
+	profile := TheftProfile()
+	profile.ID = DeathLootProfileID
+	profile.Version = DeathLootProfileVersion
+	profile.DeathLoot = true
+	return profile
+}
+
 func (profile RulesProfile) Validate() error {
 	expected, ok := rulesProfile(profile.ID, profile.Version)
 	if !ok || profile != expected {
@@ -110,6 +121,9 @@ func rulesProfile(id string, version int) (RulesProfile, bool) {
 	case id == TheftProfileID &&
 		version == TheftProfileVersion:
 		return TheftProfile(), true
+	case id == DeathLootProfileID &&
+		version == DeathLootProfileVersion:
+		return DeathLootProfile(), true
 	default:
 		return RulesProfile{}, false
 	}
@@ -250,6 +264,7 @@ const (
 	InteractionKindEconomyOffer      InteractionKind = "economy_offer"
 	InteractionKindCharityTransfer   InteractionKind = "charity_transfer"
 	InteractionKindTheftResponse     InteractionKind = "theft_response"
+	InteractionKindDeathLootPriority InteractionKind = "death_loot_priority"
 )
 
 type InteractionSubjectKind string
@@ -433,6 +448,43 @@ func (attempt TheftAttempt) clone() *TheftAttempt {
 	return &clone
 }
 
+type DeathLootPick struct {
+	PlayerID   string `json:"player_id"`
+	InstanceID string `json:"instance_id"`
+}
+
+type DeathLoot struct {
+	DeadPlayerID         string          `json:"dead_player_id"`
+	InitialCount         int             `json:"initial_count"`
+	Pool                 []string        `json:"pool,omitempty"`
+	SeatOrder            []string        `json:"seat_order,omitempty"`
+	SeatIndex            int             `json:"seat_index"`
+	Picks                []DeathLootPick `json:"picks,omitempty"`
+	PassedPlayerIDs      []string        `json:"passed_player_ids,omitempty"`
+	DiscardedInstanceIDs []string        `json:"discarded_instance_ids,omitempty"`
+	Completed            bool            `json:"completed"`
+}
+
+func (loot DeathLoot) clone() *DeathLoot {
+	clone := loot
+	clone.Pool = append([]string(nil), loot.Pool...)
+	clone.SeatOrder = append([]string(nil), loot.SeatOrder...)
+	clone.Picks = append([]DeathLootPick(nil), loot.Picks...)
+	clone.PassedPlayerIDs = append(
+		[]string(nil),
+		loot.PassedPlayerIDs...,
+	)
+	clone.DiscardedInstanceIDs = append(
+		[]string(nil),
+		loot.DiscardedInstanceIDs...,
+	)
+	return &clone
+}
+
+func (loot DeathLoot) CurrentActor() (string, bool) {
+	return currentDeathLootActor(&loot)
+}
+
 func (transfer CharityTransfer) clone() *CharityTransfer {
 	clone := transfer
 	clone.StableHandOrder = append(
@@ -608,6 +660,7 @@ type State struct {
 	EconomyOffer               *EconomyOffer           `json:"economy_offer,omitempty"`
 	CharityTransfer            *CharityTransfer        `json:"charity_transfer,omitempty"`
 	TheftAttempt               *TheftAttempt           `json:"theft_attempt,omitempty"`
+	DeathLoot                  *DeathLoot              `json:"death_loot,omitempty"`
 }
 
 func (state State) Clone() State {
@@ -669,6 +722,9 @@ func (state State) Clone() State {
 	}
 	if state.TheftAttempt != nil {
 		clone.TheftAttempt = state.TheftAttempt.clone()
+	}
+	if state.DeathLoot != nil {
+		clone.DeathLoot = state.DeathLoot.clone()
 	}
 	return clone
 }
@@ -796,6 +852,9 @@ func (state State) Validate() error {
 	if err := state.validateTheft(); err != nil {
 		return err
 	}
+	if err := state.validateDeathLoot(); err != nil {
+		return err
+	}
 	if state.Status != StatusLobby {
 		if err := state.validateInstanceZones(); err != nil {
 			return err
@@ -884,6 +943,154 @@ func (state State) validateTheft() error {
 				ErrIllegalCommand,
 			)
 		}
+	}
+	return nil
+}
+
+func (state State) validateDeathLoot() error {
+	profile, err := state.Profile()
+	if err != nil {
+		return err
+	}
+	window := state.InteractionWindow
+	if !profile.DeathLoot {
+		if state.DeathLoot != nil ||
+			window != nil &&
+				window.Status == InteractionWindowOpen &&
+				window.Kind == InteractionKindDeathLootPriority {
+			return fmt.Errorf(
+				"%w: death loot requires an enabled profile",
+				ErrIllegalCommand,
+			)
+		}
+		return nil
+	}
+	loot := state.DeathLoot
+	if loot == nil {
+		if window != nil &&
+			window.Status == InteractionWindowOpen &&
+			window.Kind == InteractionKindDeathLootPriority {
+			return fmt.Errorf(
+				"%w: death loot window lacks a pool",
+				ErrIllegalCommand,
+			)
+		}
+		return nil
+	}
+	deadIndex := state.PlayerIndex(loot.DeadPlayerID)
+	if deadIndex < 0 ||
+		!state.Players[deadIndex].Dead ||
+		loot.InitialCount < 0 ||
+		loot.SeatIndex < 0 ||
+		loot.SeatIndex > len(loot.SeatOrder) ||
+		!uniqueStrings(loot.Pool) ||
+		!uniqueStrings(loot.SeatOrder) ||
+		!uniqueStrings(loot.PassedPlayerIDs) ||
+		loot.InitialCount !=
+			len(loot.Pool)+len(loot.Picks)+len(loot.DiscardedInstanceIDs) {
+		return fmt.Errorf(
+			"%w: malformed death loot state",
+			ErrIllegalCommand,
+		)
+	}
+	for index, playerID := range loot.SeatOrder {
+		playerIndex := state.PlayerIndex(playerID)
+		if playerIndex < 0 ||
+			playerID == loot.DeadPlayerID ||
+			state.Players[playerIndex].Dead {
+			return fmt.Errorf(
+				"%w: invalid death loot seat",
+				ErrIllegalCommand,
+			)
+		}
+		if index < loot.SeatIndex {
+			picked := slices.IndexFunc(
+				loot.Picks,
+				func(pick DeathLootPick) bool {
+					return pick.PlayerID == playerID
+				},
+			) >= 0
+			passed := slices.Contains(loot.PassedPlayerIDs, playerID)
+			if picked == passed {
+				return fmt.Errorf(
+					"%w: death loot seat lacks one terminal response",
+					ErrIllegalCommand,
+				)
+			}
+		}
+	}
+	seenPicks := make(map[string]struct{}, len(loot.Picks))
+	for _, pick := range loot.Picks {
+		playerIndex := state.PlayerIndex(pick.PlayerID)
+		if playerIndex < 0 ||
+			!slices.Contains(
+				loot.SeatOrder[:loot.SeatIndex],
+				pick.PlayerID,
+			) ||
+			!slices.Contains(state.Players[playerIndex].Hand, pick.InstanceID) {
+			return fmt.Errorf(
+				"%w: malformed death loot pick",
+				ErrIllegalCommand,
+			)
+		}
+		if _, exists := seenPicks[pick.InstanceID]; exists {
+			return fmt.Errorf(
+				"%w: duplicate death loot pick",
+				ErrIllegalCommand,
+			)
+		}
+		seenPicks[pick.InstanceID] = struct{}{}
+	}
+	if loot.Completed {
+		if len(loot.Pool) != 0 ||
+			window != nil &&
+				window.Status == InteractionWindowOpen &&
+				window.Kind == InteractionKindDeathLootPriority {
+			return fmt.Errorf(
+				"%w: completed death loot remains active",
+				ErrIllegalCommand,
+			)
+		}
+		return nil
+	}
+	if len(loot.Pool) == 0 ||
+		loot.SeatIndex >= len(loot.SeatOrder) {
+		return fmt.Errorf(
+			"%w: malformed active death loot priority",
+			ErrIllegalCommand,
+		)
+	}
+	if window == nil ||
+		window.Kind != InteractionKindDeathLootPriority {
+		if loot.SeatIndex == 0 &&
+			(window == nil || window.Status == InteractionWindowClosed) {
+			return nil
+		}
+		return fmt.Errorf(
+			"%w: death loot priority window is missing",
+			ErrIllegalCommand,
+		)
+	}
+	if window.Status == InteractionWindowClosed {
+		if loot.SeatIndex == 0 ||
+			window.InitiatorActorID != loot.SeatOrder[loot.SeatIndex-1] {
+			return fmt.Errorf(
+				"%w: death loot cursor did not advance",
+				ErrIllegalCommand,
+			)
+		}
+		return nil
+	}
+	if window.Status != InteractionWindowOpen ||
+		window.EligibilityPolicy != InteractionEligibilityActorPrivate ||
+		window.Parent.Phase != state.Turn.Phase ||
+		len(window.EligibleActorIDs) != 1 ||
+		window.EligibleActorIDs[0] != loot.SeatOrder[loot.SeatIndex] ||
+		window.InitiatorActorID != loot.SeatOrder[loot.SeatIndex] {
+		return fmt.Errorf(
+			"%w: death loot window differs from current seat",
+			ErrIllegalCommand,
+		)
 	}
 	return nil
 }
@@ -1861,7 +2068,8 @@ func validInteractionKind(kind InteractionKind) bool {
 		InteractionKindRunAwayResponse,
 		InteractionKindEconomyOffer,
 		InteractionKindCharityTransfer,
-		InteractionKindTheftResponse:
+		InteractionKindTheftResponse,
+		InteractionKindDeathLootPriority:
 		return true
 	default:
 		return false
@@ -1991,6 +2199,11 @@ func (state State) validateInstanceZones() error {
 			"encounter",
 			encounterInstances,
 		); err != nil {
+			return err
+		}
+	}
+	if state.DeathLoot != nil {
+		if err := add("death_loot_pool", state.DeathLoot.Pool); err != nil {
 			return err
 		}
 	}

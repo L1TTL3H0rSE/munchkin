@@ -2510,3 +2510,382 @@ func TestRunAwayTimeoutPersistsServerRollAndCompletesStep(t *testing.T) {
 		)
 	}
 }
+
+type deathLootApplicationFixture struct {
+	service     *Service
+	store       *gatedMemoryStore
+	clock       *manualClock
+	pack        game.Pack
+	gameID      string
+	credentials map[string]string
+}
+
+func newDeathLootApplicationFixture(t *testing.T) deathLootApplicationFixture {
+	t.Helper()
+	ctx := context.Background()
+	start := time.Date(2026, time.July, 31, 8, 0, 0, 0, time.UTC)
+	pack := combatApplicationPack(t)
+	pack.SetID = "moscow-core"
+	pack.Version = 4
+	pack.Source = "death-loot-application-test"
+	pack.ContentDigest = game.CardsDigest(pack.Cards)
+	if err := pack.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	const gameID = "death-loot-application-game"
+	credentials := map[string]string{
+		"player-a": "death-loot-application-credential-a",
+		"player-b": "death-loot-application-credential-b",
+		"player-c": "death-loot-application-credential-c",
+	}
+	players := []game.Player{
+		{
+			ID:             "player-a",
+			Name:           "Alice",
+			Level:          1,
+			CredentialHash: fmt.Sprintf("%x", sha256.Sum256([]byte(credentials["player-a"]))),
+		},
+		{
+			ID:             "player-b",
+			Name:           "Bob",
+			Level:          1,
+			CredentialHash: fmt.Sprintf("%x", sha256.Sum256([]byte(credentials["player-b"]))),
+		},
+		{
+			ID:             "player-c",
+			Name:           "Cara",
+			Level:          1,
+			CredentialHash: fmt.Sprintf("%x", sha256.Sum256([]byte(credentials["player-c"]))),
+		},
+	}
+	created, err := game.CreateLobby(gameID, players[0], pack, 27)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, envelopes := applyRuntimeEvents(
+		t,
+		game.State{},
+		nil,
+		"death-loot-create",
+		[]game.DomainEvent{created},
+		start,
+	)
+	steps := []struct {
+		id      string
+		command game.Command
+	}{
+		{
+			id: "death-loot-join-b",
+			command: game.Command{
+				Type:           game.CommandJoin,
+				PlayerID:       players[1].ID,
+				DisplayName:    players[1].Name,
+				CredentialHash: players[1].CredentialHash,
+			},
+		},
+		{
+			id: "death-loot-join-c",
+			command: game.Command{
+				Type:           game.CommandJoin,
+				PlayerID:       players[2].ID,
+				DisplayName:    players[2].Name,
+				CredentialHash: players[2].CredentialHash,
+			},
+		},
+		{
+			id: "death-loot-start",
+			command: game.Command{
+				Type:    game.CommandStart,
+				ActorID: players[0].ID,
+			},
+		},
+		{
+			id: "death-loot-setup-a",
+			command: game.Command{
+				Type:    game.CommandFinishSetup,
+				ActorID: players[0].ID,
+			},
+		},
+		{
+			id: "death-loot-setup-b",
+			command: game.Command{
+				Type:    game.CommandFinishSetup,
+				ActorID: players[1].ID,
+			},
+		},
+		{
+			id: "death-loot-setup-c",
+			command: game.Command{
+				Type:    game.CommandFinishSetup,
+				ActorID: players[2].ID,
+			},
+		},
+	}
+	for _, step := range steps {
+		events, err := game.Handle(state, step.command, pack)
+		if err != nil {
+			t.Fatalf("%s: %v", step.id, err)
+		}
+		state, envelopes = applyRuntimeEvents(
+			t,
+			state,
+			envelopes,
+			step.id,
+			events,
+			start,
+		)
+	}
+	deadIndex := state.PlayerIndex("player-b")
+	if deadIndex < 0 || len(state.Players[deadIndex].Hand) < 2 {
+		t.Fatalf("death loot fixture hand=%#v", state.Players)
+	}
+	pool := append([]string(nil), state.Players[deadIndex].Hand...)
+	state.Players[deadIndex].Hand = nil
+	state.Players[deadIndex].Dead = true
+	state.Players[deadIndex].NeedsRedraw = true
+	state.DeathLoot = &game.DeathLoot{
+		DeadPlayerID: "player-b",
+		InitialCount: len(pool),
+		Pool:         pool,
+		SeatOrder:    []string{"player-c", "player-a"},
+	}
+	openedAt := start.Add(10 * time.Second)
+	state.InteractionWindow = &game.InteractionWindow{
+		ID:   "death-loot-interaction-c",
+		Kind: game.InteractionKindDeathLootPriority,
+		Parent: game.InteractionParent{
+			Phase:       state.Turn.Phase,
+			SubjectKind: game.InteractionSubjectTurn,
+			SubjectID:   state.Turn.PlayerID,
+		},
+		InitiatorActorID:  "player-c",
+		EligibilityPolicy: game.InteractionEligibilityActorPrivate,
+		AllowedIntents: []game.InteractionIntent{
+			game.InteractionIntentPass,
+			game.InteractionIntentRespond,
+		},
+		EligibleActorIDs: []string{"player-c"},
+		OpenedAt:         openedAt,
+		DeadlineAt:       openedAt.Add(30 * time.Second),
+		DeadlineRevision: 1,
+		DeadlinePolicy:   game.AddressedInteractionDeadlinePolicy(),
+		Responses: map[string]game.InteractionResponse{
+			"player-c": {
+				Requirement:   game.InteractionResponseOptional,
+				TimeoutIntent: game.InteractionIntentPass,
+				State:         game.InteractionResponsePending,
+			},
+		},
+		Status: game.InteractionWindowOpen,
+	}
+	raw, err := json.Marshal(struct {
+		State game.State `json:"state"`
+	}{State: state})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, envelopes = applyRuntimeEvents(
+		t,
+		state,
+		envelopes,
+		"death-loot-open",
+		[]game.DomainEvent{{
+			Type:    game.EventDeathLootAdvanced,
+			Payload: raw,
+		}},
+		start,
+	)
+	store := &gatedMemoryStore{Store: memory.New()}
+	if err := store.Create(ctx, state, envelopes); err != nil {
+		t.Fatal(err)
+	}
+	clock := &manualClock{value: openedAt.Add(time.Second)}
+	service := NewService(store, pack, clock, NoopPublisher{})
+	return deathLootApplicationFixture{
+		service:     service,
+		store:       store,
+		clock:       clock,
+		pack:        pack,
+		gameID:      gameID,
+		credentials: credentials,
+	}
+}
+
+func deathLootRespondAction(
+	t *testing.T,
+	projection game.Projection,
+) game.InteractionActionView {
+	t.Helper()
+	if projection.Interaction == nil ||
+		projection.Interaction.DeathLoot == nil {
+		t.Fatalf("death loot projection=%#v", projection.Interaction)
+	}
+	for _, action := range projection.Interaction.Actions {
+		if action.Type == game.InteractionIntentRespond {
+			return action
+		}
+	}
+	t.Fatal("death loot respond action is missing")
+	return game.InteractionActionView{}
+}
+
+func TestDeathLootApplicationDescriptorCASAndTimeoutRecovery(t *testing.T) {
+	fixture := newDeathLootApplicationFixture(t)
+	ctx := context.Background()
+	projection, err := fixture.service.Get(
+		ctx,
+		fixture.gameID,
+		fixture.credentials["player-c"],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	action := deathLootRespondAction(t, projection)
+	_, err = fixture.service.ExecuteInteraction(
+		ctx,
+		fixture.gameID,
+		fixture.credentials["player-a"],
+		"death-loot-foreign-pick",
+		projection.Version,
+		action.InteractionID,
+		action.ActionID,
+		game.InteractionIntentRespond,
+	)
+	if !errors.Is(err, ErrInteractionAction) {
+		t.Fatalf("foreign death loot pick error=%v", err)
+	}
+	picked, err := fixture.service.ExecuteInteraction(
+		ctx,
+		fixture.gameID,
+		fixture.credentials["player-c"],
+		"death-loot-pick-once",
+		projection.Version,
+		action.InteractionID,
+		action.ActionID,
+		game.InteractionIntentRespond,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if picked.Projection.Interaction == nil ||
+		picked.Projection.Interaction.PublicKind !=
+			"death_loot_priority" ||
+		picked.Projection.Interaction.ResponseRequiredForYou {
+		t.Fatalf("next death loot seat=%#v", picked.Projection.Interaction)
+	}
+	replayed, err := fixture.service.ExecuteInteraction(
+		ctx,
+		fixture.gameID,
+		fixture.credentials["player-c"],
+		"death-loot-pick-once",
+		projection.Version,
+		action.InteractionID,
+		action.ActionID,
+		game.InteractionIntentRespond,
+	)
+	if err != nil || !replayed.Replayed ||
+		replayed.Version != picked.Version {
+		t.Fatalf("death loot replay=%#v err=%v", replayed, err)
+	}
+	_, err = fixture.service.ExecuteInteraction(
+		ctx,
+		fixture.gameID,
+		fixture.credentials["player-c"],
+		"death-loot-stale-pick",
+		projection.Version,
+		action.InteractionID,
+		action.ActionID,
+		game.InteractionIntentRespond,
+	)
+	if !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("stale death loot pick error=%v", err)
+	}
+	current, err := fixture.service.Get(
+		ctx,
+		fixture.gameID,
+		fixture.credentials["player-a"],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.Interaction == nil ||
+		!current.Interaction.ResponseRequiredForYou {
+		t.Fatalf("second death loot seat=%#v", current.Interaction)
+	}
+	fixture.clock.Set(current.Interaction.DeadlineAt)
+	restarted := NewService(
+		fixture.store,
+		fixture.pack,
+		fixture.clock,
+		NoopPublisher{},
+	)
+	processed, err := restarted.SweepDueInteractions(ctx, 10)
+	if err != nil || processed != 1 {
+		t.Fatalf("restarted death loot timeout=%d err=%v", processed, err)
+	}
+	finalProjection, err := restarted.Get(
+		ctx,
+		fixture.gameID,
+		fixture.credentials["player-a"],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if finalProjection.Interaction != nil ||
+		finalProjection.Turn.Phase == game.PhaseSetup {
+		t.Fatalf("terminal death loot projection=%#v", finalProjection)
+	}
+}
+
+func TestDeathLootConcurrentPickAndTimeoutCommitOneSeat(t *testing.T) {
+	fixture := newDeathLootApplicationFixture(t)
+	ctx := context.Background()
+	projection, err := fixture.service.Get(
+		ctx,
+		fixture.gameID,
+		fixture.credentials["player-c"],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	action := deathLootRespondAction(t, projection)
+	gate := fixture.store.Arm()
+	pickDone := make(chan error, 1)
+	go func() {
+		_, pickErr := fixture.service.ExecuteInteraction(
+			ctx,
+			fixture.gameID,
+			fixture.credentials["player-c"],
+			"death-loot-racing-pick",
+			projection.Version,
+			action.InteractionID,
+			action.ActionID,
+			game.InteractionIntentRespond,
+		)
+		pickDone <- pickErr
+	}()
+	<-gate.entered
+	fixture.clock.Set(projection.Interaction.DeadlineAt)
+	processed, timeoutErr := fixture.service.SweepDueInteractions(ctx, 10)
+	close(gate.release)
+	pickErr := <-pickDone
+	if timeoutErr != nil || processed != 1 {
+		t.Fatalf("racing timeout=%d err=%v", processed, timeoutErr)
+	}
+	if !errors.Is(pickErr, ErrVersionConflict) {
+		t.Fatalf("racing pick error=%v", pickErr)
+	}
+	next, err := fixture.service.Get(
+		ctx,
+		fixture.gameID,
+		fixture.credentials["player-a"],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Interaction == nil ||
+		!next.Interaction.ResponseRequiredForYou ||
+		next.Version != projection.Version+2 {
+		t.Fatalf("death loot race committed more than one seat: %#v", next)
+	}
+}

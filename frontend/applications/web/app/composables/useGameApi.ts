@@ -265,6 +265,24 @@ export function useGameApi() {
     return clientCommandResult(response);
   }
 
+  async function deathLoot(
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    interactionID: string,
+    actionID: string,
+    intent: "respond" | "pass",
+  ) {
+    return interaction(
+      gameID,
+      credential,
+      expectedVersion,
+      interactionID,
+      actionID,
+      intent,
+    );
+  }
+
   function stream(
     gameID: string,
     credential: string,
@@ -301,6 +319,7 @@ export function useGameApi() {
     economyOffer,
     resolveCharity,
     attemptTheft,
+    deathLoot,
     stream,
     contentAssetURL,
   };

@@ -459,6 +459,22 @@ func (service *Service) ExecuteInteraction(
 			InteractionRevision: action.Revision,
 			ChoiceIDs:           append([]string(nil), action.ChoiceIDs...),
 		}
+		deathLootResponse := window.Kind ==
+			game.InteractionKindDeathLootPriority
+		if deathLootResponse {
+			switch intent {
+			case game.InteractionIntentPass:
+				command.Type = game.CommandPassDeathLoot
+			case game.InteractionIntentRespond:
+				if len(action.ChoiceIDs) != 1 {
+					return ErrInteractionAction
+				}
+				command.Type = game.CommandPickDeathLoot
+				command.InstanceID = action.ChoiceIDs[0]
+			default:
+				return ErrInteractionAction
+			}
+		}
 		if intent == game.InteractionIntentRespond &&
 			action.SourceInstanceID != "" {
 			command.InstanceID = action.SourceInstanceID
@@ -523,7 +539,9 @@ func (service *Service) ExecuteInteraction(
 		if err != nil {
 			return err
 		}
-		if !combatHelpResponse && !economyResponse {
+		if !combatHelpResponse &&
+			!economyResponse &&
+			!deathLootResponse {
 			events, err = appendInteractionClose(
 				state,
 				events,
@@ -1337,6 +1355,33 @@ func (service *Service) appendFollowupInteraction(
 	}
 	var spec InteractionOpenSpec
 	switch {
+	case profile.DeathLoot &&
+		next.DeathLoot != nil &&
+		!next.DeathLoot.Completed:
+		currentActorID, available := next.DeathLoot.CurrentActor()
+		if !available {
+			return nil, game.ErrIllegalCommand
+		}
+		spec = InteractionOpenSpec{
+			Kind: game.InteractionKindDeathLootPriority,
+			Parent: game.InteractionParent{
+				Phase:       next.Turn.Phase,
+				SubjectKind: game.InteractionSubjectTurn,
+				SubjectID:   next.Turn.PlayerID,
+			},
+			InitiatorActorID:  currentActorID,
+			EligibilityPolicy: game.InteractionEligibilityActorPrivate,
+			AllowedIntents: []game.InteractionIntent{
+				game.InteractionIntentPass,
+				game.InteractionIntentRespond,
+			},
+			Participants: []InteractionParticipant{{
+				ActorID:       currentActorID,
+				Requirement:   game.InteractionResponseOptional,
+				TimeoutIntent: game.InteractionIntentPass,
+			}},
+			DeadlinePolicy: game.AddressedInteractionDeadlinePolicy(),
+		}
 	case next.Turn.Pending != nil:
 		decision := next.Turn.Pending
 		spec = InteractionOpenSpec{

@@ -54,6 +54,8 @@ const (
 	CommandAttemptTheft             CommandType = "attempt_theft"
 	CommandCounterTheft             CommandType = "counter_theft"
 	CommandResolveTheft             CommandType = "resolve_theft"
+	CommandPickDeathLoot            CommandType = "pick_death_loot"
+	CommandPassDeathLoot            CommandType = "pass_death_loot"
 
 	// Bootstrap aliases remain parseable, but use the new deterministic paths.
 	CommandFight CommandType = "fight"
@@ -89,7 +91,7 @@ type Command struct {
 func CreateLobby(gameID string, owner Player, pack Pack, seed uint64) (DomainEvent, error) {
 	profile := LobbyMultiplayerProfile()
 	if pack.SetID == "moscow-core" && pack.Version == 4 {
-		profile = TheftProfile()
+		profile = DeathLootProfile()
 	} else if pack.SetID == "moscow-core" && pack.Version == 3 {
 		profile = AdvancedCombatProfile()
 	}
@@ -242,6 +244,8 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 		return handleCounterTheft(state, command, pack)
 	case CommandResolveTheft:
 		return handleResolveTheft(state, command, pack)
+	case CommandPickDeathLoot, CommandPassDeathLoot:
+		return handleDeathLootPriority(state, command, pack, false)
 	default:
 		return nil, fmt.Errorf("%w: unknown command %s", ErrIllegalCommand, command.Type)
 	}
@@ -470,6 +474,19 @@ func handleTimeoutInteraction(
 	}
 	if window.Kind == InteractionKindCharityTransfer {
 		return resolveCharityTransfer(state, command, pack, true)
+	}
+	if window.Kind == InteractionKindDeathLootPriority {
+		return handleDeathLootPriority(
+			state,
+			Command{
+				Type:                CommandPassDeathLoot,
+				InteractionID:       command.InteractionID,
+				InteractionAt:       command.InteractionAt,
+				InteractionRevision: command.InteractionRevision,
+			},
+			pack,
+			true,
+		)
 	}
 	next := state.Clone()
 	events := make([]DomainEvent, 0, len(window.EligibleActorIDs)+1)
@@ -3509,6 +3526,152 @@ func settleTheft(
 	}
 	next.TheftAttempt = nil
 	return transition(EventTheftResolved, command, next, outcomes)
+}
+
+func handleDeathLootPriority(
+	state State,
+	command Command,
+	pack Pack,
+	automatic bool,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	window, err := requireInteractionWindow(
+		state,
+		command.InteractionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	loot := state.DeathLoot
+	currentActorID, current := currentDeathLootActor(loot)
+	if !profile.DeathLoot ||
+		!current ||
+		window.Kind != InteractionKindDeathLootPriority ||
+		command.InteractionRevision != window.DeadlineRevision ||
+		command.InteractionAt.IsZero() {
+		return nil, fmt.Errorf(
+			"%w: death loot priority is stale",
+			ErrIllegalCommand,
+		)
+	}
+	if automatic {
+		if command.ActorID != "" ||
+			command.Type != CommandPassDeathLoot ||
+			command.InteractionAt.Before(window.DeadlineAt) {
+			return nil, fmt.Errorf(
+				"%w: invalid death loot timeout",
+				ErrIllegalCommand,
+			)
+		}
+	} else if command.ActorID != currentActorID ||
+		!command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: death loot action missed priority",
+			ErrIllegalCommand,
+		)
+	}
+	response, eligible := window.Responses[currentActorID]
+	if !eligible || response.State != InteractionResponsePending {
+		return nil, fmt.Errorf(
+			"%w: death loot seat already responded",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	nextLoot := next.DeathLoot
+	var outcomes []RandomOutcome
+	switch command.Type {
+	case CommandPickDeathLoot:
+		if automatic ||
+			command.InstanceID == "" ||
+			!slices.Contains(nextLoot.Pool, command.InstanceID) {
+			return nil, fmt.Errorf(
+				"%w: death loot pick is not in the current pool",
+				ErrIllegalCommand,
+			)
+		}
+		var removed bool
+		nextLoot.Pool, removed = removeString(
+			nextLoot.Pool,
+			command.InstanceID,
+		)
+		if !removed {
+			return nil, fmt.Errorf(
+				"%w: death loot pick disappeared",
+				ErrIllegalCommand,
+			)
+		}
+		looterIndex := next.PlayerIndex(currentActorID)
+		next.Players[looterIndex].Hand = append(
+			next.Players[looterIndex].Hand,
+			command.InstanceID,
+		)
+		nextLoot.Picks = append(nextLoot.Picks, DeathLootPick{
+			PlayerID:   currentActorID,
+			InstanceID: command.InstanceID,
+		})
+		response.State = InteractionResponseActed
+		response.Intent = InteractionIntentRespond
+		outcomes = append(outcomes, RandomOutcome{
+			Kind:  "death_loot_pick",
+			Order: []string{command.InstanceID},
+		})
+	case CommandPassDeathLoot:
+		nextLoot.PassedPlayerIDs = append(
+			nextLoot.PassedPlayerIDs,
+			currentActorID,
+		)
+		if automatic {
+			response.State = InteractionResponseTimedOut
+		} else {
+			response.State = InteractionResponsePassed
+		}
+		response.Intent = InteractionIntentPass
+	default:
+		return nil, fmt.Errorf(
+			"%w: unsupported death loot action",
+			ErrIllegalCommand,
+		)
+	}
+	response.AcceptedAt = command.InteractionAt
+	next.InteractionWindow.Responses[currentActorID] = response
+	next.InteractionWindow.Status = InteractionWindowClosed
+	next.InteractionWindow.CloseReason = InteractionCloseAllResponded
+	if automatic {
+		next.InteractionWindow.CloseReason =
+			InteractionCloseDeadlineExpired
+	}
+	next.InteractionWindow.ClosedAt = command.InteractionAt
+	nextLoot.SeatIndex++
+	if len(nextLoot.Pool) == 0 ||
+		nextLoot.SeatIndex >= len(nextLoot.SeatOrder) {
+		remainder := append([]string(nil), nextLoot.Pool...)
+		for _, instanceID := range remainder {
+			if err := appendDiscard(
+				&next,
+				instanceID,
+				pack,
+			); err != nil {
+				return nil, err
+			}
+		}
+		nextLoot.DiscardedInstanceIDs = append(
+			nextLoot.DiscardedInstanceIDs,
+			remainder...,
+		)
+		nextLoot.Pool = nil
+		nextLoot.Completed = true
+		if len(remainder) > 0 {
+			outcomes = append(outcomes, RandomOutcome{
+				Kind:  "death_loot_discard",
+				Order: remainder,
+			})
+		}
+	}
+	return transition(EventDeathLootAdvanced, command, next, outcomes)
 }
 
 func handleEndTurn(state State, command Command, pack Pack) ([]DomainEvent, error) {

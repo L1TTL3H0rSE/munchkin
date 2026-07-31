@@ -1,10 +1,10 @@
 # PLAN: death loot seat priority
 
 - **Plan ID:** `20260731T003715Z-361542-death-loot-seat-priority`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:37:15 UTC
-- **Обновлён:** 2026-07-31 00:37:15 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 06:04:10 UTC
+- **Владелец:** Codex `/root`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -61,22 +61,22 @@ priority: только current looter видит legal options, pick/pass/timeou
 
 ## Критерии приёмки
 
-- [ ] Death event creates internal lootable pool and preserves profile-defined
+- [x] Death event creates internal lootable pool and preserves profile-defined
   traits/persistent state; public projection reveals only safe counts/results.
-- [ ] Living actors ordered by stable persisted seat order, not response
+- [x] Living actors ordered by stable persisted seat order, not response
   latency or connection status.
-- [ ] Only current priority actor receives own legal pool options; others
+- [x] Only current priority actor receives own legal pool options; others
   cannot enumerate remaining private cards.
-- [ ] Pick/pass uses server descriptor and current version; chosen card
+- [x] Pick/pass uses server descriptor and current version; chosen card
   ownership revalidates atomically.
-- [ ] Each seat has absolute 30-second deadline; timeout auto-pass is
+- [x] Each seat has absolute 30-second deadline; timeout auto-pass is
   restart-safe and never skips two seats.
-- [ ] Pool empty/all seats terminal closes window, exact remainder discard
+- [x] Pool empty/all seats terminal closes window, exact remainder discard
   stored in event and parent phase resumes deterministically.
-- [ ] Disconnect/reconnect preserves same priority/deadline.
-- [ ] Concurrent pick/timeout and duplicate requests yield one committed
+- [x] Disconnect/reconnect preserves same priority/deadline.
+- [x] Concurrent pick/timeout and duplicate requests yield one committed
   transition.
-- [ ] Replay/privacy/HTTP/Zod tests cover 1–6 players, no loot, mixed zones,
+- [x] Replay/privacy/HTTP/Zod tests cover 1–6 players, no loot, mixed zones,
   all pass, pool exhaustion and observer redaction.
 
 ## Контекст и подтверждённое состояние
@@ -147,19 +147,19 @@ priority: только current looter видит legal options, pick/pass/timeou
 
 ## План реализации
 
-1. [ ] Add pool/seat/timeout model and replay fixtures.
-2. [ ] Implement projection/application/routes/contracts.
-3. [ ] Prove privacy, restart and pick-v-timeout races.
-4. [ ] Run full checks, verify/scope-check and archive.
+1. [x] Add pool/seat/timeout model and replay fixtures.
+2. [x] Implement projection/application/routes/contracts.
+3. [x] Prove privacy, restart and pick-v-timeout races.
+4. [x] Run full checks, verify/scope-check and archive.
 
 ## Проверки
 
-- [ ] `cd backend/game && go test ./...`
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T003715Z-361542-death-loot-seat-priority`
-- [ ] `git diff --check`
+- [x] `cd backend/game && go test ./...`
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260731T003715Z-361542-death-loot-seat-priority`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -175,16 +175,42 @@ priority: только current looter видит legal options, pick/pass/timeou
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:37:15 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Подготовить оставшиеся планы;
-  implementation/select/commit/push не разрешены.
+- **Подтверждено:** 2026-07-31 05:36:19 UTC
+- **Формулировка/ограничения пользователя:** пользователь явно согласовал
+  exact plan ID в очереди из девяти plans; после каждого завершённого plan
+  требуется отдельный локальный commit и переход к следующему. Push не
+  разрешён.
 
 ## Ход выполнения
 
 - Draft создан атомарно; реализация не начата.
+- Approval очереди подтверждён пользователем; predecessor
+  `20260731T003716Z-105e5a-theft-contested-resolution` завершён commit
+  `d45fbf6`.
+- Выполнен свежий `leinoctl context`, полностью прочитаны applicable
+  `AGENTS.md`, ADR-0008, multiplayer protocol, frontend engineering spec и
+  skills `backend-game-change`/`frontend-game-change`.
+- Добавлен versioned rules profile `lobby-multiplayer-v4`: смерть переносит
+  lootable hand/carried/equipped карты во внутренний pool, сохраняет
+  persistent character state и фиксирует стабильный порядок живых мест.
+- Каждый looter получает отдельное 30-секундное actor-private interaction
+  окно. Pick использует только opaque server descriptor; pass и timeout
+  двигают ровно один persisted seat cursor.
+- Проекция раскрывает всем только безопасные счётчики, а legal card options
+  и actions — только текущему looter. HTTP strictness test отвергает
+  клиентский `instance_id`; Zod-схема отвергает internal pool/seat data.
+- Replay фиксирует точный pick/discard outcome; application tests доказали
+  idempotent duplicate, stale CAS, restart timeout и конкурентный
+  pick-v-timeout с единственным committed переходом.
+- Канонический Node 24 verify прошёл: 18 contract tests, 46 web tests,
+  полный `go test ./...`, frontend lint/typecheck/build, `bash -n` и
+  `docker compose --parallel 8 config`.
 
 ## Итог
 
-Заполняется после реализации.
+Death loot больше не уничтожается немедленно для новых `moscow-core` v4 игр:
+он проходит приватный deterministic seat-priority цикл, а точный остаток
+фиксируется и discard-ится только в terminal transition. Старые rules
+profiles остаются replay-compatible и сохраняют прежнее поведение.
