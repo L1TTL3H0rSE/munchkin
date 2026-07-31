@@ -1,0 +1,3 @@
+# Игнорировать все Markdown-файлы
+*.md
+content/sets/moscow
