@@ -324,6 +324,82 @@ describe("wire contracts", () => {
     });
   });
 
+  it("keeps target effects actor-scoped and private choices server-projected", () => {
+    const fixture: unknown = JSON.parse(readFileSync(new URL(
+      "../../../../backend/game/internal/transport/httpapi/testdata/"
+        + "target-effect-projection-v1.json",
+      import.meta.url,
+    ), "utf8"));
+    const target = projectionSchema.parse(fixture);
+    expect(target.interaction).toMatchObject({
+      public_kind: "target_response",
+      target_player_id: "player_b",
+    });
+    expect(target.interaction?.actions[1]).toMatchObject({
+      combat_capability: "counter_combat_effect",
+      target_effect_id: "tfx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+    expect(commandPayloadSchema.parse({
+      instance_id: "target-curse-1",
+      target_player_id: "player_b",
+    })).toEqual({
+      instance_id: "target-curse-1",
+      target_player_id: "player_b",
+    });
+    expect(() => commandPayloadSchema.parse({
+      instance_id: "target-curse-1",
+      target_player_id: "player_b",
+      player_id: "player_b",
+    })).toThrow();
+    expect(interactionActionViewSchema.parse({
+      action_id: "act_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      interaction_id: "interaction_target_choice",
+      revision: 1,
+      type: "respond",
+      choice_ids: ["private-owned-card-1"],
+    }).choice_ids).toEqual(["private-owned-card-1"]);
+    expect(() => interactionActionViewSchema.parse({
+      ...target.interaction?.actions[1],
+      choice_ids: ["foreign-card-1"],
+    })).toThrow();
+  });
+
+  it("exposes only persisted Run Away results and typed actor actions", () => {
+    const fixture: unknown = JSON.parse(readFileSync(new URL(
+      "../../../../backend/game/internal/transport/httpapi/testdata/"
+        + "run-away-projection-v1.json",
+      import.meta.url,
+    ), "utf8"));
+    const runAway = projectionSchema.parse(fixture);
+    expect(runAway.turn.run_away).toMatchObject({
+      current_player_id: "player_b",
+      current_monster_instance_id: "courtyard-pigeon-1",
+      attempts: [{
+        player_id: "player_a",
+        monster_instance_id: "paperwork-hydra-1",
+        roll: 2,
+        modifier: 0,
+        total: 2,
+        escaped: false,
+        bad_stuff_applied: true,
+      }],
+      completed: false,
+    });
+    expect(runAway.interaction?.actions[1]).toMatchObject({
+      source_instance_id: "metro-shortcut-1",
+      escape_delta: 2,
+    });
+    expect(() => interactionActionViewSchema.parse({
+      ...runAway.interaction?.actions[1],
+      combat_capability: "counter_combat_effect",
+      target_effect_id: "rfx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    })).toThrow();
+    expect(() => projectionSchema.parse({
+      ...runAway,
+      rng_state: 42,
+    })).toThrow();
+  });
+
   it("keeps combat-help terms server-owned and party-scoped", () => {
     const offer = {
       action_id: "act_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",

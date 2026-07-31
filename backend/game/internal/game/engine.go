@@ -40,6 +40,12 @@ const (
 	CommandOfferCombatHelp          CommandType = "offer_combat_help"
 	CommandRespondCombatHelp        CommandType = "respond_combat_help"
 	CommandCancelCombatHelp         CommandType = "cancel_combat_help"
+	CommandPlayTargetEffect         CommandType = "play_target_effect"
+	CommandCounterTargetEffect      CommandType = "counter_target_effect"
+	CommandResolveTargetEffect      CommandType = "resolve_target_effect"
+	CommandPlayRunAwayModifier      CommandType = "play_run_away_modifier"
+	CommandCounterRunAwayEffect     CommandType = "counter_run_away_effect"
+	CommandResolveRunAwayStep       CommandType = "resolve_run_away_step"
 
 	// Bootstrap aliases remain parseable, but use the new deterministic paths.
 	CommandFight CommandType = "fight"
@@ -66,6 +72,7 @@ type Command struct {
 	ChildInteractionID     string                 `json:"-"`
 	HelperPlayerID         string                 `json:"-"`
 	TargetEffectID         string                 `json:"-"`
+	TargetPlayerID         string                 `json:"-"`
 	RewardTreasures        int                    `json:"-"`
 }
 
@@ -197,6 +204,18 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 		return handleRespondCombatHelp(state, command, pack)
 	case CommandCancelCombatHelp:
 		return handleCancelCombatHelp(state, command)
+	case CommandPlayTargetEffect:
+		return handlePlayTargetEffect(state, command, pack)
+	case CommandCounterTargetEffect:
+		return handleCounterTargetEffect(state, command, pack)
+	case CommandResolveTargetEffect:
+		return handleResolveTargetEffect(state, command, pack)
+	case CommandPlayRunAwayModifier:
+		return handlePlayRunAwayModifier(state, command, pack)
+	case CommandCounterRunAwayEffect:
+		return handleCounterRunAwayEffect(state, command, pack)
+	case CommandResolveRunAwayStep:
+		return handleResolveRunAwayStep(state, command, pack)
 	default:
 		return nil, fmt.Errorf("%w: unknown command %s", ErrIllegalCommand, command.Type)
 	}
@@ -296,10 +315,14 @@ func recordInteractionResponse(
 	if err != nil {
 		return nil, err
 	}
-	if !timeout &&
-		profile.CombatResponses &&
+	revisionBound := profile.CombatResponses &&
 		window.Kind == InteractionKindCombatResponse &&
-		window.Parent.SubjectKind == InteractionSubjectEncounter &&
+		window.Parent.SubjectKind == InteractionSubjectEncounter ||
+		window.Kind == InteractionKindTargetResponse ||
+		window.Kind == InteractionKindRunAwayResponse ||
+		window.Kind == InteractionKindPrivateChoice
+	if !timeout &&
+		revisionBound &&
 		command.InteractionRevision != window.DeadlineRevision {
 		return nil, fmt.Errorf(
 			"%w: stale combat response revision",
@@ -1060,21 +1083,36 @@ func appendCombatContinuation(
 ) ([]DomainEvent, error) {
 	window := state.InteractionWindow
 	if window == nil ||
-		window.Status != InteractionWindowClosed ||
-		window.Kind != InteractionKindCombatResponse ||
-		window.Parent.SubjectKind != InteractionSubjectEncounter {
+		window.Status != InteractionWindowClosed {
 		return events, nil
 	}
-	continued, err := handleCompleteCombatResolution(
-		state,
-		Command{
-			Type:          CommandCompleteCombatResolution,
-			ActorID:       window.InitiatorActorID,
-			InteractionID: window.ID,
-			InteractionAt: acceptedAt,
-		},
-		pack,
-	)
+	command := Command{
+		ActorID:       window.InitiatorActorID,
+		InteractionID: window.ID,
+		InteractionAt: acceptedAt,
+	}
+	var continued []DomainEvent
+	var err error
+	switch window.Kind {
+	case InteractionKindCombatResponse:
+		if window.Parent.SubjectKind != InteractionSubjectEncounter {
+			return events, nil
+		}
+		command.Type = CommandCompleteCombatResolution
+		continued, err = handleCompleteCombatResolution(
+			state,
+			command,
+			pack,
+		)
+	case InteractionKindTargetResponse:
+		command.Type = CommandResolveTargetEffect
+		continued, err = handleResolveTargetEffect(state, command, pack)
+	case InteractionKindRunAwayResponse:
+		command.Type = CommandResolveRunAwayStep
+		continued, err = handleResolveRunAwayStep(state, command, pack)
+	default:
+		return events, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1388,6 +1426,16 @@ func handlePlayCard(state State, command Command, pack Pack) ([]DomainEvent, err
 		if state.Turn.Phase == PhaseCombat {
 			return nil, fmt.Errorf("%w: card cannot be played during combat", ErrIllegalCommand)
 		}
+		profile, err := state.Profile()
+		if err != nil {
+			return nil, err
+		}
+		if profile.TargetAndRunAway && targetableEffectCard(card) {
+			return nil, fmt.Errorf(
+				"%w: other-player curse requires a server target descriptor",
+				ErrIllegalCommand,
+			)
+		}
 		nextPlayer.Hand, _ = removeString(nextPlayer.Hand, command.InstanceID)
 		next.Turn.Resolving = append(next.Turn.Resolving, command.InstanceID)
 		var outcomes []RandomOutcome
@@ -1608,6 +1656,22 @@ func handleOpenDoor(state State, command Command, pack Pack) ([]DomainEvent, err
 		next.Turn.Encounter = &Encounter{MonsterInstanceID: instanceID}
 		setTurnPhase(&next, PhaseCombat)
 	case CardCurse:
+		profile, err := next.Profile()
+		if err != nil {
+			return nil, err
+		}
+		if profile.TargetAndRunAway && targetableEffectCard(card) {
+			next.Turn.Resolving, _ = removeString(
+				next.Turn.Resolving,
+				instanceID,
+			)
+			next.Players[playerIndex].Hand = append(
+				next.Players[playerIndex].Hand,
+				instanceID,
+			)
+			setTurnPhase(&next, PhaseDoorChoice)
+			break
+		}
 		if err := beginEffectSequence(
 			&next,
 			playerIndex,
@@ -1943,20 +2007,33 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 		}
 		prefix = append(prefix, voided)
 	}
-	tags, err := characterTags(next, next.Players[playerIndex], pack)
+	profile, err := next.Profile()
 	if err != nil {
 		return nil, err
 	}
-	autoEscape := next.Players[playerIndex].Level <= monsterCard.Monster.PursuitMinLevel ||
-		containsAny(tags, monsterCard.Monster.AutoEscapeCharacterTags)
-	if autoEscape {
-		if err := discardEncounterSet(&next, pack); err != nil {
+	if profile.TargetAndRunAway {
+		next.Turn.Encounter.CombatClosed = true
+		if err := initializeRunAwaySequence(&next); err != nil {
 			return nil, err
 		}
-		setTurnPhase(&next, PhaseCharity)
-	} else {
-		next.Turn.Encounter.CombatClosed = true
 		setTurnPhase(&next, PhaseRunAway)
+	} else {
+		tags, err := characterTags(next, next.Players[playerIndex], pack)
+		if err != nil {
+			return nil, err
+		}
+		autoEscape := next.Players[playerIndex].Level <=
+			monsterCard.Monster.PursuitMinLevel ||
+			containsAny(tags, monsterCard.Monster.AutoEscapeCharacterTags)
+		if autoEscape {
+			if err := discardEncounterSet(&next, pack); err != nil {
+				return nil, err
+			}
+			setTurnPhase(&next, PhaseCharity)
+		} else {
+			next.Turn.Encounter.CombatClosed = true
+			setTurnPhase(&next, PhaseRunAway)
+		}
 	}
 	resolved, err := transition(EventCombatResolved, command, next, outcomes)
 	if err != nil {
@@ -1965,10 +2042,507 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 	return append(prefix, resolved...), nil
 }
 
+func handlePlayTargetEffect(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	playerIndex, err := requirePhase(
+		state,
+		command,
+		PhasePreparation,
+		PhaseDoorChoice,
+		PhaseCharity,
+	)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	if !profile.TargetAndRunAway ||
+		state.Turn.TargetEffect != nil ||
+		state.Turn.RunAway != nil ||
+		state.InteractionWindow != nil &&
+			state.InteractionWindow.Status == InteractionWindowOpen ||
+		strings.TrimSpace(command.InteractionID) == "" ||
+		command.InteractionAt.IsZero() ||
+		!slices.Contains(
+			state.Players[playerIndex].Hand,
+			command.InstanceID,
+		) {
+		return nil, fmt.Errorf(
+			"%w: target effect is not available",
+			ErrIllegalCommand,
+		)
+	}
+	card, _, exists := pack.DefinitionForInstance(state, command.InstanceID)
+	if !exists || !targetableEffectCard(card) {
+		return nil, fmt.Errorf(
+			"%w: target effect source is not registered",
+			ErrIllegalCommand,
+		)
+	}
+	targetIndex := state.PlayerIndex(command.TargetPlayerID)
+	if targetIndex < 0 ||
+		command.TargetPlayerID == command.ActorID ||
+		state.Players[targetIndex].Dead {
+		return nil, fmt.Errorf(
+			"%w: target player is not server-legal",
+			ErrIllegalCommand,
+		)
+	}
+	window := targetEffectWindow(
+		state,
+		command.InteractionID,
+		command.InteractionAt,
+		command.ActorID,
+		command.InstanceID,
+	)
+	if window == nil {
+		return nil, fmt.Errorf(
+			"%w: target response window has no public responder set",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	next.Players[playerIndex].Hand, _ = removeString(
+		next.Players[playerIndex].Hand,
+		command.InstanceID,
+	)
+	next.Turn.Resolving = append(next.Turn.Resolving, command.InstanceID)
+	next.Turn.TargetEffect = &TargetEffectState{
+		ID: realizedTargetEffectID(
+			command.InteractionID,
+			command.ActorID,
+			command.InstanceID,
+		),
+		InitiatorPlayerID: command.ActorID,
+		TargetPlayerID:    command.TargetPlayerID,
+		SourceInstanceID:  command.InstanceID,
+		ParentPhase:       state.Turn.Phase,
+	}
+	next.InteractionWindow = window
+	return transition(EventTargetEffectStarted, command, next, nil)
+}
+
+func handleCounterTargetEffect(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	window, err := requireInteractionWindow(state, command.InteractionID)
+	if err != nil {
+		return nil, err
+	}
+	target := state.Turn.TargetEffect
+	if !profile.TargetAndRunAway ||
+		window.Kind != InteractionKindTargetResponse ||
+		target == nil ||
+		target.Countered ||
+		command.TargetEffectID != target.ID ||
+		command.InteractionRevision != window.DeadlineRevision ||
+		command.InteractionAt.IsZero() ||
+		!command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: stale target counter",
+			ErrIllegalCommand,
+		)
+	}
+	if _, err := interactionResponseAt(window, command.ActorID); err != nil {
+		return nil, err
+	}
+	playerIndex := state.PlayerIndex(command.ActorID)
+	if playerIndex < 0 ||
+		!slices.Contains(state.Players[playerIndex].Hand, command.InstanceID) {
+		return nil, fmt.Errorf(
+			"%w: target counter source is not actor-owned",
+			ErrIllegalCommand,
+		)
+	}
+	card, _, exists := pack.DefinitionForInstance(state, command.InstanceID)
+	if !exists ||
+		card.CombatCapability == nil ||
+		card.CombatCapability.Kind != CombatCapabilityCounter {
+		return nil, fmt.Errorf(
+			"%w: target counter source is not registered",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	next.Players[playerIndex].Hand, _ = removeString(
+		next.Players[playerIndex].Hand,
+		command.InstanceID,
+	)
+	if err := appendDiscard(&next, command.InstanceID, pack); err != nil {
+		return nil, err
+	}
+	next.Turn.TargetEffect.Countered = true
+	for _, actorID := range next.InteractionWindow.EligibleActorIDs {
+		response := next.InteractionWindow.Responses[actorID]
+		response.AcceptedAt = command.InteractionAt
+		if actorID == command.ActorID {
+			response.State = InteractionResponseActed
+			response.Intent = InteractionIntentRespond
+		} else if response.State == InteractionResponsePending {
+			response.State = InteractionResponsePassed
+			response.Intent = InteractionIntentPass
+		}
+		next.InteractionWindow.Responses[actorID] = response
+	}
+	return transition(EventTargetEffectCountered, command, next, nil)
+}
+
+func handleResolveTargetEffect(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	window := state.InteractionWindow
+	target := state.Turn.TargetEffect
+	if !profile.TargetAndRunAway ||
+		window == nil ||
+		window.Status != InteractionWindowClosed ||
+		window.Kind != InteractionKindTargetResponse ||
+		target == nil ||
+		window.Parent.SubjectID != target.SourceInstanceID {
+		return nil, fmt.Errorf(
+			"%w: target effect continuation is not available",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	if target.Countered {
+		if err := discardResolvingInstance(
+			&next,
+			target.SourceInstanceID,
+			pack,
+		); err != nil {
+			return nil, err
+		}
+		next.Turn.TargetEffect = nil
+		setTurnPhase(&next, target.ParentPhase)
+		return transition(EventTargetEffectResolved, command, next, nil)
+	}
+	card, _, exists := pack.DefinitionForInstance(
+		next,
+		target.SourceInstanceID,
+	)
+	if !exists || !targetableEffectCard(card) {
+		return nil, fmt.Errorf(
+			"%w: target effect source disappeared",
+			ErrInvalidContent,
+		)
+	}
+	targetIndex := next.PlayerIndex(target.TargetPlayerID)
+	if targetIndex < 0 || next.Players[targetIndex].Dead {
+		return nil, fmt.Errorf(
+			"%w: target effect target disappeared",
+			ErrIllegalCommand,
+		)
+	}
+	var outcomes []RandomOutcome
+	if err := beginEffectSequence(
+		&next,
+		targetIndex,
+		target.SourceInstanceID,
+		card.Effects,
+		PendingFinalize{
+			Phase:             target.ParentPhase,
+			DiscardSource:     !effectsPersist(card.Effects),
+			ClearTargetEffect: true,
+			SourceInstanceID:  target.SourceInstanceID,
+		},
+		pack,
+		&outcomes,
+	); err != nil {
+		return nil, err
+	}
+	return transition(EventTargetEffectResolved, command, next, outcomes)
+}
+
+func handlePlayRunAwayModifier(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	window, err := requireInteractionWindow(state, command.InteractionID)
+	if err != nil {
+		return nil, err
+	}
+	sequence, playerIndex, _, err := currentRunAwayStep(state)
+	if err != nil {
+		return nil, err
+	}
+	if !profile.TargetAndRunAway ||
+		window.Kind != InteractionKindRunAwayResponse ||
+		command.ActorID != sequence.ParticipantPlayerIDs[sequence.ParticipantIndex] ||
+		command.InteractionRevision != window.DeadlineRevision ||
+		command.InteractionAt.IsZero() ||
+		!command.InteractionAt.Before(window.DeadlineAt) ||
+		!slices.Contains(state.Players[playerIndex].Hand, command.InstanceID) {
+		return nil, fmt.Errorf(
+			"%w: stale Run Away modifier",
+			ErrIllegalCommand,
+		)
+	}
+	card, _, exists := pack.DefinitionForInstance(state, command.InstanceID)
+	effect, legal := runAwayModifierEffect(card)
+	if !exists || !legal {
+		return nil, fmt.Errorf(
+			"%w: Run Away modifier is not registered",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	next.Players[playerIndex].Hand, _ = removeString(
+		next.Players[playerIndex].Hand,
+		command.InstanceID,
+	)
+	if err := appendDiscard(&next, command.InstanceID, pack); err != nil {
+		return nil, err
+	}
+	next.Turn.RunAway.Effects = append(
+		next.Turn.RunAway.Effects,
+		RunAwayEffect{
+			ID: realizedRunAwayEffectID(
+				window.ID,
+				command.ActorID,
+				command.InstanceID,
+				window.DeadlineRevision,
+			),
+			Kind:             RunAwayEffectModifier,
+			ActorPlayerID:    command.ActorID,
+			SourceInstanceID: command.InstanceID,
+			Amount:           effect.Amount,
+			Active:           true,
+		},
+	)
+	if err := resetInteractionResponses(
+		next.InteractionWindow,
+		command.InteractionAt,
+	); err != nil {
+		return nil, err
+	}
+	return transition(EventRunAwayResponseApplied, command, next, nil)
+}
+
+func handleCounterRunAwayEffect(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	window, err := requireInteractionWindow(state, command.InteractionID)
+	if err != nil {
+		return nil, err
+	}
+	sequence, _, _, err := currentRunAwayStep(state)
+	if err != nil {
+		return nil, err
+	}
+	targetIndex := slices.IndexFunc(
+		sequence.Effects,
+		func(effect RunAwayEffect) bool {
+			return effect.ID == command.TargetEffectID &&
+				effect.Kind == RunAwayEffectModifier &&
+				effect.Active
+		},
+	)
+	if !profile.TargetAndRunAway ||
+		window.Kind != InteractionKindRunAwayResponse ||
+		targetIndex < 0 ||
+		command.InteractionRevision != window.DeadlineRevision ||
+		command.InteractionAt.IsZero() ||
+		!command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: stale Run Away counter",
+			ErrIllegalCommand,
+		)
+	}
+	if _, err := interactionResponseAt(window, command.ActorID); err != nil {
+		return nil, err
+	}
+	playerIndex := state.PlayerIndex(command.ActorID)
+	if playerIndex < 0 ||
+		!slices.Contains(state.Players[playerIndex].Hand, command.InstanceID) {
+		return nil, fmt.Errorf(
+			"%w: Run Away counter source is not actor-owned",
+			ErrIllegalCommand,
+		)
+	}
+	card, _, exists := pack.DefinitionForInstance(state, command.InstanceID)
+	if !exists ||
+		card.CombatCapability == nil ||
+		card.CombatCapability.Kind != CombatCapabilityCounter {
+		return nil, fmt.Errorf(
+			"%w: Run Away counter source is not registered",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	next.Players[playerIndex].Hand, _ = removeString(
+		next.Players[playerIndex].Hand,
+		command.InstanceID,
+	)
+	if err := appendDiscard(&next, command.InstanceID, pack); err != nil {
+		return nil, err
+	}
+	next.Turn.RunAway.Effects[targetIndex].Active = false
+	next.Turn.RunAway.Effects = append(
+		next.Turn.RunAway.Effects,
+		RunAwayEffect{
+			ID: realizedRunAwayEffectID(
+				window.ID,
+				command.ActorID,
+				command.InstanceID,
+				window.DeadlineRevision,
+			),
+			Kind:             RunAwayEffectCounter,
+			ActorPlayerID:    command.ActorID,
+			SourceInstanceID: command.InstanceID,
+			TargetEffectID:   command.TargetEffectID,
+			Active:           true,
+		},
+	)
+	if err := resetInteractionResponses(
+		next.InteractionWindow,
+		command.InteractionAt,
+	); err != nil {
+		return nil, err
+	}
+	return transition(EventRunAwayResponseApplied, command, next, nil)
+}
+
+func handleResolveRunAwayStep(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	window := state.InteractionWindow
+	sequence, playerIndex, monsterInstanceID, err := currentRunAwayStep(state)
+	if err != nil {
+		return nil, err
+	}
+	if !profile.TargetAndRunAway ||
+		window == nil ||
+		window.Status != InteractionWindowClosed ||
+		window.Kind != InteractionKindRunAwayResponse ||
+		state.Turn.Phase != PhaseRunAway ||
+		window.Parent.SubjectID != monsterInstanceID {
+		return nil, fmt.Errorf(
+			"%w: Run Away continuation is not available",
+			ErrIllegalCommand,
+		)
+	}
+	monsterCard, _, exists := pack.DefinitionForInstance(
+		state,
+		monsterInstanceID,
+	)
+	if !exists || monsterCard.Monster == nil {
+		return nil, fmt.Errorf(
+			"%w: Run Away monster is invalid",
+			ErrInvalidContent,
+		)
+	}
+	next := state.Clone()
+	tags, err := characterTags(next, next.Players[playerIndex], pack)
+	if err != nil {
+		return nil, err
+	}
+	modifier := 0
+	for _, effect := range sequence.Effects {
+		if effect.Kind == RunAwayEffectModifier && effect.Active {
+			modifier += effect.Amount
+		}
+	}
+	bonus, err := escapeBonus(next, playerIndex, pack)
+	if err != nil {
+		return nil, err
+	}
+	automatic := next.Players[playerIndex].Level <=
+		monsterCard.Monster.PursuitMinLevel ||
+		containsAny(tags, monsterCard.Monster.AutoEscapeCharacterTags)
+	attempt := RunAwayAttempt{
+		PlayerID:          next.Players[playerIndex].ID,
+		MonsterInstanceID: monsterInstanceID,
+		Modifier:          bonus + modifier,
+		Automatic:         automatic,
+	}
+	var outcomes []RandomOutcome
+	if automatic {
+		attempt.Escaped = true
+	} else {
+		roll, rngState := rollD6(next.RNGState)
+		next.RNGState = rngState
+		attempt.Roll = roll
+		attempt.Total = roll + attempt.Modifier
+		attempt.Escaped = attempt.Total >= profile.RunAwayTarget
+		outcomes = append(outcomes, RandomOutcome{
+			Kind: "d6",
+			Roll: roll,
+		})
+	}
+	attempt.BadStuffApplied = !attempt.Escaped
+	next.Turn.RunAway.Attempts = append(
+		next.Turn.RunAway.Attempts,
+		attempt,
+	)
+	if attempt.Escaped {
+		if err := advanceRunAwaySequence(&next, pack); err != nil {
+			return nil, err
+		}
+	} else if err := beginEffectSequence(
+		&next,
+		playerIndex,
+		monsterInstanceID,
+		monsterCard.Monster.BadStuff,
+		PendingFinalize{
+			ContinueRunAway:  true,
+			SourceInstanceID: monsterInstanceID,
+		},
+		pack,
+		&outcomes,
+	); err != nil {
+		return nil, err
+	}
+	return transition(EventRunAwayStepResolved, command, next, outcomes)
+}
+
 func handleRunAway(state State, command Command, pack Pack) ([]DomainEvent, error) {
 	playerIndex, err := requirePhase(state, command, PhaseRunAway)
 	if err != nil {
 		return nil, err
+	}
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	if profile.TargetAndRunAway {
+		return nil, fmt.Errorf(
+			"%w: Run Away is resolved through the durable response step",
+			ErrIllegalCommand,
+		)
 	}
 	if state.Turn.Encounter == nil || !state.Turn.Encounter.CombatClosed {
 		return nil, fmt.Errorf("%w: losing combat was not resolved", ErrIllegalCommand)
@@ -1992,10 +2566,6 @@ func handleRunAway(state State, command Command, pack Pack) ([]DomainEvent, erro
 	next.RNGState = rngState
 	outcomes := []RandomOutcome{{Kind: "d6", Roll: roll}}
 	bonus, err := escapeBonus(next, playerIndex, pack)
-	if err != nil {
-		return nil, err
-	}
-	profile, err := next.Profile()
 	if err != nil {
 		return nil, err
 	}
@@ -2024,9 +2594,22 @@ func handleRunAway(state State, command Command, pack Pack) ([]DomainEvent, erro
 }
 
 func handleChooseEffect(state State, command Command, pack Pack) ([]DomainEvent, error) {
-	playerIndex, err := requireActiveActor(state, command)
+	playerIndex := state.PlayerIndex(command.ActorID)
+	if playerIndex < 0 {
+		return nil, fmt.Errorf("%w: effect actor is not a player", ErrIllegalCommand)
+	}
+	profile, err := state.Profile()
 	if err != nil {
 		return nil, err
+	}
+	privateChoice := profile.TargetAndRunAway &&
+		state.Turn.Pending != nil &&
+		state.Turn.Pending.ActorID == command.ActorID &&
+		state.InteractionWindow != nil &&
+		state.InteractionWindow.Status == InteractionWindowClosed &&
+		state.InteractionWindow.Kind == InteractionKindPrivateChoice
+	if command.ActorID != state.Turn.PlayerID && !privateChoice {
+		return nil, fmt.Errorf("%w: actor does not own effect choice", ErrIllegalCommand)
 	}
 	if state.Turn.Phase != PhaseResolveEffect {
 		return nil, fmt.Errorf("%w: no effect choice is pending", ErrIllegalCommand)

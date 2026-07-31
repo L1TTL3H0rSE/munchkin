@@ -1,10 +1,10 @@
 # PLAN: target effects and run away interactions
 
 - **Plan ID:** `20260731T003716Z-81b06c-target-effects-and-run-away-interactions`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:37:16 UTC
-- **Обновлён:** 2026-07-31 00:37:16 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 04:29:00 UTC
+- **Владелец:** Codex /root
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -61,21 +61,21 @@ multi-monster stable order and restart-safe timeout defaults.
 
 ## Критерии приёмки
 
-- [ ] Initiator получает только server-valid public target IDs; target видит
+- [x] Initiator получает только server-valid public target IDs; target видит
   только свои private options; observers не получают hidden choice/counter.
-- [ ] Hidden counter capability всегда использует opaque 30-second window;
+- [x] Hidden counter capability всегда использует opaque 30-second window;
   отсутствие counter не раскрывается immediate close timing.
-- [ ] Mandatory timeout применяет deterministic typed default: single option,
+- [x] Mandatory timeout применяет deterministic typed default: single option,
   stable discard/transfer order or persisted RNG; unsafe content stays disabled.
-- [ ] Each escaping participant/monster uses stable profile order and a
+- [x] Each escaping participant/monster uses stable profile order and a
   separate persisted step; client never sends roll or realized outcome.
-- [ ] Run Away modifier/counter commits before server roll, resets relevant
+- [x] Run Away modifier/counter commits before server roll, resets relevant
   response revision and replay stores exact D6/modifiers/Bad Stuff outcome.
-- [ ] Reconnect restores same absolute deadline/step; player/system race has
+- [x] Reconnect restores same absolute deadline/step; player/system race has
   one committed outcome.
-- [ ] Projection exposes own choices/actions and public realized result only.
-- [ ] Legacy single-monster Run Away and non-target effects remain compatible.
-- [ ] Engine/application/HTTP/Zod tests cover target privacy, invalid option,
+- [x] Projection exposes own choices/actions and public realized result only.
+- [x] Legacy single-monster Run Away and non-target effects remain compatible.
+- [x] Engine/application/HTTP/Zod tests cover target privacy, invalid option,
   at-deadline boundary, multiple monsters, death continuation and replay.
 
 ## Контекст и подтверждённое состояние
@@ -149,19 +149,19 @@ multi-monster stable order and restart-safe timeout defaults.
 
 ## План реализации
 
-1. [ ] Add target/escape models, defaults and replay tests.
-2. [ ] Implement application RNG/time/CAS paths.
-3. [ ] Add projections/HTTP/Zod fixtures and privacy tests.
-4. [ ] Run full checks, verify/scope-check and archive.
+1. [x] Add target/escape models, defaults and replay tests.
+2. [x] Implement application RNG/time/CAS paths.
+3. [x] Add projections/HTTP/Zod fixtures and privacy tests.
+4. [x] Run full checks, verify/scope-check and archive.
 
 ## Проверки
 
-- [ ] `cd backend/game && go test ./...`
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T003716Z-81b06c-target-effects-and-run-away-interactions`
-- [ ] `git diff --check`
+- [x] `cd backend/game && go test ./...`
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260731T003716Z-81b06c-target-effects-and-run-away-interactions`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -179,16 +179,38 @@ multi-monster stable order and restart-safe timeout defaults.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:37:16 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Подготовить оставшиеся планы;
-  implementation/select/commit/push не разрешены.
+- **Подтверждено:** 2026-07-31
+- **Формулировка/ограничения пользователя:** Пользователь явно подтвердил exact
+  plan ID в очереди из девяти планов, разрешил реализацию и отдельный локальный
+  commit после каждого плана. Push не разрешён.
 
 ## Ход выполнения
 
-- Draft создан атомарно; реализация не начата.
+- Predecessor
+  `20260731T003715Z-1b5b06-advanced-combat-effects-and-forced-help`
+  завершён, заархивирован и зафиксирован локальным commit `0058dbd`.
+- Получен свежий impact/context для game engine, application, HTTP и frontend
+  contracts; план переведён в `in_progress` для exact approved selection.
+- Добавлены actor-specific target effect, opaque counter и private mandatory
+  choice с deterministic timeout default и idempotent HTTP receipt.
+- Run Away переведён на persisted participant/monster sequence с отдельным
+  30-second response step, material revision reset, server-owned D6 и Bad Stuff.
+- Добавлены cross-actor Go/HTTP fixtures и strict Zod contracts; текущий Vue
+  adapter скрывает новый descriptor от старой ActionPanel до отдельного
+  утверждённого UI-плана, сохраняя transport schema и generic command API.
+- `go test ./...` прошёл для всех backend packages.
+- Frontend прошёл lint, typecheck, 60 tests и production Nuxt build.
+- `./leinoctl verify --changed` прошёл 13 обязательных checks; `scope-check`
+  сообщил `outsideWriteSet: []`, missing/stale checks отсутствуют.
 
 ## Итог
 
-Заполняется после реализации.
+Targetable effects и полный durable Run Away protocol активированы только в
+`lobby-multiplayer-v2@1`; старые профили сохраняют прежние команды и replay.
+Приватные options/counter sources остаются actor-specific, абсолютные deadlines
+переживают reconnect, а точные roll/modifier/outcome записываются событиями.
+Добавлены тесты target privacy/counter/default/invalid action, multi-monster
+order, modifier revision, death continuation, timeout boundary, HTTP authority,
+idempotency и Go/Zod fixture parity.

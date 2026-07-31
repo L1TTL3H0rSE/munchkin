@@ -35,6 +35,11 @@ const (
 	EventCombatHelpOfferResolved     = "game.v1.combat_help_offer_resolved"
 	EventCombatHelpRewardSettled     = "game.v1.combat_help_reward_settled"
 	EventCombatHelpRewardVoided      = "game.v1.combat_help_reward_voided"
+	EventTargetEffectStarted         = "game.v1.target_effect_started"
+	EventTargetEffectCountered       = "game.v1.target_effect_countered"
+	EventTargetEffectResolved        = "game.v1.target_effect_resolved"
+	EventRunAwayResponseApplied      = "game.v1.run_away_response_applied"
+	EventRunAwayStepResolved         = "game.v1.run_away_step_resolved"
 
 	legacyEventPlayerJoined    = "game.v1.player_joined"
 	legacyEventGameStarted     = "game.v1.game_started"
@@ -222,6 +227,11 @@ func Apply(state State, event DomainEvent) (State, error) {
 		EventCombatResolved,
 		EventCombatHelpRewardSettled,
 		EventCombatHelpRewardVoided,
+		EventTargetEffectStarted,
+		EventTargetEffectCountered,
+		EventTargetEffectResolved,
+		EventRunAwayResponseApplied,
+		EventRunAwayStepResolved,
 		EventRunAwayResolved,
 		EventEffectResolved,
 		EventCharityResolved,

@@ -41,6 +41,7 @@ type RulesProfile struct {
 	RunAwayTarget        int    `json:"run_away_target"`
 	CombatResponses      bool   `json:"combat_responses"`
 	AdvancedCombat       bool   `json:"advanced_combat"`
+	TargetAndRunAway     bool   `json:"target_and_run_away"`
 }
 
 func FirstEditionCoreProfile() RulesProfile {
@@ -70,6 +71,7 @@ func AdvancedCombatProfile() RulesProfile {
 	profile.ID = AdvancedCombatProfileID
 	profile.Version = AdvancedCombatProfileVersion
 	profile.AdvancedCombat = true
+	profile.TargetAndRunAway = true
 	return profile
 }
 
@@ -227,6 +229,8 @@ const (
 	InteractionKindCombatResponse    InteractionKind = "combat_response"
 	InteractionKindAddressedResponse InteractionKind = "addressed_response"
 	InteractionKindPrivateChoice     InteractionKind = "private_choice"
+	InteractionKindTargetResponse    InteractionKind = "target_response"
+	InteractionKindRunAwayResponse   InteractionKind = "run_away_response"
 )
 
 type InteractionSubjectKind string
@@ -354,10 +358,12 @@ func (window InteractionWindow) clone() *InteractionWindow {
 }
 
 type PendingFinalize struct {
-	Phase            Phase  `json:"phase"`
-	DiscardSource    bool   `json:"discard_source"`
-	ClearEncounter   bool   `json:"clear_encounter"`
-	SourceInstanceID string `json:"source_instance_id,omitempty"`
+	Phase             Phase  `json:"phase"`
+	DiscardSource     bool   `json:"discard_source"`
+	ClearEncounter    bool   `json:"clear_encounter"`
+	ClearTargetEffect bool   `json:"clear_target_effect"`
+	ContinueRunAway   bool   `json:"continue_run_away"`
+	SourceInstanceID  string `json:"source_instance_id,omitempty"`
 }
 
 type PendingDecision struct {
@@ -383,12 +389,87 @@ func (decision *PendingDecision) clone() *PendingDecision {
 }
 
 type Turn struct {
-	PlayerID     string           `json:"player_id"`
-	Phase        Phase            `json:"phase"`
-	Encounter    *Encounter       `json:"encounter,omitempty"`
-	Resolving    []string         `json:"resolving,omitempty"`
-	ActionWindow ActionWindow     `json:"action_window"`
-	Pending      *PendingDecision `json:"pending,omitempty"`
+	PlayerID     string             `json:"player_id"`
+	Phase        Phase              `json:"phase"`
+	Encounter    *Encounter         `json:"encounter,omitempty"`
+	Resolving    []string           `json:"resolving,omitempty"`
+	ActionWindow ActionWindow       `json:"action_window"`
+	Pending      *PendingDecision   `json:"pending,omitempty"`
+	TargetEffect *TargetEffectState `json:"target_effect,omitempty"`
+	RunAway      *RunAwaySequence   `json:"run_away,omitempty"`
+}
+
+type TargetEffectState struct {
+	ID                string `json:"effect_id"`
+	InitiatorPlayerID string `json:"initiator_player_id"`
+	TargetPlayerID    string `json:"target_player_id"`
+	SourceInstanceID  string `json:"source_instance_id"`
+	ParentPhase       Phase  `json:"parent_phase"`
+	Countered         bool   `json:"countered"`
+}
+
+func (effect *TargetEffectState) clone() *TargetEffectState {
+	if effect == nil {
+		return nil
+	}
+	clone := *effect
+	return &clone
+}
+
+type RunAwayEffectKind string
+
+const (
+	RunAwayEffectModifier RunAwayEffectKind = "modifier"
+	RunAwayEffectCounter  RunAwayEffectKind = "counter"
+)
+
+type RunAwayEffect struct {
+	ID               string            `json:"id"`
+	Kind             RunAwayEffectKind `json:"kind"`
+	ActorPlayerID    string            `json:"actor_player_id"`
+	SourceInstanceID string            `json:"source_instance_id"`
+	TargetEffectID   string            `json:"target_effect_id,omitempty"`
+	Amount           int               `json:"amount,omitempty"`
+	Active           bool              `json:"active"`
+}
+
+type RunAwayAttempt struct {
+	PlayerID          string `json:"player_id"`
+	MonsterInstanceID string `json:"monster_instance_id"`
+	Roll              int    `json:"roll,omitempty"`
+	Modifier          int    `json:"modifier"`
+	Total             int    `json:"total,omitempty"`
+	Escaped           bool   `json:"escaped"`
+	Automatic         bool   `json:"automatic,omitempty"`
+	BadStuffApplied   bool   `json:"bad_stuff_applied,omitempty"`
+}
+
+type RunAwaySequence struct {
+	ParticipantPlayerIDs []string         `json:"participant_player_ids"`
+	MonsterInstanceIDs   []string         `json:"monster_instance_ids"`
+	ParticipantIndex     int              `json:"participant_index"`
+	MonsterIndex         int              `json:"monster_index"`
+	Effects              []RunAwayEffect  `json:"effects,omitempty"`
+	Attempts             []RunAwayAttempt `json:"attempts,omitempty"`
+	Completed            bool             `json:"completed"`
+}
+
+func (sequence *RunAwaySequence) clone() *RunAwaySequence {
+	if sequence == nil {
+		return nil
+	}
+	clone := *sequence
+	clone.ParticipantPlayerIDs = append(
+		[]string(nil),
+		sequence.ParticipantPlayerIDs...,
+	)
+	clone.MonsterInstanceIDs = append(
+		[]string(nil),
+		sequence.MonsterInstanceIDs...,
+	)
+	clone.Effects = append([]RunAwayEffect(nil), sequence.Effects...)
+	clone.Attempts = append([]RunAwayAttempt(nil), sequence.Attempts...)
+	return &clone
 }
 
 type State struct {
@@ -437,6 +518,8 @@ func (state State) Clone() State {
 		state.Turn.ActionWindow.EligibleActorIDs...,
 	)
 	clone.Turn.Pending = state.Turn.Pending.clone()
+	clone.Turn.TargetEffect = state.Turn.TargetEffect.clone()
+	clone.Turn.RunAway = state.Turn.RunAway.clone()
 	if state.Turn.Encounter != nil {
 		encounter := *state.Turn.Encounter
 		encounter.AdditionalMonsterInstanceIDs = append(
@@ -560,8 +643,10 @@ func (state State) Validate() error {
 			return fmt.Errorf("%w: invalid active turn", ErrIllegalCommand)
 		}
 		if state.Turn.Pending != nil &&
-			state.Turn.Pending.ActorID != state.Turn.PlayerID {
-			return fmt.Errorf("%w: pending actor differs from active actor", ErrIllegalCommand)
+			(state.PlayerIndex(state.Turn.Pending.ActorID) < 0 ||
+				state.Turn.Pending.ActorID != state.Turn.PlayerID &&
+					!profile.TargetAndRunAway) {
+			return fmt.Errorf("%w: invalid pending actor", ErrIllegalCommand)
 		}
 	case StatusFinished:
 		if state.PlayerIndex(state.WinnerPlayerID) < 0 {
@@ -577,6 +662,9 @@ func (state State) Validate() error {
 		return err
 	}
 	if err := state.validateAdvancedEncounter(); err != nil {
+		return err
+	}
+	if err := state.validateTargetAndRunAway(); err != nil {
 		return err
 	}
 	if state.Status != StatusLobby {
@@ -970,13 +1058,296 @@ func (state State) validateAdvancedEncounter() error {
 	return nil
 }
 
+func (state State) validateTargetAndRunAway() error {
+	profile, err := state.Profile()
+	if err != nil {
+		return err
+	}
+	target := state.Turn.TargetEffect
+	sequence := state.Turn.RunAway
+	if !profile.TargetAndRunAway && (target != nil || sequence != nil) {
+		return fmt.Errorf(
+			"%w: target or Run Away state under old profile",
+			ErrIncompatibleState,
+		)
+	}
+	if target != nil {
+		if target.ID == "" ||
+			target.InitiatorPlayerID == target.TargetPlayerID ||
+			state.PlayerIndex(target.InitiatorPlayerID) < 0 ||
+			state.PlayerIndex(target.TargetPlayerID) < 0 ||
+			target.SourceInstanceID == "" ||
+			!slices.Contains(state.Turn.Resolving, target.SourceInstanceID) ||
+			!validPhase(target.ParentPhase) {
+			return fmt.Errorf(
+				"%w: malformed target effect state",
+				ErrIllegalCommand,
+			)
+		}
+		if state.Turn.Pending != nil &&
+			state.Turn.Pending.ActorID != target.TargetPlayerID {
+			return fmt.Errorf(
+				"%w: target effect choice belongs to another actor",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	if sequence != nil {
+		if len(sequence.ParticipantPlayerIDs) == 0 ||
+			len(sequence.MonsterInstanceIDs) == 0 ||
+			sequence.ParticipantIndex < 0 ||
+			sequence.MonsterIndex < 0 {
+			return fmt.Errorf(
+				"%w: malformed Run Away sequence",
+				ErrIllegalCommand,
+			)
+		}
+		seenParticipants := make(map[string]struct{}, len(sequence.ParticipantPlayerIDs))
+		for _, playerID := range sequence.ParticipantPlayerIDs {
+			if state.PlayerIndex(playerID) < 0 {
+				return fmt.Errorf(
+					"%w: unknown Run Away participant",
+					ErrIllegalCommand,
+				)
+			}
+			if _, duplicate := seenParticipants[playerID]; duplicate {
+				return fmt.Errorf(
+					"%w: duplicate Run Away participant",
+					ErrIllegalCommand,
+				)
+			}
+			seenParticipants[playerID] = struct{}{}
+		}
+		seenMonsters := make(map[string]struct{}, len(sequence.MonsterInstanceIDs))
+		for _, instanceID := range sequence.MonsterInstanceIDs {
+			if _, exists := state.Instances[instanceID]; !exists {
+				return fmt.Errorf(
+					"%w: unknown Run Away monster",
+					ErrIllegalCommand,
+				)
+			}
+			if _, duplicate := seenMonsters[instanceID]; duplicate {
+				return fmt.Errorf(
+					"%w: duplicate Run Away monster",
+					ErrIllegalCommand,
+				)
+			}
+			seenMonsters[instanceID] = struct{}{}
+		}
+		if sequence.Completed {
+			if state.Turn.Encounter != nil ||
+				sequence.ParticipantIndex != len(sequence.ParticipantPlayerIDs) ||
+				state.Turn.Phase != PhaseCharity &&
+					state.Turn.Phase != PhaseEndTurn {
+				return fmt.Errorf(
+					"%w: completed Run Away sequence is not terminal",
+					ErrIllegalCommand,
+				)
+			}
+		} else {
+			if state.Turn.Encounter == nil ||
+				sequence.ParticipantIndex >= len(sequence.ParticipantPlayerIDs) ||
+				sequence.MonsterIndex >= len(sequence.MonsterInstanceIDs) ||
+				(state.Turn.Phase != PhaseRunAway &&
+					state.Turn.Phase != PhaseResolveEffect) ||
+				!slices.Equal(
+					sequence.MonsterInstanceIDs,
+					encounterMonsterInstanceIDs(*state.Turn.Encounter),
+				) {
+				return fmt.Errorf(
+					"%w: active Run Away sequence differs from encounter",
+					ErrIllegalCommand,
+				)
+			}
+			if state.Turn.Pending != nil &&
+				state.Turn.Pending.ActorID !=
+					sequence.ParticipantPlayerIDs[sequence.ParticipantIndex] {
+				return fmt.Errorf(
+					"%w: Run Away choice belongs to another actor",
+					ErrIllegalCommand,
+				)
+			}
+		}
+		if err := validateRunAwayEffects(sequence.Effects); err != nil {
+			return err
+		}
+		if len(sequence.Attempts) >
+			len(sequence.ParticipantPlayerIDs)*len(sequence.MonsterInstanceIDs) {
+			return fmt.Errorf(
+				"%w: too many Run Away attempts",
+				ErrIllegalCommand,
+			)
+		}
+		previousPosition := -1
+		for _, attempt := range sequence.Attempts {
+			participantIndex := slices.Index(
+				sequence.ParticipantPlayerIDs,
+				attempt.PlayerID,
+			)
+			monsterIndex := slices.Index(
+				sequence.MonsterInstanceIDs,
+				attempt.MonsterInstanceID,
+			)
+			position := participantIndex*len(sequence.MonsterInstanceIDs) +
+				monsterIndex
+			if participantIndex < 0 ||
+				monsterIndex < 0 ||
+				position <= previousPosition ||
+				attempt.Roll < 0 ||
+				attempt.Roll > 6 ||
+				(!attempt.Automatic && attempt.Roll == 0) ||
+				(attempt.Automatic && attempt.Roll != 0) ||
+				attempt.Escaped && attempt.BadStuffApplied ||
+				!attempt.Escaped && !attempt.BadStuffApplied {
+				return fmt.Errorf(
+					"%w: malformed Run Away attempt",
+					ErrIllegalCommand,
+				)
+			}
+			previousPosition = position
+		}
+	}
+	window := state.InteractionWindow
+	if window == nil || window.Status != InteractionWindowOpen {
+		return nil
+	}
+	switch window.Kind {
+	case InteractionKindTargetResponse:
+		if target == nil ||
+			window.Parent.SubjectKind != InteractionSubjectEffect ||
+			window.Parent.SubjectID != target.SourceInstanceID ||
+			window.InitiatorActorID != target.InitiatorPlayerID ||
+			window.EligibilityPolicy != InteractionEligibilityOpaquePublicSet {
+			return fmt.Errorf(
+				"%w: target response window differs from effect",
+				ErrIllegalCommand,
+			)
+		}
+	case InteractionKindRunAwayResponse:
+		if sequence == nil ||
+			sequence.Completed ||
+			state.Turn.Phase != PhaseRunAway ||
+			window.Parent.SubjectKind != InteractionSubjectEncounter ||
+			window.Parent.SubjectID !=
+				sequence.MonsterInstanceIDs[sequence.MonsterIndex] ||
+			window.InitiatorActorID !=
+				sequence.ParticipantPlayerIDs[sequence.ParticipantIndex] ||
+			window.EligibilityPolicy != InteractionEligibilityOpaquePublicSet {
+			return fmt.Errorf(
+				"%w: Run Away response window differs from current step",
+				ErrIllegalCommand,
+			)
+		}
+	case InteractionKindPrivateChoice:
+		if state.Turn.Pending == nil ||
+			len(window.EligibleActorIDs) != 1 ||
+			window.EligibleActorIDs[0] != state.Turn.Pending.ActorID ||
+			window.EligibilityPolicy != InteractionEligibilityActorPrivate ||
+			window.Responses[state.Turn.Pending.ActorID].Requirement !=
+				InteractionResponseMandatory {
+			return fmt.Errorf(
+				"%w: private choice window differs from pending decision",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	return nil
+}
+
+func validateRunAwayEffects(effects []RunAwayEffect) error {
+	ids := make(map[string]struct{}, len(effects))
+	for _, effect := range effects {
+		if effect.ID == "" ||
+			effect.ActorPlayerID == "" ||
+			effect.SourceInstanceID == "" {
+			return fmt.Errorf(
+				"%w: malformed Run Away response effect",
+				ErrIllegalCommand,
+			)
+		}
+		if _, duplicate := ids[effect.ID]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate Run Away effect",
+				ErrIllegalCommand,
+			)
+		}
+		ids[effect.ID] = struct{}{}
+		switch effect.Kind {
+		case RunAwayEffectModifier:
+			if effect.Amount == 0 || effect.TargetEffectID != "" {
+				return fmt.Errorf(
+					"%w: malformed Run Away modifier",
+					ErrIllegalCommand,
+				)
+			}
+		case RunAwayEffectCounter:
+			if effect.Amount != 0 ||
+				effect.TargetEffectID == "" ||
+				!effect.Active {
+				return fmt.Errorf(
+					"%w: malformed Run Away counter",
+					ErrIllegalCommand,
+				)
+			}
+		default:
+			return fmt.Errorf(
+				"%w: unsupported Run Away effect kind",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	for _, effect := range effects {
+		if effect.Kind != RunAwayEffectCounter {
+			continue
+		}
+		targetIndex := slices.IndexFunc(
+			effects,
+			func(candidate RunAwayEffect) bool {
+				return candidate.ID == effect.TargetEffectID &&
+					candidate.Kind == RunAwayEffectModifier
+			},
+		)
+		if targetIndex < 0 {
+			return fmt.Errorf(
+				"%w: Run Away counter target is missing",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	counterTargets := make(map[string]int)
+	for _, effect := range effects {
+		if effect.Kind == RunAwayEffectCounter {
+			counterTargets[effect.TargetEffectID]++
+		}
+	}
+	for _, effect := range effects {
+		if effect.Kind != RunAwayEffectModifier {
+			continue
+		}
+		expected := 0
+		if !effect.Active {
+			expected = 1
+		}
+		if counterTargets[effect.ID] != expected {
+			return fmt.Errorf(
+				"%w: Run Away counter cardinality differs",
+				ErrIllegalCommand,
+			)
+		}
+	}
+	return nil
+}
+
 func (state State) interactionParentMatches(parent InteractionParent) bool {
 	switch parent.SubjectKind {
 	case InteractionSubjectTurn:
 		return parent.SubjectID == state.Turn.PlayerID
 	case InteractionSubjectEncounter:
 		return state.Turn.Encounter != nil &&
-			parent.SubjectID == state.Turn.Encounter.MonsterInstanceID
+			slices.Contains(
+				encounterMonsterInstanceIDs(*state.Turn.Encounter),
+				parent.SubjectID,
+			)
 	case InteractionSubjectEffect:
 		return slices.Contains(state.Turn.Resolving, parent.SubjectID)
 	case InteractionSubjectInteraction:
@@ -1089,7 +1460,9 @@ func validInteractionKind(kind InteractionKind) bool {
 	switch kind {
 	case InteractionKindCombatResponse,
 		InteractionKindAddressedResponse,
-		InteractionKindPrivateChoice:
+		InteractionKindPrivateChoice,
+		InteractionKindTargetResponse,
+		InteractionKindRunAwayResponse:
 		return true
 	default:
 		return false

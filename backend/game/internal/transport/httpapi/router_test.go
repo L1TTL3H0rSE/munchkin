@@ -121,6 +121,76 @@ func routerCombatPack(t *testing.T) game.Pack {
 	return pack
 }
 
+func routerTargetPack(t *testing.T) game.Pack {
+	t.Helper()
+	cards := make([]game.Card, 0, 12)
+	for index := 0; index < 10; index++ {
+		cards = append(cards, game.Card{
+			ID: fmt.Sprintf(
+				"router-target-curse-%d",
+				index,
+			),
+			Name:             "Router target curse",
+			Deck:             game.DeckDoor,
+			Kind:             game.CardCurse,
+			Copies:           30,
+			InteractionScope: game.InteractionOtherPlayers,
+			Effects: []game.Effect{{
+				Kind:     game.EffectDiscard,
+				Selector: game.SelectorOwnedCard,
+				Count:    1,
+			}},
+		})
+	}
+	cards = append(
+		cards,
+		game.Card{
+			ID:               "router-target-monster",
+			Name:             "Router target filler monster",
+			Deck:             game.DeckDoor,
+			Kind:             game.CardMonster,
+			Copies:           25,
+			InteractionScope: game.InteractionNone,
+			Monster: &game.MonsterSpec{
+				Strength:  2,
+				Treasures: 1,
+				Levels:    1,
+				BadStuff: []game.Effect{{
+					Kind:   game.EffectLoseLevel,
+					Amount: 1,
+				}},
+			},
+		},
+		game.Card{
+			ID:               "router-target-item",
+			Name:             "Router target filler item",
+			Deck:             game.DeckTreasure,
+			Kind:             game.CardItem,
+			Copies:           25,
+			InteractionScope: game.InteractionSelf,
+			Item: &game.ItemSpec{
+				Slot:  game.SlotNone,
+				Size:  game.SizeSmall,
+				Value: 100,
+			},
+		},
+	)
+	pack := game.Pack{
+		SchemaVersion: 1,
+		SetID:         "moscow-core",
+		Version:       3,
+		Author:        "tests",
+		License:       "CC0-1.0",
+		Source:        "router-target-test",
+		Cards:         cards,
+	}
+	pack.ContentDigest = game.CardsDigest(pack.Cards)
+	if err := pack.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	return pack
+}
+
 func TestCreateGetAndForgedCredential(t *testing.T) {
 	_, server := testRouter(t)
 	createResponse := requestJSON(
@@ -375,6 +445,194 @@ func TestCommandRequiresIdempotencyKey(t *testing.T) {
 		t.Fatalf("status %d", response.StatusCode)
 	}
 	response.Body.Close()
+}
+
+func TestPlayTargetEffectRouteUsesServerTargetAndOpaqueWindow(t *testing.T) {
+	ctx := context.Background()
+	service, server := testRouterWithPack(t, routerTargetPack(t))
+	var (
+		owner          application.LobbyResult
+		target         application.LobbyResult
+		setupCompleted application.CommandResult
+		sourceID       string
+	)
+	for attempt := 0; attempt < 8 && sourceID == ""; attempt++ {
+		var err error
+		owner, err = service.CreateLobby(ctx, "Alice")
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err = service.JoinLobby(
+			ctx,
+			owner.GameID,
+			fmt.Sprintf(
+				"router-target-bob-credential-%02d",
+				attempt,
+			),
+			"router-target-join",
+			owner.Projection.Version,
+			"Bob",
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		started, err := service.Execute(
+			ctx,
+			owner.GameID,
+			owner.Credential,
+			"router-target-start",
+			target.Projection.Version,
+			game.Command{Type: game.CommandStart},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ownerSetup, err := service.Execute(
+			ctx,
+			owner.GameID,
+			owner.Credential,
+			"router-target-owner-setup",
+			started.Version,
+			game.Command{Type: game.CommandFinishSetup},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		setupCompleted, err = service.Execute(
+			ctx,
+			owner.GameID,
+			target.Credential,
+			"router-target-other-setup",
+			ownerSetup.Version,
+			game.Command{Type: game.CommandFinishSetup},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		projection, err := service.Get(
+			ctx,
+			owner.GameID,
+			owner.Credential,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, card := range projection.You.Hand {
+			if card.Kind == game.CardCurse {
+				sourceID = card.InstanceID
+				break
+			}
+		}
+	}
+	if sourceID == "" {
+		t.Fatal("target route fixture did not deal a target source")
+	}
+
+	forged := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/play-target-effect",
+		owner.Credential,
+		"router-target-forged",
+		map[string]any{
+			"expected_version": setupCompleted.Version,
+			"instance_id":      sourceID,
+			"target_player_id": target.PlayerID,
+			"player_id":        target.PlayerID,
+		},
+	)
+	if forged.StatusCode != http.StatusBadRequest {
+		t.Fatalf("forged target authority status %d", forged.StatusCode)
+	}
+	forged.Body.Close()
+
+	selfTarget := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/play-target-effect",
+		owner.Credential,
+		"router-target-self",
+		map[string]any{
+			"expected_version": setupCompleted.Version,
+			"instance_id":      sourceID,
+			"target_player_id": owner.PlayerID,
+		},
+	)
+	if selfTarget.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("invalid server target status %d", selfTarget.StatusCode)
+	}
+	selfTarget.Body.Close()
+
+	response := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/play-target-effect",
+		owner.Credential,
+		"router-target-play",
+		map[string]any{
+			"expected_version": setupCompleted.Version,
+			"instance_id":      sourceID,
+			"target_player_id": target.PlayerID,
+		},
+	)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("play target status %d", response.StatusCode)
+	}
+	var result application.CommandResult
+	decodeResponse(t, response, &result)
+	if result.Projection.Interaction == nil ||
+		result.Projection.Interaction.PublicKind != "target_response" ||
+		result.Projection.Interaction.TargetPlayerID != target.PlayerID {
+		t.Fatalf("target route result: %#v", result.Projection.Interaction)
+	}
+
+	targetProjection, err := service.Get(
+		ctx,
+		owner.GameID,
+		target.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if targetProjection.Interaction == nil ||
+		!targetProjection.Interaction.ResponseRequiredForYou ||
+		len(targetProjection.Interaction.Actions) != 1 ||
+		targetProjection.Interaction.Actions[0].Type !=
+			game.InteractionIntentPass {
+		t.Fatalf(
+			"opaque target response projection: %#v",
+			targetProjection.Interaction,
+		)
+	}
+
+	replay := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/play-target-effect",
+		owner.Credential,
+		"router-target-play",
+		map[string]any{
+			"expected_version": setupCompleted.Version,
+			"instance_id":      sourceID,
+			"target_player_id": target.PlayerID,
+		},
+	)
+	if replay.StatusCode != http.StatusOK {
+		t.Fatalf("target replay status %d", replay.StatusCode)
+	}
+	var replayed application.CommandResult
+	decodeResponse(t, replay, &replayed)
+	if !replayed.Replayed || replayed.Version != result.Version {
+		t.Fatalf("target route replay: %#v", replayed)
+	}
 }
 
 func TestInteractionRoutesUseActorProjectionAndRejectAuthorityFields(t *testing.T) {
@@ -848,6 +1106,80 @@ func TestAdvancedCombatProjectionFixtureIsStrictActorContract(t *testing.T) {
 	} {
 		if strings.Contains(string(raw), forbidden) {
 			t.Fatalf("advanced combat fixture leaked %q", forbidden)
+		}
+	}
+}
+
+func TestTargetEffectProjectionFixtureIsStrictActorContract(t *testing.T) {
+	raw, err := os.ReadFile("testdata/target-effect-projection-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var projection game.Projection
+	if err := decoder.Decode(&projection); err != nil {
+		t.Fatal(err)
+	}
+	if projection.Interaction == nil ||
+		projection.Interaction.PublicKind != "target_response" ||
+		projection.Interaction.TargetPlayerID != "player_b" ||
+		len(projection.Interaction.Actions) != 2 {
+		t.Fatalf("invalid target fixture: %#v", projection.Interaction)
+	}
+	counter := projection.Interaction.Actions[1]
+	if counter.CombatCapability != game.CombatCapabilityCounter ||
+		!strings.HasPrefix(counter.TargetEffectID, "tfx_") ||
+		counter.SourceInstanceID == "" {
+		t.Fatalf("invalid target counter descriptor: %#v", counter)
+	}
+	for _, forbidden := range []string{
+		"eligible_actor_ids",
+		"initiator_actor_id",
+		"deadline_revision",
+		"responses",
+		"credential_hash",
+		"pending_finalize",
+		"target_effect_source",
+	} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatalf("target fixture leaked %q", forbidden)
+		}
+	}
+}
+
+func TestRunAwayProjectionFixtureIsStrictActorContract(t *testing.T) {
+	raw, err := os.ReadFile("testdata/run-away-projection-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var projection game.Projection
+	if err := decoder.Decode(&projection); err != nil {
+		t.Fatal(err)
+	}
+	if projection.Interaction == nil ||
+		projection.Interaction.PublicKind != "run_away_response" ||
+		projection.Turn.RunAway == nil ||
+		len(projection.Turn.RunAway.Attempts) != 1 ||
+		projection.Turn.RunAway.Attempts[0].Roll != 2 ||
+		len(projection.Interaction.Actions) != 2 ||
+		projection.Interaction.Actions[1].EscapeDelta != 2 {
+		t.Fatalf("invalid Run Away fixture: %#v", projection)
+	}
+	for _, forbidden := range []string{
+		"eligible_actor_ids",
+		"initiator_actor_id",
+		"deadline_revision",
+		"responses",
+		"credential_hash",
+		"rng_state",
+		"participant_player_ids",
+		"monster_instance_ids",
+	} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatalf("Run Away fixture leaked %q", forbidden)
 		}
 	}
 }

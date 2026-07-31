@@ -63,6 +63,10 @@ func NewWithOptions(service *application.Service, options Options) http.Handler 
 	mux.HandleFunc("POST /api/v1/games/{gameID}/start", router.command(game.CommandStart))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/finish-setup", router.command(game.CommandFinishSetup))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/play-card", router.command(game.CommandPlayCard))
+	mux.HandleFunc(
+		"POST /api/v1/games/{gameID}/commands/play-target-effect",
+		router.playTargetEffect,
+	)
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/equip-item", router.command(game.CommandEquipItem))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/unequip-item", router.command(game.CommandUnequipItem))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/discard-card", router.command(game.CommandDiscardCard))
@@ -110,6 +114,7 @@ type commandRequest struct {
 	ExpectedVersion  uint64   `json:"expected_version"`
 	InstanceID       string   `json:"instance_id,omitempty"`
 	TargetInstanceID string   `json:"target_instance_id,omitempty"`
+	TargetPlayerID   string   `json:"target_player_id,omitempty"`
 	InstanceIDs      []string `json:"instance_ids,omitempty"`
 	ChoiceIDs        []string `json:"choice_ids,omitempty"`
 	AbilityIndex     int      `json:"ability_index,omitempty"`
@@ -344,6 +349,48 @@ func (router *Router) requestCombatResolution(
 		bearerToken(request),
 		commandID,
 		body.ExpectedVersion,
+	)
+	if err != nil {
+		router.mapError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, result)
+}
+
+func (router *Router) playTargetEffect(
+	writer http.ResponseWriter,
+	request *http.Request,
+) {
+	var body commandRequest
+	if err := decodeJSON(writer, request, &body); err != nil {
+		writeError(
+			writer,
+			http.StatusBadRequest,
+			"invalid_request",
+			err.Error(),
+		)
+		return
+	}
+	commandID := strings.TrimSpace(
+		request.Header.Get("Idempotency-Key"),
+	)
+	if commandID == "" || len(commandID) > 128 {
+		writeError(
+			writer,
+			http.StatusBadRequest,
+			"idempotency_key_required",
+			"Idempotency-Key is required",
+		)
+		return
+	}
+	result, err := router.service.PlayTargetEffect(
+		request.Context(),
+		request.PathValue("gameID"),
+		bearerToken(request),
+		commandID,
+		body.ExpectedVersion,
+		body.InstanceID,
+		body.TargetPlayerID,
 	)
 	if err != nil {
 		router.mapError(writer, err)

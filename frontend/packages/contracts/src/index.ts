@@ -30,6 +30,7 @@ export const actionTypeSchema = z.enum([
   "start",
   "finish_setup",
   "play_card",
+  "play_target_effect",
   "equip_item",
   "unequip_item",
   "discard_card",
@@ -164,6 +165,7 @@ export const actionViewSchema = z.object({
   source_instance_id: z.string().min(1).optional(),
   instance_ids: z.array(z.string().min(1)).optional(),
   target_instance_ids: z.array(z.string().min(1)).optional(),
+  target_player_ids: z.array(z.string().min(1)).optional(),
   minimum: z.number().int().nonnegative().optional(),
   maximum: z.number().int().nonnegative().optional(),
   minimum_total: z.number().int().positive().optional(),
@@ -178,6 +180,28 @@ export const turnViewSchema = z.object({
   resolving: nullableArray(cardViewSchema),
   combat: combatViewSchema.optional(),
   pending_decision: decisionViewSchema.optional(),
+  run_away: z.object({
+    current_player_id: z.string().min(1).optional(),
+    current_monster_instance_id: z.string().min(1).optional(),
+    effects: z.array(z.object({
+      effect_id: z.string().regex(/^rfx_[a-f0-9]{32}$/),
+      kind: z.enum(["modifier", "counter"]),
+      target_effect_id: z.string().regex(/^rfx_[a-f0-9]{32}$/).optional(),
+      amount: z.number().int().refine((value) => value !== 0).optional(),
+      active: z.boolean(),
+    }).strict()),
+    attempts: z.array(z.object({
+      player_id: z.string().min(1),
+      monster_instance_id: z.string().min(1),
+      roll: z.number().int().min(1).max(6).optional(),
+      modifier: z.number().int(),
+      total: z.number().int().optional(),
+      escaped: z.boolean(),
+      automatic: z.literal(true).optional(),
+      bad_stuff_applied: z.literal(true).optional(),
+    }).strict()),
+    completed: z.boolean(),
+  }).strict().optional(),
   available_actions: nullableArray(actionViewSchema),
 }).strict();
 
@@ -191,12 +215,51 @@ export const interactionActionViewSchema = z.object({
   combat_delta: z.number().int().refine((value) => value !== 0).optional(),
   combat_capability: combatCapabilityKindSchema.optional(),
   target_monster_instance_id: z.string().min(1).optional(),
-  target_effect_id: z.string().regex(/^fx_[a-f0-9]{32}$/).optional(),
+  target_effect_id: z.string()
+    .regex(/^(?:fx|tfx|rfx)_[a-f0-9]{32}$/)
+    .optional(),
   helper_player_id: z.string().min(1).optional(),
   reward_treasures: z.number().int().positive().optional(),
+  choice_ids: z.array(z.string().min(1)).optional(),
+  escape_delta: z.number().int().min(-20).max(20)
+    .refine((value) => value !== 0)
+    .optional(),
 }).strict().superRefine((action, context) => {
+  if (action.choice_ids !== undefined &&
+    (action.type !== "respond" ||
+      action.source_instance_id !== undefined ||
+      action.combat_capability !== undefined ||
+      action.target !== undefined ||
+      action.target_monster_instance_id !== undefined ||
+      action.target_effect_id !== undefined ||
+      action.helper_player_id !== undefined ||
+      action.combat_delta !== undefined ||
+      action.escape_delta !== undefined)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "private choice must contain only server-projected choice IDs",
+    });
+  }
+  if (action.escape_delta !== undefined &&
+    (action.type !== "respond" ||
+      action.source_instance_id === undefined ||
+      action.combat_capability !== undefined ||
+      action.target !== undefined ||
+      action.target_monster_instance_id !== undefined ||
+      action.target_effect_id !== undefined ||
+      action.helper_player_id !== undefined ||
+      action.combat_delta !== undefined ||
+      action.choice_ids !== undefined)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Run Away modifier requires one actor-owned source",
+    });
+  }
   if (action.combat_capability !== undefined &&
-    (action.type !== "respond" || action.source_instance_id === undefined)) {
+    (action.type !== "respond" ||
+      action.source_instance_id === undefined ||
+      action.choice_ids !== undefined ||
+      action.escape_delta !== undefined)) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       message: "advanced combat capability requires an actor-owned response source",
@@ -271,6 +334,9 @@ export const interactionViewSchema = z.object({
     "response_window",
     "combat_response",
     "combat_help_offer",
+    "target_response",
+    "run_away_response",
+    "private_choice",
   ]),
   parent_phase: phaseSchema,
   public_subject: z.enum([
@@ -290,6 +356,7 @@ export const interactionViewSchema = z.object({
     helper_player_id: z.string().min(1),
     reward_treasures: z.number().int().positive(),
   }).strict().optional(),
+  target_player_id: z.string().min(1).optional(),
 }).strict();
 
 export const projectionSchema = z.object({
@@ -349,6 +416,7 @@ export const commandResultSchema = z.object({
 export const commandPayloadSchema = z.object({
   instance_id: z.string().min(1).optional(),
   target_instance_id: z.string().min(1).optional(),
+  target_player_id: z.string().min(1).optional(),
   instance_ids: z.array(z.string().min(1)).optional(),
   choice_ids: z.array(z.string().min(1)).optional(),
   ability_index: z.number().int().nonnegative().optional(),
@@ -521,12 +589,27 @@ export const studioAPIErrorSchema = z.object({
 }).strict();
 
 export type CardView = z.infer<typeof cardViewSchema>;
-export type Projection = z.infer<typeof projectionSchema>;
-export type LobbyResult = z.infer<typeof lobbyResultSchema>;
-export type CommandResult = z.infer<typeof commandResultSchema>;
 export type Invalidation = z.infer<typeof invalidationSchema>;
-export type ActionDescriptor = z.infer<typeof actionViewSchema>;
 export type ActionType = z.infer<typeof actionTypeSchema>;
+export type ServerActionDescriptor = z.infer<typeof actionViewSchema>;
+export type ActionDescriptor =
+  Omit<ServerActionDescriptor, "type"> & {
+    type: Exclude<ActionType, "play_target_effect">;
+  };
+type ServerProjection = z.infer<typeof projectionSchema>;
+export type Projection = Omit<ServerProjection, "turn"> & {
+  turn: Omit<ServerProjection["turn"], "available_actions"> & {
+    available_actions: ActionDescriptor[];
+  };
+};
+export type LobbyResult =
+  Omit<z.infer<typeof lobbyResultSchema>, "projection"> & {
+    projection: Projection;
+  };
+export type CommandResult =
+  Omit<z.infer<typeof commandResultSchema>, "projection"> & {
+    projection: Projection;
+  };
 export type CommandPayload = z.infer<typeof commandPayloadSchema>;
 export type CombatResolutionRequest = z.infer<
   typeof combatResolutionRequestSchema

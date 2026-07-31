@@ -2,6 +2,7 @@ package application_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"sync"
@@ -1385,4 +1386,630 @@ func interactionActionForTest(
 	}
 	t.Fatalf("interaction action %q missing: %#v", intent, projection.Interaction)
 	return game.InteractionActionView{}
+}
+
+func targetRuntimePack(t *testing.T) game.Pack {
+	t.Helper()
+	pack := game.Pack{
+		SchemaVersion: 1,
+		SetID:         "moscow-core",
+		Version:       3,
+		Author:        "tests",
+		License:       "CC0-1.0",
+		Source:        "target-runtime-test",
+		Cards: []game.Card{
+			{
+				ID:               "runtime-target-curse",
+				Name:             "Runtime target curse",
+				Deck:             game.DeckDoor,
+				Kind:             game.CardCurse,
+				Copies:           30,
+				InteractionScope: game.InteractionOtherPlayers,
+				Effects: []game.Effect{{
+					Kind:     game.EffectDiscard,
+					Selector: game.SelectorOwnedCard,
+					Count:    1,
+				}},
+			},
+			{
+				ID:               "runtime-target-filler-monster",
+				Name:             "Runtime target filler monster",
+				Deck:             game.DeckDoor,
+				Kind:             game.CardMonster,
+				Copies:           30,
+				InteractionScope: game.InteractionNone,
+				Monster: &game.MonsterSpec{
+					Strength:  2,
+					Treasures: 1,
+					Levels:    1,
+					BadStuff: []game.Effect{{
+						Kind:   game.EffectLoseLevel,
+						Amount: 1,
+					}},
+				},
+			},
+			{
+				ID:               "runtime-target-item",
+				Name:             "Runtime target item",
+				Deck:             game.DeckTreasure,
+				Kind:             game.CardItem,
+				Copies:           30,
+				InteractionScope: game.InteractionSelf,
+				Item: &game.ItemSpec{
+					Slot:  game.SlotNone,
+					Size:  game.SizeSmall,
+					Value: 100,
+				},
+			},
+		},
+	}
+	for index := 0; index < 9; index++ {
+		pack.Cards = append(pack.Cards, game.Card{
+			ID: fmt.Sprintf(
+				"runtime-target-curse-filler-%02d",
+				index,
+			),
+			Name:             "Runtime target curse filler",
+			Deck:             game.DeckDoor,
+			Kind:             game.CardCurse,
+			Copies:           1,
+			InteractionScope: game.InteractionOtherPlayers,
+			Effects: []game.Effect{{
+				Kind:     game.EffectDiscard,
+				Selector: game.SelectorOwnedCard,
+				Count:    1,
+			}},
+		})
+	}
+	pack.ContentDigest = game.CardsDigest(pack.Cards)
+	if err := pack.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	return pack
+}
+
+func runAwayRuntimePack(t *testing.T) game.Pack {
+	t.Helper()
+	pack := game.Pack{
+		SchemaVersion: 1,
+		SetID:         "moscow-core",
+		Version:       3,
+		Author:        "tests",
+		License:       "CC0-1.0",
+		Source:        "run-away-runtime-test",
+		Cards: []game.Card{
+			{
+				ID:               "runtime-run-away-monster",
+				Name:             "Runtime Run Away monster",
+				Deck:             game.DeckDoor,
+				Kind:             game.CardMonster,
+				Copies:           30,
+				InteractionScope: game.InteractionNone,
+				Monster: &game.MonsterSpec{
+					Strength:  50,
+					Treasures: 1,
+					Levels:    1,
+					BadStuff: []game.Effect{{
+						Kind:   game.EffectLoseLevel,
+						Amount: 1,
+					}},
+				},
+			},
+			{
+				ID:               "runtime-run-away-modifier",
+				Name:             "Runtime Run Away modifier",
+				Deck:             game.DeckTreasure,
+				Kind:             game.CardOneShot,
+				Copies:           30,
+				InteractionScope: game.InteractionSelf,
+				Effects: []game.Effect{{
+					Kind:   game.EffectModifyEscape,
+					Amount: 2,
+				}},
+			},
+		},
+	}
+	for index := 0; index < 10; index++ {
+		pack.Cards = append(pack.Cards, game.Card{
+			ID: fmt.Sprintf(
+				"runtime-run-away-monster-filler-%02d",
+				index,
+			),
+			Name:             "Runtime Run Away monster filler",
+			Deck:             game.DeckDoor,
+			Kind:             game.CardMonster,
+			Copies:           1,
+			InteractionScope: game.InteractionNone,
+			Monster: &game.MonsterSpec{
+				Strength:  50,
+				Treasures: 1,
+				Levels:    1,
+				BadStuff: []game.Effect{{
+					Kind:   game.EffectLoseLevel,
+					Amount: 1,
+				}},
+			},
+		})
+	}
+	pack.ContentDigest = game.CardsDigest(pack.Cards)
+	if err := pack.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	return pack
+}
+
+type twoPlayerRuntimeFixture struct {
+	service *Service
+	store   *memory.Store
+	clock   *manualClock
+	owner   LobbyResult
+	other   LobbyResult
+	current CommandResult
+}
+
+func newTwoPlayerRuntimeFixture(
+	t *testing.T,
+	pack game.Pack,
+	start time.Time,
+) twoPlayerRuntimeFixture {
+	t.Helper()
+	ctx := context.Background()
+	const (
+		gameID          = "runtime-game"
+		ownerID         = "player-a"
+		otherID         = "player-b"
+		ownerCredential = "target-runtime-alice-credential"
+		otherCredential = "target-runtime-bob-credential"
+	)
+	ownerHash := fmt.Sprintf(
+		"%x",
+		sha256.Sum256([]byte(ownerCredential)),
+	)
+	otherHash := fmt.Sprintf(
+		"%x",
+		sha256.Sum256([]byte(otherCredential)),
+	)
+	var (
+		state     game.State
+		envelopes []game.EventEnvelope
+	)
+	for seed := uint64(1); seed <= 4096; seed++ {
+		lobbyEvent, err := game.CreateLobby(
+			gameID,
+			game.Player{
+				ID:             ownerID,
+				Name:           "Alice",
+				Level:          1,
+				CredentialHash: ownerHash,
+			},
+			pack,
+			seed,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		candidate, candidateEvents := applyRuntimeEvents(
+			t,
+			game.State{},
+			nil,
+			"runtime-create",
+			[]game.DomainEvent{lobbyEvent},
+			start,
+		)
+		commands := []struct {
+			id      string
+			command game.Command
+		}{
+			{
+				id: "runtime-join",
+				command: game.Command{
+					Type:           game.CommandJoin,
+					PlayerID:       otherID,
+					DisplayName:    "Bob",
+					CredentialHash: otherHash,
+				},
+			},
+			{
+				id: "runtime-start",
+				command: game.Command{
+					Type:    game.CommandStart,
+					ActorID: ownerID,
+				},
+			},
+			{
+				id: "runtime-owner-setup",
+				command: game.Command{
+					Type:    game.CommandFinishSetup,
+					ActorID: ownerID,
+				},
+			},
+			{
+				id: "runtime-other-setup",
+				command: game.Command{
+					Type:    game.CommandFinishSetup,
+					ActorID: otherID,
+				},
+			},
+		}
+		for _, step := range commands {
+			domainEvents, err := game.Handle(
+				candidate,
+				step.command,
+				pack,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			candidate, candidateEvents = applyRuntimeEvents(
+				t,
+				candidate,
+				candidateEvents,
+				step.id,
+				domainEvents,
+				start,
+			)
+		}
+		if pack.Source == "target-runtime-test" &&
+			!playerHasCardKind(candidate, ownerID, game.CardCurse, pack) {
+			continue
+		}
+		state = candidate
+		envelopes = candidateEvents
+		break
+	}
+	if state.GameID == "" {
+		t.Fatal("deterministic runtime fixture seed was not found")
+	}
+	store := memory.New()
+	clock := &manualClock{value: start}
+	service := NewService(store, pack, clock, NoopPublisher{})
+	if err := store.Create(ctx, state, envelopes); err != nil {
+		t.Fatal(err)
+	}
+	ownerProjection, err := game.ProjectForActor(state, ownerID, pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherProjection, err := game.ProjectForActor(state, otherID, pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return twoPlayerRuntimeFixture{
+		service: service,
+		store:   store,
+		clock:   clock,
+		owner: LobbyResult{
+			GameID:     gameID,
+			PlayerID:   ownerID,
+			Credential: ownerCredential,
+			Projection: ownerProjection,
+		},
+		other: LobbyResult{
+			GameID:     gameID,
+			PlayerID:   otherID,
+			Credential: otherCredential,
+			Projection: otherProjection,
+		},
+		current: CommandResult{
+			GameID:     gameID,
+			CommandID:  "runtime-other-setup",
+			Version:    state.Version,
+			Projection: ownerProjection,
+		},
+	}
+}
+
+func applyRuntimeEvents(
+	t *testing.T,
+	state game.State,
+	envelopes []game.EventEnvelope,
+	commandID string,
+	domainEvents []game.DomainEvent,
+	start time.Time,
+) (game.State, []game.EventEnvelope) {
+	t.Helper()
+	next := state
+	for _, domainEvent := range domainEvents {
+		applied, err := game.Apply(next, domainEvent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		envelopes = append(envelopes, game.EventEnvelope{
+			GameID:     applied.GameID,
+			Sequence:   applied.Version,
+			EventID:    fmt.Sprintf("%s:%d", commandID, applied.Version),
+			CommandID:  commandID,
+			Type:       domainEvent.Type,
+			Schema:     1,
+			OccurredAt: start.Add(time.Duration(applied.Version) * time.Millisecond),
+			Payload:    domainEvent.Payload,
+		})
+		next = applied
+	}
+	return next, envelopes
+}
+
+func playerHasCardKind(
+	state game.State,
+	playerID string,
+	kind game.CardKind,
+	pack game.Pack,
+) bool {
+	playerIndex := state.PlayerIndex(playerID)
+	if playerIndex < 0 {
+		return false
+	}
+	for _, instanceID := range state.Players[playerIndex].Hand {
+		card, _, exists := pack.DefinitionForInstance(state, instanceID)
+		if exists && card.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func TestTargetEffectTimeoutRestoresSameDeadlineAndUsesStableDefault(
+	t *testing.T,
+) {
+	ctx := context.Background()
+	fixture := newTwoPlayerRuntimeFixture(
+		t,
+		targetRuntimePack(t),
+		time.Date(2026, time.July, 31, 9, 0, 0, 0, time.UTC),
+	)
+	ownerProjection, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var targetSourceID string
+	for _, card := range ownerProjection.You.Hand {
+		if card.Kind == game.CardCurse {
+			targetSourceID = card.InstanceID
+			break
+		}
+	}
+	if targetSourceID == "" {
+		t.Fatal("target source was not dealt")
+	}
+	started, err := fixture.service.PlayTargetEffect(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"target-runtime-play",
+		fixture.current.Version,
+		targetSourceID,
+		fixture.other.PlayerID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayed, err := fixture.service.PlayTargetEffect(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"target-runtime-play",
+		fixture.current.Version,
+		targetSourceID,
+		fixture.other.PlayerID,
+	)
+	if err != nil || !replayed.Replayed ||
+		replayed.Version != started.Version {
+		t.Fatalf("target receipt replay=%#v err=%v", replayed, err)
+	}
+	targetProjection, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if targetProjection.Interaction == nil ||
+		targetProjection.Interaction.PublicKind != "target_response" ||
+		targetProjection.Interaction.DeadlineAt.Sub(
+			*targetProjection.Interaction.ServerTime,
+		) != 30*time.Second {
+		t.Fatalf("opaque target deadline: %#v", targetProjection.Interaction)
+	}
+	responseDeadline := targetProjection.Interaction.DeadlineAt
+	reconnected, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reconnected.Interaction == nil ||
+		!reconnected.Interaction.DeadlineAt.Equal(responseDeadline) {
+		t.Fatalf("reconnect changed target deadline: %#v", reconnected.Interaction)
+	}
+	pass := interactionActionForTest(
+		t,
+		targetProjection,
+		game.InteractionIntentPass,
+	)
+	fixture.clock.Set(responseDeadline.Add(-time.Second))
+	privateResult, err := fixture.service.ExecuteInteraction(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+		"target-runtime-pass",
+		targetProjection.Version,
+		targetProjection.Interaction.InteractionID,
+		pass.ActionID,
+		pass.Type,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	private := privateResult.Projection.Interaction
+	if private == nil ||
+		private.PublicKind != "private_choice" ||
+		!private.ResponseRequiredForYou ||
+		private.DeadlineAt.Sub(*private.ServerTime) != 30*time.Second ||
+		privateResult.Projection.Turn.PendingDecision == nil {
+		t.Fatalf("private target continuation: %#v", privateResult.Projection)
+	}
+	defaultChoiceID :=
+		privateResult.Projection.Turn.PendingDecision.Options[0]
+	if _, err := fixture.service.ExecuteInteraction(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+		"target-runtime-invalid-choice",
+		privateResult.Version,
+		private.InteractionID,
+		"act_ffffffffffffffffffffffffffffffff",
+		game.InteractionIntentRespond,
+	); err == nil {
+		t.Fatal("non-projected private choice action was accepted")
+	}
+	privateDeadline := private.DeadlineAt
+	fixture.clock.Set(privateDeadline)
+	processed, err := fixture.service.SweepDueInteractions(ctx, 10)
+	if err != nil || processed != 1 {
+		t.Fatalf("private timeout processed=%d err=%v", processed, err)
+	}
+	finalProjection, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if finalProjection.Interaction != nil ||
+		finalProjection.Turn.PendingDecision != nil ||
+		finalProjection.Turn.Phase != game.PhasePreparation {
+		t.Fatalf("target timeout did not resume parent: %#v", finalProjection)
+	}
+	var finalState game.State
+	if err := fixture.store.WithinGame(
+		ctx,
+		fixture.owner.GameID,
+		func(tx Tx) error {
+			finalState = tx.State()
+			return nil
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	targetIndex := finalState.PlayerIndex(fixture.other.PlayerID)
+	for _, instanceID := range finalState.Players[targetIndex].Hand {
+		if instanceID == defaultChoiceID {
+			t.Fatalf("stable timeout choice remained owned: %s", instanceID)
+		}
+	}
+}
+
+func TestRunAwayTimeoutPersistsServerRollAndCompletesStep(t *testing.T) {
+	ctx := context.Background()
+	fixture := newTwoPlayerRuntimeFixture(
+		t,
+		runAwayRuntimePack(t),
+		time.Date(2026, time.July, 31, 10, 0, 0, 0, time.UTC),
+	)
+	opened, err := fixture.service.Execute(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"run-away-runtime-door",
+		fixture.current.Version,
+		game.Command{Type: game.CommandOpenDoor},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requested, err := fixture.service.RequestCombatResolution(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"run-away-runtime-request",
+		opened.Version,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pass := interactionActionForTest(
+		t,
+		responder,
+		game.InteractionIntentPass,
+	)
+	fixture.clock.Set(
+		responder.Interaction.DeadlineAt.Add(-time.Second),
+	)
+	runAwayOpened, err := fixture.service.ExecuteInteraction(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+		"run-away-runtime-combat-pass",
+		responder.Version,
+		responder.Interaction.InteractionID,
+		pass.ActionID,
+		pass.Type,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runAwayOpened.Projection.Interaction == nil ||
+		runAwayOpened.Projection.Interaction.PublicKind !=
+			"run_away_response" ||
+		runAwayOpened.Projection.Turn.RunAway == nil {
+		t.Fatalf("Run Away followup was not atomic: %#v", runAwayOpened.Projection)
+	}
+	runAwayDeadline := runAwayOpened.Projection.Interaction.DeadlineAt
+	reconnected, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reconnected.Interaction == nil ||
+		!reconnected.Interaction.DeadlineAt.Equal(runAwayDeadline) {
+		t.Fatalf("Run Away reconnect changed deadline: %#v", reconnected.Interaction)
+	}
+	fixture.clock.Set(runAwayDeadline)
+	processed, err := fixture.service.SweepDueInteractions(ctx, 10)
+	if err != nil || processed != 1 {
+		t.Fatalf("Run Away timeout processed=%d err=%v", processed, err)
+	}
+	finalProjection, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if finalProjection.Interaction != nil ||
+		finalProjection.Turn.RunAway == nil ||
+		!finalProjection.Turn.RunAway.Completed ||
+		len(finalProjection.Turn.RunAway.Attempts) != 1 ||
+		finalProjection.Turn.RunAway.Attempts[0].Roll < 1 ||
+		finalProjection.Turn.RunAway.Attempts[0].Roll > 6 ||
+		finalProjection.Turn.Phase != game.PhaseCharity {
+		t.Fatalf("persisted Run Away timeout: %#v", finalProjection)
+	}
+	if requested.Version >= runAwayOpened.Version {
+		t.Fatalf(
+			"Run Away followup did not advance version: request=%d followup=%d",
+			requested.Version,
+			runAwayOpened.Version,
+		)
+	}
 }

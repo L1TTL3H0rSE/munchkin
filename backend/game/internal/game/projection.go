@@ -101,6 +101,7 @@ type ActionView struct {
 	SourceInstanceID  string         `json:"source_instance_id,omitempty"`
 	InstanceIDs       []string       `json:"instance_ids,omitempty"`
 	TargetInstanceIDs []string       `json:"target_instance_ids,omitempty"`
+	TargetPlayerIDs   []string       `json:"target_player_ids,omitempty"`
 	Minimum           int            `json:"minimum,omitempty"`
 	Maximum           int            `json:"maximum,omitempty"`
 	MinimumTotal      int            `json:"minimum_total,omitempty"`
@@ -115,6 +116,7 @@ type TurnView struct {
 	Resolving        []CardView    `json:"resolving"`
 	Combat           *CombatView   `json:"combat,omitempty"`
 	PendingDecision  *DecisionView `json:"pending_decision,omitempty"`
+	RunAway          *RunAwayView  `json:"run_away,omitempty"`
 	AvailableActions []ActionView  `json:"available_actions"`
 }
 
@@ -131,6 +133,35 @@ type InteractionActionView struct {
 	TargetEffectID          string               `json:"target_effect_id,omitempty"`
 	HelperPlayerID          string               `json:"helper_player_id,omitempty"`
 	RewardTreasures         int                  `json:"reward_treasures,omitempty"`
+	ChoiceIDs               []string             `json:"choice_ids,omitempty"`
+	EscapeDelta             int                  `json:"escape_delta,omitempty"`
+}
+
+type RunAwayEffectView struct {
+	EffectID       string            `json:"effect_id"`
+	Kind           RunAwayEffectKind `json:"kind"`
+	TargetEffectID string            `json:"target_effect_id,omitempty"`
+	Amount         int               `json:"amount,omitempty"`
+	Active         bool              `json:"active"`
+}
+
+type RunAwayAttemptView struct {
+	PlayerID          string `json:"player_id"`
+	MonsterInstanceID string `json:"monster_instance_id"`
+	Roll              int    `json:"roll,omitempty"`
+	Modifier          int    `json:"modifier"`
+	Total             int    `json:"total,omitempty"`
+	Escaped           bool   `json:"escaped"`
+	Automatic         bool   `json:"automatic,omitempty"`
+	BadStuffApplied   bool   `json:"bad_stuff_applied,omitempty"`
+}
+
+type RunAwayView struct {
+	CurrentPlayerID          string               `json:"current_player_id,omitempty"`
+	CurrentMonsterInstanceID string               `json:"current_monster_instance_id,omitempty"`
+	Effects                  []RunAwayEffectView  `json:"effects"`
+	Attempts                 []RunAwayAttemptView `json:"attempts"`
+	Completed                bool                 `json:"completed"`
 }
 
 type CombatHelpOfferView struct {
@@ -150,6 +181,7 @@ type InteractionView struct {
 	ResponseRequiredForYou bool                     `json:"response_required_for_you"`
 	Actions                []InteractionActionView  `json:"actions"`
 	CombatHelpOffer        *CombatHelpOfferView     `json:"combat_help_offer,omitempty"`
+	TargetPlayerID         string                   `json:"target_player_id,omitempty"`
 }
 
 type Projection struct {
@@ -292,6 +324,41 @@ func ProjectForActor(state State, actorID string, pack Pack) (Projection, error)
 			Maximum:          state.Turn.Pending.Maximum,
 		}
 	}
+	if state.Turn.RunAway != nil {
+		runAway := &RunAwayView{
+			Effects:   []RunAwayEffectView{},
+			Attempts:  []RunAwayAttemptView{},
+			Completed: state.Turn.RunAway.Completed,
+		}
+		if !state.Turn.RunAway.Completed {
+			runAway.CurrentPlayerID =
+				state.Turn.RunAway.ParticipantPlayerIDs[state.Turn.RunAway.ParticipantIndex]
+			runAway.CurrentMonsterInstanceID =
+				state.Turn.RunAway.MonsterInstanceIDs[state.Turn.RunAway.MonsterIndex]
+		}
+		for _, effect := range state.Turn.RunAway.Effects {
+			runAway.Effects = append(runAway.Effects, RunAwayEffectView{
+				EffectID:       effect.ID,
+				Kind:           effect.Kind,
+				TargetEffectID: effect.TargetEffectID,
+				Amount:         effect.Amount,
+				Active:         effect.Active,
+			})
+		}
+		for _, attempt := range state.Turn.RunAway.Attempts {
+			runAway.Attempts = append(runAway.Attempts, RunAwayAttemptView{
+				PlayerID:          attempt.PlayerID,
+				MonsterInstanceID: attempt.MonsterInstanceID,
+				Roll:              attempt.Roll,
+				Modifier:          attempt.Modifier,
+				Total:             attempt.Total,
+				Escaped:           attempt.Escaped,
+				Automatic:         attempt.Automatic,
+				BadStuffApplied:   attempt.BadStuffApplied,
+			})
+		}
+		projection.Turn.RunAway = runAway
+	}
 	actions, err := projectActions(state, playerIndex, actorID, pack)
 	if err != nil {
 		return Projection{}, err
@@ -354,6 +421,24 @@ func projectInteraction(
 	if domainCombatHelp {
 		publicKind = "combat_help_offer"
 	}
+	domainTargetResponse := profile.TargetAndRunAway &&
+		window.Kind == InteractionKindTargetResponse &&
+		state.Turn.TargetEffect != nil
+	if domainTargetResponse {
+		publicKind = "target_response"
+	}
+	domainRunAwayResponse := profile.TargetAndRunAway &&
+		window.Kind == InteractionKindRunAwayResponse &&
+		state.Turn.RunAway != nil
+	if domainRunAwayResponse {
+		publicKind = "run_away_response"
+	}
+	domainPrivateChoice := profile.TargetAndRunAway &&
+		window.Kind == InteractionKindPrivateChoice &&
+		state.Turn.Pending != nil
+	if domainPrivateChoice {
+		publicKind = "private_choice"
+	}
 	view := &InteractionView{
 		InteractionID: window.ID,
 		PublicKind:    publicKind,
@@ -362,6 +447,9 @@ func projectInteraction(
 		Status:        window.Status,
 		DeadlineAt:    window.DeadlineAt,
 		Actions:       []InteractionActionView{},
+	}
+	if domainTargetResponse {
+		view.TargetPlayerID = state.Turn.TargetEffect.TargetPlayerID
 	}
 	if domainCombatHelp {
 		offer := state.CombatHelpOffer
@@ -421,6 +509,134 @@ func projectInteraction(
 	view.ResponseRequiredForYou = response.State == InteractionResponsePending
 	if !view.ResponseRequiredForYou {
 		return view, nil
+	}
+	if domainPrivateChoice {
+		if actorID != state.Turn.Pending.ActorID {
+			return view, nil
+		}
+		for _, choiceIDs := range privateChoiceSelections(
+			state.Turn.Pending.Options,
+			state.Turn.Pending.Minimum,
+			state.Turn.Pending.Maximum,
+		) {
+			view.Actions = append(view.Actions, InteractionActionView{
+				ActionID: choiceInteractionActionID(
+					window.ID,
+					actorID,
+					choiceIDs,
+					state.Version,
+				),
+				InteractionID: window.ID,
+				Revision:      window.DeadlineRevision,
+				Type:          InteractionIntentRespond,
+				ChoiceIDs:     choiceIDs,
+			})
+		}
+		return view, nil
+	}
+	if domainTargetResponse &&
+		!state.Turn.TargetEffect.Countered {
+		playerIndex := state.PlayerIndex(actorID)
+		for _, instanceID := range state.Players[playerIndex].Hand {
+			card, _, exists := pack.DefinitionForInstance(
+				state,
+				instanceID,
+			)
+			if !exists {
+				return nil, fmt.Errorf(
+					"%w: target counter source %s",
+					ErrUnknownCard,
+					instanceID,
+				)
+			}
+			if card.CombatCapability == nil ||
+				card.CombatCapability.Kind != CombatCapabilityCounter {
+				continue
+			}
+			view.Actions = append(view.Actions, InteractionActionView{
+				ActionID: advancedCombatActionID(
+					window.ID,
+					actorID,
+					instanceID,
+					CombatCapabilityCounter,
+					state.Turn.TargetEffect.ID,
+					state.Version,
+				),
+				InteractionID:    window.ID,
+				Revision:         window.DeadlineRevision,
+				Type:             InteractionIntentRespond,
+				SourceInstanceID: instanceID,
+				CombatCapability: CombatCapabilityCounter,
+				TargetEffectID:   state.Turn.TargetEffect.ID,
+			})
+		}
+	}
+	if domainRunAwayResponse {
+		sequence, playerIndex, _, err := currentRunAwayStep(state)
+		if err != nil {
+			return nil, err
+		}
+		actorIndex := state.PlayerIndex(actorID)
+		for _, instanceID := range state.Players[actorIndex].Hand {
+			card, _, exists := pack.DefinitionForInstance(
+				state,
+				instanceID,
+			)
+			if !exists {
+				return nil, fmt.Errorf(
+					"%w: Run Away response source %s",
+					ErrUnknownCard,
+					instanceID,
+				)
+			}
+			if actorIndex == playerIndex {
+				if effect, legal := runAwayModifierEffect(card); legal {
+					view.Actions = append(
+						view.Actions,
+						InteractionActionView{
+							ActionID: runAwayActionID(
+								window.ID,
+								actorID,
+								instanceID,
+								"",
+								effect.Amount,
+								state.Version,
+							),
+							InteractionID:    window.ID,
+							Revision:         window.DeadlineRevision,
+							Type:             InteractionIntentRespond,
+							SourceInstanceID: instanceID,
+							EscapeDelta:      effect.Amount,
+						},
+					)
+				}
+			}
+			if card.CombatCapability == nil ||
+				card.CombatCapability.Kind != CombatCapabilityCounter {
+				continue
+			}
+			for _, effect := range sequence.Effects {
+				if effect.Kind != RunAwayEffectModifier || !effect.Active {
+					continue
+				}
+				view.Actions = append(view.Actions, InteractionActionView{
+					ActionID: runAwayActionID(
+						window.ID,
+						actorID,
+						instanceID,
+						effect.ID,
+						0,
+						state.Version,
+					),
+					InteractionID:    window.ID,
+					Revision:         window.DeadlineRevision,
+					Type:             InteractionIntentRespond,
+					SourceInstanceID: instanceID,
+					CombatCapability: CombatCapabilityCounter,
+					TargetEffectID:   effect.ID,
+				})
+			}
+		}
 	}
 	for _, intent := range window.AllowedIntents {
 		if intent == InteractionIntentAutoResolve {
@@ -666,6 +882,78 @@ func advancedCombatActionID(
 	return fmt.Sprintf("act_%x", digest[:16])
 }
 
+func privateChoiceSelections(
+	options []string,
+	minimum int,
+	maximum int,
+) [][]string {
+	if minimum < 0 ||
+		maximum < minimum ||
+		maximum > len(options) {
+		return nil
+	}
+	const maximumProjectedChoices = 256
+	selections := make([][]string, 0)
+	var visit func(start int, remaining int, current []string)
+	visit = func(start int, remaining int, current []string) {
+		if len(selections) >= maximumProjectedChoices {
+			return
+		}
+		if remaining == 0 {
+			selections = append(
+				selections,
+				append([]string(nil), current...),
+			)
+			return
+		}
+		for index := start; index <= len(options)-remaining; index++ {
+			visit(
+				index+1,
+				remaining-1,
+				append(current, options[index]),
+			)
+		}
+	}
+	for count := minimum; count <= maximum; count++ {
+		visit(0, count, nil)
+	}
+	return selections
+}
+
+func choiceInteractionActionID(
+	interactionID string,
+	actorID string,
+	choiceIDs []string,
+	version uint64,
+) string {
+	digest := sha256.Sum256([]byte(
+		interactionID + "\x00" +
+			actorID + "\x00" +
+			fmt.Sprintf("%q", choiceIDs) + "\x00" +
+			strconv.FormatUint(version, 10),
+	))
+	return fmt.Sprintf("act_%x", digest[:16])
+}
+
+func runAwayActionID(
+	interactionID string,
+	actorID string,
+	sourceInstanceID string,
+	targetEffectID string,
+	amount int,
+	version uint64,
+) string {
+	digest := sha256.Sum256([]byte(
+		interactionID + "\x00" +
+			actorID + "\x00" +
+			sourceInstanceID + "\x00" +
+			targetEffectID + "\x00" +
+			strconv.Itoa(amount) + "\x00" +
+			strconv.FormatUint(version, 10),
+	))
+	return fmt.Sprintf("act_%x", digest[:16])
+}
+
 func combatHelpActionID(
 	interactionID string,
 	actorID string,
@@ -882,12 +1170,37 @@ func projectActions(
 		return []ActionView{}, nil
 	}
 	player := state.Players[playerIndex]
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
 	var actions []ActionView
+	targetPlayerIDs := func() []string {
+		targets := make([]string, 0, len(state.Players)-1)
+		for _, candidate := range state.Players {
+			if candidate.ID != actorID && !candidate.Dead {
+				targets = append(targets, candidate.ID)
+			}
+		}
+		return targets
+	}
 	addManagementActions := func(includeSell bool) error {
 		for _, instanceID := range player.Hand {
 			card, _, exists := pack.DefinitionForInstance(state, instanceID)
 			if !exists {
 				return fmt.Errorf("%w: hand card %s", ErrUnknownCard, instanceID)
+			}
+			if profile.TargetAndRunAway &&
+				targetableEffectCard(card) {
+				targets := targetPlayerIDs()
+				if len(targets) > 0 {
+					actions = append(actions, ActionView{
+						Type:             CommandPlayTargetEffect,
+						SourceInstanceID: instanceID,
+						TargetPlayerIDs:  targets,
+					})
+				}
+				continue
 			}
 			if playableInPhase(card, state.Turn.Phase) {
 				action := ActionView{
@@ -1025,7 +1338,18 @@ func projectActions(
 	case PhaseDoorChoice:
 		for _, instanceID := range player.Hand {
 			card, _, exists := pack.DefinitionForInstance(state, instanceID)
-			if exists && card.Monster != nil {
+			if exists &&
+				profile.TargetAndRunAway &&
+				targetableEffectCard(card) {
+				targets := targetPlayerIDs()
+				if len(targets) > 0 {
+					actions = append(actions, ActionView{
+						Type:             CommandPlayTargetEffect,
+						SourceInstanceID: instanceID,
+						TargetPlayerIDs:  targets,
+					})
+				}
+			} else if exists && card.Monster != nil {
 				actions = append(actions, ActionView{
 					Type:             CommandLookForTrouble,
 					SourceInstanceID: instanceID,
@@ -1065,15 +1389,13 @@ func projectActions(
 				}
 			}
 		}
-		profile, err := state.Profile()
-		if err != nil {
-			return nil, err
-		}
 		if !profile.CombatResponses {
 			actions = append(actions, ActionView{Type: CommandResolveCombat})
 		}
 	case PhaseRunAway:
-		actions = append(actions, ActionView{Type: CommandRunAway})
+		if !profile.TargetAndRunAway {
+			actions = append(actions, ActionView{Type: CommandRunAway})
+		}
 	case PhaseCharity:
 		if err := addManagementActions(true); err != nil {
 			return nil, err

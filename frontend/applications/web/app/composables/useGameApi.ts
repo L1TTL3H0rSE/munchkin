@@ -8,10 +8,13 @@ import {
   lobbySummarySchema,
   projectionSchema,
   commandPayloadSchema,
+  type ActionDescriptor,
   type ActionType,
+  type CommandResult,
   type CommandPayload,
   type Invalidation,
   type InteractionIntent,
+  type LobbyResult,
   type Projection,
 } from "@munchkin/contracts";
 
@@ -24,7 +27,7 @@ export function useGameApi() {
       method: "POST",
       body: {display_name: displayName},
     });
-    return lobbyResultSchema.parse(response);
+    return clientLobbyResult(response);
   }
 
   async function getLobby(gameID: string) {
@@ -61,14 +64,14 @@ export function useGameApi() {
       }
       response = await request();
     }
-    return lobbyResultSchema.parse(response);
+    return clientLobbyResult(response);
   }
 
   async function getGame(gameID: string, credential: string) {
     const response = await $fetch(`${baseURL}/api/v1/games/${encodeURIComponent(gameID)}`, {
       headers: authorization(credential),
     });
-    return projectionSchema.parse(response);
+    return clientProjection(response);
   }
 
   async function command(
@@ -93,7 +96,7 @@ export function useGameApi() {
         ...parsedPayload,
       },
     });
-    return commandResultSchema.parse(response);
+    return clientCommandResult(response);
   }
 
   async function interaction(
@@ -124,7 +127,7 @@ export function useGameApi() {
         body: request,
       },
     );
-    return commandResultSchema.parse(response);
+    return clientCommandResult(response);
   }
 
   async function requestCombatResolution(
@@ -146,7 +149,7 @@ export function useGameApi() {
         body: request,
       },
     );
-    return commandResultSchema.parse(response);
+    return clientCommandResult(response);
   }
 
   async function combatHelp(
@@ -170,7 +173,7 @@ export function useGameApi() {
         body: request,
       },
     );
-    return commandResultSchema.parse(response);
+    return clientCommandResult(response);
   }
 
   function stream(
@@ -208,6 +211,36 @@ export function useGameApi() {
     combatHelp,
     stream,
     contentAssetURL,
+  };
+}
+
+function clientLobbyResult(response: unknown): LobbyResult {
+  const parsed = lobbyResultSchema.parse(response);
+  return {
+    ...parsed,
+    projection: clientProjection(parsed.projection),
+  };
+}
+
+function clientCommandResult(response: unknown): CommandResult {
+  const parsed = commandResultSchema.parse(response);
+  return {
+    ...parsed,
+    projection: clientProjection(parsed.projection),
+  };
+}
+
+function clientProjection(response: unknown): Projection {
+  const parsed = projectionSchema.parse(response);
+  return {
+    ...parsed,
+    turn: {
+      ...parsed.turn,
+      available_actions: parsed.turn.available_actions.filter(
+        (action): action is ActionDescriptor =>
+          action.type !== "play_target_effect",
+      ),
+    },
   };
 }
 

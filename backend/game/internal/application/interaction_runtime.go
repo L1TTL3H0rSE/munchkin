@@ -155,6 +155,14 @@ func (service *Service) RequestCombatResolution(
 		if err != nil {
 			return err
 		}
+		events, err = service.appendFollowupInteraction(
+			state,
+			events,
+			acceptedAt,
+		)
+		if err != nil {
+			return err
+		}
 		envelopes, next, err := service.applyAt(
 			state,
 			commandID,
@@ -189,6 +197,143 @@ func (service *Service) RequestCombatResolution(
 			Projection: projection,
 		}
 		publish = interactionInvalidation(gameID, next.Version, acceptedAt)
+		return nil
+	})
+	if err != nil {
+		return CommandResult{}, err
+	}
+	if publish != nil {
+		_ = service.publisher.Publish(ctx, *publish)
+	}
+	return result, nil
+}
+
+func (service *Service) PlayTargetEffect(
+	ctx context.Context,
+	gameID string,
+	credential string,
+	commandID string,
+	expectedVersion uint64,
+	sourceInstanceID string,
+	targetPlayerID string,
+) (CommandResult, error) {
+	gameID = strings.TrimSpace(gameID)
+	commandID = strings.TrimSpace(commandID)
+	sourceInstanceID = strings.TrimSpace(sourceInstanceID)
+	targetPlayerID = strings.TrimSpace(targetPlayerID)
+	if gameID == "" || credential == "" || commandID == "" {
+		return CommandResult{}, ErrUnauthorized
+	}
+	if sourceInstanceID == "" || targetPlayerID == "" {
+		return CommandResult{}, ErrInteractionAction
+	}
+	tokenHash := hashCredential(credential)
+	fingerprint := targetEffectFingerprint(
+		expectedVersion,
+		sourceInstanceID,
+		targetPlayerID,
+	)
+	var result CommandResult
+	var publish *Invalidation
+	err := service.store.WithinGame(ctx, gameID, func(tx Tx) error {
+		state := tx.State()
+		if err := service.ensureContentIdentity(state); err != nil {
+			return err
+		}
+		actorID, exists := state.ActorByCredentialHash(tokenHash)
+		if !exists {
+			return ErrUnauthorized
+		}
+		if receipt, exists := tx.FindReceipt(actorID, commandID); exists {
+			if receipt.Fingerprint != fingerprint {
+				return ErrIdempotencyConflict
+			}
+			var projection game.Projection
+			if err := json.Unmarshal(
+				receipt.Projection,
+				&projection,
+			); err != nil {
+				return err
+			}
+			result = CommandResult{
+				GameID:     gameID,
+				CommandID:  commandID,
+				Version:    receipt.Version,
+				Replayed:   true,
+				Projection: projection,
+			}
+			return nil
+		}
+		if state.Version != expectedVersion {
+			return ErrVersionConflict
+		}
+		acceptedAt := time.Unix(0, service.clock.Now()).UTC()
+		interactionID, err := service.randomID("interaction")
+		if err != nil {
+			return err
+		}
+		events, err := game.Handle(
+			state,
+			game.Command{
+				Type:           game.CommandPlayTargetEffect,
+				ActorID:        actorID,
+				InstanceID:     sourceInstanceID,
+				TargetPlayerID: targetPlayerID,
+				InteractionID:  interactionID,
+				InteractionAt:  acceptedAt,
+			},
+			service.pack,
+		)
+		if err != nil {
+			return err
+		}
+		envelopes, next, err := service.applyAt(
+			state,
+			commandID,
+			events,
+			acceptedAt,
+		)
+		if err != nil {
+			return err
+		}
+		projection, err := service.projectForActor(
+			next,
+			actorID,
+			acceptedAt,
+		)
+		if err != nil {
+			return err
+		}
+		rawProjection, err := json.Marshal(projection)
+		if err != nil {
+			return err
+		}
+		receipt := Receipt{
+			ActorID:     actorID,
+			CommandID:   commandID,
+			Fingerprint: fingerprint,
+			Version:     next.Version,
+			Projection:  rawProjection,
+		}
+		if err := tx.Save(
+			state.Version,
+			next,
+			envelopes,
+			&receipt,
+		); err != nil {
+			return err
+		}
+		result = CommandResult{
+			GameID:     gameID,
+			CommandID:  commandID,
+			Version:    next.Version,
+			Projection: projection,
+		}
+		publish = interactionInvalidation(
+			gameID,
+			next.Version,
+			acceptedAt,
+		)
 		return nil
 	})
 	if err != nil {
@@ -311,20 +456,40 @@ func (service *Service) ExecuteInteraction(
 			InteractionIntent:   intent,
 			InteractionAt:       acceptedAt,
 			InteractionRevision: action.Revision,
+			ChoiceIDs:           append([]string(nil), action.ChoiceIDs...),
 		}
 		if intent == game.InteractionIntentRespond &&
 			action.SourceInstanceID != "" {
 			command.InstanceID = action.SourceInstanceID
-			if action.CombatCapability != "" {
-				command.Type = game.CommandPlayAdvancedCombatEffect
-				command.TargetInstanceID =
-					action.TargetMonsterInstanceID
+			switch window.Kind {
+			case game.InteractionKindTargetResponse:
+				command.Type = game.CommandCounterTargetEffect
 				command.TargetEffectID = action.TargetEffectID
-				command.HelperPlayerID = action.HelperPlayerID
-			} else {
-				command.Type = game.CommandPlayCombatIntervention
-				command.TargetInstanceID = string(action.Target)
+			case game.InteractionKindRunAwayResponse:
+				if action.EscapeDelta != 0 {
+					command.Type = game.CommandPlayRunAwayModifier
+				} else {
+					command.Type = game.CommandCounterRunAwayEffect
+					command.TargetEffectID = action.TargetEffectID
+				}
+			case game.InteractionKindCombatResponse:
+				if action.CombatCapability != "" {
+					command.Type = game.CommandPlayAdvancedCombatEffect
+					command.TargetInstanceID =
+						action.TargetMonsterInstanceID
+					command.TargetEffectID = action.TargetEffectID
+					command.HelperPlayerID = action.HelperPlayerID
+				} else {
+					command.Type = game.CommandPlayCombatIntervention
+					command.TargetInstanceID = string(action.Target)
+				}
+			default:
+				return ErrInteractionAction
 			}
+		} else if intent == game.InteractionIntentRespond &&
+			(window.Kind == game.InteractionKindTargetResponse ||
+				window.Kind == game.InteractionKindRunAwayResponse) {
+			return ErrInteractionAction
 		}
 		combatHelpResponse := state.CombatHelpOffer != nil &&
 			state.SuspendedInteractionWindow != nil &&
@@ -348,6 +513,37 @@ func (service *Service) ExecuteInteraction(
 			if err != nil {
 				return err
 			}
+		}
+		if window.Kind == game.InteractionKindPrivateChoice &&
+			intent == game.InteractionIntentRespond {
+			intermediate, err := applyDomainEvents(
+				state,
+				events,
+			)
+			if err != nil {
+				return err
+			}
+			choiceEvents, err := game.Handle(
+				intermediate,
+				game.Command{
+					Type:      game.CommandChooseEffect,
+					ActorID:   actorID,
+					ChoiceIDs: append([]string(nil), action.ChoiceIDs...),
+				},
+				service.pack,
+			)
+			if err != nil {
+				return err
+			}
+			events = append(events, choiceEvents...)
+		}
+		events, err = service.appendFollowupInteraction(
+			state,
+			events,
+			acceptedAt,
+		)
+		if err != nil {
+			return err
 		}
 		envelopes, next, err := service.applyAt(
 			state,
@@ -673,6 +869,14 @@ func (service *Service) timeoutInTransaction(
 	if err != nil {
 		return game.State{}, nil, false, err
 	}
+	events, err = service.appendFollowupInteraction(
+		state,
+		events,
+		observedAt,
+	)
+	if err != nil {
+		return game.State{}, nil, false, err
+	}
 	envelopes, next, err := service.applyAt(
 		state,
 		commandID,
@@ -686,6 +890,163 @@ func (service *Service) timeoutInTransaction(
 		return game.State{}, nil, false, err
 	}
 	return next, interactionInvalidation(state.GameID, next.Version, observedAt), true, nil
+}
+
+func (service *Service) appendFollowupInteraction(
+	state game.State,
+	events []game.DomainEvent,
+	openedAt time.Time,
+) ([]game.DomainEvent, error) {
+	next, err := applyDomainEvents(state, events)
+	if err != nil {
+		return nil, err
+	}
+	if next.InteractionWindow != nil &&
+		next.InteractionWindow.Status == game.InteractionWindowOpen {
+		return events, nil
+	}
+	profile, err := next.Profile()
+	if err != nil {
+		return nil, err
+	}
+	if !profile.TargetAndRunAway {
+		return events, nil
+	}
+	if next.InteractionWindow != nil &&
+		next.InteractionWindow.Status == game.InteractionWindowClosed &&
+		next.InteractionWindow.Kind == game.InteractionKindPrivateChoice &&
+		next.Turn.Pending != nil {
+		decision := next.Turn.Pending
+		if decision.Minimum < 0 ||
+			decision.Minimum > len(decision.Options) {
+			return nil, game.ErrIllegalCommand
+		}
+		selected := append(
+			[]string(nil),
+			decision.Options[:decision.Minimum]...,
+		)
+		defaultEvents, err := game.Handle(
+			next,
+			game.Command{
+				Type:      game.CommandChooseEffect,
+				ActorID:   decision.ActorID,
+				ChoiceIDs: selected,
+			},
+			service.pack,
+		)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, defaultEvents...)
+		next, err = applyDomainEvents(next, defaultEvents)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var spec InteractionOpenSpec
+	switch {
+	case next.Turn.Pending != nil:
+		decision := next.Turn.Pending
+		spec = InteractionOpenSpec{
+			Kind: game.InteractionKindPrivateChoice,
+			Parent: game.InteractionParent{
+				Phase:       next.Turn.Phase,
+				SubjectKind: game.InteractionSubjectTurn,
+				SubjectID:   next.Turn.PlayerID,
+			},
+			InitiatorActorID:  decision.ActorID,
+			EligibilityPolicy: game.InteractionEligibilityActorPrivate,
+			AllowedIntents: []game.InteractionIntent{
+				game.InteractionIntentRespond,
+				game.InteractionIntentAutoResolve,
+			},
+			Participants: []InteractionParticipant{{
+				ActorID:       decision.ActorID,
+				Requirement:   game.InteractionResponseMandatory,
+				TimeoutIntent: game.InteractionIntentAutoResolve,
+			}},
+			DeadlinePolicy: game.AddressedInteractionDeadlinePolicy(),
+		}
+	case next.Turn.Phase == game.PhaseRunAway &&
+		next.Turn.RunAway != nil &&
+		!next.Turn.RunAway.Completed:
+		sequence := next.Turn.RunAway
+		currentPlayerID := sequence.ParticipantPlayerIDs[sequence.ParticipantIndex]
+		currentMonsterID := sequence.MonsterInstanceIDs[sequence.MonsterIndex]
+		participants := make(
+			[]InteractionParticipant,
+			0,
+			len(next.Players),
+		)
+		for _, player := range next.Players {
+			if player.Dead {
+				continue
+			}
+			participants = append(participants, InteractionParticipant{
+				ActorID:       player.ID,
+				Requirement:   game.InteractionResponseOptional,
+				TimeoutIntent: game.InteractionIntentPass,
+			})
+		}
+		spec = InteractionOpenSpec{
+			Kind: game.InteractionKindRunAwayResponse,
+			Parent: game.InteractionParent{
+				Phase:       game.PhaseRunAway,
+				SubjectKind: game.InteractionSubjectEncounter,
+				SubjectID:   currentMonsterID,
+			},
+			InitiatorActorID:  currentPlayerID,
+			EligibilityPolicy: game.InteractionEligibilityOpaquePublicSet,
+			AllowedIntents: []game.InteractionIntent{
+				game.InteractionIntentPass,
+				game.InteractionIntentRespond,
+			},
+			Participants:   participants,
+			DeadlinePolicy: game.AddressedInteractionDeadlinePolicy(),
+		}
+	default:
+		return events, nil
+	}
+	interactionID, err := service.randomID("interaction")
+	if err != nil {
+		return nil, err
+	}
+	window, err := interactionWindowFromSpec(
+		interactionID,
+		openedAt,
+		spec,
+	)
+	if err != nil {
+		return nil, err
+	}
+	openEvents, err := game.Handle(
+		next,
+		game.Command{
+			Type:              game.CommandOpenInteractionWindow,
+			ActorID:           spec.InitiatorActorID,
+			InteractionWindow: window,
+		},
+		service.pack,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return append(events, openEvents...), nil
+}
+
+func applyDomainEvents(
+	state game.State,
+	events []game.DomainEvent,
+) (game.State, error) {
+	next := state
+	var err error
+	for _, event := range events {
+		next, err = game.Apply(next, event)
+		if err != nil {
+			return game.State{}, err
+		}
+	}
+	return next, nil
 }
 
 func interactionWindowFromSpec(
@@ -862,6 +1223,29 @@ func interactionFingerprint(
 	})
 	if err != nil {
 		panic(fmt.Sprintf("marshal interaction fingerprint: %v", err))
+	}
+	digest := sha256.Sum256(raw)
+	return hex.EncodeToString(digest[:])
+}
+
+func targetEffectFingerprint(
+	expectedVersion uint64,
+	sourceInstanceID string,
+	targetPlayerID string,
+) string {
+	raw, err := json.Marshal(struct {
+		Type             string `json:"type"`
+		ExpectedVersion  uint64 `json:"expected_version"`
+		SourceInstanceID string `json:"source_instance_id"`
+		TargetPlayerID   string `json:"target_player_id"`
+	}{
+		Type:             string(game.CommandPlayTargetEffect),
+		ExpectedVersion:  expectedVersion,
+		SourceInstanceID: sourceInstanceID,
+		TargetPlayerID:   targetPlayerID,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("marshal target-effect fingerprint: %v", err))
 	}
 	digest := sha256.Sum256(raw)
 	return hex.EncodeToString(digest[:])

@@ -39,6 +39,144 @@ func AddressedInteractionDeadlinePolicy() InteractionDeadlinePolicy {
 	}
 }
 
+func targetResponseActors(state State, initiatorID string) []string {
+	actorIDs := make([]string, 0, len(state.Players)-1)
+	for _, player := range state.Players {
+		if player.ID != initiatorID && !player.Dead {
+			actorIDs = append(actorIDs, player.ID)
+		}
+	}
+	return actorIDs
+}
+
+func runAwayResponseActors(state State) []string {
+	actorIDs := make([]string, 0, len(state.Players))
+	for _, player := range state.Players {
+		if !player.Dead {
+			actorIDs = append(actorIDs, player.ID)
+		}
+	}
+	return actorIDs
+}
+
+func targetEffectWindow(
+	state State,
+	interactionID string,
+	openedAt time.Time,
+	initiatorID string,
+	sourceInstanceID string,
+) *InteractionWindow {
+	actorIDs := targetResponseActors(state, initiatorID)
+	if len(actorIDs) == 0 {
+		return nil
+	}
+	responses := make(map[string]InteractionResponse, len(actorIDs))
+	for _, actorID := range actorIDs {
+		responses[actorID] = InteractionResponse{
+			Requirement:   InteractionResponseOptional,
+			TimeoutIntent: InteractionIntentPass,
+			State:         InteractionResponsePending,
+		}
+	}
+	policy := AddressedInteractionDeadlinePolicy()
+	return &InteractionWindow{
+		ID:   interactionID,
+		Kind: InteractionKindTargetResponse,
+		Parent: InteractionParent{
+			Phase:       state.Turn.Phase,
+			SubjectKind: InteractionSubjectEffect,
+			SubjectID:   sourceInstanceID,
+		},
+		InitiatorActorID:  initiatorID,
+		EligibilityPolicy: InteractionEligibilityOpaquePublicSet,
+		AllowedIntents: []InteractionIntent{
+			InteractionIntentPass,
+			InteractionIntentRespond,
+		},
+		EligibleActorIDs: actorIDs,
+		OpenedAt:         openedAt,
+		DeadlineAt: openedAt.Add(
+			time.Duration(policy.BaseSeconds) * time.Second,
+		),
+		DeadlineRevision: 1,
+		DeadlinePolicy:   policy,
+		Responses:        responses,
+		Status:           InteractionWindowOpen,
+	}
+}
+
+func initializeRunAwaySequence(state *State) error {
+	if state.Turn.Encounter == nil {
+		return fmt.Errorf("%w: missing Run Away encounter", ErrIllegalCommand)
+	}
+	participants := []string{state.Turn.PlayerID}
+	if help := state.Turn.Encounter.CombatHelp; help != nil {
+		if help.HelperPlayerID != "" &&
+			help.HelperPlayerID != state.Turn.PlayerID {
+			participants = append(participants, help.HelperPlayerID)
+		}
+	}
+	state.Turn.RunAway = &RunAwaySequence{
+		ParticipantPlayerIDs: participants,
+		MonsterInstanceIDs: encounterMonsterInstanceIDs(
+			*state.Turn.Encounter,
+		),
+	}
+	return nil
+}
+
+func currentRunAwayStep(
+	state State,
+) (*RunAwaySequence, int, string, error) {
+	sequence := state.Turn.RunAway
+	if sequence == nil ||
+		sequence.Completed ||
+		sequence.ParticipantIndex < 0 ||
+		sequence.ParticipantIndex >= len(sequence.ParticipantPlayerIDs) ||
+		sequence.MonsterIndex < 0 ||
+		sequence.MonsterIndex >= len(sequence.MonsterInstanceIDs) {
+		return nil, -1, "", fmt.Errorf(
+			"%w: Run Away step is not active",
+			ErrIllegalCommand,
+		)
+	}
+	playerIndex := state.PlayerIndex(
+		sequence.ParticipantPlayerIDs[sequence.ParticipantIndex],
+	)
+	if playerIndex < 0 {
+		return nil, -1, "", fmt.Errorf(
+			"%w: Run Away participant is missing",
+			ErrIllegalCommand,
+		)
+	}
+	return sequence, playerIndex,
+		sequence.MonsterInstanceIDs[sequence.MonsterIndex], nil
+}
+
+func resetInteractionResponses(
+	window *InteractionWindow,
+	acceptedAt time.Time,
+) error {
+	if window == nil ||
+		window.Status != InteractionWindowOpen ||
+		acceptedAt.IsZero() ||
+		!acceptedAt.Before(window.DeadlineAt) {
+		return fmt.Errorf(
+			"%w: stale interaction material response",
+			ErrIllegalCommand,
+		)
+	}
+	for _, actorID := range window.EligibleActorIDs {
+		response := window.Responses[actorID]
+		response.State = InteractionResponsePending
+		response.Intent = ""
+		response.AcceptedAt = time.Time{}
+		window.Responses[actorID] = response
+	}
+	window.DeadlineRevision++
+	return nil
+}
+
 func materializeForProfile(
 	pack Pack,
 	profile RulesProfile,

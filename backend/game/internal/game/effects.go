@@ -23,6 +23,34 @@ func realizedCombatEffectID(
 	return fmt.Sprintf("fx_%x", digest[:16])
 }
 
+func realizedTargetEffectID(
+	interactionID string,
+	initiatorID string,
+	sourceInstanceID string,
+) string {
+	digest := sha256.Sum256([]byte(
+		interactionID + "\x00" +
+			initiatorID + "\x00" +
+			sourceInstanceID,
+	))
+	return fmt.Sprintf("tfx_%x", digest[:16])
+}
+
+func realizedRunAwayEffectID(
+	interactionID string,
+	actorID string,
+	sourceInstanceID string,
+	revision uint32,
+) string {
+	digest := sha256.Sum256([]byte(
+		interactionID + "\x00" +
+			actorID + "\x00" +
+			sourceInstanceID + "\x00" +
+			strconv.FormatUint(uint64(revision), 10),
+	))
+	return fmt.Sprintf("rfx_%x", digest[:16])
+}
+
 func materializeSelectedProfile(
 	pack Pack,
 	profile RulesProfile,
@@ -36,7 +64,9 @@ func materializeSelectedProfile(
 		basic = basic && card.CombatCapability == nil
 		advanced := profile.AdvancedCombat &&
 			card.CombatCapability != nil
-		if !basic && !advanced {
+		targeted := profile.TargetAndRunAway &&
+			targetableEffectCard(card)
+		if !basic && !advanced && !targeted {
 			continue
 		}
 		for copyIndex := 1; copyIndex <= card.Copies; copyIndex++ {
@@ -67,6 +97,28 @@ func materializeSelectedProfile(
 		}
 	}
 	return instances, doors, treasures, nil
+}
+
+func targetableEffectCard(card Card) bool {
+	return card.InteractionScope == InteractionOtherPlayers &&
+		card.Kind == CardCurse &&
+		len(card.Effects) > 0 &&
+		card.CombatCapability == nil
+}
+
+func runAwayModifierEffect(card Card) (Effect, bool) {
+	if card.Kind != CardOneShot ||
+		card.InteractionScope != InteractionSelf ||
+		len(card.Effects) != 1 {
+		return Effect{}, false
+	}
+	effect := card.Effects[0]
+	if effect.Kind != EffectModifyEscape ||
+		effect.Persistent ||
+		effect.Amount == 0 {
+		return Effect{}, false
+	}
+	return effect, true
 }
 
 func encounterMonsterInstanceIDs(encounter Encounter) []string {
@@ -490,16 +542,66 @@ func finalizeEffectSequence(
 			return err
 		}
 	}
+	if finalize.ClearTargetEffect {
+		state.Turn.TargetEffect = nil
+	}
 	if state.Status == StatusFinished {
 		state.Turn.Phase = ""
 		state.Turn.ActionWindow = ActionWindow{}
 		return nil
+	}
+	if finalize.ContinueRunAway {
+		return advanceRunAwaySequence(state, pack)
 	}
 	phase := finalize.Phase
 	if state.Players[playerIndex].Dead {
 		phase = PhaseCharity
 	}
 	setTurnPhase(state, phase)
+	return nil
+}
+
+func advanceRunAwaySequence(state *State, pack Pack) error {
+	sequence := state.Turn.RunAway
+	if sequence == nil || sequence.Completed {
+		return fmt.Errorf(
+			"%w: Run Away continuation is not active",
+			ErrIllegalCommand,
+		)
+	}
+	sequence.Effects = nil
+	sequence.MonsterIndex++
+	if sequence.MonsterIndex >= len(sequence.MonsterInstanceIDs) {
+		sequence.ParticipantIndex++
+		sequence.MonsterIndex = 0
+	}
+	for sequence.ParticipantIndex < len(sequence.ParticipantPlayerIDs) {
+		playerIndex := state.PlayerIndex(
+			sequence.ParticipantPlayerIDs[sequence.ParticipantIndex],
+		)
+		if playerIndex < 0 {
+			return fmt.Errorf(
+				"%w: Run Away participant disappeared",
+				ErrIllegalCommand,
+			)
+		}
+		if !state.Players[playerIndex].Dead {
+			break
+		}
+		sequence.ParticipantIndex++
+		sequence.MonsterIndex = 0
+	}
+	if sequence.ParticipantIndex >= len(sequence.ParticipantPlayerIDs) {
+		sequence.ParticipantIndex = len(sequence.ParticipantPlayerIDs)
+		sequence.MonsterIndex = 0
+		sequence.Completed = true
+		if err := discardEncounterSet(state, pack); err != nil {
+			return err
+		}
+		setTurnPhase(state, PhaseCharity)
+		return nil
+	}
+	setTurnPhase(state, PhaseRunAway)
 	return nil
 }
 

@@ -1,0 +1,117 @@
+{
+  "game_id": "game_target_fixture",
+  "version": 18,
+  "status": "active",
+  "is_owner": false,
+  "you": {
+    "player_id": "player_c",
+    "name": "Cara",
+    "level": 1,
+    "combat_strength": 1,
+    "escape_bonus": 0,
+    "hand_limit": 5,
+    "character_tags": [],
+    "hand": [
+      {
+        "instance_id": "anonymous-complaint-1",
+        "definition_id": "anonymous-complaint",
+        "name": "Анонимная жалоба с приложениями",
+        "deck": "treasure",
+        "kind": "one_shot",
+        "rules_text": "Отмени выбранный направленный эффект."
+      }
+    ],
+    "carried": [],
+    "equipped": [],
+    "traits": [],
+    "attachments": [],
+    "persistent_curses": [],
+    "setup_done": true,
+    "dead": false,
+    "needs_redraw": false
+  },
+  "players": [
+    {
+      "player_id": "player_a",
+      "name": "Alice",
+      "level": 1,
+      "hand_count": 7,
+      "carried": [],
+      "equipped": [],
+      "traits": [],
+      "attachments": [],
+      "persistent_curses": [],
+      "setup_done": true,
+      "dead": false
+    },
+    {
+      "player_id": "player_b",
+      "name": "Bob",
+      "level": 1,
+      "hand_count": 8,
+      "carried": [],
+      "equipped": [],
+      "traits": [],
+      "attachments": [],
+      "persistent_curses": [],
+      "setup_done": true,
+      "dead": false
+    },
+    {
+      "player_id": "player_c",
+      "name": "Cara",
+      "level": 1,
+      "hand_count": 1,
+      "carried": [],
+      "equipped": [],
+      "traits": [],
+      "attachments": [],
+      "persistent_curses": [],
+      "setup_done": true,
+      "dead": false
+    }
+  ],
+  "turn": {
+    "player_id": "player_a",
+    "phase": "preparation",
+    "resolving": [],
+    "available_actions": []
+  },
+  "door_deck_count": 78,
+  "door_discard_count": 0,
+  "treasure_deck_count": 64,
+  "treasure_discard_count": 0,
+  "content_set_id": "moscow-core",
+  "content_version": 3,
+  "rules_profile_id": "lobby-multiplayer-v2",
+  "rules_profile_version": 1,
+  "interaction": {
+    "interaction_id": "interaction_target_0123456789",
+    "public_kind": "target_response",
+    "parent_phase": "preparation",
+    "public_subject": "current_effect",
+    "status": "open",
+    "deadline_at": "2026-07-31T04:01:00Z",
+    "server_time": "2026-07-31T04:00:30Z",
+    "my_response_state": "pending",
+    "response_required_for_you": false,
+    "actions": [
+      {
+        "action_id": "act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "interaction_id": "interaction_target_0123456789",
+        "revision": 1,
+        "type": "pass"
+      },
+      {
+        "action_id": "act_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "interaction_id": "interaction_target_0123456789",
+        "revision": 1,
+        "type": "respond",
+        "source_instance_id": "anonymous-complaint-1",
+        "combat_capability": "counter_combat_effect",
+        "target_effect_id": "tfx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "target_player_id": "player_b"
+  }
+}
