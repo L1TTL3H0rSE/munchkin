@@ -35,6 +35,7 @@ import {
   readSession,
   recordSessionCheck,
   releasePlanLifecycle,
+  releaseSelectedPlanForRotation,
   resolveSessionId,
   selectSessionPlan,
   sessionScopeReport,
@@ -315,7 +316,7 @@ function helpText() {
     "Session:",
     "  plan create <short-kebab-name>",
     "  plan claim <plan-id> [--takeover] [--session <id>]",
-    "  plan release <plan-id> [--session <id>]",
+    "  plan release <plan-id> [--session <id>]  # handoff or guarded completed rotation",
     "  plan select <plan-id> [--takeover] [--session <id>]",
     "",
     "Explicit execution:",
@@ -536,14 +537,44 @@ async function execute(command, positionals, options, context) {
 
   if (command === "plan-release") {
     const planId = positionals[2];
-    const released = releasePlanLifecycle(
+    const resolvedSessionId = resolveSessionId(options.session);
+    const selectedSession = readSession(repoRoot, profile.runtimeDir, resolvedSessionId);
+    if (!selectedSession) {
+      const released = releasePlanLifecycle(
+        repoRoot,
+        profile.runtimeDir,
+        planId,
+        resolvedSessionId,
+      );
+      return outputEnvelope(command, { planId, released, mode: "handoff" });
+    }
+
+    const current = snapshotRepository(repoRoot);
+    const changed = changedSinceBaseline(selectedSession.baseline, current);
+    const graph = buildComponentGraph(repoRoot, profile);
+    const requiredChecks = componentChecks(impactedComponents(graph, changed));
+    const result = releaseSelectedPlanForRotation(
       repoRoot,
-      profile.runtimeDir,
+      profile,
+      registry,
       planId,
-      resolveSessionId(options.session),
-      { releaseSelectedSession: true },
+      {
+        sessionId: resolvedSessionId,
+        current,
+        requiredChecks,
+      },
     );
-    return outputEnvelope(command, { planId, released });
+    return outputEnvelope(command, {
+      planId,
+      released: result.released,
+      mode: result.mode,
+      releasedAt: result.releasedAt,
+      completedChecks: result.report.completedChecks.map((check) => check.id),
+    }, {
+      warnings: result.report.unledgered.length
+        ? [`${result.report.unledgered.length} changed path(s) were not recorded by post-write hooks`]
+        : [],
+    });
   }
 
   if (command === "scope-check") {

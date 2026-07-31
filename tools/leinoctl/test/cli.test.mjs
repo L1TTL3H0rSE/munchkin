@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 import test from "node:test";
 import { main } from "../src/cli.mjs";
 import { EXIT_CODES } from "../src/errors.mjs";
@@ -19,6 +20,51 @@ function captureStream() {
       return value;
     },
   };
+}
+
+function planText(planId, status, writePath) {
+  return [
+    `# PLAN: ${planId}`,
+    "",
+    `- **Plan ID:** \`${planId}\``,
+    `- **Статус:** ${status}`,
+    "- **Владелец:** Fixture",
+    "- **Workspace:** shared",
+    "- **Режим параллельности:** exclusive",
+    "",
+    "## Machine-readable manifest",
+    "",
+    "```json",
+    JSON.stringify({
+      schemaVersion: 1,
+      paths: [
+        writePath,
+        `.plans/active/${planId}.md`,
+        `.plans/archive/${planId}.md`,
+      ],
+      components: [],
+      contracts: [],
+      dependsOn: [],
+      sharedResources: [],
+    }, null, 2),
+    "```",
+    "",
+    "## Координация с другими планами",
+    "",
+    "### Write set",
+    "",
+    "| Path | Mode | Reason |",
+    "|---|---|---|",
+    `| \`${writePath}\` | write | fixture |`,
+    `| \`.plans/active/${planId}.md\` | write | lifecycle |`,
+    `| \`.plans/archive/${planId}.md\` | write | lifecycle |`,
+    "",
+    "## Согласование",
+    "",
+    "- **Статус:** approved",
+    "- **Подтверждено:** 2026-07-31 00:00 UTC",
+    "",
+  ].join("\n");
 }
 
 test("CLI reports parse and command option failures as versioned JSON", async () => {
@@ -241,5 +287,117 @@ test("verify without an explicit base ignores dirty state that predates session 
   assert.equal(
     readSession(root, profile.runtimeDir, "verify-session").ledger.checks.length,
     1,
+  );
+});
+
+test("CLI rotates completed plans in one session only after a separate commit", async () => {
+  const root = temporaryDirectory();
+  const firstPlan = "0100-first";
+  const nextPlan = "0101-next";
+  writeJson(root, ".leino/profile.json", fixtureProfile());
+  writeFile(root, ".gitignore", ".leino/runtime/\n");
+  writeFile(
+    root,
+    `.plans/active/${firstPlan}.md`,
+    planText(firstPlan, "in_progress", "src/**"),
+  );
+  writeFile(
+    root,
+    `.plans/active/${nextPlan}.md`,
+    planText(nextPlan, "approved", "next/**"),
+  );
+  execFileSync("git", ["init", "--initial-branch=main"], { cwd: root });
+  execFileSync("git", ["config", "user.email", "fixture@example.test"], { cwd: root });
+  execFileSync("git", ["config", "user.name", "Fixture"], { cwd: root });
+  execFileSync("git", ["add", "."], { cwd: root });
+  execFileSync("git", ["commit", "-m", "fixture"], { cwd: root });
+
+  let stdout = captureStream();
+  let stderr = captureStream();
+  let exitCode = await main([
+    "plan",
+    "select",
+    firstPlan,
+    "--session",
+    "queue-session",
+    "--repo",
+    root,
+    "--json",
+  ], {
+    stdout: stdout.stream,
+    stderr: stderr.stream,
+  });
+  assert.equal(exitCode, EXIT_CODES.ok, stderr.value());
+
+  writeFile(root, "src/change.js", "export const changed = true;\n");
+  fs.unlinkSync(`${root}/.plans/active/${firstPlan}.md`);
+  writeFile(
+    root,
+    `.plans/archive/${firstPlan}.md`,
+    planText(firstPlan, "completed", "src/**"),
+  );
+
+  stdout = captureStream();
+  stderr = captureStream();
+  exitCode = await main([
+    "plan",
+    "release",
+    firstPlan,
+    "--session",
+    "queue-session",
+    "--repo",
+    root,
+    "--json",
+  ], {
+    stdout: stdout.stream,
+    stderr: stderr.stream,
+  });
+  assert.equal(exitCode, EXIT_CODES.ok, stderr.value());
+  assert.equal(JSON.parse(stdout.value()).data.mode, "rotation");
+  assert.equal(readSession(root, ".leino/runtime", "queue-session"), null);
+
+  stdout = captureStream();
+  stderr = captureStream();
+  exitCode = await main([
+    "plan",
+    "select",
+    nextPlan,
+    "--session",
+    "queue-session",
+    "--repo",
+    root,
+    "--json",
+  ], {
+    stdout: stdout.stream,
+    stderr: stderr.stream,
+  });
+  assert.equal(exitCode, EXIT_CODES.policy);
+  assert.match(stderr.value(), /commit completed plan/);
+
+  execFileSync("git", ["add", "."], { cwd: root });
+  execFileSync("git", ["commit", "-m", "complete first"], { cwd: root });
+
+  stdout = captureStream();
+  stderr = captureStream();
+  exitCode = await main([
+    "plan",
+    "select",
+    nextPlan,
+    "--session",
+    "queue-session",
+    "--repo",
+    root,
+    "--json",
+  ], {
+    stdout: stdout.stream,
+    stderr: stderr.stream,
+  });
+  assert.equal(exitCode, EXIT_CODES.ok, stderr.value());
+  const state = readSession(root, ".leino/runtime", "queue-session");
+  assert.equal(state.planId, nextPlan);
+  assert.deepEqual(state.ledger, { targets: [], checks: [] });
+  assert.deepEqual(
+    state.rotationHistory.map((entry) => entry.planId),
+    [firstPlan],
   );
 });

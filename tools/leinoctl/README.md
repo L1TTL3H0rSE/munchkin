@@ -33,10 +33,18 @@ checks. Результат проверки привязан к covered paths и
 Lifecycle ownership не захватывается молча:
 
 ```sh
-./leinoctl plan release <plan-id>                    # штатный handoff
+./leinoctl plan release <plan-id>                    # handoff или guarded rotation
 ./leinoctl plan claim <plan-id>                      # новый owner
 ./leinoctl plan select <plan-id> --takeover          # recovery после проверки
 ```
+
+Без selected plan `release` остаётся обычным handoff lifecycle claim. Для
+selected plan он fail-closed: план должен быть lint-clean, `completed`,
+находиться в archive и иметь свежие scope/verification evidence. Команда
+сохраняет локальный rotation checkpoint и снимает active selection. Следующий
+`select` с тем же session ID разрешён только после отдельного local commit и
+при отсутствии нового dirty delta относительно исходного baseline; новый plan
+получает свежий baseline и пустой ledger. CLI не делает commit или push.
 
 `compose` — явный execution adapter: profile задаёт Compose files, CLI владеет
 единственным `--parallel`, а аргументы после `--` передаются буквально без

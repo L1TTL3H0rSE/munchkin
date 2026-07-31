@@ -18,7 +18,8 @@ core людям, hooks и CI. Это guardrail, не security boundary.
 
 ## Доверие
 
-После clone или изменения hooks/config:
+После clone или изменения hooks/config, `tools/leinoctl` либо lifecycle-правил
+в `AGENTS.md`:
 
 1. Просмотри diff.
 2. Запусти harness/leinoctl tests.
@@ -41,10 +42,33 @@ Selection разрешает только active `approved|in_progress` plan б�
 получает lifecycle ownership и сохраняет repository identity, session ID,
 root HEAD (включая unborn `null`), status/fingerprints и ledger.
 
-Повторный select того же ID идемпотентен. Смена plan/baseline в одной session
-запрещена. Draft ownership передаётся через `plan release`/`plan claim`;
-`--takeover` используется только после проверки, что прежняя session
-остановлена.
+Повторный select того же ID идемпотентен. Пока plan выбран, прямой select
+другого ID запрещён. Draft ownership без selected plan передаётся через
+`plan release`/`plan claim`; `--takeover` используется только после проверки,
+что прежняя session остановлена.
+
+Один диалог/session может последовательно выполнить несколько заранее
+согласованных exact plan IDs. Переход является отдельным fail-closed state
+transition:
+
+1. Выполнить current plan и все required checks.
+2. Запустить `verify --changed` и `scope-check --plan <current>`.
+3. Поставить `completed` и перенести тот же plan в archive.
+4. Выполнить `plan release <current>`. Для selected plan команда повторно
+   проверяет completed/archive, checklist, lint, scope и verification.
+5. Release удаляет active session/ownership, но сохраняет bounded rotation
+   checkpoint. Обычные repository writes после этого не авторизованы.
+6. Зафиксировать завершённый plan отдельным локальным commit; push делать
+   только при явном разрешении пользователя.
+7. Если approval следующего exact plan не записан заранее, выполнить
+   `plan claim <next>`, записать approval/status и затем `plan select <next>`.
+   Select требует новый commit, отсутствие нового dirty delta относительно
+   исходного baseline и обычную eligibility/dependency проверку.
+
+Новый select создаёт свежий baseline и пустой ledger, сохраняя bounded history
+завершённых plan IDs. Failed release не меняет session/ownership. Failed select
+не поглощает незакоммиченные изменения старого plan. Material scope/contract/
+risk/order change или failed check останавливает согласованную очередь.
 
 ## Pre/Post/Stop
 
@@ -86,5 +110,7 @@ changed impact graph от доступного base SHA.
 - Detector не определяет произвольную кодировку.
 - Tool payloads могут измениться после Codex upgrade.
 - Runtime ledger локален и не является shared registry.
+- Rotation checkpoint локален/ignored, не является approval следующего plan и
+  не доказывает push в remote.
 - `sync` generic, но repository без submodules/remote не рекламирует его как
   основной workflow.

@@ -39,9 +39,15 @@ migrations, CI или поведение требует отдельного pla
 ./leinoctl plan select <plan-id>
 ```
 
-Одна session выбирает один plan. Материальное изменение scope, contracts,
-write set, shared resources, dependencies или рисков требует повторного
-согласования.
+В каждый момент session выбирает ровно один plan. Один диалог может выполнить
+заранее согласованную очередь exact plan IDs последовательно, но прямой
+`select` другого plan запрещён. Для перехода текущий plan должен пройти
+verify/scope-check, стать `completed` и переместиться в archive; затем выполни
+`plan release`, зафиксируй его отдельным локальным commit и только после этого
+выбери следующий plan. Push между plans выполняется лишь при явном разрешении
+пользователя. Material change scope, contracts, write set, shared resources,
+dependencies, рисков или порядка очереди останавливает цепочку и требует
+повторного согласования.
 
 Перед завершением:
 
@@ -121,5 +127,6 @@ node --test --test-isolation=none .codex/hooks/test/*.test.mjs
 node .codex/hooks/plan-lint.mjs
 ```
 
-После изменения `.codex` или `.leino` просмотри diff, запусти tests и начни
-новую trusted session. Текущая session не доказывает загрузку новых hooks.
+После изменения `.codex`, `.leino`, `tools/leinoctl` или lifecycle-правил в
+этом файле просмотри diff, запусти tests и начни новую trusted session.
+Текущая session не доказывает загрузку новых hooks или инструкций.

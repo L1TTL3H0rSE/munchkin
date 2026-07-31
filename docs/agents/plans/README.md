@@ -61,6 +61,31 @@ config exclusive по умолчанию.
 Lifecycle ownership передаётся `plan release` → `plan claim`. `--takeover`
 используется только для recovery после проверки остановки прежней session.
 
+### Последовательная очередь в одном диалоге
+
+Пользователь может одним сообщением согласовать exact plan IDs и их порядок.
+Approval каждого plan всё равно записывается в его lifecycle section. В один
+момент выбран только один plan; прямой `select B` при selected `A` запрещён.
+
+После полного завершения текущего plan:
+
+```bash
+./leinoctl verify --changed
+./leinoctl scope-check --plan <current-plan-id>
+# отметить completed и перенести current plan в archive
+./leinoctl plan release <current-plan-id>
+# создать отдельный local commit; push только если явно разрешён
+# при необходимости: plan claim next и записать его approval/status
+./leinoctl plan select <next-plan-id>
+```
+
+Selected release отличается от draft handoff: он разрешён только для
+lint-clean completed archived plan со свежими scope/check evidence и сохраняет
+rotation checkpoint. Следующий select требует отдельный commit завершённого
+plan, сохраняет предсуществующий dirty baseline и создаёт новый пустой ledger.
+Material scope/contract/risk/dependency/order change, failed check или новый
+unexpected dirty path останавливают очередь и требуют пользователя.
+
 ## Команды
 
 ```bash

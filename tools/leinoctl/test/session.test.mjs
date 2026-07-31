@@ -3,10 +3,12 @@ import test from "node:test";
 import {
   claimPlanLifecycle,
   lifecyclePlanIdsForSession,
+  readRotationCheckpoint,
   readSession,
   recordSessionCheck,
   recordSessionTargets,
   releasePlanLifecycle,
+  releaseSelectedPlanForRotation,
   resolveSessionId,
   selectSessionPlan,
   sessionScopeReport,
@@ -28,6 +30,23 @@ function registry() {
       eligible: true,
       writeSet: [{ path: "src/**", mode: "write" }],
     }],
+  };
+}
+
+function completedRegistry(planId = "0100-fixture") {
+  const plan = {
+    planId,
+    placement: "archive",
+    status: "completed",
+    unchecked: 0,
+    issues: [],
+    eligible: false,
+    writeSet: [{ path: "src/**", mode: "write" }],
+  };
+  return {
+    active: [],
+    archive: [plan],
+    all: [plan],
   };
 }
 
@@ -321,6 +340,346 @@ test("plan lifecycle ownership supports explicit handoff and release", () => {
   assert.deepEqual(
     lifecyclePlanIdsForSession(root, runtimeDir, "thread-other"),
     [],
+  );
+});
+
+test("selected release requires completed archive and preserves state on failure", () => {
+  const root = temporaryDirectory();
+  const profile = {
+    runtimeDir: ".leino/runtime",
+    plans: { activeDir: ".plans/active", archiveDir: ".plans/archive" },
+  };
+  selectSessionPlan(root, profile, registry(), "0100-fixture", {
+    sessionId: "thread-release-failure",
+    snapshot: cleanSnapshot,
+  });
+  const current = {
+    ...cleanSnapshot,
+    root: {
+      head: "abc",
+      entries: [{
+        status: " M",
+        path: "src/change.js",
+        fingerprint: "file:changed",
+      }],
+    },
+  };
+
+  assert.throws(
+    () => releaseSelectedPlanForRotation(
+      root,
+      profile,
+      registry(),
+      "0100-fixture",
+      {
+        sessionId: "thread-release-failure",
+        current,
+      },
+    ),
+    /must be completed/,
+  );
+  assert.equal(
+    readSession(root, profile.runtimeDir, "thread-release-failure").planId,
+    "0100-fixture",
+  );
+  assert.deepEqual(
+    lifecyclePlanIdsForSession(root, profile.runtimeDir, "thread-release-failure"),
+    ["0100-fixture"],
+  );
+  assert.equal(
+    readRotationCheckpoint(root, profile.runtimeDir, "thread-release-failure"),
+    null,
+  );
+  assert.throws(
+    () => releasePlanLifecycle(
+      root,
+      profile.runtimeDir,
+      "0100-fixture",
+      "thread-release-failure",
+      { releaseSelectedSession: true },
+    ),
+    /guarded rotation release/,
+  );
+});
+
+test("selected release rejects missing checks without mutating ownership", () => {
+  const root = temporaryDirectory();
+  const profile = {
+    runtimeDir: ".leino/runtime",
+    plans: { activeDir: ".plans/active", archiveDir: ".plans/archive" },
+  };
+  selectSessionPlan(root, profile, registry(), "0100-fixture", {
+    sessionId: "thread-release-check",
+    snapshot: cleanSnapshot,
+  });
+  const current = {
+    ...cleanSnapshot,
+    root: {
+      head: "abc",
+      entries: [{
+        status: " M",
+        path: "src/change.js",
+        fingerprint: "file:changed",
+      }],
+    },
+  };
+  const requiredChecks = [{
+    id: "fixture-check",
+    cwd: ".",
+    argv: ["node", "--test"],
+  }];
+
+  assert.throws(
+    () => releaseSelectedPlanForRotation(
+      root,
+      profile,
+      completedRegistry(),
+      "0100-fixture",
+      {
+        sessionId: "thread-release-check",
+        current: {
+          ...cleanSnapshot,
+          root: {
+            head: "abc",
+            entries: [{
+              status: " M",
+              path: "outside.txt",
+              fingerprint: "file:outside",
+            }],
+          },
+        },
+      },
+    ),
+    /unresolved scope or verification/,
+  );
+  assert.throws(
+    () => releaseSelectedPlanForRotation(
+      root,
+      profile,
+      completedRegistry(),
+      "0100-fixture",
+      {
+        sessionId: "thread-release-check",
+        current,
+        requiredChecks,
+      },
+    ),
+    /unresolved scope or verification/,
+  );
+  assert.equal(
+    readSession(root, profile.runtimeDir, "thread-release-check").planId,
+    "0100-fixture",
+  );
+  assert.deepEqual(
+    lifecyclePlanIdsForSession(root, profile.runtimeDir, "thread-release-check"),
+    ["0100-fixture"],
+  );
+});
+
+test("completed release requires a commit then resets baseline and ledger for next plan", () => {
+  const root = temporaryDirectory();
+  const profile = {
+    runtimeDir: ".leino/runtime",
+    plans: { activeDir: ".plans/active", archiveDir: ".plans/archive" },
+  };
+  selectSessionPlan(root, profile, registry(), "0100-fixture", {
+    sessionId: "thread-rotation",
+    snapshot: cleanSnapshot,
+  });
+  recordSessionTargets(root, profile, "thread-rotation", ["src/change.js"]);
+  const releasedSnapshot = {
+    ...cleanSnapshot,
+    root: {
+      head: "abc",
+      entries: [{
+        status: " M",
+        path: "src/change.js",
+        fingerprint: "file:changed",
+      }],
+    },
+  };
+
+  const released = releaseSelectedPlanForRotation(
+    root,
+    profile,
+    completedRegistry(),
+    "0100-fixture",
+    {
+      sessionId: "thread-rotation",
+      current: releasedSnapshot,
+    },
+  );
+  assert.equal(released.mode, "rotation");
+  assert.equal(readSession(root, profile.runtimeDir, "thread-rotation"), null);
+  assert.deepEqual(
+    lifecyclePlanIdsForSession(root, profile.runtimeDir, "thread-rotation"),
+    [],
+  );
+  assert.equal(
+    readRotationCheckpoint(root, profile.runtimeDir, "thread-rotation").previousPlanId,
+    "0100-fixture",
+  );
+
+  const nextRegistry = {
+    active: [{
+      planId: "0101-next",
+      eligible: true,
+      issues: [],
+      writeSet: [{ path: "next/**", mode: "write" }],
+    }],
+  };
+  assert.throws(
+    () => selectSessionPlan(root, profile, nextRegistry, "0101-next", {
+      sessionId: "thread-rotation",
+      snapshot: releasedSnapshot,
+    }),
+    /commit completed plan/,
+  );
+
+  const committedSnapshot = {
+    ...cleanSnapshot,
+    root: { head: "def", entries: [] },
+  };
+  const next = selectSessionPlan(root, profile, nextRegistry, "0101-next", {
+    sessionId: "thread-rotation",
+    snapshot: committedSnapshot,
+  });
+  assert.equal(next.schemaVersion, 2);
+  assert.equal(next.planId, "0101-next");
+  assert.deepEqual(next.ledger, { targets: [], checks: [] });
+  assert.equal(next.rotationHistory.length, 1);
+  assert.equal(next.rotationHistory[0].planId, "0100-fixture");
+  assert.deepEqual(next.baseline, committedSnapshot);
+  assert.equal(
+    readRotationCheckpoint(root, profile.runtimeDir, "thread-rotation"),
+    null,
+  );
+});
+
+test("rotation preserves pre-existing dirty paths and permits only next lifecycle edits", () => {
+  const root = temporaryDirectory();
+  const profile = {
+    runtimeDir: ".leino/runtime",
+    plans: { activeDir: ".plans/active", archiveDir: ".plans/archive" },
+  };
+  const baseline = {
+    ...cleanSnapshot,
+    root: {
+      head: "abc",
+      entries: [{
+        status: " M",
+        path: "user.txt",
+        fingerprint: "file:user",
+      }],
+    },
+  };
+  selectSessionPlan(root, profile, registry(), "0100-fixture", {
+    sessionId: "thread-dirty-baseline",
+    snapshot: baseline,
+  });
+  releaseSelectedPlanForRotation(
+    root,
+    profile,
+    completedRegistry(),
+    "0100-fixture",
+    {
+      sessionId: "thread-dirty-baseline",
+      current: {
+        ...baseline,
+        root: {
+          head: "abc",
+          entries: [
+            ...baseline.root.entries,
+            {
+              status: " M",
+              path: "src/change.js",
+              fingerprint: "file:changed",
+            },
+          ],
+        },
+      },
+    },
+  );
+  const nextRegistry = {
+    active: [{
+      planId: "0101-next",
+      eligible: true,
+      issues: [],
+      writeSet: [{ path: "next/**", mode: "write" }],
+    }],
+  };
+  const committedWithApproval = {
+    ...baseline,
+    root: {
+      head: "def",
+      entries: [
+        ...baseline.root.entries,
+        {
+          status: " M",
+          path: ".plans/active/0101-next.md",
+          fingerprint: "file:approval",
+        },
+      ],
+    },
+  };
+  assert.equal(
+    selectSessionPlan(
+      root,
+      profile,
+      nextRegistry,
+      "0101-next",
+      {
+        sessionId: "thread-dirty-baseline",
+        snapshot: committedWithApproval,
+      },
+    ).planId,
+    "0101-next",
+  );
+
+  const secondRoot = temporaryDirectory();
+  selectSessionPlan(secondRoot, profile, registry(), "0100-fixture", {
+    sessionId: "thread-mutated-baseline",
+    snapshot: baseline,
+  });
+  releaseSelectedPlanForRotation(
+    secondRoot,
+    profile,
+    completedRegistry(),
+    "0100-fixture",
+    {
+      sessionId: "thread-mutated-baseline",
+      current: {
+        ...baseline,
+        root: {
+          head: "abc",
+          entries: [
+            ...baseline.root.entries,
+            {
+              status: " M",
+              path: "src/change.js",
+              fingerprint: "file:changed",
+            },
+          ],
+        },
+      },
+    },
+  );
+  assert.throws(
+    () => selectSessionPlan(secondRoot, profile, nextRegistry, "0101-next", {
+      sessionId: "thread-mutated-baseline",
+      snapshot: {
+        ...baseline,
+        root: {
+          head: "def",
+          entries: [{
+            status: " M",
+            path: "user.txt",
+            fingerprint: "file:mutated",
+          }],
+        },
+      },
+    }),
+    /worktree changed outside lifecycle checkpoints/,
   );
 });
 
