@@ -1,10 +1,10 @@
 # PLAN: theft contested resolution
 
 - **Plan ID:** `20260731T003716Z-105e5a-theft-contested-resolution`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:37:16 UTC
-- **Обновлён:** 2026-07-31 00:37:16 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 05:31:18 UTC
+- **Владелец:** Codex `/root`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -70,20 +70,20 @@ outcome, opaque counter window and atomic ownership transfer без перечи
 
 ## Критерии приёмки
 
-- [ ] Новый immutable `moscow-core@4` добавляет только original typed theft
+- [x] Новый immutable `moscow-core@4` добавляет только original typed theft
   ability/capability; prior versions/digests unchanged.
-- [ ] Victim выбирается только из server descriptors; source ability, phase,
+- [x] Victim выбирается только из server descriptors; source ability, phase,
   cooldown/cost and victim legality revalidate under CAS.
-- [ ] Client never receives victim hand/item candidate list or chooses hidden
+- [x] Client never receives victim hand/item candidate list or chooses hidden
   target instance; engine RNG outcome persists in event.
-- [ ] Counter window uses opaque public actor set, own counter descriptors and
+- [x] Counter window uses opaque public actor set, own counter descriptors and
   30-second auto-pass; no capability timing leak.
-- [ ] Cost/counter/random transfer commit atomically or not at all; public zone
+- [x] Cost/counter/random transfer commit atomically or not at all; public zone
   result is revealed only when rule makes it public.
-- [ ] Duplicate/retry/stale/timeout and concurrent victim state change have one
+- [x] Duplicate/retry/stale/timeout and concurrent victim state change have one
   deterministic winner.
-- [ ] Replay applies exact stolen/no-op outcome without RNG.
-- [ ] Schema/validator, engine/application/HTTP/Zod and three-actor privacy
+- [x] Replay applies exact stolen/no-op outcome without RNG.
+- [x] Schema/validator, engine/application/HTTP/Zod and three-actor privacy
   tests reject arbitrary target IDs, unknown abilities and private leaks.
 
 ## Контекст и подтверждённое состояние
@@ -161,21 +161,21 @@ outcome, opaque counter window and atomic ownership transfer без перечи
 
 ## План реализации
 
-1. [ ] Add schema/validator/v4 content.
-2. [ ] Implement pure theft/counter/RNG events.
-3. [ ] Add application/projection/HTTP/Zod privacy tests.
-4. [ ] Run validators/full checks, verify/scope-check and archive.
+1. [x] Add schema/validator/v4 content.
+2. [x] Implement pure theft/counter/RNG events.
+3. [x] Add application/projection/HTTP/Zod privacy tests.
+4. [x] Run validators/full checks, verify/scope-check and archive.
 
 ## Проверки
 
-- [ ] `node content/tools/validate.mjs content/sets/moscow/v4/cards.json`
-- [ ] `node --test content/tools/validate.test.mjs`
-- [ ] `cd backend/game && go test ./...`
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T003716Z-105e5a-theft-contested-resolution`
-- [ ] `git diff --check`
+- [x] `node content/tools/validate.mjs content/sets/moscow/v4/cards.json`
+- [x] `node --test content/tools/validate.test.mjs`
+- [x] `cd backend/game && go test ./...`
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260731T003716Z-105e5a-theft-contested-resolution`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -190,16 +190,36 @@ outcome, opaque counter window and atomic ownership transfer без перечи
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:37:16 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Подготовить оставшиеся планы;
-  implementation/select/commit/push не разрешены.
+- **Подтверждено:** 2026-07-31 05:05:45 UTC
+- **Формулировка/ограничения пользователя:** пользователь явно согласовал
+  exact plan ID в очереди из девяти plans; после каждого завершённого plan
+  требуется отдельный локальный commit и переход к следующему. Push не
+  разрешён.
 
 ## Ход выполнения
 
 - Draft создан атомарно; реализация не начата.
+- Approval очереди подтверждён пользователем; predecessor
+  `20260731T003716Z-5adc34-trade-gift-and-charity-transfer` завершён commit
+  `383972a`.
+- Выполнен свежий `leinoctl context`, полностью прочитаны applicable
+  `AGENTS.md` и skill `content-pack-change`; выбран immutable boundary
+  `moscow-core@4` без изменения prior versions.
+- Добавлен `lobby-multiplayer-v3@1`, closed ability
+  `steal_random_card`, capability `counter_theft`, actor-owned descriptors,
+  30-second opaque window и persisted RNG outcome.
+- Engine/application tests покрывают counter/timeout/replay, idempotency,
+  stale version, forged foreign target/cost, cooldown и три actor-specific
+  projection без foreign-hand leak.
+- Canonical Node 24 `verify --changed` прошёл 15 checks; final scope-check:
+  `outsideWriteSet: []`, `staleChecks: []`, `missingRequiredChecks: []`.
 
 ## Итог
 
-Заполняется после реализации.
+Plan завершён. Published immutable `moscow-core@4` имеет digest
+`sha256:f7289170bf3b74ed72f81cbd4c79907f32c50a8a950e5bcc11e3689d99cb683b`;
+v1-v3 не изменены. Проверки: content/schema 29/29, contracts 17/17, web 46/46,
+полный Go suite, frontend lint/typecheck/build, plan-lint, canonical verify,
+scope-check и `git diff --check` — успешно.

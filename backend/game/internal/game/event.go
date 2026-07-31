@@ -44,6 +44,8 @@ const (
 	EventEconomyOfferResolved        = "game.v1.economy_offer_resolved"
 	EventCharityTransferStarted      = "game.v1.charity_transfer_started"
 	EventCharityAllocated            = "game.v1.charity_allocated"
+	EventTheftAttemptStarted         = "game.v1.theft_attempt_started"
+	EventTheftResolved               = "game.v1.theft_resolved"
 
 	legacyEventPlayerJoined    = "game.v1.player_joined"
 	legacyEventGameStarted     = "game.v1.game_started"
@@ -240,6 +242,8 @@ func Apply(state State, event DomainEvent) (State, error) {
 		EventEconomyOfferResolved,
 		EventCharityTransferStarted,
 		EventCharityAllocated,
+		EventTheftAttemptStarted,
+		EventTheftResolved,
 		EventRunAwayResolved,
 		EventEffectResolved,
 		EventCharityResolved,

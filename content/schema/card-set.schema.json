@@ -71,6 +71,7 @@
         "copies",
         "interaction_scope",
         "combat_capability",
+        "theft_capability",
         "rules_text",
         "flavor_text",
         "image",
@@ -334,28 +335,52 @@
       }
     },
     "ability": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "kind",
-        "amount",
-        "discard_count"
-      ],
-      "properties": {
-        "kind": {
-          "const": "discard_for_combat"
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "amount",
+            "discard_count"
+          ],
+          "properties": {
+            "kind": {
+              "const": "discard_for_combat"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "discard_count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          }
         },
-        "amount": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 20
-        },
-        "discard_count": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 5
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "discard_count",
+            "cooldown_turns"
+          ],
+          "properties": {
+            "kind": {
+              "const": "steal_random_card"
+            },
+            "discard_count": {
+              "const": 1
+            },
+            "cooldown_turns": {
+              "const": 1
+            }
+          }
         }
-      }
+      ]
     },
     "effect": {
       "type": "object",
@@ -682,6 +707,18 @@
         }
       ]
     },
+    "theftCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "counter_theft"
+        }
+      }
+    },
     "monster": {
       "type": "object",
       "additionalProperties": false,
@@ -863,6 +900,9 @@
         },
         "combat_capability": {
           "$ref": "#/$defs/combatCapability"
+        },
+        "theft_capability": {
+          "$ref": "#/$defs/theftCapability"
         },
         "rules_text": {
           "type": "string",

@@ -1383,6 +1383,37 @@ func TestCombatHelpProjectionFixtureIsStrictPartyContract(t *testing.T) {
 	}
 }
 
+func TestTheftRouteRejectsClientSelectedHiddenTarget(t *testing.T) {
+	_, server := testRouter(t)
+	response := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/game/commands/attempt-theft",
+		"",
+		"theft-hidden-target",
+		map[string]any{
+			"expected_version":   1,
+			"source_instance_id": "source-1",
+			"ability_index":      0,
+			"cost_instance_ids":  []string{"own-cost-1"},
+			"victim_player_id":   "player-b",
+			"target_instance_id": "foreign-hidden-1",
+		},
+	)
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf(
+			"hidden theft target status=%d",
+			response.StatusCode,
+		)
+	}
+	var body map[string]any
+	decodeResponse(t, response, &body)
+	if body["code"] != "invalid_request" {
+		t.Fatalf("hidden theft target response=%#v", body)
+	}
+}
+
 func requestJSON(
 	t *testing.T,
 	client *http.Client,

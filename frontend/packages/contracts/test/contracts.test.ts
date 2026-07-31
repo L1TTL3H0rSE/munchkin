@@ -16,6 +16,7 @@ import {
   studioCompileRequestSchema,
   studioGenerateRequestSchema,
   studioJobSchema,
+  theftRequestSchema,
 } from "../src/index";
 
 const item = {
@@ -174,6 +175,58 @@ describe("wire contracts", () => {
         recipient_player_id: "player_b",
         recipient_hand: ["secret"],
       }],
+    })).toThrow();
+  });
+
+  it("keeps theft victim public and hidden selection server-only", () => {
+    expect(theftRequestSchema.parse({
+      expected_version: 14,
+      source_instance_id: "theft-class-1",
+      ability_index: 0,
+      cost_instance_ids: ["own-cost-1"],
+      victim_player_id: "player_b",
+    }).victim_player_id).toBe("player_b");
+    expect(() => theftRequestSchema.parse({
+      expected_version: 14,
+      source_instance_id: "theft-class-1",
+      ability_index: 0,
+      cost_instance_ids: ["own-cost-1"],
+      victim_player_id: "player_b",
+      target_instance_id: "foreign-secret-1",
+    })).toThrow();
+    const theft = projectionSchema.parse({
+      ...projection,
+      rules_profile_id: "lobby-multiplayer-v3",
+      turn: {...projection.turn, phase: "preparation"},
+      interaction: {
+        interaction_id: "interaction-theft",
+        public_kind: "theft_response",
+        parent_phase: "preparation",
+        public_subject: "current_turn",
+        status: "open",
+        deadline_at: "2026-07-31T10:00:30.000Z",
+        server_time: "2026-07-31T10:00:00.000Z",
+        my_response_state: "pending",
+        response_required_for_you: true,
+        actions: [{
+          action_id: `act_${"b".repeat(32)}`,
+          interaction_id: "interaction-theft",
+          revision: 1,
+          type: "respond",
+          source_instance_id: "own-counter-1",
+          theft_capability: "counter_theft",
+        }],
+      },
+    });
+    expect(
+      theft.interaction?.actions[0]?.theft_capability,
+    ).toBe("counter_theft");
+    expect(() => projectionSchema.parse({
+      ...theft,
+      interaction: {
+        ...theft.interaction,
+        victim_hand: ["foreign-secret-1"],
+      },
     })).toThrow();
   });
 

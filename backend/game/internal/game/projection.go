@@ -130,6 +130,7 @@ type InteractionActionView struct {
 	Target                  EffectTarget         `json:"target,omitempty"`
 	CombatDelta             int                  `json:"combat_delta,omitempty"`
 	CombatCapability        CombatCapabilityKind `json:"combat_capability,omitempty"`
+	TheftCapability         TheftCapabilityKind  `json:"theft_capability,omitempty"`
 	TargetMonsterInstanceID string               `json:"target_monster_instance_id,omitempty"`
 	TargetEffectID          string               `json:"target_effect_id,omitempty"`
 	HelperPlayerID          string               `json:"helper_player_id,omitempty"`
@@ -469,6 +470,12 @@ func projectInteraction(
 	if domainCharityTransfer {
 		publicKind = "charity_transfer"
 	}
+	domainTheftResponse := profile.Theft &&
+		window.Kind == InteractionKindTheftResponse &&
+		state.TheftAttempt != nil
+	if domainTheftResponse {
+		publicKind = "theft_response"
+	}
 	view := &InteractionView{
 		InteractionID: window.ID,
 		PublicKind:    publicKind,
@@ -628,6 +635,40 @@ func projectInteraction(
 	}
 	if domainCharityTransfer {
 		return view, nil
+	}
+	if domainTheftResponse {
+		playerIndex := state.PlayerIndex(actorID)
+		for _, instanceID := range state.Players[playerIndex].Hand {
+			card, _, exists := pack.DefinitionForInstance(
+				state,
+				instanceID,
+			)
+			if !exists {
+				return nil, fmt.Errorf(
+					"%w: theft counter source %s",
+					ErrUnknownCard,
+					instanceID,
+				)
+			}
+			if card.TheftCapability == nil ||
+				card.TheftCapability.Kind != TheftCapabilityCounter {
+				continue
+			}
+			view.Actions = append(view.Actions, InteractionActionView{
+				ActionID: theftInteractionActionID(
+					window.ID,
+					actorID,
+					instanceID,
+					card.TheftCapability.Kind,
+					state.Version,
+				),
+				InteractionID:    window.ID,
+				Revision:         window.DeadlineRevision,
+				Type:             InteractionIntentRespond,
+				SourceInstanceID: instanceID,
+				TheftCapability:  card.TheftCapability.Kind,
+			})
+		}
 	}
 	if domainTargetResponse &&
 		!state.Turn.TargetEffect.Countered {
@@ -972,6 +1013,23 @@ func advancedCombatActionID(
 			sourceInstanceID + "\x00" +
 			string(capability) + "\x00" +
 			targetKey + "\x00" +
+			strconv.FormatUint(version, 10),
+	))
+	return fmt.Sprintf("act_%x", digest[:16])
+}
+
+func theftInteractionActionID(
+	interactionID string,
+	actorID string,
+	sourceInstanceID string,
+	capability TheftCapabilityKind,
+	version uint64,
+) string {
+	digest := sha256.Sum256([]byte(
+		interactionID + "\x00" +
+			actorID + "\x00" +
+			sourceInstanceID + "\x00" +
+			string(capability) + "\x00" +
 			strconv.FormatUint(version, 10),
 	))
 	return fmt.Sprintf("act_%x", digest[:16])
@@ -1481,6 +1539,53 @@ func projectActions(
 		}
 		if err := addEconomyActions(); err != nil {
 			return nil, err
+		}
+		if profile.Theft && !state.Turn.TheftUsed && len(player.Hand) > 0 {
+			targets := make([]string, 0, len(state.Players)-1)
+			for index, candidate := range state.Players {
+				if index != playerIndex &&
+					!candidate.Dead &&
+					len(candidate.Hand) > 0 {
+					targets = append(targets, candidate.ID)
+				}
+			}
+			if len(targets) > 0 {
+				for _, sourceID := range player.Traits {
+					card, _, exists := pack.DefinitionForInstance(
+						state,
+						sourceID,
+					)
+					if !exists {
+						return nil, fmt.Errorf(
+							"%w: theft source %s",
+							ErrUnknownCard,
+							sourceID,
+						)
+					}
+					for abilityIndex, ability := range card.Abilities {
+						if ability.Kind != AbilityStealRandomCard ||
+							ability.DiscardCount != 1 ||
+							ability.CooldownTurns != 1 {
+							continue
+						}
+						actions = append(actions, ActionView{
+							Type:             CommandAttemptTheft,
+							SourceInstanceID: sourceID,
+							InstanceIDs: append(
+								[]string(nil),
+								player.Hand...,
+							),
+							TargetPlayerIDs: append(
+								[]string(nil),
+								targets...,
+							),
+							Minimum:      1,
+							Maximum:      1,
+							AbilityIndex: abilityIndex,
+						})
+					}
+				}
+			}
 		}
 		actions = append(actions, ActionView{Type: CommandOpenDoor})
 	case PhaseDoorChoice:

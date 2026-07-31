@@ -15,6 +15,8 @@ const (
 	LobbyMultiplayerProfileVersion = 1
 	AdvancedCombatProfileID        = "lobby-multiplayer-v2"
 	AdvancedCombatProfileVersion   = 1
+	TheftProfileID                 = "lobby-multiplayer-v3"
+	TheftProfileVersion            = 1
 	MinPlayers                     = 1
 	MaxPlayers                     = 6
 	WinningLevel                   = 10
@@ -43,6 +45,7 @@ type RulesProfile struct {
 	AdvancedCombat       bool   `json:"advanced_combat"`
 	TargetAndRunAway     bool   `json:"target_and_run_away"`
 	PlayerEconomy        bool   `json:"player_economy"`
+	Theft                bool   `json:"theft"`
 }
 
 func FirstEditionCoreProfile() RulesProfile {
@@ -77,6 +80,14 @@ func AdvancedCombatProfile() RulesProfile {
 	return profile
 }
 
+func TheftProfile() RulesProfile {
+	profile := AdvancedCombatProfile()
+	profile.ID = TheftProfileID
+	profile.Version = TheftProfileVersion
+	profile.Theft = true
+	return profile
+}
+
 func (profile RulesProfile) Validate() error {
 	expected, ok := rulesProfile(profile.ID, profile.Version)
 	if !ok || profile != expected {
@@ -96,6 +107,9 @@ func rulesProfile(id string, version int) (RulesProfile, bool) {
 	case id == AdvancedCombatProfileID &&
 		version == AdvancedCombatProfileVersion:
 		return AdvancedCombatProfile(), true
+	case id == TheftProfileID &&
+		version == TheftProfileVersion:
+		return TheftProfile(), true
 	default:
 		return RulesProfile{}, false
 	}
@@ -235,6 +249,7 @@ const (
 	InteractionKindRunAwayResponse   InteractionKind = "run_away_response"
 	InteractionKindEconomyOffer      InteractionKind = "economy_offer"
 	InteractionKindCharityTransfer   InteractionKind = "charity_transfer"
+	InteractionKindTheftResponse     InteractionKind = "theft_response"
 )
 
 type InteractionSubjectKind string
@@ -395,6 +410,29 @@ type CharityTransfer struct {
 	Completed            bool                `json:"completed"`
 }
 
+type TheftAttempt struct {
+	InteractionID     string   `json:"interaction_id"`
+	ThiefPlayerID     string   `json:"thief_player_id"`
+	VictimPlayerID    string   `json:"victim_player_id"`
+	SourceInstanceID  string   `json:"source_instance_id"`
+	AbilityIndex      int      `json:"ability_index"`
+	CostInstanceIDs   []string `json:"cost_instance_ids"`
+	ParentPhase       Phase    `json:"parent_phase"`
+	CounteredBy       string   `json:"countered_by,omitempty"`
+	CounterInstanceID string   `json:"counter_instance_id,omitempty"`
+	StolenInstanceID  string   `json:"stolen_instance_id,omitempty"`
+	Resolved          bool     `json:"resolved"`
+}
+
+func (attempt TheftAttempt) clone() *TheftAttempt {
+	clone := attempt
+	clone.CostInstanceIDs = append(
+		[]string(nil),
+		attempt.CostInstanceIDs...,
+	)
+	return &clone
+}
+
 func (transfer CharityTransfer) clone() *CharityTransfer {
 	clone := transfer
 	clone.StableHandOrder = append(
@@ -469,6 +507,7 @@ type Turn struct {
 	Pending      *PendingDecision   `json:"pending,omitempty"`
 	TargetEffect *TargetEffectState `json:"target_effect,omitempty"`
 	RunAway      *RunAwaySequence   `json:"run_away,omitempty"`
+	TheftUsed    bool               `json:"theft_used,omitempty"`
 }
 
 type TargetEffectState struct {
@@ -568,6 +607,7 @@ type State struct {
 	CombatHelpOffer            *CombatHelpOffer        `json:"combat_help_offer,omitempty"`
 	EconomyOffer               *EconomyOffer           `json:"economy_offer,omitempty"`
 	CharityTransfer            *CharityTransfer        `json:"charity_transfer,omitempty"`
+	TheftAttempt               *TheftAttempt           `json:"theft_attempt,omitempty"`
 }
 
 func (state State) Clone() State {
@@ -626,6 +666,9 @@ func (state State) Clone() State {
 	}
 	if state.CharityTransfer != nil {
 		clone.CharityTransfer = state.CharityTransfer.clone()
+	}
+	if state.TheftAttempt != nil {
+		clone.TheftAttempt = state.TheftAttempt.clone()
 	}
 	return clone
 }
@@ -750,9 +793,96 @@ func (state State) Validate() error {
 	if err := state.validatePlayerEconomy(); err != nil {
 		return err
 	}
+	if err := state.validateTheft(); err != nil {
+		return err
+	}
 	if state.Status != StatusLobby {
 		if err := state.validateInstanceZones(); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (state State) validateTheft() error {
+	profile, err := state.Profile()
+	if err != nil {
+		return err
+	}
+	if !profile.Theft {
+		if state.TheftAttempt != nil {
+			return fmt.Errorf(
+				"%w: theft requires an enabled profile",
+				ErrIllegalCommand,
+			)
+		}
+		return nil
+	}
+	attempt := state.TheftAttempt
+	window := state.InteractionWindow
+	if attempt == nil {
+		if window != nil &&
+			window.Status == InteractionWindowOpen &&
+			window.Kind == InteractionKindTheftResponse {
+			return fmt.Errorf(
+				"%w: theft response window lacks attempt",
+				ErrIllegalCommand,
+			)
+		}
+		return nil
+	}
+	thiefIndex := state.PlayerIndex(attempt.ThiefPlayerID)
+	victimIndex := state.PlayerIndex(attempt.VictimPlayerID)
+	if attempt.InteractionID == "" ||
+		attempt.Resolved ||
+		thiefIndex < 0 ||
+		victimIndex < 0 ||
+		thiefIndex == victimIndex ||
+		state.Players[thiefIndex].Dead ||
+		state.Players[victimIndex].Dead ||
+		attempt.ThiefPlayerID != state.Turn.PlayerID ||
+		attempt.ParentPhase != PhasePreparation ||
+		state.Turn.Phase != attempt.ParentPhase ||
+		!state.Turn.TheftUsed ||
+		len(attempt.CostInstanceIDs) != 1 ||
+		!uniqueStrings(attempt.CostInstanceIDs) ||
+		!slices.Contains(
+			state.Players[thiefIndex].Traits,
+			attempt.SourceInstanceID,
+		) ||
+		!slices.Contains(
+			state.Players[thiefIndex].Hand,
+			attempt.CostInstanceIDs[0],
+		) ||
+		len(state.Players[victimIndex].Hand) == 0 ||
+		window == nil ||
+		window.ID != attempt.InteractionID ||
+		window.Kind != InteractionKindTheftResponse ||
+		window.InitiatorActorID != attempt.ThiefPlayerID ||
+		window.EligibilityPolicy != InteractionEligibilityOpaquePublicSet {
+		return fmt.Errorf(
+			"%w: malformed active theft attempt",
+			ErrIllegalCommand,
+		)
+	}
+	if attempt.AbilityIndex < 0 ||
+		(window.Status != InteractionWindowOpen &&
+			window.Status != InteractionWindowClosed) ||
+		len(window.EligibleActorIDs) != len(window.Responses) {
+		return fmt.Errorf(
+			"%w: malformed theft descriptors",
+			ErrIllegalCommand,
+		)
+	}
+	for _, actorID := range window.EligibleActorIDs {
+		index := state.PlayerIndex(actorID)
+		if index < 0 ||
+			state.Players[index].Dead ||
+			actorID == attempt.ThiefPlayerID {
+			return fmt.Errorf(
+				"%w: malformed theft eligible actor",
+				ErrIllegalCommand,
+			)
 		}
 	}
 	return nil
@@ -1730,7 +1860,8 @@ func validInteractionKind(kind InteractionKind) bool {
 		InteractionKindTargetResponse,
 		InteractionKindRunAwayResponse,
 		InteractionKindEconomyOffer,
-		InteractionKindCharityTransfer:
+		InteractionKindCharityTransfer,
+		InteractionKindTheftResponse:
 		return true
 	default:
 		return false

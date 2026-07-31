@@ -27,6 +27,7 @@ const CARD_KEYS = new Set([
   "effects",
   "abilities",
   "combat_capability",
+  "theft_capability",
   "rules_text",
   "flavor_text",
   "image",
@@ -72,8 +73,14 @@ const EFFECT_KEYS = new Set([
   "persistent",
   "can_win",
 ]);
-const ABILITY_KEYS = new Set(["kind", "amount", "discard_count"]);
+const ABILITY_KEYS = new Set([
+  "kind",
+  "amount",
+  "discard_count",
+  "cooldown_turns",
+]);
 const COMBAT_CAPABILITY_KEYS = new Set(["kind", "amount"]);
+const THEFT_CAPABILITY_KEYS = new Set(["kind"]);
 const COMBAT_CAPABILITY_KINDS = new Set([
   "add_monster",
   "enhance_monster",
@@ -416,11 +423,25 @@ function validateAbilities(abilities, label) {
   abilities.forEach((ability, index) => {
     const current = `${label}[${index}]`;
     rejectUnknown(ability, ABILITY_KEYS, current);
-    if (ability.kind !== "discard_for_combat") {
-      fail(`${current}.kind is not registered`);
+    switch (ability.kind) {
+      case "discard_for_combat":
+        integer(ability.amount, `${current}.amount`, 1, 20);
+        integer(ability.discard_count, `${current}.discard_count`, 1, 5);
+        if (ability.cooldown_turns !== undefined) {
+          fail(`${current}.cooldown_turns is not allowed`);
+        }
+        break;
+      case "steal_random_card":
+        if (ability.amount !== undefined) {
+          fail(`${current}.amount is not allowed`);
+        }
+        if (ability.discard_count !== 1 || ability.cooldown_turns !== 1) {
+          fail(`${current} must use one-card cost and one-turn cooldown`);
+        }
+        break;
+      default:
+        fail(`${current}.kind is not registered`);
     }
-    integer(ability.amount, `${current}.amount`, 1, 20);
-    integer(ability.discard_count, `${current}.discard_count`, 1, 5);
   });
 }
 
@@ -496,6 +517,7 @@ function noSpecs(card, label, allowed) {
     "effects",
     "abilities",
     "combat_capability",
+    "theft_capability",
   ]) {
     if (!allowed.has(key) && card[key] !== undefined) {
       fail(`${label}.${key} is not allowed for kind ${card.kind}`);
@@ -540,6 +562,21 @@ function validateCombatCapability(card, label) {
   }
 }
 
+function validateTheftCapability(card, label) {
+  const capability = card.theft_capability;
+  if (capability === undefined) {
+    return;
+  }
+  rejectUnknown(capability, THEFT_CAPABILITY_KEYS, `${label}.theft_capability`);
+  if (capability.kind !== "counter_theft" ||
+    card.interaction_scope !== "other_players" ||
+    card.kind !== "one_shot" ||
+    card.deck !== "treasure" ||
+    card.combat_capability !== undefined) {
+    fail(`${label} has an invalid theft capability`);
+  }
+}
+
 function validateCard(card, index) {
   const label = `cards[${index}]`;
   rejectUnknown(card, CARD_KEYS, label);
@@ -568,7 +605,12 @@ function validateCard(card, index) {
     fail(`${cardID}.image is required with alt_text`);
   }
   validateAbilities(card.abilities, `${cardID}.abilities`);
+  if (card.abilities?.some((ability) => ability.kind === "steal_random_card") &&
+    (card.kind !== "class" || card.interaction_scope !== "other_players")) {
+    fail(`${cardID} theft ability requires an other_players class`);
+  }
   validateCombatCapability(card, cardID);
+  validateTheftCapability(card, cardID);
   switch (card.kind) {
     case "monster":
       if (card.deck !== "door") {
@@ -628,7 +670,11 @@ function validateCard(card, index) {
       if (card.deck !== "treasure") {
         fail(`${cardID} one-shot must use treasure deck`);
       }
-      noSpecs(card, cardID, new Set(["effects", "combat_capability"]));
+      noSpecs(
+        card,
+        cardID,
+        new Set(["effects", "combat_capability", "theft_capability"]),
+      );
       validateEffects(card.effects, `${cardID}.effects`, true);
       if (card.effects.some((effect) =>
         effect.persistent === true ||

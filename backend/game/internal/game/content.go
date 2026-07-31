@@ -137,12 +137,14 @@ type AbilityKind string
 
 const (
 	AbilityDiscardForCombat AbilityKind = "discard_for_combat"
+	AbilityStealRandomCard  AbilityKind = "steal_random_card"
 )
 
 type Ability struct {
-	Kind         AbilityKind `json:"kind"`
-	Amount       int         `json:"amount"`
-	DiscardCount int         `json:"discard_count"`
+	Kind          AbilityKind `json:"kind"`
+	Amount        int         `json:"amount,omitempty"`
+	DiscardCount  int         `json:"discard_count"`
+	CooldownTurns int         `json:"cooldown_turns,omitempty"`
 }
 
 type SelectorKind string
@@ -204,6 +206,16 @@ type CombatCapability struct {
 	Amount int                  `json:"amount,omitempty"`
 }
 
+type TheftCapabilityKind string
+
+const (
+	TheftCapabilityCounter TheftCapabilityKind = "counter_theft"
+)
+
+type TheftCapability struct {
+	Kind TheftCapabilityKind `json:"kind"`
+}
+
 type MonsterSpec struct {
 	Strength                int        `json:"strength"`
 	Treasures               int        `json:"treasures"`
@@ -230,6 +242,7 @@ type Card struct {
 	Effects          []Effect          `json:"effects,omitempty"`
 	Abilities        []Ability         `json:"abilities,omitempty"`
 	CombatCapability *CombatCapability `json:"combat_capability,omitempty"`
+	TheftCapability  *TheftCapability  `json:"theft_capability,omitempty"`
 	RulesText        string            `json:"rules_text,omitempty"`
 	FlavorText       string            `json:"flavor_text,omitempty"`
 	Image            string            `json:"image,omitempty"`
@@ -560,12 +573,36 @@ func validateCard(card Card) error {
 	if err := validateCombatCapability(card); err != nil {
 		return err
 	}
+	if err := validateTheftCapability(card); err != nil {
+		return err
+	}
 	for _, ability := range card.Abilities {
-		if ability.Kind != AbilityDiscardForCombat ||
-			ability.Amount < 1 ||
-			ability.Amount > 20 ||
-			ability.DiscardCount < 1 ||
-			ability.DiscardCount > 5 {
+		switch ability.Kind {
+		case AbilityDiscardForCombat:
+			if ability.Amount < 1 ||
+				ability.Amount > 20 ||
+				ability.DiscardCount < 1 ||
+				ability.DiscardCount > 5 ||
+				ability.CooldownTurns != 0 {
+				return fmt.Errorf(
+					"%w: card %s has invalid ability",
+					ErrInvalidContent,
+					card.ID,
+				)
+			}
+		case AbilityStealRandomCard:
+			if card.Kind != CardClass ||
+				card.InteractionScope != InteractionOtherPlayers ||
+				ability.Amount != 0 ||
+				ability.DiscardCount != 1 ||
+				ability.CooldownTurns != 1 {
+				return fmt.Errorf(
+					"%w: card %s has invalid theft ability",
+					ErrInvalidContent,
+					card.ID,
+				)
+			}
+		default:
 			return fmt.Errorf("%w: card %s has invalid ability", ErrInvalidContent, card.ID)
 		}
 	}
@@ -732,6 +769,25 @@ func validateCombatCapability(card Card) error {
 			"%w: unknown combat capability %q on %s",
 			ErrInvalidContent,
 			capability.Kind,
+			card.ID,
+		)
+	}
+	return nil
+}
+
+func validateTheftCapability(card Card) error {
+	capability := card.TheftCapability
+	if capability == nil {
+		return nil
+	}
+	if card.InteractionScope != InteractionOtherPlayers ||
+		card.Kind != CardOneShot ||
+		card.Deck != DeckTreasure ||
+		card.CombatCapability != nil ||
+		capability.Kind != TheftCapabilityCounter {
+		return fmt.Errorf(
+			"%w: invalid theft capability on %s",
+			ErrInvalidContent,
 			card.ID,
 		)
 	}

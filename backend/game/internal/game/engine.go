@@ -51,6 +51,9 @@ const (
 	CommandRespondEconomyOffer      CommandType = "respond_economy_offer"
 	CommandCancelEconomyOffer       CommandType = "cancel_economy_offer"
 	CommandBeginCharityTransfer     CommandType = "begin_charity_transfer"
+	CommandAttemptTheft             CommandType = "attempt_theft"
+	CommandCounterTheft             CommandType = "counter_theft"
+	CommandResolveTheft             CommandType = "resolve_theft"
 
 	// Bootstrap aliases remain parseable, but use the new deterministic paths.
 	CommandFight CommandType = "fight"
@@ -85,7 +88,9 @@ type Command struct {
 
 func CreateLobby(gameID string, owner Player, pack Pack, seed uint64) (DomainEvent, error) {
 	profile := LobbyMultiplayerProfile()
-	if pack.SetID == "moscow-core" && pack.Version == 3 {
+	if pack.SetID == "moscow-core" && pack.Version == 4 {
+		profile = TheftProfile()
+	} else if pack.SetID == "moscow-core" && pack.Version == 3 {
 		profile = AdvancedCombatProfile()
 	}
 	return CreateLobbyWithProfile(
@@ -231,6 +236,12 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 		return handleCancelEconomyOffer(state, command)
 	case CommandBeginCharityTransfer:
 		return handleBeginCharityTransfer(state, command, pack)
+	case CommandAttemptTheft:
+		return handleAttemptTheft(state, command, pack)
+	case CommandCounterTheft:
+		return handleCounterTheft(state, command, pack)
+	case CommandResolveTheft:
+		return handleResolveTheft(state, command, pack)
 	default:
 		return nil, fmt.Errorf("%w: unknown command %s", ErrIllegalCommand, command.Type)
 	}
@@ -335,7 +346,8 @@ func recordInteractionResponse(
 		window.Parent.SubjectKind == InteractionSubjectEncounter ||
 		window.Kind == InteractionKindTargetResponse ||
 		window.Kind == InteractionKindRunAwayResponse ||
-		window.Kind == InteractionKindPrivateChoice
+		window.Kind == InteractionKindPrivateChoice ||
+		window.Kind == InteractionKindTheftResponse
 	if !timeout &&
 		revisionBound &&
 		command.InteractionRevision != window.DeadlineRevision {
@@ -1131,6 +1143,9 @@ func appendCombatContinuation(
 	case InteractionKindRunAwayResponse:
 		command.Type = CommandResolveRunAwayStep
 		continued, err = handleResolveRunAwayStep(state, command, pack)
+	case InteractionKindTheftResponse:
+		command.Type = CommandResolveTheft
+		continued, err = handleResolveTheft(state, command, pack)
 	default:
 		return events, nil
 	}
@@ -1257,6 +1272,44 @@ func handleStart(state State, command Command, pack Pack) ([]DomainEvent, error)
 	instances, doors, treasures, err := materializeSelectedProfile(pack, profile)
 	if err != nil {
 		return nil, err
+	}
+	if profile.Theft {
+		for _, card := range pack.Cards {
+			theftDefinition := card.TheftCapability != nil
+			for _, ability := range card.Abilities {
+				theftDefinition = theftDefinition ||
+					ability.Kind == AbilityStealRandomCard
+			}
+			if !theftDefinition {
+				continue
+			}
+			for copyIndex := 1; copyIndex <= card.Copies; copyIndex++ {
+				instanceID := fmt.Sprintf(
+					"%s-%d",
+					card.ID,
+					copyIndex,
+				)
+				if _, exists := instances[instanceID]; exists {
+					continue
+				}
+				instances[instanceID] = CardInstance{
+					ID:           instanceID,
+					DefinitionID: card.ID,
+				}
+				switch card.Deck {
+				case DeckDoor:
+					doors = append(doors, instanceID)
+				case DeckTreasure:
+					treasures = append(treasures, instanceID)
+				default:
+					return nil, fmt.Errorf(
+						"%w: theft card %s has invalid deck",
+						ErrInvalidContent,
+						card.ID,
+					)
+				}
+			}
+		}
 	}
 	doors, rngState := shuffle(doors, state.RNGState)
 	treasures, rngState = shuffle(treasures, rngState)
@@ -3162,6 +3215,300 @@ func handleResolveCharity(state State, command Command, pack Pack) ([]DomainEven
 	}
 	setTurnPhase(&next, PhaseEndTurn)
 	return transition(EventCharityResolved, command, next, nil)
+}
+
+func handleAttemptTheft(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	thiefIndex, err := requirePhase(state, command, PhasePreparation)
+	if err != nil {
+		return nil, err
+	}
+	if !profile.Theft ||
+		state.Turn.TheftUsed ||
+		state.TheftAttempt != nil ||
+		state.InteractionWindow != nil &&
+			state.InteractionWindow.Status == InteractionWindowOpen ||
+		command.InteractionID == "" ||
+		command.InteractionAt.IsZero() ||
+		command.TargetPlayerID == "" ||
+		command.TargetPlayerID == command.ActorID ||
+		command.TargetInstanceID != "" ||
+		len(command.RequestedInstanceIDs) != 0 ||
+		len(command.ChoiceIDs) != 0 ||
+		len(command.InstanceIDs) != 1 ||
+		!uniqueStrings(command.InstanceIDs) {
+		return nil, fmt.Errorf(
+			"%w: theft is not available",
+			ErrIllegalCommand,
+		)
+	}
+	if !slices.Contains(
+		state.Players[thiefIndex].Traits,
+		command.InstanceID,
+	) || !slices.Contains(
+		state.Players[thiefIndex].Hand,
+		command.InstanceIDs[0],
+	) {
+		return nil, fmt.Errorf(
+			"%w: theft source or cost is not actor-owned",
+			ErrIllegalCommand,
+		)
+	}
+	source, _, exists := pack.DefinitionForInstance(
+		state,
+		command.InstanceID,
+	)
+	if !exists ||
+		command.AbilityIndex < 0 ||
+		command.AbilityIndex >= len(source.Abilities) {
+		return nil, fmt.Errorf(
+			"%w: theft source ability is unavailable",
+			ErrIllegalCommand,
+		)
+	}
+	ability := source.Abilities[command.AbilityIndex]
+	if ability.Kind != AbilityStealRandomCard ||
+		ability.DiscardCount != 1 ||
+		ability.CooldownTurns != 1 {
+		return nil, fmt.Errorf(
+			"%w: theft ability is not registered",
+			ErrIllegalCommand,
+		)
+	}
+	victimIndex := state.PlayerIndex(command.TargetPlayerID)
+	if victimIndex < 0 ||
+		state.Players[victimIndex].Dead ||
+		len(state.Players[victimIndex].Hand) == 0 {
+		return nil, fmt.Errorf(
+			"%w: theft victim is unavailable",
+			ErrIllegalCommand,
+		)
+	}
+	attempt := TheftAttempt{
+		InteractionID:    command.InteractionID,
+		ThiefPlayerID:    command.ActorID,
+		VictimPlayerID:   command.TargetPlayerID,
+		SourceInstanceID: command.InstanceID,
+		AbilityIndex:     command.AbilityIndex,
+		CostInstanceIDs: append(
+			[]string(nil),
+			command.InstanceIDs...,
+		),
+		ParentPhase: PhasePreparation,
+	}
+	window, err := theftResponseWindow(
+		state,
+		attempt,
+		command.InteractionAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	next := state.Clone()
+	next.Turn.TheftUsed = true
+	next.TheftAttempt = attempt.clone()
+	next.InteractionWindow = window
+	return transition(EventTheftAttemptStarted, command, next, nil)
+}
+
+func handleCounterTheft(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	window, err := requireInteractionWindow(
+		state,
+		command.InteractionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	attempt := state.TheftAttempt
+	if attempt == nil ||
+		window.Kind != InteractionKindTheftResponse ||
+		command.InteractionRevision != window.DeadlineRevision ||
+		command.InteractionAt.IsZero() ||
+		!command.InteractionAt.Before(window.DeadlineAt) ||
+		command.ActorID == attempt.ThiefPlayerID {
+		return nil, fmt.Errorf(
+			"%w: stale theft counter",
+			ErrIllegalCommand,
+		)
+	}
+	response, eligible := window.Responses[command.ActorID]
+	counterIndex := state.PlayerIndex(command.ActorID)
+	if !eligible ||
+		response.State != InteractionResponsePending ||
+		counterIndex < 0 ||
+		!slices.Contains(
+			state.Players[counterIndex].Hand,
+			command.InstanceID,
+		) {
+		return nil, fmt.Errorf(
+			"%w: theft counter is not actor-owned",
+			ErrIllegalCommand,
+		)
+	}
+	card, _, exists := pack.DefinitionForInstance(
+		state,
+		command.InstanceID,
+	)
+	if !exists ||
+		card.TheftCapability == nil ||
+		card.TheftCapability.Kind != TheftCapabilityCounter {
+		return nil, fmt.Errorf(
+			"%w: theft counter capability is unavailable",
+			ErrIllegalCommand,
+		)
+	}
+	return settleTheft(
+		state,
+		command,
+		pack,
+		command.ActorID,
+		command.InstanceID,
+	)
+}
+
+func handleResolveTheft(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	attempt := state.TheftAttempt
+	window := state.InteractionWindow
+	if attempt == nil ||
+		window == nil ||
+		window.ID != attempt.InteractionID ||
+		window.Kind != InteractionKindTheftResponse ||
+		window.Status != InteractionWindowClosed ||
+		command.InteractionID != window.ID {
+		return nil, fmt.Errorf(
+			"%w: theft resolution is not ready",
+			ErrIllegalCommand,
+		)
+	}
+	return settleTheft(state, command, pack, "", "")
+}
+
+func settleTheft(
+	state State,
+	command Command,
+	pack Pack,
+	counterPlayerID string,
+	counterInstanceID string,
+) ([]DomainEvent, error) {
+	attempt := state.TheftAttempt
+	if attempt == nil {
+		return nil, fmt.Errorf(
+			"%w: theft attempt is missing",
+			ErrIllegalCommand,
+		)
+	}
+	thiefIndex := state.PlayerIndex(attempt.ThiefPlayerID)
+	victimIndex := state.PlayerIndex(attempt.VictimPlayerID)
+	if thiefIndex < 0 ||
+		victimIndex < 0 ||
+		len(attempt.CostInstanceIDs) != 1 ||
+		!slices.Contains(
+			state.Players[thiefIndex].Hand,
+			attempt.CostInstanceIDs[0],
+		) ||
+		len(state.Players[victimIndex].Hand) == 0 {
+		return nil, fmt.Errorf(
+			"%w: theft clauses changed before settlement",
+			ErrIllegalCommand,
+		)
+	}
+	source, _, exists := pack.DefinitionForInstance(
+		state,
+		attempt.SourceInstanceID,
+	)
+	if !exists ||
+		attempt.AbilityIndex < 0 ||
+		attempt.AbilityIndex >= len(source.Abilities) ||
+		source.Abilities[attempt.AbilityIndex].Kind !=
+			AbilityStealRandomCard {
+		return nil, fmt.Errorf(
+			"%w: theft source changed before settlement",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	if err := discardOwnedInstance(
+		&next,
+		thiefIndex,
+		attempt.CostInstanceIDs[0],
+		pack,
+	); err != nil {
+		return nil, err
+	}
+	var outcomes []RandomOutcome
+	if counterPlayerID != "" {
+		counterIndex := next.PlayerIndex(counterPlayerID)
+		if counterIndex < 0 ||
+			!slices.Contains(
+				next.Players[counterIndex].Hand,
+				counterInstanceID,
+			) {
+			return nil, fmt.Errorf(
+				"%w: theft counter changed before settlement",
+				ErrIllegalCommand,
+			)
+		}
+		if err := discardOwnedInstance(
+			&next,
+			counterIndex,
+			counterInstanceID,
+			pack,
+		); err != nil {
+			return nil, err
+		}
+	} else {
+		value, rngState := nextRandom(next.RNGState)
+		next.RNGState = rngState
+		victimHand := next.Players[victimIndex].Hand
+		selectedIndex := int(value % uint64(len(victimHand)))
+		stolenInstanceID := victimHand[selectedIndex]
+		var removed bool
+		next.Players[victimIndex].Hand, removed = removeString(
+			victimHand,
+			stolenInstanceID,
+		)
+		if !removed {
+			return nil, fmt.Errorf(
+				"%w: theft selection disappeared",
+				ErrIllegalCommand,
+			)
+		}
+		next.Players[thiefIndex].Hand = append(
+			next.Players[thiefIndex].Hand,
+			stolenInstanceID,
+		)
+		outcomes = append(outcomes, RandomOutcome{
+			Kind:  "theft",
+			Order: []string{stolenInstanceID},
+		})
+	}
+	if next.InteractionWindow.Status == InteractionWindowOpen {
+		response := next.InteractionWindow.Responses[counterPlayerID]
+		response.State = InteractionResponseActed
+		response.Intent = InteractionIntentRespond
+		response.AcceptedAt = command.InteractionAt
+		next.InteractionWindow.Responses[counterPlayerID] = response
+		next.InteractionWindow.Status = InteractionWindowClosed
+		next.InteractionWindow.CloseReason = InteractionCloseSuperseded
+		next.InteractionWindow.ClosedAt = command.InteractionAt
+	}
+	next.TheftAttempt = nil
+	return transition(EventTheftResolved, command, next, outcomes)
 }
 
 func handleEndTurn(state State, command Command, pack Pack) ([]DomainEvent, error) {

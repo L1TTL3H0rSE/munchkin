@@ -98,6 +98,10 @@ func NewWithOptions(service *application.Service, options Options) http.Handler 
 		"POST /api/v1/games/{gameID}/commands/resolve-charity",
 		router.resolveCharity,
 	)
+	mux.HandleFunc(
+		"POST /api/v1/games/{gameID}/commands/attempt-theft",
+		router.attemptTheft,
+	)
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/end-turn", router.command(game.CommandEndTurn))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/fight", router.command(game.CommandFight))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/loot", router.command(game.CommandLoot))
@@ -158,6 +162,14 @@ type charityRequest struct {
 	ExpectedVersion uint64                   `json:"expected_version"`
 	InstanceIDs     []string                 `json:"instance_ids,omitempty"`
 	Allocations     []game.CharityAllocation `json:"allocations,omitempty"`
+}
+
+type theftRequest struct {
+	ExpectedVersion  uint64   `json:"expected_version"`
+	SourceInstanceID string   `json:"source_instance_id"`
+	AbilityIndex     int      `json:"ability_index"`
+	CostInstanceIDs  []string `json:"cost_instance_ids"`
+	VictimPlayerID   string   `json:"victim_player_id"`
 }
 
 func (router *Router) health(writer http.ResponseWriter, _ *http.Request) {
@@ -547,6 +559,50 @@ func (router *Router) resolveCharity(
 		body.ExpectedVersion,
 		body.InstanceIDs,
 		body.Allocations,
+	)
+	if err != nil {
+		router.mapError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, result)
+}
+
+func (router *Router) attemptTheft(
+	writer http.ResponseWriter,
+	request *http.Request,
+) {
+	var body theftRequest
+	if err := decodeJSON(writer, request, &body); err != nil {
+		writeError(
+			writer,
+			http.StatusBadRequest,
+			"invalid_request",
+			err.Error(),
+		)
+		return
+	}
+	commandID := strings.TrimSpace(
+		request.Header.Get("Idempotency-Key"),
+	)
+	if commandID == "" || len(commandID) > 128 {
+		writeError(
+			writer,
+			http.StatusBadRequest,
+			"idempotency_key_required",
+			"Idempotency-Key is required",
+		)
+		return
+	}
+	result, err := router.service.AttemptTheft(
+		request.Context(),
+		request.PathValue("gameID"),
+		bearerToken(request),
+		commandID,
+		body.ExpectedVersion,
+		body.SourceInstanceID,
+		body.AbilityIndex,
+		body.CostInstanceIDs,
+		body.VictimPlayerID,
 	)
 	if err != nil {
 		router.mapError(writer, err)

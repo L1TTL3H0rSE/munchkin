@@ -96,6 +96,26 @@ node content/tools/digest.mjs content/sets/moscow/v3/cards.json
 node content/tools/validate.mjs content/sets/moscow/v3/cards.json
 ```
 
+### Contested theft v4
+
+`sets/moscow/v4/cards.json` — опубликованный immutable pack для
+`lobby-multiplayer-v3@1`. Он наследует published v3 по exact
+`source_digest`, не изменяя v1-v3, и добавляет только две оригинальные typed
+definitions: class ability `steal_random_card` и one-shot capability
+`counter_theft`. Digest v4:
+`sha256:f7289170bf3b74ed72f81cbd4c79907f32c50a8a950e5bcc11e3689d99cb683b`.
+
+Theft ability имеет фиксированные `discard_count: 1` и
+`cooldown_turns: 1`. Клиент выбирает только server-projected victim и свою
+карту стоимости; конкретная карта чужой руки выбирается engine RNG и
+фиксируется в event. `counter_theft` не принимает target path или foreign
+instance ID.
+
+```bash
+node content/tools/digest.mjs content/sets/moscow/v4/cards.json
+node content/tools/validate.mjs content/sets/moscow/v4/cards.json
+```
+
 ## Definitions и instances
 
 JSON pack хранит `CardDefinition`. Обязательные поля каждой definition:
@@ -123,6 +143,10 @@ Profile `first-edition-core-v1@1` остаётся immutable compatibility path:
 материализует только четыре зарегистрированные advanced-combat capabilities.
 Старые content versions и оба предыдущих profile не активируют эти
 capabilities.
+
+Новые lobby, pinned на `moscow-core@4`, используют
+`lobby-multiplayer-v3@1` и активируют closed theft registry. Prior packs и
+profiles не получают theft actions.
 
 ## Закрытая модель mechanics
 

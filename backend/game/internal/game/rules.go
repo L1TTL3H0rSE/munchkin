@@ -156,6 +156,69 @@ func charityTransferWindow(
 	}, nil
 }
 
+func theftResponseWindow(
+	state State,
+	attempt TheftAttempt,
+	openedAt time.Time,
+) (*InteractionWindow, error) {
+	if attempt.InteractionID == "" ||
+		attempt.ThiefPlayerID == "" ||
+		attempt.VictimPlayerID == "" ||
+		openedAt.IsZero() {
+		return nil, fmt.Errorf(
+			"%w: incomplete theft response window",
+			ErrIllegalCommand,
+		)
+	}
+	eligible := make([]string, 0, len(state.Players)-1)
+	responses := make(
+		map[string]InteractionResponse,
+		len(state.Players)-1,
+	)
+	for _, player := range state.Players {
+		if player.Dead || player.ID == attempt.ThiefPlayerID {
+			continue
+		}
+		eligible = append(eligible, player.ID)
+		responses[player.ID] = InteractionResponse{
+			Requirement:   InteractionResponseOptional,
+			TimeoutIntent: InteractionIntentPass,
+			State:         InteractionResponsePending,
+		}
+	}
+	if len(eligible) == 0 {
+		return nil, fmt.Errorf(
+			"%w: theft has no response actors",
+			ErrIllegalCommand,
+		)
+	}
+	policy := AddressedInteractionDeadlinePolicy()
+	return &InteractionWindow{
+		ID:   attempt.InteractionID,
+		Kind: InteractionKindTheftResponse,
+		Parent: InteractionParent{
+			Phase:       attempt.ParentPhase,
+			SubjectKind: InteractionSubjectTurn,
+			SubjectID:   state.Turn.PlayerID,
+		},
+		InitiatorActorID:  attempt.ThiefPlayerID,
+		EligibilityPolicy: InteractionEligibilityOpaquePublicSet,
+		AllowedIntents: []InteractionIntent{
+			InteractionIntentPass,
+			InteractionIntentRespond,
+		},
+		EligibleActorIDs: eligible,
+		OpenedAt:         openedAt,
+		DeadlineAt: openedAt.Add(
+			time.Duration(policy.BaseSeconds) * time.Second,
+		),
+		DeadlineRevision: 1,
+		DeadlinePolicy:   policy,
+		Responses:        responses,
+		Status:           InteractionWindowOpen,
+	}, nil
+}
+
 func transferableCarriedInstances(
 	state State,
 	playerIndex int,

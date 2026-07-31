@@ -4,6 +4,7 @@ import {
   combatResolutionRequestSchema,
   economyOfferRequestSchema,
   charityRequestSchema,
+  theftRequestSchema,
   interactionCommandRequestSchema,
   invalidationSchema,
   lobbyResultSchema,
@@ -234,6 +235,36 @@ export function useGameApi() {
     return clientCommandResult(response);
   }
 
+  async function attemptTheft(
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    sourceInstanceID: string,
+    abilityIndex: number,
+    costInstanceID: string,
+    victimPlayerID: string,
+  ) {
+    const request = theftRequestSchema.parse({
+      expected_version: expectedVersion,
+      source_instance_id: sourceInstanceID,
+      ability_index: abilityIndex,
+      cost_instance_ids: [costInstanceID],
+      victim_player_id: victimPlayerID,
+    });
+    const response = await $fetch(
+      `${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/commands/attempt-theft`,
+      {
+        method: "POST",
+        headers: {
+          ...authorization(credential),
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: request,
+      },
+    );
+    return clientCommandResult(response);
+  }
+
   function stream(
     gameID: string,
     credential: string,
@@ -269,6 +300,7 @@ export function useGameApi() {
     combatHelp,
     economyOffer,
     resolveCharity,
+    attemptTheft,
     stream,
     contentAssetURL,
   };
@@ -301,7 +333,8 @@ function clientProjection(response: unknown): Projection {
           action.type !== "play_target_effect" &&
           action.type !== "propose_trade" &&
           action.type !== "propose_gift" &&
-          action.type !== "resolve_charity",
+          action.type !== "resolve_charity" &&
+          action.type !== "attempt_theft",
       ),
     },
   };

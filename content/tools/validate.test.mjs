@@ -33,6 +33,13 @@ const moscowV3 = JSON.parse(
 const moscowV3Provenance = JSON.parse(
   fs.readFileSync(path.join(moscowV3Root, "provenance.json"), "utf8"),
 );
+const moscowV4Root = path.join(root, "sets", "moscow", "v4");
+const moscowV4 = JSON.parse(
+  fs.readFileSync(path.join(moscowV4Root, "cards.json"), "utf8"),
+);
+const moscowV4Provenance = JSON.parse(
+  fs.readFileSync(path.join(moscowV4Root, "provenance.json"), "utf8"),
+);
 const powershellProbe = spawnSync(
   "pwsh",
   ["-NoProfile", "-NonInteractive", "-Command", "exit 0"],
@@ -526,6 +533,83 @@ test("advanced-combat capability registry rejects unknown fields and combination
   assert.throws(
     () => validatePack(withDigest(wrongCardKind)),
     /invalid force_combat_helper capability/,
+  );
+});
+
+test("moscow-core v4 adds only closed contested-theft definitions", () => {
+  const result = validatePack(structuredClone(moscowV4));
+  assert.equal(result.setID, "moscow-core");
+  assert.equal(result.version, 4);
+  assert.equal(result.digest, moscowV4.content_digest);
+  assert.equal(result.definitions, 170);
+  assert.equal(result.doors, 83);
+  assert.equal(result.treasures, 68);
+  assert.equal(result.deferred, 21);
+  assert.deepEqual(
+    moscowV4.cards.slice(0, moscowV3.cards.length),
+    moscowV3.cards,
+  );
+  assert.equal(moscowV4Provenance.status, "published");
+  assert.equal(moscowV4Provenance.source_version, 3);
+  assert.equal(
+    moscowV4Provenance.source_digest,
+    moscowV3.content_digest,
+  );
+  assert.equal(
+    moscowV4Provenance.content_digest,
+    moscowV4.content_digest,
+  );
+  assert.deepEqual(
+    moscowV4.cards
+      .filter((card) =>
+        card.abilities?.some((ability) =>
+          ability.kind === "steal_random_card"))
+      .map((card) => card.id),
+    ["courtyard-sleight-class"],
+  );
+  assert.deepEqual(
+    moscowV4.cards
+      .filter((card) => card.theft_capability !== undefined)
+      .map((card) => [
+        card.id,
+        card.theft_capability,
+      ]),
+    [["pocket-bell-counter", {kind: "counter_theft"}]],
+  );
+});
+
+test("theft registry rejects hidden targets, unknown kinds and loose costs", () => {
+  const find = (pack, id) => pack.cards.find((card) => card.id === id);
+
+  const rawTarget = structuredClone(moscowV4);
+  find(rawTarget, "courtyard-sleight-class").abilities[0].target_path =
+    "players[1].hand";
+  assert.throws(
+    () => validatePack(withDigest(rawTarget)),
+    /unknown field target_path/,
+  );
+
+  const unknownAbility = structuredClone(moscowV4);
+  find(unknownAbility, "courtyard-sleight-class").abilities[0].kind =
+    "run_script";
+  assert.throws(
+    () => validatePack(withDigest(unknownAbility)),
+    /kind is not registered/,
+  );
+
+  const looseCost = structuredClone(moscowV4);
+  find(looseCost, "courtyard-sleight-class").abilities[0].discard_count = 2;
+  assert.throws(
+    () => validatePack(withDigest(looseCost)),
+    /one-card cost/,
+  );
+
+  const unknownCounter = structuredClone(moscowV4);
+  find(unknownCounter, "pocket-bell-counter").theft_capability.kind =
+    "counter_anything";
+  assert.throws(
+    () => validatePack(withDigest(unknownCounter)),
+    /invalid theft capability/,
   );
 });
 
@@ -1032,6 +1116,24 @@ test("JSON Schema accepts committed moscow-core v3 and rejects raw targets", {
     (card) => card.id === "sudden-traffic-jam",
   ).combat_capability.target_path = "players[1].hand";
   assert.equal(schemaAccepts(rawTarget), false);
+});
+
+test("JSON Schema accepts committed moscow-core v4 and rejects theft targets", {
+  skip: powershellProbe.status === 0
+    ? false
+    : "PowerShell Test-Json is unavailable",
+}, () => {
+  assert.equal(schemaAccepts(moscowV4), true);
+  const rawTarget = structuredClone(moscowV4);
+  rawTarget.cards.find(
+    (card) => card.id === "courtyard-sleight-class",
+  ).abilities[0].target_instance_id = "foreign-hand-card";
+  assert.equal(schemaAccepts(rawTarget), false);
+  const unknownCounter = structuredClone(moscowV4);
+  unknownCounter.cards.find(
+    (card) => card.id === "pocket-bell-counter",
+  ).theft_capability.kind = "counter_anything";
+  assert.equal(schemaAccepts(unknownCounter), false);
 });
 
 test("unknown fields, effects, selectors and conditions fail closed", () => {

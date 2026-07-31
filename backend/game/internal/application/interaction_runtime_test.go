@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -1721,6 +1722,66 @@ func newTwoPlayerRuntimeFixture(
 			!playerHasCardKind(candidate, ownerID, game.CardCurse, pack) {
 			continue
 		}
+		if pack.Source == "theft-runtime-test" {
+			base := candidate.Clone()
+			ownerIndex := candidate.PlayerIndex(ownerID)
+			sourceIndex := -1
+			for handIndex, instanceID := range candidate.Players[ownerIndex].Hand {
+				card, _, exists := pack.DefinitionForInstance(
+					candidate,
+					instanceID,
+				)
+				if exists &&
+					slices.ContainsFunc(
+						card.Abilities,
+						func(ability game.Ability) bool {
+							return ability.Kind ==
+								game.AbilityStealRandomCard
+						},
+					) {
+					sourceIndex = handIndex
+					break
+				}
+			}
+			if sourceIndex < 0 ||
+				len(candidate.Players[ownerIndex].Hand) < 2 ||
+				len(candidate.Players[candidate.PlayerIndex(otherID)].Hand) == 0 {
+				continue
+			}
+			sourceID := candidate.Players[ownerIndex].Hand[sourceIndex]
+			candidate.Players[ownerIndex].Hand = append(
+				candidate.Players[ownerIndex].Hand[:sourceIndex],
+				candidate.Players[ownerIndex].Hand[sourceIndex+1:]...,
+			)
+			candidate.Players[ownerIndex].Traits = append(
+				candidate.Players[ownerIndex].Traits,
+				sourceID,
+			)
+			if err := candidate.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := json.Marshal(struct {
+				Reason game.CommandType `json:"reason"`
+				State  game.State       `json:"state"`
+			}{
+				Reason: game.CommandPlayCard,
+				State:  candidate,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			candidate, candidateEvents = applyRuntimeEvents(
+				t,
+				base,
+				candidateEvents,
+				"runtime-theft-fixture",
+				[]game.DomainEvent{{
+					Type:    game.EventCardPlayed,
+					Payload: raw,
+				}},
+				start,
+			)
+		}
 		state = candidate
 		envelopes = candidateEvents
 		break
@@ -1827,6 +1888,53 @@ func economyRuntimePack(t *testing.T, charity bool) game.Pack {
 	return pack
 }
 
+func theftRuntimePack(t *testing.T) game.Pack {
+	t.Helper()
+	pack := targetRuntimePack(t)
+	pack.Version = 4
+	pack.Source = "theft-runtime-test"
+	pack.Cards = append(pack.Cards,
+		game.Card{
+			ID:               "runtime-theft-class",
+			Name:             "Runtime theft class",
+			Deck:             game.DeckDoor,
+			Kind:             game.CardClass,
+			Copies:           30,
+			InteractionScope: game.InteractionOtherPlayers,
+			Trait: &game.TraitSpec{
+				Group: game.TraitClass,
+				Tags:  []string{"runtime-theft"},
+			},
+			Abilities: []game.Ability{{
+				Kind:          game.AbilityStealRandomCard,
+				DiscardCount:  1,
+				CooldownTurns: 1,
+			}},
+		},
+		game.Card{
+			ID:               "runtime-theft-counter",
+			Name:             "Runtime theft counter",
+			Deck:             game.DeckTreasure,
+			Kind:             game.CardOneShot,
+			Copies:           30,
+			InteractionScope: game.InteractionOtherPlayers,
+			Effects: []game.Effect{{
+				Kind:   game.EffectModifyCombat,
+				Amount: 1,
+				Target: game.EffectTargetPlayer,
+			}},
+			TheftCapability: &game.TheftCapability{
+				Kind: game.TheftCapabilityCounter,
+			},
+		},
+	)
+	pack.ContentDigest = game.CardsDigest(pack.Cards)
+	if err := pack.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	return pack
+}
+
 func TestEconomyRuntimeReceiptsCASAndPartyActions(t *testing.T) {
 	ctx := context.Background()
 	fixture := newTwoPlayerRuntimeFixture(
@@ -1925,6 +2033,123 @@ func TestEconomyRuntimeReceiptsCASAndPartyActions(t *testing.T) {
 		game.InteractionIntentDecline,
 	); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("stale economy response=%v", err)
+	}
+}
+
+func TestTheftRuntimeReceiptsCASAndTimeoutSettlement(t *testing.T) {
+	ctx := context.Background()
+	fixture := newTwoPlayerRuntimeFixture(
+		t,
+		theftRuntimePack(t),
+		time.Date(2026, time.July, 31, 10, 20, 0, 0, time.UTC),
+	)
+	actionIndex := slices.IndexFunc(
+		fixture.owner.Projection.Turn.AvailableActions,
+		func(action game.ActionView) bool {
+			return action.Type == game.CommandAttemptTheft
+		},
+	)
+	if actionIndex < 0 {
+		t.Fatalf(
+			"theft descriptor missing: %#v",
+			fixture.owner.Projection.Turn.AvailableActions,
+		)
+	}
+	action := fixture.owner.Projection.Turn.AvailableActions[actionIndex]
+	costID := action.InstanceIDs[0]
+	opened, err := fixture.service.AttemptTheft(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"theft-open",
+		fixture.current.Version,
+		action.SourceInstanceID,
+		action.AbilityIndex,
+		[]string{costID},
+		fixture.other.PlayerID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opened.Projection.Interaction == nil ||
+		opened.Projection.Interaction.PublicKind != "theft_response" {
+		t.Fatalf("theft projection=%#v", opened.Projection.Interaction)
+	}
+	replayed, err := fixture.service.AttemptTheft(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"theft-open",
+		fixture.current.Version,
+		action.SourceInstanceID,
+		action.AbilityIndex,
+		[]string{costID},
+		fixture.other.PlayerID,
+	)
+	if err != nil || !replayed.Replayed || replayed.Version != opened.Version {
+		t.Fatalf("theft replay=%#v err=%v", replayed, err)
+	}
+	if _, err := fixture.service.AttemptTheft(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"theft-open",
+		fixture.current.Version,
+		action.SourceInstanceID,
+		action.AbilityIndex,
+		[]string{costID},
+		fixture.owner.PlayerID,
+	); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("theft fingerprint conflict=%v", err)
+	}
+	if _, err := fixture.service.AttemptTheft(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+		"theft-stale",
+		fixture.current.Version,
+		action.SourceInstanceID,
+		action.AbilityIndex,
+		[]string{costID},
+		fixture.other.PlayerID,
+	); !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("stale theft command=%v", err)
+	}
+	otherBefore := len(fixture.other.Projection.You.Hand)
+	fixture.clock.Set(opened.Projection.Interaction.DeadlineAt)
+	processed, err := fixture.service.SweepDueInteractions(ctx, 10)
+	if err != nil || processed != 1 {
+		t.Fatalf("theft sweep=%d err=%v", processed, err)
+	}
+	ownerAfter, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		fixture.owner.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherAfter, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		fixture.other.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ownerAfter.Interaction != nil ||
+		len(otherAfter.You.Hand) != otherBefore-1 ||
+		slices.ContainsFunc(
+			otherAfter.You.Hand,
+			func(card game.CardView) bool {
+				return card.InstanceID == costID
+			},
+		) {
+		t.Fatalf(
+			"theft timeout owner=%#v other=%#v",
+			ownerAfter,
+			otherAfter,
+		)
 	}
 }
 

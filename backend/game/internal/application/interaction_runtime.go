@@ -484,6 +484,12 @@ func (service *Service) ExecuteInteraction(
 					command.Type = game.CommandPlayCombatIntervention
 					command.TargetInstanceID = string(action.Target)
 				}
+			case game.InteractionKindTheftResponse:
+				if action.TheftCapability !=
+					game.TheftCapabilityCounter {
+					return ErrInteractionAction
+				}
+				command.Type = game.CommandCounterTheft
 			default:
 				return ErrInteractionAction
 			}
@@ -669,6 +675,75 @@ func (service *Service) ProposeEconomyOffer(
 						command.RequestedInstanceIDs,
 						descriptor.RequestedInstanceIDs,
 					) {
+				return game.Command{}, ErrInteractionAction
+			}
+			interactionID, err := service.randomID("interaction")
+			if err != nil {
+				return game.Command{}, err
+			}
+			command.ActorID = actorID
+			command.InteractionID = interactionID
+			command.InteractionAt = acceptedAt
+			return command, nil
+		},
+	)
+}
+
+func (service *Service) AttemptTheft(
+	ctx context.Context,
+	gameID string,
+	credential string,
+	commandID string,
+	expectedVersion uint64,
+	sourceInstanceID string,
+	abilityIndex int,
+	costInstanceIDs []string,
+	victimPlayerID string,
+) (CommandResult, error) {
+	command := game.Command{
+		Type:           game.CommandAttemptTheft,
+		InstanceID:     strings.TrimSpace(sourceInstanceID),
+		AbilityIndex:   abilityIndex,
+		InstanceIDs:    append([]string(nil), costInstanceIDs...),
+		TargetPlayerID: strings.TrimSpace(victimPlayerID),
+	}
+	fingerprint := theftFingerprint(command, expectedVersion)
+	return service.executeTimedEconomyCommand(
+		ctx,
+		gameID,
+		credential,
+		commandID,
+		expectedVersion,
+		fingerprint,
+		func(state game.State, actorID string, acceptedAt time.Time) (game.Command, error) {
+			projected, err := game.ProjectForActor(
+				state,
+				actorID,
+				service.pack,
+			)
+			if err != nil {
+				return game.Command{}, err
+			}
+			var descriptor *game.ActionView
+			for index := range projected.Turn.AvailableActions {
+				action := &projected.Turn.AvailableActions[index]
+				if action.Type == game.CommandAttemptTheft &&
+					action.SourceInstanceID == command.InstanceID &&
+					action.AbilityIndex == command.AbilityIndex {
+					descriptor = action
+					break
+				}
+			}
+			if descriptor == nil ||
+				!allStringsAllowed(
+					command.InstanceIDs,
+					descriptor.InstanceIDs,
+				) ||
+				len(command.InstanceIDs) != 1 ||
+				!slices.Contains(
+					descriptor.TargetPlayerIDs,
+					command.TargetPlayerID,
+				) {
 				return game.Command{}, ErrInteractionAction
 			}
 			interactionID, err := service.randomID("interaction")
@@ -1611,6 +1686,32 @@ func charityFingerprint(
 	})
 	if err != nil {
 		panic(fmt.Sprintf("marshal charity fingerprint: %v", err))
+	}
+	digest := sha256.Sum256(raw)
+	return hex.EncodeToString(digest[:])
+}
+
+func theftFingerprint(
+	command game.Command,
+	expectedVersion uint64,
+) string {
+	raw, err := json.Marshal(struct {
+		Type             game.CommandType `json:"type"`
+		ExpectedVersion  uint64           `json:"expected_version"`
+		SourceInstanceID string           `json:"source_instance_id"`
+		AbilityIndex     int              `json:"ability_index"`
+		CostInstanceIDs  []string         `json:"cost_instance_ids"`
+		VictimPlayerID   string           `json:"victim_player_id"`
+	}{
+		Type:             command.Type,
+		ExpectedVersion:  expectedVersion,
+		SourceInstanceID: command.InstanceID,
+		AbilityIndex:     command.AbilityIndex,
+		CostInstanceIDs:  command.InstanceIDs,
+		VictimPlayerID:   command.TargetPlayerID,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("marshal theft fingerprint: %v", err))
 	}
 	digest := sha256.Sum256(raw)
 	return hex.EncodeToString(digest[:])

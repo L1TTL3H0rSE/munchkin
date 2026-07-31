@@ -45,6 +45,7 @@ export const actionTypeSchema = z.enum([
   "resolve_charity",
   "propose_trade",
   "propose_gift",
+  "attempt_theft",
   "end_turn",
   "fight",
   "loot",
@@ -75,6 +76,7 @@ export const combatCapabilityKindSchema = z.enum([
   "counter_combat_effect",
   "force_combat_helper",
 ]);
+export const theftCapabilityKindSchema = z.literal("counter_theft");
 
 export const cardViewSchema = z.object({
   instance_id: z.string().min(1),
@@ -218,6 +220,7 @@ export const interactionActionViewSchema = z.object({
   target: z.enum(["player", "monster"]).optional(),
   combat_delta: z.number().int().refine((value) => value !== 0).optional(),
   combat_capability: combatCapabilityKindSchema.optional(),
+  theft_capability: theftCapabilityKindSchema.optional(),
   target_monster_instance_id: z.string().min(1).optional(),
   target_effect_id: z.string()
     .regex(/^(?:fx|tfx|rfx)_[a-f0-9]{32}$/)
@@ -233,6 +236,7 @@ export const interactionActionViewSchema = z.object({
     (action.type !== "respond" ||
       action.source_instance_id !== undefined ||
       action.combat_capability !== undefined ||
+      action.theft_capability !== undefined ||
       action.target !== undefined ||
       action.target_monster_instance_id !== undefined ||
       action.target_effect_id !== undefined ||
@@ -248,6 +252,7 @@ export const interactionActionViewSchema = z.object({
     (action.type !== "respond" ||
       action.source_instance_id === undefined ||
       action.combat_capability !== undefined ||
+      action.theft_capability !== undefined ||
       action.target !== undefined ||
       action.target_monster_instance_id !== undefined ||
       action.target_effect_id !== undefined ||
@@ -267,6 +272,22 @@ export const interactionActionViewSchema = z.object({
     context.addIssue({
       code: z.ZodIssueCode.custom,
       message: "advanced combat capability requires an actor-owned response source",
+    });
+  }
+  if (action.theft_capability !== undefined &&
+    (action.type !== "respond" ||
+      action.source_instance_id === undefined ||
+      action.combat_capability !== undefined ||
+      action.target !== undefined ||
+      action.target_monster_instance_id !== undefined ||
+      action.target_effect_id !== undefined ||
+      action.helper_player_id !== undefined ||
+      action.combat_delta !== undefined ||
+      action.choice_ids !== undefined ||
+      action.escape_delta !== undefined)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "theft counter requires one actor-owned response source",
     });
   }
   switch (action.combat_capability) {
@@ -343,6 +364,7 @@ export const interactionViewSchema = z.object({
     "private_choice",
     "economy_offer",
     "charity_transfer",
+    "theft_response",
   ]),
   parent_phase: phaseSchema,
   public_subject: z.enum([
@@ -396,6 +418,7 @@ export const projectionSchema = z.object({
     "first-edition-core-v1",
     "lobby-multiplayer-v1",
     "lobby-multiplayer-v2",
+    "lobby-multiplayer-v3",
   ]),
   rules_profile_version: z.literal(1),
   interaction: interactionViewSchema.optional(),
@@ -412,6 +435,7 @@ export const lobbySummarySchema = z.object({
     "first-edition-core-v1",
     "lobby-multiplayer-v1",
     "lobby-multiplayer-v2",
+    "lobby-multiplayer-v3",
   ]),
   rules_profile_version: z.literal(1),
 }).strict();
@@ -472,6 +496,14 @@ export const charityRequestSchema = z.object({
   expected_version: z.number().int().nonnegative(),
   instance_ids: z.array(z.string().min(1)).optional(),
   allocations: z.array(charityAllocationSchema).optional(),
+}).strict();
+
+export const theftRequestSchema = z.object({
+  expected_version: z.number().int().nonnegative(),
+  source_instance_id: z.string().min(1),
+  ability_index: z.number().int().nonnegative(),
+  cost_instance_ids: z.array(z.string().min(1)).length(1),
+  victim_player_id: z.string().min(1),
 }).strict();
 
 export const invalidationSchema = z.object({
@@ -632,7 +664,7 @@ export type ActionDescriptor =
   Omit<ServerActionDescriptor, "type"> & {
     type: Exclude<
       ActionType,
-      "play_target_effect" | "propose_trade" | "propose_gift"
+      "play_target_effect" | "propose_trade" | "propose_gift" | "attempt_theft"
     >;
   };
 type ServerProjection = z.infer<typeof projectionSchema>;
@@ -662,6 +694,7 @@ export type InteractionCommandRequest = z.infer<
 export type EconomyOfferRequest = z.infer<typeof economyOfferRequestSchema>;
 export type CharityRequest = z.infer<typeof charityRequestSchema>;
 export type CharityAllocation = z.infer<typeof charityAllocationSchema>;
+export type TheftRequest = z.infer<typeof theftRequestSchema>;
 export type StudioArtBrief = z.infer<typeof studioArtBriefSchema>;
 export type StudioGenerationSettings = z.infer<
   typeof studioGenerationSettingsSchema

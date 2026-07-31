@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "set_id": "moscow-core",
+  "version": 4,
+  "status": "published",
+  "source_version": 3,
+  "source_digest": "sha256:5150be9bd21b86ef9f2adf87fec42f89da26264a3519379f04057e7140bbc238",
+  "content_digest": "sha256:f7289170bf3b74ed72f81cbd4c79907f32c50a8a950e5bcc11e3689d99cb683b",
+  "records": [
+    {
+      "card_id": "yard-evacuator",
+      "asset_path": "assets/yard-evacuator.webp",
+      "alt_text": "Дружелюбный эвакуатор поднимает парковочное место над городским двором.",
+      "provider": "openai",
+      "model": "codex-imagegen-built-in",
+      "quality": "unexposed",
+      "size": "1024x1536",
+      "prompt_hash": "sha256:8fe0f3285e16b25fcf6979cbe736cb0ddbbdde021eca287ce5573d3259903a3c",
+      "output_sha256": "sha256:9c5deb8e2fe695e40362d58d97403f102ce375fe2916b6940290e1576d1d2083",
+      "provider_request_id": "codex-imagegen-call_wUnBZi0LEEWTnAyLaheuE9Ke",
+      "approved_at": "2026-07-29T21:45:26.693Z"
+    }
+  ]
+}
