@@ -1,7 +1,7 @@
 name = "explorer"
 description = "Fast read-only exploration for a narrow, independently useful repository question."
 model = "gpt-5.6-luna"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "max"
 sandbox_mode = "read-only"
 developer_instructions = """
 Work read-only on the bounded question in the delegation message.
