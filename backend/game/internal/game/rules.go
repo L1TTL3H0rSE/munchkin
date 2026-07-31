@@ -150,6 +150,105 @@ func combatResponseWindow(
 	}
 }
 
+func combatHelpWindow(
+	parent InteractionWindow,
+	offer CombatHelpOffer,
+	openedAt time.Time,
+) (*InteractionWindow, error) {
+	if parent.Status != InteractionWindowOpen ||
+		parent.Kind != InteractionKindCombatResponse ||
+		parent.Parent.SubjectKind != InteractionSubjectEncounter ||
+		offer.ID == "" ||
+		offer.ParentInteractionID != parent.ID ||
+		offer.CombatantPlayerID != parent.InitiatorActorID ||
+		offer.HelperPlayerID == "" ||
+		offer.RewardTreasures < 1 ||
+		openedAt.IsZero() ||
+		openedAt.Before(parent.OpenedAt) {
+		return nil, fmt.Errorf(
+			"%w: malformed combat-help offer",
+			ErrIllegalCommand,
+		)
+	}
+	remaining := parent.DeadlineAt.Sub(openedAt)
+	if remaining < 10*time.Second {
+		return nil, fmt.Errorf(
+			"%w: combat-help offer requires ten parent seconds",
+			ErrIllegalCommand,
+		)
+	}
+	deadline := openedAt.Add(30 * time.Second)
+	if parent.DeadlineAt.Before(deadline) {
+		deadline = parent.DeadlineAt
+	}
+	baseSeconds := int(
+		(deadline.Sub(openedAt) + time.Second - 1) / time.Second,
+	)
+	policy := InteractionDeadlinePolicy{
+		BaseSeconds: baseSeconds,
+		MaxSeconds:  baseSeconds,
+	}
+	return &InteractionWindow{
+		ID:   offer.ID,
+		Kind: InteractionKindAddressedResponse,
+		Parent: InteractionParent{
+			Phase:               PhaseCombat,
+			SubjectKind:         InteractionSubjectInteraction,
+			SubjectID:           parent.ID,
+			ParentInteractionID: parent.ID,
+		},
+		InitiatorActorID:  offer.CombatantPlayerID,
+		EligibilityPolicy: InteractionEligibilityActorPrivate,
+		AllowedIntents: []InteractionIntent{
+			InteractionIntentAccept,
+			InteractionIntentDecline,
+		},
+		EligibleActorIDs: []string{offer.HelperPlayerID},
+		OpenedAt:         openedAt,
+		DeadlineAt:       deadline,
+		DeadlineRevision: 1,
+		DeadlinePolicy:   policy,
+		Responses: map[string]InteractionResponse{
+			offer.HelperPlayerID: {
+				Requirement:   InteractionResponseMandatory,
+				TimeoutIntent: InteractionIntentDecline,
+				State:         InteractionResponsePending,
+			},
+		},
+		Status: InteractionWindowOpen,
+	}, nil
+}
+
+func combatHelpRewardMaximum(state State, pack Pack) (int, error) {
+	if state.Turn.Encounter == nil {
+		return 0, fmt.Errorf("%w: missing encounter", ErrIllegalCommand)
+	}
+	playerIndex := state.PlayerIndex(state.Turn.PlayerID)
+	if playerIndex < 0 {
+		return 0, fmt.Errorf("%w: missing combatant", ErrIllegalCommand)
+	}
+	monsterCard, _, exists := pack.DefinitionForInstance(
+		state,
+		state.Turn.Encounter.MonsterInstanceID,
+	)
+	if !exists || monsterCard.Monster == nil {
+		return 0, fmt.Errorf("%w: invalid monster", ErrInvalidContent)
+	}
+	modifier, err := treasureRewardModifier(
+		state,
+		playerIndex,
+		pack,
+		monsterCard.Monster.Tags,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return min(
+		max(0, monsterCard.Monster.Treasures+modifier),
+		len(state.TreasureDeck)+len(state.TreasureDiscard),
+	), nil
+}
+
 func combatInterventionDeadlineAfter(
 	window InteractionWindow,
 	acceptedAt time.Time,
@@ -695,6 +794,55 @@ func combatTotals(state State, playerIndex int, pack Pack) (CombatTotals, error)
 	}
 	playerStrength += playerModifier
 	monsterStrength += monsterModifier
+	if help := state.Turn.Encounter.CombatHelp; help != nil &&
+		help.RewardStatus == CombatHelpRewardAccepted {
+		helperIndex := state.PlayerIndex(help.HelperPlayerID)
+		if helperIndex < 0 {
+			return CombatTotals{}, fmt.Errorf(
+				"%w: combat helper is missing",
+				ErrIllegalCommand,
+			)
+		}
+		helper := state.Players[helperIndex]
+		helperCards, err := playerDefinitions(
+			state,
+			helper,
+			pack,
+			helper.Equipped,
+			helper.Traits,
+		)
+		if err != nil {
+			return CombatTotals{}, err
+		}
+		helperStrength := helper.Level
+		for _, card := range helperCards {
+			if card.Item != nil {
+				helperStrength += card.Item.Bonus
+			}
+		}
+		helperPlayerModifier, err := activePlayerModifiers(
+			state,
+			helper,
+			pack,
+			ModifierPlayerCombat,
+			monsterCard.Monster.Tags,
+		)
+		if err != nil {
+			return CombatTotals{}, err
+		}
+		helperMonsterModifier, err := activePlayerModifiers(
+			state,
+			helper,
+			pack,
+			ModifierMonsterCombat,
+			monsterCard.Monster.Tags,
+		)
+		if err != nil {
+			return CombatTotals{}, err
+		}
+		playerStrength += helperStrength + helperPlayerModifier
+		monsterStrength += helperMonsterModifier
+	}
 	for _, modifier := range monsterCard.Monster.Modifiers {
 		if modifierApplies(modifier, tags, monsterCard.Monster.Tags) {
 			switch modifier.Target {

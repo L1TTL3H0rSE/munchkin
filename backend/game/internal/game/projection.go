@@ -62,12 +62,14 @@ type OtherPlayerView struct {
 }
 
 type CombatView struct {
-	PlayerStrength   int                         `json:"player_strength"`
-	MonsterStrength  int                         `json:"monster_strength"`
-	PlayerWinning    bool                        `json:"player_winning"`
-	TieWins          bool                        `json:"tie_wins"`
-	CombatClosed     bool                        `json:"combat_closed"`
-	ResolutionAction *CombatResolutionActionView `json:"resolution_action,omitempty"`
+	PlayerStrength        int                         `json:"player_strength"`
+	MonsterStrength       int                         `json:"monster_strength"`
+	PlayerWinning         bool                        `json:"player_winning"`
+	TieWins               bool                        `json:"tie_wins"`
+	CombatClosed          bool                        `json:"combat_closed"`
+	HelperPlayerID        string                      `json:"helper_player_id,omitempty"`
+	HelperRewardTreasures int                         `json:"helper_reward_treasures,omitempty"`
+	ResolutionAction      *CombatResolutionActionView `json:"resolution_action,omitempty"`
 }
 
 type CombatResolutionActionView struct {
@@ -112,6 +114,13 @@ type InteractionActionView struct {
 	SourceInstanceID string            `json:"source_instance_id,omitempty"`
 	Target           EffectTarget      `json:"target,omitempty"`
 	CombatDelta      int               `json:"combat_delta,omitempty"`
+	HelperPlayerID   string            `json:"helper_player_id,omitempty"`
+	RewardTreasures  int               `json:"reward_treasures,omitempty"`
+}
+
+type CombatHelpOfferView struct {
+	HelperPlayerID  string `json:"helper_player_id"`
+	RewardTreasures int    `json:"reward_treasures"`
 }
 
 type InteractionView struct {
@@ -125,6 +134,7 @@ type InteractionView struct {
 	MyResponseState        InteractionResponseState `json:"my_response_state,omitempty"`
 	ResponseRequiredForYou bool                     `json:"response_required_for_you"`
 	Actions                []InteractionActionView  `json:"actions"`
+	CombatHelpOffer        *CombatHelpOfferView     `json:"combat_help_offer,omitempty"`
 }
 
 type Projection struct {
@@ -209,6 +219,10 @@ func ProjectForActor(state State, actorID string, pack Pack) (Projection, error)
 				TieWins:         totals.TieWins,
 				CombatClosed:    state.Turn.Encounter.CombatClosed,
 			}
+			if help := state.Turn.Encounter.CombatHelp; help != nil {
+				combat.HelperPlayerID = help.HelperPlayerID
+				combat.HelperRewardTreasures = help.RewardTreasures
+			}
 			profile, err := state.Profile()
 			if err != nil {
 				return Projection{}, err
@@ -258,6 +272,30 @@ func projectInteraction(
 	if window == nil || window.Status != InteractionWindowOpen {
 		return nil, nil
 	}
+	if state.CombatHelpOffer != nil &&
+		state.SuspendedInteractionWindow != nil &&
+		window.ID == state.CombatHelpOffer.ID {
+		offer := state.CombatHelpOffer
+		if actorID != offer.CombatantPlayerID &&
+			actorID != offer.HelperPlayerID {
+			parent := state.SuspendedInteractionWindow
+			view := &InteractionView{
+				InteractionID: parent.ID,
+				PublicKind:    "combat_response",
+				ParentPhase:   parent.Parent.Phase,
+				PublicSubject: publicInteractionSubject(
+					parent.Parent.SubjectKind,
+				),
+				Status:     parent.Status,
+				DeadlineAt: parent.DeadlineAt,
+				Actions:    []InteractionActionView{},
+			}
+			if response, ok := parent.Responses[actorID]; ok {
+				view.MyResponseState = response.State
+			}
+			return view, nil
+		}
+	}
 	publicKind := "response_window"
 	profile, err := state.Profile()
 	if err != nil {
@@ -269,6 +307,12 @@ func projectInteraction(
 	if domainCombatResponse {
 		publicKind = "combat_response"
 	}
+	domainCombatHelp := state.CombatHelpOffer != nil &&
+		state.SuspendedInteractionWindow != nil &&
+		window.ID == state.CombatHelpOffer.ID
+	if domainCombatHelp {
+		publicKind = "combat_help_offer"
+	}
 	view := &InteractionView{
 		InteractionID: window.ID,
 		PublicKind:    publicKind,
@@ -277,6 +321,56 @@ func projectInteraction(
 		Status:        window.Status,
 		DeadlineAt:    window.DeadlineAt,
 		Actions:       []InteractionActionView{},
+	}
+	if domainCombatHelp {
+		offer := state.CombatHelpOffer
+		view.CombatHelpOffer = &CombatHelpOfferView{
+			HelperPlayerID:  offer.HelperPlayerID,
+			RewardTreasures: offer.RewardTreasures,
+		}
+		if actorID == offer.CombatantPlayerID {
+			view.Actions = append(view.Actions, InteractionActionView{
+				ActionID: combatHelpActionID(
+					window.ID,
+					actorID,
+					InteractionIntentCancelHelp,
+					"",
+					0,
+					state.Version,
+				),
+				InteractionID: window.ID,
+				Revision:      window.DeadlineRevision,
+				Type:          InteractionIntentCancelHelp,
+			})
+			actions, err := projectCombatHelpOfferActions(
+				state,
+				actorID,
+				window.ID,
+				window.DeadlineRevision,
+				pack,
+			)
+			if err != nil {
+				return nil, err
+			}
+			view.Actions = append(view.Actions, actions...)
+			return view, nil
+		}
+	}
+	if domainCombatResponse &&
+		actorID == window.InitiatorActorID &&
+		state.Turn.Encounter != nil &&
+		state.Turn.Encounter.CombatHelp == nil {
+		actions, err := projectCombatHelpOfferActions(
+			state,
+			actorID,
+			window.ID,
+			window.DeadlineRevision,
+			pack,
+		)
+		if err != nil {
+			return nil, err
+		}
+		view.Actions = append(view.Actions, actions...)
 	}
 	response, eligible := window.Responses[actorID]
 	if !eligible {
@@ -349,6 +443,43 @@ func projectInteraction(
 	return view, nil
 }
 
+func projectCombatHelpOfferActions(
+	state State,
+	actorID string,
+	interactionID string,
+	revision uint32,
+	pack Pack,
+) ([]InteractionActionView, error) {
+	maxReward, err := combatHelpRewardMaximum(state, pack)
+	if err != nil {
+		return nil, err
+	}
+	actions := make([]InteractionActionView, 0)
+	for _, player := range state.Players {
+		if player.ID == state.Turn.PlayerID || player.Dead {
+			continue
+		}
+		for reward := 1; reward <= maxReward; reward++ {
+			actions = append(actions, InteractionActionView{
+				ActionID: combatHelpActionID(
+					interactionID,
+					actorID,
+					InteractionIntentOfferHelp,
+					player.ID,
+					reward,
+					state.Version,
+				),
+				InteractionID:   interactionID,
+				Revision:        revision,
+				Type:            InteractionIntentOfferHelp,
+				HelperPlayerID:  player.ID,
+				RewardTreasures: reward,
+			})
+		}
+	}
+	return actions, nil
+}
+
 func publicInteractionSubject(kind InteractionSubjectKind) string {
 	switch kind {
 	case InteractionSubjectTurn:
@@ -378,6 +509,25 @@ func interactionActionID(
 			string(intent) + "\x00" +
 			sourceInstanceID + "\x00" +
 			string(target) + "\x00" +
+			strconv.FormatUint(version, 10),
+	))
+	return fmt.Sprintf("act_%x", digest[:16])
+}
+
+func combatHelpActionID(
+	interactionID string,
+	actorID string,
+	intent InteractionIntent,
+	helperPlayerID string,
+	rewardTreasures int,
+	version uint64,
+) string {
+	digest := sha256.Sum256([]byte(
+		interactionID + "\x00" +
+			actorID + "\x00" +
+			string(intent) + "\x00" +
+			helperPlayerID + "\x00" +
+			strconv.Itoa(rewardTreasures) + "\x00" +
 			strconv.FormatUint(version, 10),
 	))
 	return fmt.Sprintf("act_%x", digest[:16])

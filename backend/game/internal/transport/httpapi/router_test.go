@@ -626,6 +626,129 @@ func TestCombatResolutionRequestRouteIsStrictAndServerAuthoritative(t *testing.T
 		result.Projection.RulesProfileID != game.LobbyMultiplayerProfileID {
 		t.Fatalf("combat response result: %#v", result.Projection)
 	}
+	var offer game.InteractionActionView
+	for _, action := range result.Projection.Interaction.Actions {
+		if action.Type == game.InteractionIntentOfferHelp {
+			offer = action
+			break
+		}
+	}
+	if offer.ActionID == "" ||
+		offer.HelperPlayerID != responder.PlayerID ||
+		offer.RewardTreasures != 1 {
+		t.Fatalf("server-owned helper action: %#v", result.Projection.Interaction)
+	}
+	unknownAuthority := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+"/commands/combat-help",
+		owner.Credential,
+		"router-combat-help-forged",
+		map[string]any{
+			"expected_version": result.Version,
+			"action_id":        offer.ActionID,
+			"helper_player_id": responder.PlayerID,
+			"reward_treasures": 99,
+		},
+	)
+	if unknownAuthority.StatusCode != http.StatusBadRequest {
+		t.Fatalf("combat-help authority status %d", unknownAuthority.StatusCode)
+	}
+	unknownAuthority.Body.Close()
+	offeredResponse := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+"/commands/combat-help",
+		owner.Credential,
+		"router-combat-help-offer",
+		map[string]any{
+			"expected_version": result.Version,
+			"action_id":        offer.ActionID,
+		},
+	)
+	if offeredResponse.StatusCode != http.StatusOK {
+		t.Fatalf("combat-help offer status %d", offeredResponse.StatusCode)
+	}
+	var offered application.CommandResult
+	decodeResponse(t, offeredResponse, &offered)
+	if offered.Projection.Interaction == nil ||
+		offered.Projection.Interaction.PublicKind != "combat_help_offer" ||
+		offered.Projection.Interaction.CombatHelpOffer == nil {
+		t.Fatalf("combat-help owner result: %#v", offered.Projection.Interaction)
+	}
+	helperProjectionResponse := requestJSON(
+		t,
+		server.Client(),
+		http.MethodGet,
+		server.URL+"/api/v1/games/"+owner.GameID,
+		responder.Credential,
+		"",
+		nil,
+	)
+	if helperProjectionResponse.StatusCode != http.StatusOK {
+		t.Fatalf("helper projection status %d", helperProjectionResponse.StatusCode)
+	}
+	var helperProjection game.Projection
+	decodeResponse(t, helperProjectionResponse, &helperProjection)
+	var accept game.InteractionActionView
+	for _, action := range helperProjection.Interaction.Actions {
+		if action.Type == game.InteractionIntentAccept {
+			accept = action
+			break
+		}
+	}
+	if accept.ActionID == "" ||
+		helperProjection.Interaction.CombatHelpOffer == nil ||
+		helperProjection.Interaction.CombatHelpOffer.RewardTreasures != 1 {
+		t.Fatalf("helper private offer: %#v", helperProjection.Interaction)
+	}
+	forgedAccept := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/respond-interaction",
+		responder.Credential,
+		"router-combat-help-accept-forged",
+		map[string]any{
+			"expected_version": offered.Version,
+			"interaction_id":   helperProjection.Interaction.InteractionID,
+			"action_id":        accept.ActionID,
+			"intent":           game.InteractionIntentAccept,
+			"reward_treasures": 1,
+		},
+	)
+	if forgedAccept.StatusCode != http.StatusBadRequest {
+		t.Fatalf("forged helper accept status %d", forgedAccept.StatusCode)
+	}
+	forgedAccept.Body.Close()
+	acceptedResponse := requestJSON(
+		t,
+		server.Client(),
+		http.MethodPost,
+		server.URL+"/api/v1/games/"+owner.GameID+
+			"/commands/respond-interaction",
+		responder.Credential,
+		"router-combat-help-accept",
+		map[string]any{
+			"expected_version": offered.Version,
+			"interaction_id":   helperProjection.Interaction.InteractionID,
+			"action_id":        accept.ActionID,
+			"intent":           game.InteractionIntentAccept,
+		},
+	)
+	if acceptedResponse.StatusCode != http.StatusOK {
+		t.Fatalf("helper accept status %d", acceptedResponse.StatusCode)
+	}
+	var accepted application.CommandResult
+	decodeResponse(t, acceptedResponse, &accepted)
+	if accepted.Projection.Turn.Combat == nil ||
+		accepted.Projection.Turn.Combat.HelperPlayerID != responder.PlayerID ||
+		accepted.Projection.Turn.Combat.HelperRewardTreasures != 1 {
+		t.Fatalf("accepted helper combat projection: %#v", accepted.Projection.Turn.Combat)
+	}
 }
 
 func TestInteractionProjectionFixtureIsStrictGoContract(t *testing.T) {
@@ -684,6 +807,42 @@ func TestCombatResponseProjectionFixtureIsStrictGoContract(t *testing.T) {
 	} {
 		if strings.Contains(string(raw), forbidden) {
 			t.Fatalf("combat fixture leaked %q", forbidden)
+		}
+	}
+}
+
+func TestCombatHelpProjectionFixtureIsStrictPartyContract(t *testing.T) {
+	raw, err := os.ReadFile("testdata/combat-help-projection-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var projection game.Projection
+	if err := decoder.Decode(&projection); err != nil {
+		t.Fatal(err)
+	}
+	if projection.Interaction == nil ||
+		projection.Interaction.PublicKind != "combat_help_offer" ||
+		projection.Interaction.CombatHelpOffer == nil ||
+		projection.Interaction.CombatHelpOffer.HelperPlayerID !=
+			projection.You.PlayerID ||
+		projection.Interaction.CombatHelpOffer.RewardTreasures != 1 ||
+		len(projection.Interaction.Actions) != 2 ||
+		projection.Interaction.Actions[0].Type !=
+			game.InteractionIntentAccept {
+		t.Fatalf("invalid combat-help fixture: %#v", projection.Interaction)
+	}
+	for _, forbidden := range []string{
+		"eligible_actor_ids",
+		"initiator_actor_id",
+		"deadline_revision",
+		"responses",
+		"credential_hash",
+		"parent_deadline_at",
+	} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatalf("combat-help fixture leaked %q", forbidden)
 		}
 	}
 }

@@ -504,6 +504,235 @@ func TestCombatResolutionRequestUsesReceiptAndContinuesAfterPass(t *testing.T) {
 	}
 }
 
+func TestCombatHelpActionsArePrivateIdempotentAndHaveOneConcurrentWinner(
+	t *testing.T,
+) {
+	ctx := context.Background()
+	clock := &manualClock{
+		value: time.Date(2026, time.July, 31, 4, 30, 0, 0, time.UTC),
+	}
+	store := memory.New()
+	service := NewService(
+		store,
+		combatApplicationPack(t),
+		clock,
+		NoopPublisher{},
+	)
+	owner, err := service.CreateLobby(ctx, "Alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	helper, err := service.JoinLobby(
+		ctx,
+		owner.GameID,
+		"combat-helper-credential",
+		"combat-helper-join",
+		owner.Projection.Version,
+		"Bob",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-helper-start",
+		helper.Projection.Version,
+		game.Command{Type: game.CommandStart},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setupOwner, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-helper-setup-owner",
+		started.Version,
+		game.Command{Type: game.CommandFinishSetup},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setupHelper, err := service.Execute(
+		ctx,
+		owner.GameID,
+		helper.Credential,
+		"combat-helper-setup-helper",
+		setupOwner.Version,
+		game.Command{Type: game.CommandFinishSetup},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := service.Execute(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-helper-open-door",
+		setupHelper.Version,
+		game.Command{Type: game.CommandOpenDoor},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requested, err := service.RequestCombatResolution(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-helper-request",
+		opened.Version,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	offer := interactionActionForTest(
+		t,
+		requested.Projection,
+		game.InteractionIntentOfferHelp,
+	)
+	if offer.HelperPlayerID != helper.PlayerID ||
+		offer.RewardTreasures != 1 {
+		t.Fatalf("server-owned offer: %#v", offer)
+	}
+	if _, err := service.ExecuteCombatHelpAction(
+		ctx,
+		owner.GameID,
+		helper.Credential,
+		"foreign-help-action",
+		requested.Version,
+		offer.ActionID,
+	); !errors.Is(err, ErrInteractionAction) {
+		t.Fatalf("foreign actor used private offer action: %v", err)
+	}
+	offered, err := service.ExecuteCombatHelpAction(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-help-offer",
+		requested.Version,
+		offer.ActionID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offered.Projection.Interaction == nil ||
+		offered.Projection.Interaction.PublicKind != "combat_help_offer" ||
+		offered.Projection.Interaction.CombatHelpOffer == nil {
+		t.Fatalf("owner offer projection: %#v", offered.Projection.Interaction)
+	}
+	replayed, err := service.ExecuteCombatHelpAction(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-help-offer",
+		requested.Version,
+		offer.ActionID,
+	)
+	if err != nil || !replayed.Replayed ||
+		replayed.Version != offered.Version {
+		t.Fatalf("offer replay=%#v err=%v", replayed, err)
+	}
+	cancel := interactionActionForTest(
+		t,
+		offered.Projection,
+		game.InteractionIntentCancelHelp,
+	)
+	if _, err := service.ExecuteCombatHelpAction(
+		ctx,
+		owner.GameID,
+		owner.Credential,
+		"combat-help-offer",
+		offered.Version,
+		cancel.ActionID,
+	); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("offer command ID accepted another fingerprint: %v", err)
+	}
+
+	helperProjection, err := service.Get(
+		ctx,
+		owner.GameID,
+		helper.Credential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accept := interactionActionForTest(
+		t,
+		helperProjection,
+		game.InteractionIntentAccept,
+	)
+	supersede := interactionActionForTest(
+		t,
+		offered.Projection,
+		game.InteractionIntentOfferHelp,
+	)
+	type outcome struct {
+		err error
+	}
+	release := make(chan struct{})
+	outcomes := make(chan outcome, 2)
+	go func() {
+		<-release
+		_, err := service.ExecuteInteraction(
+			ctx,
+			owner.GameID,
+			helper.Credential,
+			"combat-help-accept",
+			helperProjection.Version,
+			helperProjection.Interaction.InteractionID,
+			accept.ActionID,
+			accept.Type,
+		)
+		outcomes <- outcome{err: err}
+	}()
+	go func() {
+		<-release
+		_, err := service.ExecuteCombatHelpAction(
+			ctx,
+			owner.GameID,
+			owner.Credential,
+			"combat-help-supersede",
+			offered.Version,
+			supersede.ActionID,
+		)
+		outcomes <- outcome{err: err}
+	}()
+	close(release)
+	successes := 0
+	conflicts := 0
+	for range 2 {
+		result := <-outcomes
+		switch {
+		case result.err == nil:
+			successes++
+		case errors.Is(result.err, ErrVersionConflict):
+			conflicts++
+		default:
+			t.Fatalf("concurrent help outcome: %v", result.err)
+		}
+	}
+	if successes != 1 || conflicts != 1 {
+		t.Fatalf(
+			"concurrent accept/supersede successes=%d conflicts=%d",
+			successes,
+			conflicts,
+		)
+	}
+	due, err := store.DueInteractions(
+		ctx,
+		clock.value.Add(30*time.Second),
+		10,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(due) > 1 {
+		t.Fatalf("more than one actionable deadline survived: %#v", due)
+	}
+}
+
 func TestExpiredPlayerCommandCommitsSingleTimeout(t *testing.T) {
 	fixture := newInteractionFixture(t, 1)
 	ctx := context.Background()

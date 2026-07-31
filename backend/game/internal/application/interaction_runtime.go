@@ -318,11 +318,183 @@ func (service *Service) ExecuteInteraction(
 			command.InstanceID = action.SourceInstanceID
 			command.TargetInstanceID = string(action.Target)
 		}
+		combatHelpResponse := state.CombatHelpOffer != nil &&
+			state.SuspendedInteractionWindow != nil &&
+			state.CombatHelpOffer.ID == interactionID
+		if combatHelpResponse &&
+			(intent == game.InteractionIntentAccept ||
+				intent == game.InteractionIntentDecline) {
+			command.Type = game.CommandRespondCombatHelp
+		}
 		events, err := game.Handle(state, command, service.pack)
 		if err != nil {
 			return err
 		}
-		events, err = appendInteractionClose(state, events, command, service.pack)
+		if !combatHelpResponse {
+			events, err = appendInteractionClose(
+				state,
+				events,
+				command,
+				service.pack,
+			)
+			if err != nil {
+				return err
+			}
+		}
+		envelopes, next, err := service.applyAt(
+			state,
+			commandID,
+			events,
+			acceptedAt,
+		)
+		if err != nil {
+			return err
+		}
+		projection, err := service.projectForActor(next, actorID, acceptedAt)
+		if err != nil {
+			return err
+		}
+		rawProjection, err := json.Marshal(projection)
+		if err != nil {
+			return err
+		}
+		receipt := Receipt{
+			ActorID:     actorID,
+			CommandID:   commandID,
+			Fingerprint: fingerprint,
+			Version:     next.Version,
+			Projection:  rawProjection,
+		}
+		if err := tx.Save(state.Version, next, envelopes, &receipt); err != nil {
+			return err
+		}
+		result = CommandResult{
+			GameID:     gameID,
+			CommandID:  commandID,
+			Version:    next.Version,
+			Projection: projection,
+		}
+		publish = interactionInvalidation(gameID, next.Version, acceptedAt)
+		return nil
+	})
+	if err != nil {
+		return CommandResult{}, err
+	}
+	if publish != nil {
+		_ = service.publisher.Publish(ctx, *publish)
+	}
+	if committedError != nil {
+		return CommandResult{}, committedError
+	}
+	return result, nil
+}
+
+func (service *Service) ExecuteCombatHelpAction(
+	ctx context.Context,
+	gameID string,
+	credential string,
+	commandID string,
+	expectedVersion uint64,
+	actionID string,
+) (CommandResult, error) {
+	gameID = strings.TrimSpace(gameID)
+	commandID = strings.TrimSpace(commandID)
+	actionID = strings.TrimSpace(actionID)
+	if gameID == "" || credential == "" || commandID == "" {
+		return CommandResult{}, ErrUnauthorized
+	}
+	if actionID == "" {
+		return CommandResult{}, ErrInteractionAction
+	}
+	tokenHash := hashCredential(credential)
+	fingerprint := combatHelpFingerprint(expectedVersion, actionID)
+	var result CommandResult
+	var publish *Invalidation
+	var committedError error
+	err := service.store.WithinGame(ctx, gameID, func(tx Tx) error {
+		state := tx.State()
+		if err := service.ensureContentIdentity(state); err != nil {
+			return err
+		}
+		actorID, exists := state.ActorByCredentialHash(tokenHash)
+		if !exists {
+			return ErrUnauthorized
+		}
+		if receipt, exists := tx.FindReceipt(actorID, commandID); exists {
+			if receipt.Fingerprint != fingerprint {
+				return ErrIdempotencyConflict
+			}
+			var projection game.Projection
+			if err := json.Unmarshal(receipt.Projection, &projection); err != nil {
+				return err
+			}
+			result = CommandResult{
+				GameID:     gameID,
+				CommandID:  commandID,
+				Version:    receipt.Version,
+				Replayed:   true,
+				Projection: projection,
+			}
+			return nil
+		}
+		if state.Version != expectedVersion {
+			return ErrVersionConflict
+		}
+		projected, err := game.ProjectForActor(state, actorID, service.pack)
+		if err != nil {
+			return err
+		}
+		action, available := projectedCombatHelpAction(projected, actionID)
+		if !available {
+			return ErrInteractionAction
+		}
+		window := state.InteractionWindow
+		if window == nil ||
+			window.Status != game.InteractionWindowOpen ||
+			window.ID != action.InteractionID {
+			return ErrInteractionClosed
+		}
+		acceptedAt := time.Unix(0, service.clock.Now()).UTC()
+		if !acceptedAt.Before(window.DeadlineAt) {
+			next, invalidation, processed, err := service.timeoutInTransaction(
+				tx,
+				state,
+				window.ID,
+				window.DeadlineRevision,
+				acceptedAt,
+			)
+			if err != nil {
+				return err
+			}
+			if processed {
+				publish = invalidation
+				result.Version = next.Version
+			}
+			committedError = ErrInteractionExpired
+			return nil
+		}
+		command := game.Command{
+			ActorID:             actorID,
+			InteractionID:       action.InteractionID,
+			InteractionAt:       acceptedAt,
+			InteractionRevision: action.Revision,
+		}
+		switch action.Type {
+		case game.InteractionIntentOfferHelp:
+			childID, err := service.randomID("interaction")
+			if err != nil {
+				return err
+			}
+			command.Type = game.CommandOfferCombatHelp
+			command.ChildInteractionID = childID
+			command.HelperPlayerID = action.HelperPlayerID
+			command.RewardTreasures = action.RewardTreasures
+		case game.InteractionIntentCancelHelp:
+			command.Type = game.CommandCancelCombatHelp
+		default:
+			return ErrInteractionAction
+		}
+		events, err := game.Handle(state, command, service.pack)
 		if err != nil {
 			return err
 		}
@@ -632,6 +804,23 @@ func projectedInteractionAction(
 	return game.InteractionActionView{}, false
 }
 
+func projectedCombatHelpAction(
+	projection game.Projection,
+	actionID string,
+) (game.InteractionActionView, bool) {
+	if projection.Interaction == nil {
+		return game.InteractionActionView{}, false
+	}
+	for _, action := range projection.Interaction.Actions {
+		if action.ActionID == actionID &&
+			(action.Type == game.InteractionIntentOfferHelp ||
+				action.Type == game.InteractionIntentCancelHelp) {
+			return action, true
+		}
+	}
+	return game.InteractionActionView{}, false
+}
+
 func playerInteractionIntent(intent game.InteractionIntent) bool {
 	switch intent {
 	case game.InteractionIntentPass,
@@ -665,6 +854,23 @@ func interactionFingerprint(
 	})
 	if err != nil {
 		panic(fmt.Sprintf("marshal interaction fingerprint: %v", err))
+	}
+	digest := sha256.Sum256(raw)
+	return hex.EncodeToString(digest[:])
+}
+
+func combatHelpFingerprint(expectedVersion uint64, actionID string) string {
+	raw, err := json.Marshal(struct {
+		Type            string `json:"type"`
+		ExpectedVersion uint64 `json:"expected_version"`
+		ActionID        string `json:"action_id"`
+	}{
+		Type:            "combat_help_action",
+		ExpectedVersion: expectedVersion,
+		ActionID:        actionID,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("marshal combat-help fingerprint: %v", err))
 	}
 	digest := sha256.Sum256(raw)
 	return hex.EncodeToString(digest[:])

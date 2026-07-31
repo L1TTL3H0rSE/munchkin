@@ -1,10 +1,10 @@
 # PLAN: combat helper reward settlement
 
 - **Plan ID:** `20260731T001853Z-015911-combat-helper-reward-settlement`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:18:53 UTC
-- **Обновлён:** 2026-07-31 00:18:53 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 02:57:28 UTC
+- **Владелец:** Codex `/root`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -58,37 +58,37 @@ Treasure obligation становятся immutable и при победе исп
 
 ## Критерии приёмки
 
-- [ ] Help доступен только combatant через server descriptor внутри открытого
+- [x] Help доступен только combatant через server descriptor внутри открытого
   `combat_response`; client не присылает произвольный helper ID или максимум
   награды вне allowlisted options.
-- [ ] Offer содержит ровно одного living non-combatant и reward
+- [x] Offer содержит ровно одного living non-combatant и reward
   `1..max_available_treasures`, где maximum вычисляет backend из typed
   encounter reward и доступного Treasure draw capacity.
-- [ ] Одновременно существует не более одного pending offer. Combatant может
+- [x] Одновременно существует не более одного pending offer. Combatant может
   cancel либо supersede только до accept; эти действия не продлевают parent.
-- [ ] Offer не открывается, если parent оставляет менее 10 секунд; deadline
+- [x] Offer не открывается, если parent оставляет менее 10 секунд; deadline
   равен `min(opened_at + 30s, parent_deadline_at)`.
-- [ ] Exact helper/reward/action options видят только combatant и invited
+- [x] Exact helper/reward/action options видят только combatant и invited
   helper. Остальные actors видят не более coarse combat summary без факта
   declined/pending negotiation, если он не стал public rule outcome.
-- [ ] Invited helper может только accept/decline server-supplied offer ID.
+- [x] Invited helper может только accept/decline server-supplied offer ID.
   Late/stale/foreign response rejected under current version/window checks.
-- [ ] Accept фиксирует ровно одного helper и reward obligation, пересчитывает
+- [x] Accept фиксирует ровно одного helper и reward obligation, пересчитывает
   combat participant strength, сбрасывает response revision и может получить
   bounded material `+10s`; helper/reward после accept immutable.
-- [ ] Defeat/run-away закрывает conditional obligation с нулевой выплатой.
+- [x] Defeat/run-away закрывает conditional obligation с нулевой выплатой.
   Victory реализует Treasure draw один раз, persist-ит exact order и
   канонически отдаёт первые promised cards helper, остаток combatant.
-- [ ] Combat transition, делающий accepted reward неисполнимым, fail-closed до
+- [x] Combat transition, делающий accepted reward неисполнимым, fail-closed до
   append; UI договорённость не может обойти engine invariant.
-- [ ] Level/outcome, helper/combatant hands, reward settlement, window close,
+- [x] Level/outcome, helper/combatant hands, reward settlement, window close,
   deadline sync и receipt коммитятся атомарно; replay не читает deck/RNG/clock.
-- [ ] Duplicate offer/accept/decline/cancel/supersede возвращает receipt,
+- [x] Duplicate offer/accept/decline/cancel/supersede возвращает receipt,
   fingerprint reuse conflicts, concurrent accept/supersede имеет одного
   committed winner.
-- [ ] Legacy combat response без help, old rules profile and zero-helper
+- [x] Legacy combat response без help, old rules profile and zero-helper
   settlement сохраняют прежнее observable behavior.
-- [ ] Cross-actor Go/Zod fixtures и tests покрывают privacy, deadline clamp,
+- [x] Cross-actor Go/Zod fixtures и tests покрывают privacy, deadline clamp,
   parent timeout, reward bounds, immutable accept, victory/defeat and replay.
 
 ## Контекст и подтверждённое состояние
@@ -192,28 +192,28 @@ Treasure obligation становятся immutable и при победе исп
 
 ## План реализации
 
-1. [ ] Добавить parent/child and accepted obligation invariants plus replay
+1. [x] Добавить parent/child and accepted obligation invariants plus replay
    fixtures.
-2. [ ] Реализовать offer/cancel/supersede/accept/decline transitions and
+2. [x] Реализовать offer/cancel/supersede/accept/decline transitions and
    privacy projection.
-3. [ ] Подключить helper totals and exact victory/defeat settlement.
-4. [ ] Подключить application/HTTP/Zod/API contracts and concurrency tests.
-5. [ ] Выполнить focused/full checks, adversarial privacy/economy review,
+3. [x] Подключить helper totals and exact victory/defeat settlement.
+4. [x] Подключить application/HTTP/Zod/API contracts and concurrency tests.
+5. [x] Выполнить focused/full checks, adversarial privacy/economy review,
    canonical verify/scope-check and archive.
 
 ## Проверки
 
-- [ ] `cd backend/game && go test ./internal/game -run 'Help|Reward|Combat|Interaction' -count=1`
-- [ ] `cd backend/game && go test ./internal/application -run 'Help|Interaction' -count=1`
-- [ ] `cd backend/game && go test ./internal/transport/httpapi -run 'Help|Interaction' -count=1`
-- [ ] `cd backend/game && go test ./...`
-- [ ] `cd frontend && pnpm --filter @munchkin/contracts test`
-- [ ] `cd frontend && pnpm --filter @munchkin/web test`
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T001853Z-015911-combat-helper-reward-settlement`
-- [ ] `git diff --check`
+- [x] `cd backend/game && go test ./internal/game -run 'Help|Reward|Combat|Interaction' -count=1`
+- [x] `cd backend/game && go test ./internal/application -run 'Help|Interaction' -count=1`
+- [x] `cd backend/game && go test ./internal/transport/httpapi -run 'Help|Interaction' -count=1`
+- [x] `cd backend/game && go test ./...`
+- [x] `cd frontend && pnpm --filter @munchkin/contracts test`
+- [x] `cd frontend && pnpm --filter @munchkin/web test`
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260731T001853Z-015911-combat-helper-reward-settlement`
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -235,19 +235,43 @@ Treasure obligation становятся immutable и при победе исп
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:18:53 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Пользователь попросил подготовить
-  backend/frontend plans параллельно фоновой Terraform-работе; implementation,
-  selection, commit и push не разрешены.
+- **Подтверждено:** 2026-07-31
+- **Формулировка/ограничения пользователя:** Пользователь явно согласовал exact
+  plan ID вторым в очереди из девяти plans, разрешил выполнение и потребовал
+  отдельный локальный commit перед переходом к следующему plan. Push не
+  разрешён.
 
 ## Ход выполнения
 
 - Draft создан атомарно; реализация не начата.
 - Read-only audit использовал accepted ADR timing/help defaults and current
   engine reward path; Terraform files не затронуты.
+- Dependency plan `20260731T001853Z-be25a0-combat-response-domain-activation`
+  завершён, архивирован и зафиксирован отдельным commit `8b374f0`.
+- Approval записан; plan переведён в `in_progress` перед selection.
+- Реализован один suspended parent + один actionable child offer: offer,
+  cancel, supersede, accept, decline и timeout не позволяют двум actors
+  одновременно владеть negotiation.
+- Accepted helper и integer Treasure obligation сохраняются в encounter,
+  добавляют только authoritative helper strength и после accept неизменяемы.
+- Victory выполняет helper-first exact draw allocation через отдельный
+  replay-safe settlement event; defeat фиксирует zero-payout void event, а
+  невозможная обещанная выплата fail-closed до append.
+- Party-specific projection, opaque action IDs, strict HTTP/Zod request и web
+  adapter не принимают helper/reward/deadline authority от client.
+- Focused и полный Go suites прошли; frontend завершил 11 contracts tests,
+  46 web tests, lint, typecheck и production build. Functional CAS test
+  подтвердил одного winner в accept/supersede race; `-race` недоступен в
+  текущем Windows toolchain без CGO.
+- Canonical verify выполнил product, harness, `leinoctl`, script syntax и
+  Compose config checks; scope-check подтвердил `outsideWriteSet: []`,
+  `missingRequiredChecks: []`.
 
 ## Итог
 
-Заполняется после реализации.
+Voluntary helper flow завершён и архивирован. Parent/child timing, party
+privacy, immutable acceptance, helper combat total, zero-payout defeat,
+helper-first victory settlement, receipts и CAS races подтверждены тестами.
+Push не выполнялся.

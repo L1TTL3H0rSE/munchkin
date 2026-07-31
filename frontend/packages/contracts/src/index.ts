@@ -52,6 +52,10 @@ export const interactionIntentSchema = z.enum([
   "accept",
   "decline",
 ]);
+export const interactionActionTypeSchema = interactionIntentSchema.or(z.enum([
+  "offer_help",
+  "cancel_help",
+]));
 export const interactionResponseStateSchema = z.enum([
   "pending",
   "passed",
@@ -124,6 +128,8 @@ export const combatViewSchema = z.object({
   player_winning: z.boolean(),
   tie_wins: z.boolean(),
   combat_closed: z.boolean(),
+  helper_player_id: z.string().min(1).optional(),
+  helper_reward_treasures: z.number().int().positive().optional(),
   resolution_action: z.object({
     type: z.literal("request_combat_resolution"),
   }).strict().optional(),
@@ -163,15 +169,21 @@ export const interactionActionViewSchema = z.object({
   action_id: z.string().regex(/^act_[a-f0-9]{32}$/),
   interaction_id: z.string().min(1),
   revision: z.number().int().positive(),
-  type: interactionIntentSchema,
+  type: interactionActionTypeSchema,
   source_instance_id: z.string().min(1).optional(),
   target: z.enum(["player", "monster"]).optional(),
   combat_delta: z.number().int().refine((value) => value !== 0).optional(),
+  helper_player_id: z.string().min(1).optional(),
+  reward_treasures: z.number().int().positive().optional(),
 }).strict();
 
 export const interactionViewSchema = z.object({
   interaction_id: z.string().min(1),
-  public_kind: z.enum(["response_window", "combat_response"]),
+  public_kind: z.enum([
+    "response_window",
+    "combat_response",
+    "combat_help_offer",
+  ]),
   parent_phase: phaseSchema,
   public_subject: z.enum([
     "current_turn",
@@ -186,6 +198,10 @@ export const interactionViewSchema = z.object({
   my_response_state: interactionResponseStateSchema.optional(),
   response_required_for_you: z.boolean(),
   actions: z.array(interactionActionViewSchema),
+  combat_help_offer: z.object({
+    helper_player_id: z.string().min(1),
+    reward_treasures: z.number().int().positive(),
+  }).strict().optional(),
 }).strict();
 
 export const projectionSchema = z.object({
@@ -250,6 +266,11 @@ export const commandPayloadSchema = z.object({
 
 export const combatResolutionRequestSchema = z.object({
   expected_version: z.number().int().nonnegative(),
+}).strict();
+
+export const combatHelpRequestSchema = z.object({
+  expected_version: z.number().int().nonnegative(),
+  action_id: z.string().regex(/^act_[a-f0-9]{32}$/),
 }).strict();
 
 export const interactionCommandRequestSchema = z.object({
@@ -420,6 +441,7 @@ export type CommandPayload = z.infer<typeof commandPayloadSchema>;
 export type CombatResolutionRequest = z.infer<
   typeof combatResolutionRequestSchema
 >;
+export type CombatHelpRequest = z.infer<typeof combatHelpRequestSchema>;
 export type InteractionIntent = z.infer<typeof interactionIntentSchema>;
 export type InteractionView = z.infer<typeof interactionViewSchema>;
 export type InteractionCommandRequest = z.infer<

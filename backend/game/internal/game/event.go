@@ -3,6 +3,7 @@ package game
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 	"time"
 )
@@ -29,6 +30,10 @@ const (
 	EventInteractionResponseRecorded = "game.v1.interaction_response_recorded"
 	EventInteractionWindowClosed     = "game.v1.interaction_window_closed"
 	EventCombatInterventionApplied   = "game.v1.combat_intervention_applied"
+	EventCombatHelpOffered           = "game.v1.combat_help_offered"
+	EventCombatHelpOfferResolved     = "game.v1.combat_help_offer_resolved"
+	EventCombatHelpRewardSettled     = "game.v1.combat_help_reward_settled"
+	EventCombatHelpRewardVoided      = "game.v1.combat_help_reward_voided"
 
 	legacyEventPlayerJoined    = "game.v1.player_joined"
 	legacyEventGameStarted     = "game.v1.game_started"
@@ -112,6 +117,24 @@ type combatInterventionAppliedPayload struct {
 	ExtensionBudgetSeconds int          `json:"extension_budget_seconds"`
 }
 
+type combatHelpOfferedPayload struct {
+	Offer           CombatHelpOffer   `json:"offer"`
+	Window          InteractionWindow `json:"window"`
+	ReplacedOfferID string            `json:"replaced_offer_id,omitempty"`
+}
+
+type combatHelpOfferResolvedPayload struct {
+	OfferID                      string                 `json:"offer_id"`
+	ParentInteractionID          string                 `json:"parent_interaction_id"`
+	ActorID                      string                 `json:"actor_id"`
+	Intent                       InteractionIntent      `json:"intent,omitempty"`
+	Reason                       InteractionCloseReason `json:"reason"`
+	ResolvedAt                   time.Time              `json:"resolved_at"`
+	ParentDeadlineAt             time.Time              `json:"parent_deadline_at"`
+	ParentDeadlineRevision       uint32                 `json:"parent_deadline_revision"`
+	ParentExtensionBudgetSeconds int                    `json:"parent_extension_budget_seconds"`
+}
+
 func newEvent(eventType string, payload any) (DomainEvent, error) {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -176,6 +199,8 @@ func Apply(state State, event DomainEvent) (State, error) {
 		EventRoomLooted,
 		EventCombatAction,
 		EventCombatResolved,
+		EventCombatHelpRewardSettled,
+		EventCombatHelpRewardVoided,
 		EventRunAwayResolved,
 		EventEffectResolved,
 		EventCharityResolved,
@@ -277,6 +302,34 @@ func Apply(state State, event DomainEvent) (State, error) {
 			return State{}, err
 		}
 		return next, nil
+	case EventCombatHelpOffered:
+		payload, err := decode[combatHelpOfferedPayload](event)
+		if err != nil {
+			return State{}, err
+		}
+		next, err := applyCombatHelpOffered(state, payload)
+		if err != nil {
+			return State{}, err
+		}
+		next.Version++
+		if err := next.Validate(); err != nil {
+			return State{}, err
+		}
+		return next, nil
+	case EventCombatHelpOfferResolved:
+		payload, err := decode[combatHelpOfferResolvedPayload](event)
+		if err != nil {
+			return State{}, err
+		}
+		next, err := applyCombatHelpOfferResolved(state, payload)
+		if err != nil {
+			return State{}, err
+		}
+		next.Version++
+		if err := next.Validate(); err != nil {
+			return State{}, err
+		}
+		return next, nil
 	case EventInteractionWindowClosed:
 		payload, err := decode[interactionWindowClosedPayload](event)
 		if err != nil {
@@ -315,6 +368,168 @@ func Apply(state State, event DomainEvent) (State, error) {
 	default:
 		return State{}, fmt.Errorf("%w: unknown event %s", ErrIllegalCommand, event.Type)
 	}
+}
+
+func applyCombatHelpOffered(
+	state State,
+	payload combatHelpOfferedPayload,
+) (State, error) {
+	var parent InteractionWindow
+	if payload.ReplacedOfferID == "" {
+		if state.CombatHelpOffer != nil ||
+			state.SuspendedInteractionWindow != nil ||
+			state.InteractionWindow == nil ||
+			state.InteractionWindow.Status != InteractionWindowOpen ||
+			state.InteractionWindow.Kind != InteractionKindCombatResponse {
+			return State{}, fmt.Errorf(
+				"%w: combat-help parent is not available",
+				ErrIllegalCommand,
+			)
+		}
+		parent = *state.InteractionWindow.clone()
+	} else {
+		if state.CombatHelpOffer == nil ||
+			state.SuspendedInteractionWindow == nil ||
+			state.InteractionWindow == nil ||
+			state.InteractionWindow.ID != payload.ReplacedOfferID ||
+			state.CombatHelpOffer.ID != payload.ReplacedOfferID {
+			return State{}, fmt.Errorf(
+				"%w: combat-help supersede target is stale",
+				ErrIllegalCommand,
+			)
+		}
+		parent = *state.SuspendedInteractionWindow.clone()
+	}
+	expectedWindow, err := combatHelpWindow(
+		parent,
+		payload.Offer,
+		payload.Window.OpenedAt,
+	)
+	if err != nil || !reflect.DeepEqual(*expectedWindow, payload.Window) {
+		return State{}, fmt.Errorf(
+			"%w: combat-help child outcome differs",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	if payload.ReplacedOfferID == "" {
+		next.SuspendedInteractionWindow = parent.clone()
+	}
+	next.InteractionWindow = payload.Window.clone()
+	offer := payload.Offer
+	next.CombatHelpOffer = &offer
+	return next, nil
+}
+
+func applyCombatHelpOfferResolved(
+	state State,
+	payload combatHelpOfferResolvedPayload,
+) (State, error) {
+	if state.CombatHelpOffer == nil ||
+		state.SuspendedInteractionWindow == nil ||
+		state.InteractionWindow == nil ||
+		state.InteractionWindow.ID != payload.OfferID ||
+		state.CombatHelpOffer.ID != payload.OfferID ||
+		state.SuspendedInteractionWindow.ID != payload.ParentInteractionID {
+		return State{}, fmt.Errorf(
+			"%w: combat-help resolution is stale",
+			ErrIllegalCommand,
+		)
+	}
+	child := *state.InteractionWindow.clone()
+	parent := *state.SuspendedInteractionWindow.clone()
+	offer := *state.CombatHelpOffer
+	if payload.ResolvedAt.IsZero() ||
+		payload.ResolvedAt.Before(child.OpenedAt) {
+		return State{}, fmt.Errorf(
+			"%w: combat-help resolution instant",
+			ErrIllegalCommand,
+		)
+	}
+	expectedDeadline := parent.DeadlineAt
+	expectedRevision := parent.DeadlineRevision
+	expectedBudget := parent.ExtensionBudgetSeconds
+	switch payload.Reason {
+	case InteractionCloseAccepted:
+		if payload.ActorID != offer.HelperPlayerID ||
+			payload.Intent != InteractionIntentAccept ||
+			!payload.ResolvedAt.Before(child.DeadlineAt) {
+			return State{}, fmt.Errorf(
+				"%w: malformed combat-help acceptance",
+				ErrIllegalCommand,
+			)
+		}
+		var err error
+		expectedDeadline, expectedRevision, expectedBudget, err =
+			combatInterventionDeadlineAfter(parent, payload.ResolvedAt)
+		if err != nil {
+			return State{}, err
+		}
+	case InteractionCloseDeclined:
+		if payload.ActorID != offer.HelperPlayerID ||
+			payload.Intent != InteractionIntentDecline ||
+			!payload.ResolvedAt.Before(child.DeadlineAt) {
+			return State{}, fmt.Errorf(
+				"%w: malformed combat-help decline",
+				ErrIllegalCommand,
+			)
+		}
+	case InteractionCloseCancelled:
+		if payload.ActorID != offer.CombatantPlayerID ||
+			payload.Intent != "" ||
+			!payload.ResolvedAt.Before(child.DeadlineAt) {
+			return State{}, fmt.Errorf(
+				"%w: malformed combat-help cancel",
+				ErrIllegalCommand,
+			)
+		}
+	case InteractionCloseDeadlineExpired:
+		if payload.ActorID != offer.HelperPlayerID ||
+			payload.Intent != InteractionIntentDecline ||
+			payload.ResolvedAt.Before(child.DeadlineAt) {
+			return State{}, fmt.Errorf(
+				"%w: malformed combat-help timeout",
+				ErrIllegalCommand,
+			)
+		}
+	default:
+		return State{}, fmt.Errorf(
+			"%w: invalid combat-help resolution reason",
+			ErrIllegalCommand,
+		)
+	}
+	if !payload.ParentDeadlineAt.Equal(expectedDeadline) ||
+		payload.ParentDeadlineRevision != expectedRevision ||
+		payload.ParentExtensionBudgetSeconds != expectedBudget {
+		return State{}, fmt.Errorf(
+			"%w: combat-help parent deadline outcome differs",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	next.InteractionWindow = parent.clone()
+	next.InteractionWindow.DeadlineAt = payload.ParentDeadlineAt
+	next.InteractionWindow.DeadlineRevision =
+		payload.ParentDeadlineRevision
+	next.InteractionWindow.ExtensionBudgetSeconds =
+		payload.ParentExtensionBudgetSeconds
+	if payload.Reason == InteractionCloseAccepted {
+		for _, actorID := range next.InteractionWindow.EligibleActorIDs {
+			response := next.InteractionWindow.Responses[actorID]
+			response.State = InteractionResponsePending
+			response.Intent = ""
+			response.AcceptedAt = time.Time{}
+			next.InteractionWindow.Responses[actorID] = response
+		}
+		next.Turn.Encounter.CombatHelp = &CombatHelpAgreement{
+			HelperPlayerID:  offer.HelperPlayerID,
+			RewardTreasures: offer.RewardTreasures,
+			RewardStatus:    CombatHelpRewardAccepted,
+		}
+	}
+	next.SuspendedInteractionWindow = nil
+	next.CombatHelpOffer = nil
+	return next, nil
 }
 
 func applyCombatIntervention(

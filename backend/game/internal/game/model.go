@@ -159,12 +159,35 @@ func (player Player) allOwnedZones() [][]string {
 }
 
 type Encounter struct {
-	MonsterInstanceID      string `json:"monster_instance_id"`
-	PlayerCombatModifier   int    `json:"player_combat_modifier"`
-	MonsterCombatModifier  int    `json:"monster_combat_modifier"`
-	EscapeModifier         int    `json:"escape_modifier"`
-	TreasureRewardModifier int    `json:"treasure_reward_modifier"`
-	CombatClosed           bool   `json:"combat_closed"`
+	MonsterInstanceID      string               `json:"monster_instance_id"`
+	PlayerCombatModifier   int                  `json:"player_combat_modifier"`
+	MonsterCombatModifier  int                  `json:"monster_combat_modifier"`
+	EscapeModifier         int                  `json:"escape_modifier"`
+	TreasureRewardModifier int                  `json:"treasure_reward_modifier"`
+	CombatClosed           bool                 `json:"combat_closed"`
+	CombatHelp             *CombatHelpAgreement `json:"combat_help,omitempty"`
+}
+
+type CombatHelpRewardStatus string
+
+const (
+	CombatHelpRewardAccepted CombatHelpRewardStatus = "accepted"
+	CombatHelpRewardSettled  CombatHelpRewardStatus = "settled"
+	CombatHelpRewardVoided   CombatHelpRewardStatus = "voided"
+)
+
+type CombatHelpAgreement struct {
+	HelperPlayerID  string                 `json:"helper_player_id"`
+	RewardTreasures int                    `json:"reward_treasures"`
+	RewardStatus    CombatHelpRewardStatus `json:"reward_status"`
+}
+
+type CombatHelpOffer struct {
+	ID                  string `json:"offer_id"`
+	ParentInteractionID string `json:"parent_interaction_id"`
+	CombatantPlayerID   string `json:"combatant_player_id"`
+	HelperPlayerID      string `json:"helper_player_id"`
+	RewardTreasures     int    `json:"reward_treasures"`
 }
 
 type ActionWindow struct {
@@ -205,6 +228,8 @@ const (
 	InteractionIntentAccept      InteractionIntent = "accept"
 	InteractionIntentDecline     InteractionIntent = "decline"
 	InteractionIntentAutoResolve InteractionIntent = "auto_resolve"
+	InteractionIntentOfferHelp   InteractionIntent = "offer_help"
+	InteractionIntentCancelHelp  InteractionIntent = "cancel_help"
 )
 
 type InteractionResponseRequirement string
@@ -341,25 +366,27 @@ type Turn struct {
 }
 
 type State struct {
-	GameID              string                  `json:"game_id"`
-	Version             uint64                  `json:"version"`
-	Status              Status                  `json:"status"`
-	OwnerPlayerID       string                  `json:"owner_player_id"`
-	Players             []Player                `json:"players"`
-	Turn                Turn                    `json:"turn"`
-	Instances           map[string]CardInstance `json:"instances,omitempty"`
-	DoorDeck            []string                `json:"door_deck,omitempty"`
-	TreasureDeck        []string                `json:"treasure_deck,omitempty"`
-	DoorDiscard         []string                `json:"door_discard,omitempty"`
-	TreasureDiscard     []string                `json:"treasure_discard,omitempty"`
-	RNGState            uint64                  `json:"rng_state"`
-	ContentSetID        string                  `json:"content_set_id"`
-	ContentVersion      int                     `json:"content_version"`
-	ContentDigest       string                  `json:"content_digest"`
-	RulesProfileID      string                  `json:"rules_profile_id"`
-	RulesProfileVersion int                     `json:"rules_profile_version"`
-	WinnerPlayerID      string                  `json:"winner_player_id,omitempty"`
-	InteractionWindow   *InteractionWindow      `json:"interaction_window,omitempty"`
+	GameID                     string                  `json:"game_id"`
+	Version                    uint64                  `json:"version"`
+	Status                     Status                  `json:"status"`
+	OwnerPlayerID              string                  `json:"owner_player_id"`
+	Players                    []Player                `json:"players"`
+	Turn                       Turn                    `json:"turn"`
+	Instances                  map[string]CardInstance `json:"instances,omitempty"`
+	DoorDeck                   []string                `json:"door_deck,omitempty"`
+	TreasureDeck               []string                `json:"treasure_deck,omitempty"`
+	DoorDiscard                []string                `json:"door_discard,omitempty"`
+	TreasureDiscard            []string                `json:"treasure_discard,omitempty"`
+	RNGState                   uint64                  `json:"rng_state"`
+	ContentSetID               string                  `json:"content_set_id"`
+	ContentVersion             int                     `json:"content_version"`
+	ContentDigest              string                  `json:"content_digest"`
+	RulesProfileID             string                  `json:"rules_profile_id"`
+	RulesProfileVersion        int                     `json:"rules_profile_version"`
+	WinnerPlayerID             string                  `json:"winner_player_id,omitempty"`
+	InteractionWindow          *InteractionWindow      `json:"interaction_window,omitempty"`
+	SuspendedInteractionWindow *InteractionWindow      `json:"suspended_interaction_window,omitempty"`
+	CombatHelpOffer            *CombatHelpOffer        `json:"combat_help_offer,omitempty"`
 }
 
 func (state State) Clone() State {
@@ -386,10 +413,22 @@ func (state State) Clone() State {
 	clone.Turn.Pending = state.Turn.Pending.clone()
 	if state.Turn.Encounter != nil {
 		encounter := *state.Turn.Encounter
+		if state.Turn.Encounter.CombatHelp != nil {
+			agreement := *state.Turn.Encounter.CombatHelp
+			encounter.CombatHelp = &agreement
+		}
 		clone.Turn.Encounter = &encounter
 	}
 	if state.InteractionWindow != nil {
 		clone.InteractionWindow = state.InteractionWindow.clone()
+	}
+	if state.SuspendedInteractionWindow != nil {
+		clone.SuspendedInteractionWindow =
+			state.SuspendedInteractionWindow.clone()
+	}
+	if state.CombatHelpOffer != nil {
+		offer := *state.CombatHelpOffer
+		clone.CombatHelpOffer = &offer
 	}
 	return clone
 }
@@ -498,6 +537,9 @@ func (state State) Validate() error {
 		return fmt.Errorf("%w: invalid status", ErrIllegalCommand)
 	}
 	if err := state.validateInteractionWindow(); err != nil {
+		return err
+	}
+	if err := state.validateCombatHelp(); err != nil {
 		return err
 	}
 	if state.Status != StatusLobby {
@@ -655,6 +697,118 @@ func (state State) validateInteractionWindow() error {
 	return nil
 }
 
+func (state State) validateCombatHelp() error {
+	window := state.InteractionWindow
+	parent := state.SuspendedInteractionWindow
+	offer := state.CombatHelpOffer
+	if parent == nil && offer == nil {
+		if window != nil &&
+			window.Status == InteractionWindowOpen &&
+			window.Kind == InteractionKindAddressedResponse &&
+			window.Parent.SubjectKind == InteractionSubjectInteraction {
+			return fmt.Errorf(
+				"%w: addressed combat-help window lacks parent state",
+				ErrIllegalCommand,
+			)
+		}
+		return state.validateCombatHelpAgreement()
+	}
+	if parent == nil || offer == nil || window == nil {
+		return fmt.Errorf(
+			"%w: incomplete combat-help offer state",
+			ErrIllegalCommand,
+		)
+	}
+	if state.Status != StatusActive ||
+		state.Turn.Phase != PhaseCombat ||
+		state.Turn.Encounter == nil ||
+		state.Turn.Encounter.CombatClosed ||
+		state.Turn.Encounter.CombatHelp != nil ||
+		parent.Status != InteractionWindowOpen ||
+		parent.Kind != InteractionKindCombatResponse ||
+		parent.Parent.SubjectKind != InteractionSubjectEncounter ||
+		parent.Parent.Phase != PhaseCombat ||
+		parent.Parent.SubjectID != state.Turn.Encounter.MonsterInstanceID ||
+		parent.InitiatorActorID != state.Turn.PlayerID ||
+		window.Status != InteractionWindowOpen ||
+		window.Kind != InteractionKindAddressedResponse ||
+		window.Parent.SubjectKind != InteractionSubjectInteraction ||
+		window.Parent.ParentInteractionID != parent.ID ||
+		window.Parent.SubjectID != parent.ID ||
+		window.InitiatorActorID != state.Turn.PlayerID ||
+		window.ID != offer.ID ||
+		offer.ParentInteractionID != parent.ID ||
+		offer.CombatantPlayerID != state.Turn.PlayerID ||
+		offer.RewardTreasures < 1 ||
+		len(window.EligibleActorIDs) != 1 ||
+		window.EligibleActorIDs[0] != offer.HelperPlayerID ||
+		window.DeadlineAt.After(parent.DeadlineAt) {
+		return fmt.Errorf(
+			"%w: malformed combat-help offer state",
+			ErrIllegalCommand,
+		)
+	}
+	helperIndex := state.PlayerIndex(offer.HelperPlayerID)
+	if helperIndex < 0 ||
+		offer.HelperPlayerID == state.Turn.PlayerID ||
+		state.Players[helperIndex].Dead {
+		return fmt.Errorf(
+			"%w: invalid combat-help invitee",
+			ErrIllegalCommand,
+		)
+	}
+	return nil
+}
+
+func (state State) validateCombatHelpAgreement() error {
+	if state.Turn.Encounter == nil ||
+		state.Turn.Encounter.CombatHelp == nil {
+		return nil
+	}
+	agreement := state.Turn.Encounter.CombatHelp
+	helperIndex := state.PlayerIndex(agreement.HelperPlayerID)
+	if helperIndex < 0 ||
+		agreement.HelperPlayerID == state.Turn.PlayerID ||
+		agreement.RewardTreasures < 1 {
+		return fmt.Errorf(
+			"%w: malformed combat-help agreement",
+			ErrIllegalCommand,
+		)
+	}
+	switch agreement.RewardStatus {
+	case CombatHelpRewardAccepted:
+		if state.Turn.Phase != PhaseCombat ||
+			state.Turn.Encounter.CombatClosed ||
+			state.Players[helperIndex].Dead {
+			return fmt.Errorf(
+				"%w: accepted combat help is no longer legal",
+				ErrIllegalCommand,
+			)
+		}
+	case CombatHelpRewardSettled:
+		if state.Turn.Phase != PhaseCombat {
+			return fmt.Errorf(
+				"%w: settled combat reward must finish atomically",
+				ErrIllegalCommand,
+			)
+		}
+	case CombatHelpRewardVoided:
+		if state.Turn.Phase != PhaseCombat &&
+			state.Turn.Phase != PhaseRunAway {
+			return fmt.Errorf(
+				"%w: voided combat reward has invalid phase",
+				ErrIllegalCommand,
+			)
+		}
+	default:
+		return fmt.Errorf(
+			"%w: invalid combat-help reward status",
+			ErrIllegalCommand,
+		)
+	}
+	return nil
+}
+
 func (state State) interactionParentMatches(parent InteractionParent) bool {
 	switch parent.SubjectKind {
 	case InteractionSubjectTurn:
@@ -682,7 +836,8 @@ func validateInteractionResponse(
 			return fmt.Errorf("%w: optional response must timeout as pass", ErrIllegalCommand)
 		}
 	case InteractionResponseMandatory:
-		if response.TimeoutIntent != InteractionIntentAutoResolve {
+		if response.TimeoutIntent != InteractionIntentAutoResolve &&
+			response.TimeoutIntent != InteractionIntentDecline {
 			return fmt.Errorf("%w: mandatory response lacks typed default", ErrIllegalCommand)
 		}
 	default:

@@ -1,5 +1,6 @@
 import {
   commandResultSchema,
+  combatHelpRequestSchema,
   combatResolutionRequestSchema,
   interactionCommandRequestSchema,
   invalidationSchema,
@@ -148,6 +149,30 @@ export function useGameApi() {
     return commandResultSchema.parse(response);
   }
 
+  async function combatHelp(
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    actionID: string,
+  ) {
+    const request = combatHelpRequestSchema.parse({
+      expected_version: expectedVersion,
+      action_id: actionID,
+    });
+    const response = await $fetch(
+      `${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/commands/combat-help`,
+      {
+        method: "POST",
+        headers: {
+          ...authorization(credential),
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: request,
+      },
+    );
+    return commandResultSchema.parse(response);
+  }
+
   function stream(
     gameID: string,
     credential: string,
@@ -180,6 +205,7 @@ export function useGameApi() {
     command,
     interaction,
     requestCombatResolution,
+    combatHelp,
     stream,
     contentAssetURL,
   };

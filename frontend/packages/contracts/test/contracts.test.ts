@@ -2,6 +2,7 @@ import {readFileSync} from "node:fs";
 import {describe, expect, it} from "vitest";
 import {
   actionViewSchema,
+  combatHelpRequestSchema,
   combatResolutionRequestSchema,
   commandPayloadSchema,
   interactionActionViewSchema,
@@ -249,6 +250,66 @@ describe("wire contracts", () => {
       target: "player",
       combat_delta: 5,
     });
+  });
+
+  it("keeps combat-help terms server-owned and party-scoped", () => {
+    const offer = {
+      action_id: "act_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      interaction_id: "interaction_combat",
+      revision: 2,
+      type: "offer_help",
+      helper_player_id: "player_b",
+      reward_treasures: 1,
+    };
+    expect(interactionActionViewSchema.parse(offer)).toMatchObject({
+      helper_player_id: "player_b",
+      reward_treasures: 1,
+    });
+    expect(combatHelpRequestSchema.parse({
+      expected_version: 14,
+      action_id: offer.action_id,
+    })).toEqual({
+      expected_version: 14,
+      action_id: offer.action_id,
+    });
+    expect(() => combatHelpRequestSchema.parse({
+      expected_version: 14,
+      action_id: offer.action_id,
+      helper_player_id: "player_c",
+    })).toThrow();
+    expect(() => combatHelpRequestSchema.parse({
+      expected_version: 14,
+      action_id: offer.action_id,
+      reward_treasures: 9,
+    })).toThrow();
+    expect(() => interactionActionViewSchema.parse({
+      ...offer,
+      reward_treasures: 0,
+    })).toThrow();
+
+    const fixture: unknown = JSON.parse(readFileSync(new URL(
+      "../../../../backend/game/internal/transport/httpapi/testdata/"
+        + "combat-help-projection-v1.json",
+      import.meta.url,
+    ), "utf8"));
+    const parsed = projectionSchema.parse(fixture);
+    expect(parsed.interaction).toMatchObject({
+      public_kind: "combat_help_offer",
+      combat_help_offer: {
+        helper_player_id: "player_b",
+        reward_treasures: 1,
+      },
+    });
+    if (!parsed.interaction) {
+      throw new Error("combat-help fixture was not parsed");
+    }
+    expect(() => projectionSchema.parse({
+      ...parsed,
+      interaction: {
+        ...parsed.interaction,
+        helper_candidates: ["player_c"],
+      },
+    })).toThrow();
   });
 
   it("keeps Card Studio generation requests closed and path-free", () => {

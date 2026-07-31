@@ -36,6 +36,9 @@ const (
 	CommandCloseInteractionWindow   CommandType = "close_interaction_window"
 	CommandPlayCombatIntervention   CommandType = "play_combat_intervention"
 	CommandCompleteCombatResolution CommandType = "complete_combat_resolution"
+	CommandOfferCombatHelp          CommandType = "offer_combat_help"
+	CommandRespondCombatHelp        CommandType = "respond_combat_help"
+	CommandCancelCombatHelp         CommandType = "cancel_combat_help"
 
 	// Bootstrap aliases remain parseable, but use the new deterministic paths.
 	CommandFight CommandType = "fight"
@@ -59,6 +62,9 @@ type Command struct {
 	InteractionRevision    uint32                 `json:"-"`
 	InteractionCloseReason InteractionCloseReason `json:"-"`
 	InteractionWindow      *InteractionWindow     `json:"-"`
+	ChildInteractionID     string                 `json:"-"`
+	HelperPlayerID         string                 `json:"-"`
+	RewardTreasures        int                    `json:"-"`
 }
 
 func CreateLobby(gameID string, owner Player, pack Pack, seed uint64) (DomainEvent, error) {
@@ -177,6 +183,12 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 		return handlePlayCombatIntervention(state, command, pack)
 	case CommandCompleteCombatResolution:
 		return handleCompleteCombatResolution(state, command, pack)
+	case CommandOfferCombatHelp:
+		return handleOfferCombatHelp(state, command, pack)
+	case CommandRespondCombatHelp:
+		return handleRespondCombatHelp(state, command, pack)
+	case CommandCancelCombatHelp:
+		return handleCancelCombatHelp(state, command)
 	default:
 		return nil, fmt.Errorf("%w: unknown command %s", ErrIllegalCommand, command.Type)
 	}
@@ -390,6 +402,11 @@ func handleTimeoutInteraction(
 			ErrIllegalCommand,
 		)
 	}
+	if state.CombatHelpOffer != nil &&
+		state.SuspendedInteractionWindow != nil &&
+		window.ID == state.CombatHelpOffer.ID {
+		return handleTimeoutCombatHelp(state, command, pack)
+	}
 	next := state.Clone()
 	events := make([]DomainEvent, 0, len(window.EligibleActorIDs)+1)
 	for _, actorID := range window.EligibleActorIDs {
@@ -567,6 +584,311 @@ func handlePlayCombatIntervention(
 		return nil, err
 	}
 	return []DomainEvent{event}, nil
+}
+
+func handleOfferCombatHelp(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	if !profile.CombatResponses ||
+		state.Status != StatusActive ||
+		state.Turn.Phase != PhaseCombat ||
+		state.Turn.Encounter == nil ||
+		state.Turn.Encounter.CombatClosed ||
+		state.Turn.Encounter.CombatHelp != nil ||
+		command.ActorID != state.Turn.PlayerID ||
+		strings.TrimSpace(command.ChildInteractionID) == "" {
+		return nil, fmt.Errorf(
+			"%w: combat help is not available",
+			ErrIllegalCommand,
+		)
+	}
+	var parent InteractionWindow
+	var replacedOfferID string
+	if state.CombatHelpOffer == nil {
+		window, err := requireInteractionWindow(state, command.InteractionID)
+		if err != nil {
+			return nil, err
+		}
+		if window.Kind != InteractionKindCombatResponse ||
+			window.Parent.SubjectKind != InteractionSubjectEncounter ||
+			window.InitiatorActorID != command.ActorID ||
+			window.DeadlineRevision != command.InteractionRevision {
+			return nil, fmt.Errorf(
+				"%w: stale combat-help parent action",
+				ErrIllegalCommand,
+			)
+		}
+		parent = window
+	} else {
+		window, err := requireInteractionWindow(state, command.InteractionID)
+		if err != nil {
+			return nil, err
+		}
+		if state.SuspendedInteractionWindow == nil ||
+			window.ID != state.CombatHelpOffer.ID ||
+			window.InitiatorActorID != command.ActorID ||
+			window.DeadlineRevision != command.InteractionRevision {
+			return nil, fmt.Errorf(
+				"%w: stale combat-help supersede action",
+				ErrIllegalCommand,
+			)
+		}
+		parent = *state.SuspendedInteractionWindow.clone()
+		replacedOfferID = state.CombatHelpOffer.ID
+	}
+	helperIndex := state.PlayerIndex(command.HelperPlayerID)
+	if helperIndex < 0 ||
+		command.HelperPlayerID == command.ActorID ||
+		state.Players[helperIndex].Dead {
+		return nil, fmt.Errorf(
+			"%w: combat helper is not eligible",
+			ErrIllegalCommand,
+		)
+	}
+	maxReward, err := combatHelpRewardMaximum(state, pack)
+	if err != nil {
+		return nil, err
+	}
+	if command.RewardTreasures < 1 ||
+		command.RewardTreasures > maxReward {
+		return nil, fmt.Errorf(
+			"%w: combat-help reward is outside server bounds",
+			ErrIllegalCommand,
+		)
+	}
+	offer := CombatHelpOffer{
+		ID:                  command.ChildInteractionID,
+		ParentInteractionID: parent.ID,
+		CombatantPlayerID:   command.ActorID,
+		HelperPlayerID:      command.HelperPlayerID,
+		RewardTreasures:     command.RewardTreasures,
+	}
+	child, err := combatHelpWindow(parent, offer, command.InteractionAt)
+	if err != nil {
+		return nil, err
+	}
+	event, err := newEvent(
+		EventCombatHelpOffered,
+		combatHelpOfferedPayload{
+			Offer:           offer,
+			Window:          *child,
+			ReplacedOfferID: replacedOfferID,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := Apply(state, event); err != nil {
+		return nil, err
+	}
+	return []DomainEvent{event}, nil
+}
+
+func handleRespondCombatHelp(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	if command.InteractionIntent != InteractionIntentAccept &&
+		command.InteractionIntent != InteractionIntentDecline {
+		return nil, fmt.Errorf(
+			"%w: combat-help response must accept or decline",
+			ErrIllegalCommand,
+		)
+	}
+	window, offer, parent, err := requireCombatHelpOffer(
+		state,
+		command.InteractionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if command.ActorID != offer.HelperPlayerID ||
+		command.InteractionRevision != window.DeadlineRevision ||
+		command.InteractionAt.IsZero() ||
+		command.InteractionAt.Before(window.OpenedAt) ||
+		!command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: stale or foreign combat-help response",
+			ErrIllegalCommand,
+		)
+	}
+	if _, err := interactionResponseAt(window, command.ActorID); err != nil {
+		return nil, err
+	}
+	reason := InteractionCloseDeclined
+	parentDeadline := parent.DeadlineAt
+	parentRevision := parent.DeadlineRevision
+	parentBudget := parent.ExtensionBudgetSeconds
+	if command.InteractionIntent == InteractionIntentAccept {
+		maxReward, err := combatHelpRewardMaximum(state, pack)
+		if err != nil {
+			return nil, err
+		}
+		if offer.RewardTreasures > maxReward {
+			return nil, fmt.Errorf(
+				"%w: accepted combat-help reward is no longer available",
+				ErrIllegalCommand,
+			)
+		}
+		parentDeadline, parentRevision, parentBudget, err =
+			combatInterventionDeadlineAfter(parent, command.InteractionAt)
+		if err != nil {
+			return nil, err
+		}
+		reason = InteractionCloseAccepted
+	}
+	event, err := newEvent(
+		EventCombatHelpOfferResolved,
+		combatHelpOfferResolvedPayload{
+			OfferID:                      offer.ID,
+			ParentInteractionID:          parent.ID,
+			ActorID:                      command.ActorID,
+			Intent:                       command.InteractionIntent,
+			Reason:                       reason,
+			ResolvedAt:                   command.InteractionAt,
+			ParentDeadlineAt:             parentDeadline,
+			ParentDeadlineRevision:       parentRevision,
+			ParentExtensionBudgetSeconds: parentBudget,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := Apply(state, event); err != nil {
+		return nil, err
+	}
+	return []DomainEvent{event}, nil
+}
+
+func handleCancelCombatHelp(
+	state State,
+	command Command,
+) ([]DomainEvent, error) {
+	window, offer, parent, err := requireCombatHelpOffer(
+		state,
+		command.InteractionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if command.ActorID != offer.CombatantPlayerID ||
+		command.ActorID != window.InitiatorActorID ||
+		command.InteractionRevision != window.DeadlineRevision ||
+		command.InteractionAt.IsZero() ||
+		command.InteractionAt.Before(window.OpenedAt) ||
+		!command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: stale or foreign combat-help cancel",
+			ErrIllegalCommand,
+		)
+	}
+	event, err := newEvent(
+		EventCombatHelpOfferResolved,
+		combatHelpOfferResolvedPayload{
+			OfferID:                      offer.ID,
+			ParentInteractionID:          parent.ID,
+			ActorID:                      command.ActorID,
+			Reason:                       InteractionCloseCancelled,
+			ResolvedAt:                   command.InteractionAt,
+			ParentDeadlineAt:             parent.DeadlineAt,
+			ParentDeadlineRevision:       parent.DeadlineRevision,
+			ParentExtensionBudgetSeconds: parent.ExtensionBudgetSeconds,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := Apply(state, event); err != nil {
+		return nil, err
+	}
+	return []DomainEvent{event}, nil
+}
+
+func handleTimeoutCombatHelp(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
+	window, offer, parent, err := requireCombatHelpOffer(
+		state,
+		command.InteractionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if command.InteractionRevision != window.DeadlineRevision ||
+		command.InteractionAt.Before(window.DeadlineAt) {
+		return nil, fmt.Errorf(
+			"%w: stale combat-help timeout",
+			ErrIllegalCommand,
+		)
+	}
+	event, err := newEvent(
+		EventCombatHelpOfferResolved,
+		combatHelpOfferResolvedPayload{
+			OfferID:                      offer.ID,
+			ParentInteractionID:          parent.ID,
+			ActorID:                      offer.HelperPlayerID,
+			Intent:                       InteractionIntentDecline,
+			Reason:                       InteractionCloseDeadlineExpired,
+			ResolvedAt:                   command.InteractionAt,
+			ParentDeadlineAt:             parent.DeadlineAt,
+			ParentDeadlineRevision:       parent.DeadlineRevision,
+			ParentExtensionBudgetSeconds: parent.ExtensionBudgetSeconds,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	next, err := Apply(state, event)
+	if err != nil {
+		return nil, err
+	}
+	events := []DomainEvent{event}
+	if !command.InteractionAt.Before(parent.DeadlineAt) {
+		parentEvents, err := handleTimeoutInteraction(
+			next,
+			Command{
+				Type:                CommandTimeoutInteraction,
+				InteractionID:       parent.ID,
+				InteractionAt:       command.InteractionAt,
+				InteractionRevision: parent.DeadlineRevision,
+			},
+			pack,
+		)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, parentEvents...)
+	}
+	return events, nil
+}
+
+func requireCombatHelpOffer(
+	state State,
+	interactionID string,
+) (InteractionWindow, CombatHelpOffer, InteractionWindow, error) {
+	window, err := requireInteractionWindow(state, interactionID)
+	if err != nil {
+		return InteractionWindow{}, CombatHelpOffer{}, InteractionWindow{}, err
+	}
+	if state.CombatHelpOffer == nil ||
+		state.SuspendedInteractionWindow == nil ||
+		state.CombatHelpOffer.ID != window.ID {
+		return InteractionWindow{}, CombatHelpOffer{}, InteractionWindow{},
+			fmt.Errorf("%w: combat-help offer is not active", ErrIllegalCommand)
+	}
+	return window,
+		*state.CombatHelpOffer,
+		*state.SuspendedInteractionWindow.clone(),
+		nil
 }
 
 func appendCombatContinuation(
@@ -1346,7 +1668,61 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 			rewardCount,
 			len(next.TreasureDeck)+len(next.TreasureDiscard),
 		)
-		if rewardCount > 0 {
+		var prefix []DomainEvent
+		help := next.Turn.Encounter.CombatHelp
+		if help != nil && help.RewardStatus == CombatHelpRewardAccepted {
+			if rewardCount < help.RewardTreasures {
+				return nil, fmt.Errorf(
+					"%w: accepted helper reward cannot be settled",
+					ErrIllegalCommand,
+				)
+			}
+			helperIndex := next.PlayerIndex(help.HelperPlayerID)
+			if helperIndex < 0 {
+				return nil, fmt.Errorf(
+					"%w: accepted combat helper is missing",
+					ErrIllegalCommand,
+				)
+			}
+			rewards, err := next.takeCards(
+				DeckTreasure,
+				rewardCount,
+				&outcomes,
+			)
+			if err != nil {
+				return nil, err
+			}
+			outcomes = append(outcomes, RandomOutcome{
+				Kind:  "draw",
+				Deck:  DeckTreasure,
+				Order: append([]string(nil), rewards...),
+			})
+			next.Players[helperIndex].Hand = append(
+				next.Players[helperIndex].Hand,
+				rewards[:help.RewardTreasures]...,
+			)
+			next.Players[playerIndex].Hand = append(
+				next.Players[playerIndex].Hand,
+				rewards[help.RewardTreasures:]...,
+			)
+			next.Turn.Encounter.CombatHelp.RewardStatus =
+				CombatHelpRewardSettled
+			settlement, err := newStateEvent(
+				EventCombatHelpRewardSettled,
+				command.Type,
+				next,
+				outcomes,
+			)
+			if err != nil {
+				return nil, err
+			}
+			next, err = Apply(state, settlement)
+			if err != nil {
+				return nil, err
+			}
+			prefix = append(prefix, settlement)
+			outcomes = nil
+		} else if rewardCount > 0 {
 			rewards, err := next.takeCards(DeckTreasure, rewardCount, &outcomes)
 			if err != nil {
 				return nil, err
@@ -1375,7 +1751,35 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 		} else {
 			setTurnPhase(&next, PhaseCharity)
 		}
-		return transition(EventCombatResolved, command, next, outcomes)
+		resolved, err := transition(
+			EventCombatResolved,
+			command,
+			next,
+			outcomes,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return append(prefix, resolved...), nil
+	}
+	var prefix []DomainEvent
+	if help := next.Turn.Encounter.CombatHelp; help != nil &&
+		help.RewardStatus == CombatHelpRewardAccepted {
+		next.Turn.Encounter.CombatHelp.RewardStatus = CombatHelpRewardVoided
+		voided, err := newStateEvent(
+			EventCombatHelpRewardVoided,
+			command.Type,
+			next,
+			nil,
+		)
+		if err != nil {
+			return nil, err
+		}
+		next, err = Apply(state, voided)
+		if err != nil {
+			return nil, err
+		}
+		prefix = append(prefix, voided)
 	}
 	tags, err := characterTags(next, next.Players[playerIndex], pack)
 	if err != nil {
@@ -1392,7 +1796,11 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 		next.Turn.Encounter.CombatClosed = true
 		setTurnPhase(&next, PhaseRunAway)
 	}
-	return transition(EventCombatResolved, command, next, outcomes)
+	resolved, err := transition(EventCombatResolved, command, next, outcomes)
+	if err != nil {
+		return nil, err
+	}
+	return append(prefix, resolved...), nil
 }
 
 func handleRunAway(state State, command Command, pack Pack) ([]DomainEvent, error) {

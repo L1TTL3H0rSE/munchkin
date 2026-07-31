@@ -145,6 +145,41 @@ describe("interaction API adapter", () => {
     expect(options.body).not.toHaveProperty("combat_delta");
   });
 
+  it("submits combat-help negotiation by opaque action ID only", async () => {
+    const actionID = "act_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    const fetchMock = vi.fn().mockResolvedValue({
+      game_id: combatProjection.game_id,
+      command_id: "help_fixture",
+      version: combatProjection.version,
+      replayed: false,
+      projection: combatProjection,
+    });
+    vi.stubGlobal("useRuntimeConfig", () => ({
+      public: {apiBase: "https://game.example.test"},
+    }));
+    vi.stubGlobal("$fetch", fetchMock);
+
+    await useGameApi().combatHelp(
+      combatProjection.game_id,
+      "credential",
+      combatProjection.version,
+      actionID,
+    );
+
+    const [url, options] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe(
+      "https://game.example.test/api/v1/games/game_combat_fixture/"
+        + "commands/combat-help",
+    );
+    expect(options.body).toEqual({
+      expected_version: 12,
+      action_id: actionID,
+    });
+    expect(options.body).not.toHaveProperty("helper_player_id");
+    expect(options.body).not.toHaveProperty("reward_treasures");
+    expect(options.body).not.toHaveProperty("deadline_at");
+  });
+
   it("rejects an invalid action ID before transport", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("useRuntimeConfig", () => ({

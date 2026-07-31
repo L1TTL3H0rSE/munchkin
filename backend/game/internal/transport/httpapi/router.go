@@ -76,6 +76,10 @@ func NewWithOptions(service *application.Service, options Options) http.Handler 
 		"POST /api/v1/games/{gameID}/commands/request-combat-resolution",
 		router.requestCombatResolution,
 	)
+	mux.HandleFunc(
+		"POST /api/v1/games/{gameID}/commands/combat-help",
+		router.combatHelp,
+	)
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/run-away", router.command(game.CommandRunAway))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/choose-effect", router.command(game.CommandChooseEffect))
 	mux.HandleFunc("POST /api/v1/games/{gameID}/commands/resolve-charity", router.command(game.CommandResolveCharity))
@@ -120,6 +124,11 @@ type interactionRequest struct {
 
 type versionedRequest struct {
 	ExpectedVersion uint64 `json:"expected_version"`
+}
+
+type combatHelpRequest struct {
+	ExpectedVersion uint64 `json:"expected_version"`
+	ActionID        string `json:"action_id"`
 }
 
 func (router *Router) health(writer http.ResponseWriter, _ *http.Request) {
@@ -386,6 +395,40 @@ func (router *Router) interaction(pass bool) http.HandlerFunc {
 		}
 		writeJSON(writer, http.StatusOK, result)
 	}
+}
+
+func (router *Router) combatHelp(
+	writer http.ResponseWriter,
+	request *http.Request,
+) {
+	var body combatHelpRequest
+	if err := decodeJSON(writer, request, &body); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	commandID := strings.TrimSpace(request.Header.Get("Idempotency-Key"))
+	if commandID == "" || len(commandID) > 128 {
+		writeError(
+			writer,
+			http.StatusBadRequest,
+			"idempotency_key_required",
+			"Idempotency-Key is required",
+		)
+		return
+	}
+	result, err := router.service.ExecuteCombatHelpAction(
+		request.Context(),
+		request.PathValue("gameID"),
+		bearerToken(request),
+		commandID,
+		body.ExpectedVersion,
+		body.ActionID,
+	)
+	if err != nil {
+		router.mapError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, result)
 }
 
 func respondInteractionIntent(intent game.InteractionIntent) bool {
