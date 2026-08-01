@@ -171,11 +171,13 @@ local production graph: one public Yandex Cloud DNS zone, one exact-hostname
 `A` record targeting the already reserved `81.26.187.230`, one deletion-
 protected Lockbox secret container and one exact runtime `viewer` IAM member.
 The telemetry plan adds a dedicated Monium writer service account, two exact
-folder IAM member roles and one dashboard. The repository graph is therefore
-checked as `19` resources, while the live remote state remains the previously
+folder IAM member roles and one dashboard. The backup plan adds one protected
+KMS key, one private versioned bucket, two bucket IAM bindings and two
+conditional KMS member bindings. The repository graph is therefore checked as
+`25` resources, while the live remote state remains the previously
 applied `10` until separate sanitized Terraform plans and owner approvals. The
-DNS/record, Monium/IAM/dashboard and registrar NS delegation are separate
-mutation gates.
+DNS/record, Monium/IAM/dashboard, backup bucket/KMS/IAM and registrar NS
+delegation are separate mutation gates.
 
 The Lockbox resource deliberately contains no password generation block,
 secret version, entry or payload value. PostgreSQL password, derived DSN,
@@ -201,6 +203,25 @@ owner-approved Monium API/UI import; no owner email is stored in the
 repository. The Collector sends metrics and traces only, with bounded
 sampling/queue/retry and no logs. A clean local graph is not evidence of a
 remote apply or of a live dashboard, alert delivery or cost/soak result.
+
+### PostgreSQL backup graph (local-only, not applied)
+
+The production root defines the dedicated
+`munchkin-production-backups-b1g55l8i2mtpv23b5ql7` bucket with anonymous access
+disabled, static-key authentication disabled, versioning, default KMS
+encryption and lifecycle prefixes for `7 daily + 4 weekly` retention. The
+existing keyless runtime service account receives only bucket-scoped
+`storage.uploader` plus KMS `kms.keys.encrypter` for upload/read-after-write;
+the owner-supplied `backup_operator_subject` conditionally receives
+`storage.viewer` and KMS `kms.keys.decrypter` for the isolated restore drill.
+The Terraform provider identity is the separate provisioning/configuration
+actor; no bucket object, static key or secret payload is stored in state.
+
+`backup_operator_subject` is intentionally empty by default, so a local plan
+cannot accidentally provision restore access. The exact Object Storage/KMS
+graph, first-dump growth, non-production token probe, bucket apply and restore
+drill remain owner-gated evidence/mutation steps. See
+`docs/operations/POSTGRES_BACKUP_AND_RESTORE.md` for the sanitized sequence.
 
 ### GitHub Actions WIF handoff (repository implementation, not applied)
 
@@ -322,9 +343,9 @@ terraform fmt -check -recursive infra/terraform
 - требует ровно по одному bucket-scoped `storage.configurer` и
   `storage.editor` binding с exact единственным member — state service
   account — и запрещает folder-wide варианты этих roles;
-- проверяет exact пять deployer roles, runtime-SA handoff, ровно `19`
-  local production resources (including DNS, metadata-only Lockbox and
-  Monium telemetry), три data lookup, exact runtime puller plus CI pusher,
+- проверяет exact пять deployer roles, runtime-SA handoff, ровно `25`
+  local production resources (including DNS, metadata-only Lockbox, Monium
+  telemetry and the private encrypted backup graph), три data lookup, exact runtime puller plus CI pusher,
   sensitive SSH boundary,
   IPv4-only ingress, fixed VM/disk profile и cloud-init host baseline;
 - отклоняет tracked state/plan/tfvars/backend artifacts и inline credentials.

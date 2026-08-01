@@ -1,0 +1,69 @@
+apiVersion: observability.munchkin/v1
+kind: AlertSet
+metadata:
+  name: munchkin-production-backup-alerts
+  owner: repository
+  environment: production
+spec:
+  provider: yandex-monium
+  project: folder__b1g55l8i2mtpv23b5ql7
+  provisioning: manual-import-after-separate-remote-approval
+  budget:
+    currency: RUB
+    soft_ceiling_monthly: 300
+    review_at_percent: 70
+    stop_at_percent: 100
+    include_alert_calculation_cost: true
+  delivery:
+    destination_ref: owner-only-email-outside-repository
+    address_source: approved-owner-secret-store
+    address_is_not_stored_here: true
+    test_delivery_requires_separate_approval: true
+    deduplication:
+      key: munchkin-production-backup/{{ rule.id }}
+      group_by:
+        - rule.id
+        - backup.kind
+        - deployment.environment
+    silence:
+      default_duration: 30m
+      manual_only: true
+      require_reason: true
+      auto_resolve_after: 15m
+  rules:
+    - id: backup-freshness-over-26h
+      name: PostgreSQL backup freshness over 26 hours
+      severity: critical
+      for: 10m
+      condition:
+        query: backup_age_hours
+        expression: "last(backup_age_hours) > 26"
+      queries:
+        backup_verified_timestamp: >-
+          series_max({project="folder__b1g55l8i2mtpv23b5ql7", cluster="production",
+          service="munchkin-backup", env="production", name="munchkin.backup.verified_timestamp",
+          backup.kind="postgres"})
+        backup_age_hours: "max((now() - backup_verified_timestamp) / 3600, 0)"
+      prerequisite: the host backup job must publish the bounded OTLP metric after a verified manifest commit.
+      runbook: https://github.com/L1TTL3H0rSE/munchkin/blob/main/docs/operations/POSTGRES_BACKUP_AND_RESTORE.md#stale-or-missing-backup
+      annotations:
+        summary: The newest verified PostgreSQL backup is older than the approved 26-hour freshness threshold.
+        action: Stop destructive maintenance, inspect the root-owned backup status and run the non-production token/upload checks.
+
+    - id: backup-job-failure
+      name: PostgreSQL backup job failure
+      severity: high
+      for: 5m
+      condition:
+        query: backup_failure
+        expression: "last(backup_failure) > 0"
+      queries:
+        backup_failure: >-
+          series_max({project="folder__b1g55l8i2mtpv23b5ql7", cluster="production",
+          service="munchkin-backup", env="production", name="munchkin.backup.failure",
+          backup.kind="postgres"})
+      prerequisite: the host backup job must publish a failure metric without object names, database values or credentials.
+      runbook: https://github.com/L1TTL3H0rSE/munchkin/blob/main/docs/operations/POSTGRES_BACKUP_AND_RESTORE.md#backup-failure
+      annotations:
+        summary: The scheduled PostgreSQL backup reported a failure.
+        action: Preserve the last verified object, inspect failure_stage only, and do not delete or overwrite backup generations.

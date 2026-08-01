@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Munchkin PostgreSQL off-host backup schedule
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Europe/Moscow
+Persistent=true
+AccuracySec=1min
+Unit=munchkin-postgres-backup.service
+
+[Install]
+WantedBy=timers.target

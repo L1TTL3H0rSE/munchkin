@@ -722,8 +722,10 @@ production_registry="$production_root/registry.tf"
 production_compute="$production_root/compute.tf"
 production_cloud_init="$production_root/cloud-init.yaml.tftpl"
 production_telemetry="$production_root/telemetry.tf"
+production_backup="$production_root/backup.tf"
 production_dashboard="$repo_root/infra/observability/monium/production-dashboard.json"
 production_alerts="$repo_root/infra/observability/monium/production-alerts.yaml"
+production_backup_alerts="$repo_root/infra/observability/monium/backup-alerts.yaml"
 
 for required_file in \
   "$production_variables" \
@@ -735,8 +737,10 @@ for required_file in \
   "$production_compute" \
   "$production_cloud_init" \
   "$production_telemetry" \
+  "$production_backup" \
   "$production_dashboard" \
   "$production_alerts" \
+  "$production_backup_alerts" \
   "$production_root/outputs.tf"; do
   if [[ ! -f "$required_file" ]]; then
     echo "production graph is missing required file: $required_file" >&2
@@ -749,8 +753,8 @@ production_resource_count="$(
     wc -l |
     tr -d '[:space:]'
 )"
-if [[ "$production_resource_count" != "19" ]]; then
-  echo "production graph must contain exactly 19 managed resources; got $production_resource_count" >&2
+if [[ "$production_resource_count" != "25" ]]; then
+  echo "production graph must contain exactly 25 managed resources; got $production_resource_count" >&2
   exit 1
 fi
 
@@ -762,9 +766,13 @@ declare -A expected_production_resource_counts=(
   [yandex_container_registry]=1
   [yandex_container_repository]=2
   [yandex_container_registry_iam_binding]=2
+  [yandex_kms_symmetric_key]=1
+  [yandex_kms_symmetric_key_iam_member]=2
   [yandex_iam_service_account]=1
   [yandex_resourcemanager_folder_iam_member]=2
   [yandex_monitoring_dashboard]=1
+  [yandex_storage_bucket]=1
+  [yandex_storage_bucket_iam_binding]=2
   [yandex_dns_zone]=1
   [yandex_dns_recordset]=1
   [yandex_lockbox_secret]=1
@@ -858,6 +866,53 @@ if ! rg -q 'monium_api_key_expiry_days' "$production_root/variables.tf" ||
   ! rg -q 'owner-only-email-outside-repository|address_is_not_stored_here' "$production_alerts" ||
   ! rg -q 'for:' "$production_alerts"; then
   echo "Monium dashboard/alert contract or owner-only delivery boundary is incomplete" >&2
+  exit 1
+fi
+
+if ! rg -q '^resource "yandex_kms_symmetric_key" "postgres_backup"' "$production_backup" ||
+  ! rg -q 'name[[:space:]]*=[[:space:]]*"munchkin-postgres-backups"' "$production_backup" ||
+  ! rg -q 'default_algorithm[[:space:]]*=[[:space:]]*"AES_256"' "$production_backup" ||
+  ! rg -q 'deletion_protection[[:space:]]*=[[:space:]]*true' "$production_backup" ||
+  [[ "$(rg -c 'prevent_destroy[[:space:]]*=[[:space:]]*true' "$production_backup")" != "2" ]]; then
+  echo "backup KMS key must be AES-256, deletion-protected and prevent_destroy protected" >&2
+  exit 1
+fi
+if ! rg -q '^resource "yandex_storage_bucket" "postgres_backups"' "$production_backup" ||
+  ! rg -q 'bucket[[:space:]]*=[[:space:]]*local\.backup_bucket_name' "$production_backup" ||
+  ! rg -q 'disabled_statickey_auth[[:space:]]*=[[:space:]]*true' "$production_backup" ||
+  ! rg -q 'force_destroy[[:space:]]*=[[:space:]]*false' "$production_backup" ||
+  ! rg -q 'enabled[[:space:]]*=[[:space:]]*true' "$production_backup" ||
+  ! rg -q 'kms_master_key_id[[:space:]]*=[[:space:]]*yandex_kms_symmetric_key\.postgres_backup\.id' "$production_backup" ||
+  [[ "$(rg -c 'anonymous_access_flags' "$production_backup")" != "1" ]]; then
+  echo "backup bucket must be private, versioned and KMS-encrypted without static-key auth" >&2
+  exit 1
+fi
+for expected_backup_role in storage.uploader storage.viewer; do
+  if [[ "$(rg -c "role[[:space:]]*=[[:space:]]*\"$expected_backup_role\"" "$production_backup")" != "1" ]]; then
+    echo "backup bucket must contain one conditional $expected_backup_role binding" >&2
+    exit 1
+  fi
+done
+if ! rg -q 'serviceAccount:\$\{data\.yandex_iam_service_account\.runtime\.id\}' "$production_backup" ||
+  ! rg -q 'trimspace\(var\.backup_operator_subject\)' "$production_backup" ||
+  [[ "$(rg -c 'role[[:space:]]*=[[:space:]]*"kms\.keys\.(encrypter|decrypter)"' "$production_backup")" != "2" ]] ||
+  ! rg -q 'backup_operator_subject' "$production_root/variables.tf" ||
+  ! rg -q 'backup_storage_ceiling_rub' "$production_root/variables.tf" ||
+  ! rg -q 'var\.backup_storage_ceiling_rub <= 300' "$production_root/variables.tf"; then
+  echo "backup IAM must keep runtime upload/encryption and conditional operator read/decrypt exact" >&2
+  exit 1
+fi
+if rg -q 'storage_access_key|storage_secret_key|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|service_account_key|secret_value' "$production_backup"; then
+  echo "backup Terraform must not contain static or payload credentials" >&2
+  exit 1
+fi
+if ! rg -q 'retain-seven-daily|retain-four-weekly' "$production_backup" ||
+  ! rg -q 'days[[:space:]]*=[[:space:]]*8' "$production_backup" ||
+  ! rg -q 'days[[:space:]]*=[[:space:]]*35' "$production_backup" ||
+  ! rg -q 'backup-freshness-over-26h' "$production_backup_alerts" ||
+  ! rg -q 'backup-job-failure' "$production_backup_alerts" ||
+  ! rg -q 'last\(backup_age_hours\) > 26' "$production_backup_alerts"; then
+  echo "backup retention and freshness/failure alert contract is incomplete" >&2
   exit 1
 fi
 

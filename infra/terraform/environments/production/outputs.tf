@@ -89,6 +89,31 @@ output "monium_api_key_expiry_days" {
   value       = var.monium_api_key_expiry_days
 }
 
+output "postgres_backup_bucket_name" {
+  description = "Dedicated private Object Storage bucket for encrypted PostgreSQL backups."
+  value       = yandex_storage_bucket.postgres_backups.bucket
+}
+
+output "postgres_backup_kms_key_id" {
+  description = "Deletion-protected KMS key used for server-side backup encryption."
+  value       = yandex_kms_symmetric_key.postgres_backup.id
+}
+
+output "postgres_backup_uploader_service_account_id" {
+  description = "Existing keyless runtime service account granted bucket-scoped upload/read-back access."
+  value       = data.yandex_iam_service_account.runtime.id
+}
+
+output "postgres_backup_operator_subject" {
+  description = "Optional owner-supplied isolated-restore subject; no secret value."
+  value       = var.backup_operator_subject
+}
+
+output "postgres_backup_storage_ceiling_rub" {
+  description = "Approved monthly backup storage soft ceiling in RUB."
+  value       = var.backup_storage_ceiling_rub
+}
+
 output "instance_id" {
   description = "Production Compute instance."
   value       = yandex_compute_instance.production.id

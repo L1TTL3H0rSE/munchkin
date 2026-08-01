@@ -1,0 +1,32 @@
+[Unit]
+Description=Munchkin PostgreSQL verified off-host backup
+Requires=docker.service
+After=docker.service network-online.target srv-munchkin.mount
+Wants=network-online.target
+ConditionPathExists=/srv/munchkin/compose/compose.production.yml
+ConditionPathExists=/srv/munchkin/compose/scripts/backup-postgres.sh
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/srv/munchkin
+EnvironmentFile=-/etc/munchkin/postgres-backup.env
+ExecStart=/srv/munchkin/compose/scripts/backup-postgres.sh
+TimeoutStartSec=55min
+RuntimeMaxSec=55min
+CPUQuota=75%
+MemoryMax=768M
+TasksMax=128
+Nice=10
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/munchkin/state /srv/munchkin/backup-work
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

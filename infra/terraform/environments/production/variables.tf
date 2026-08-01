@@ -78,3 +78,30 @@ variable "monium_api_key_expiry_days" {
     error_message = "monium_api_key_expiry_days must be an integer between 1 and 90 days."
   }
 }
+
+variable "backup_operator_subject" {
+  type        = string
+  description = "Optional owner-supplied userAccount/federatedUser subject for isolated restore; empty keeps restore access unprovisioned."
+  nullable    = false
+  default     = ""
+
+  validation {
+    condition = trimspace(var.backup_operator_subject) == "" || can(regex(
+      "^(userAccount|federatedUser):[a-z0-9]+$",
+      trimspace(var.backup_operator_subject),
+    ))
+    error_message = "backup_operator_subject must be empty or a userAccount:<id>/federatedUser:<id> subject."
+  }
+}
+
+variable "backup_storage_ceiling_rub" {
+  type        = number
+  description = "Approved soft monthly Object Storage/KMS/operations ceiling for PostgreSQL backups."
+  nullable    = false
+  default     = 300
+
+  validation {
+    condition     = floor(var.backup_storage_ceiling_rub) == var.backup_storage_ceiling_rub && var.backup_storage_ceiling_rub > 0 && var.backup_storage_ceiling_rub <= 300
+    error_message = "backup_storage_ceiling_rub must be a positive integer no higher than the approved 300 RUB/month ceiling."
+  }
+}

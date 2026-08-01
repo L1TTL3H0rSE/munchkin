@@ -506,6 +506,17 @@ require separate remote/secret/mutation approvals.
 - Ошибка upload, stale backup или checksum failure видны оператору.
 - Backup credential не даёт приложению лишних bucket permissions.
 
+**Статус 2026-08-01:** local Terraform declares the deletion-protected KMS
+key, private versioned/static-auth-disabled backup bucket, exact runtime
+uploader/encrypter boundary and conditional operator viewer/decrypter boundary.
+Root-owned keyless backup/restore scripts, 03:00 Europe/Moscow systemd units,
+manifest/SHA-256 commit marker, disposable restore Compose and owner-only
+freshness/failure alert definitions are implemented. First-dump growth,
+non-production PUT/HEAD/GET probe, Terraform apply, VM installation, first
+verified backup, actual isolated restore/RPO/RTO, alert import/test delivery,
+reboot recovery and account-specific cost evidence remain unrun because each
+requires a separate remote/runtime approval or unavailable Docker/Monium state.
+
 ### INFRA-011 — security и supply-chain minimum
 
 **Работа**
