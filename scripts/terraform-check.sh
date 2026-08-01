@@ -104,6 +104,7 @@ done
 terraform fmt -check -recursive "$terraform_root"
 
 policy_source="$terraform_root/bootstrap/main.tf"
+bootstrap_github_actions="$terraform_root/bootstrap/github_actions.tf"
 
 extract_policy_statement() {
   local sid="$1"
@@ -118,6 +119,23 @@ extract_policy_statement() {
       exit
     }
   ' "$policy_source"
+}
+
+extract_resource_block() {
+  local resource_type="$1"
+  local resource_name="$2"
+  local source_file="$3"
+  awk -v signature="resource \"${resource_type}\" \"${resource_name}\"" '
+    index($0, signature) {
+      in_resource = 1
+    }
+    in_resource {
+      print
+    }
+    in_resource && /^}$/ {
+      exit
+    }
+  ' "$source_file"
 }
 
 require_assignment_count() {
@@ -668,6 +686,32 @@ if [[ "$(
   exit 1
 fi
 
+if [[ ! -f "$bootstrap_github_actions" ]] ||
+  [[ "$(rg -c '^resource "yandex_iam_service_account"' "$bootstrap_github_actions")" != "1" ]] ||
+  [[ "$(rg -c '^resource "yandex_iam_workload_identity_oidc_federation"' "$bootstrap_github_actions")" != "1" ]] ||
+  [[ "$(rg -c '^resource "yandex_iam_workload_identity_federated_credential"' "$bootstrap_github_actions")" != "1" ]] ||
+  ! rg -q 'name[[:space:]]*=[[:space:]]*"munchkin-github-images"' "$bootstrap_github_actions" ||
+  ! rg -q 'issuer[[:space:]]*=[[:space:]]*local\.github_oidc_issuer' "$bootstrap_github_actions" ||
+  ! rg -q 'jwks_url[[:space:]]*=[[:space:]]*local\.github_oidc_jwks_url' "$bootstrap_github_actions" ||
+  ! rg -q 'audiences[[:space:]]*=[[:space:]]*\[local\.github_oidc_audience\]' "$bootstrap_github_actions" ||
+  ! rg -q 'external_subject_id[[:space:]]*=[[:space:]]*local\.github_oidc_subject' "$bootstrap_github_actions" ||
+  rg -q 'yandex_iam_service_account_(key|authorized_key)|access_key|secret_key|YC_TOKEN|AWS_' \
+    "$bootstrap_github_actions" ||
+  rg -q '\*' "$bootstrap_github_actions"; then
+  echo "bootstrap GitHub Actions trust must be exactly one keyless SA, federation and credential" >&2
+  exit 1
+fi
+for expected_github_claim in \
+  'https://token.actions.githubusercontent.com' \
+  'https://token.actions.githubusercontent.com/.well-known/jwks' \
+  'https://github.com/L1TTL3H0rSE' \
+  'repo:L1TTL3H0rSE@32160016/munchkin@1316069622:environment:production-images'; do
+  if ! rg -q -F "$expected_github_claim" "$bootstrap_github_actions"; then
+    echo "bootstrap GitHub trust is missing exact claim: $expected_github_claim" >&2
+    exit 1
+  fi
+done
+
 production_root="$terraform_root/environments/production"
 production_variables="$production_root/variables.tf"
 production_iam="$production_root/iam.tf"
@@ -695,8 +739,8 @@ production_resource_count="$(
     wc -l |
     tr -d '[:space:]'
 )"
-if [[ "$production_resource_count" != "10" ]]; then
-  echo "production graph must contain exactly 10 managed resources; got $production_resource_count" >&2
+if [[ "$production_resource_count" != "11" ]]; then
+  echo "production graph must contain exactly 11 managed resources; got $production_resource_count" >&2
   exit 1
 fi
 
@@ -707,7 +751,7 @@ declare -A expected_production_resource_counts=(
   [yandex_vpc_address]=1
   [yandex_container_registry]=1
   [yandex_container_repository]=2
-  [yandex_container_registry_iam_binding]=1
+  [yandex_container_registry_iam_binding]=2
   [yandex_compute_disk]=1
   [yandex_compute_instance]=1
 )
@@ -728,10 +772,11 @@ production_data_count="$(
     wc -l |
     tr -d '[:space:]'
 )"
-if [[ "$production_data_count" != "2" ]] ||
+if [[ "$production_data_count" != "3" ]] ||
   ! rg -q '^data "yandex_iam_service_account" "runtime"' "$production_iam" ||
+  ! rg -q '^data "yandex_iam_service_account" "github_images"' "$production_iam" ||
   ! rg -q '^data "yandex_compute_image" "ubuntu"' "$production_compute"; then
-  echo "production graph must contain only the runtime and Ubuntu lookups" >&2
+  echo "production graph must contain only runtime, GitHub CI and Ubuntu lookups" >&2
   exit 1
 fi
 
@@ -743,12 +788,16 @@ if ! rg -q '^[[:space:]]*sensitive[[:space:]]*=[[:space:]]*true$' \
   exit 1
 fi
 
-if ! rg -q '^[[:space:]]*role[[:space:]]*=[[:space:]]*"container-registry\.images\.puller"$' \
-  "$production_iam" ||
-  ! rg -q 'serviceAccount:\$\{data\.yandex_iam_service_account\.runtime\.id\}' \
-    "$production_iam" ||
-  rg -q 'pusher|scanner|editor|admin' "$production_iam"; then
-  echo "runtime registry access must be one exact pull-only binding" >&2
+runtime_registry_binding="$(extract_resource_block yandex_container_registry_iam_binding runtime_puller "$production_iam")"
+github_registry_binding="$(extract_resource_block yandex_container_registry_iam_binding github_images_pusher "$production_iam")"
+if [[ -z "$runtime_registry_binding" ]] ||
+  ! rg -q '^[[:space:]]*role[[:space:]]*=[[:space:]]*"container-registry\.images\.puller"$' <<< "$runtime_registry_binding" ||
+  ! rg -q 'serviceAccount:\$\{data\.yandex_iam_service_account\.runtime\.id\}' <<< "$runtime_registry_binding" ||
+  [[ -z "$github_registry_binding" ]] ||
+  ! rg -q '^[[:space:]]*role[[:space:]]*=[[:space:]]*"container-registry\.images\.pusher"$' <<< "$github_registry_binding" ||
+  ! rg -q 'serviceAccount:\$\{data\.yandex_iam_service_account\.github_images\.id\}' <<< "$github_registry_binding" ||
+  rg -q 'pusher|scanner|editor|admin' <<< "$runtime_registry_binding"; then
+  echo "registry access must preserve runtime pull-only and add one exact CI pusher binding" >&2
   exit 1
 fi
 

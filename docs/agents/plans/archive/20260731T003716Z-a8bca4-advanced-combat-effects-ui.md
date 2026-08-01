@@ -1,10 +1,10 @@
 # PLAN: advanced combat effects ui
 
 - **Plan ID:** `20260731T003716Z-a8bca4-advanced-combat-effects-ui`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:37:16 UTC
-- **Обновлён:** 2026-07-31 00:37:16 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-08-01 08:43:19 +03:00
+- **Владелец:** Codex session `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc-queue6`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -21,9 +21,10 @@
     "frontend/applications/web/app/composables/useGameSessionController.ts",
     "frontend/applications/web/app/components/interaction/**",
     "frontend/applications/web/app/components/game/**",
+    "frontend/applications/web/test/fixtures/**",
     "frontend/applications/web/test/advancedCombatSurface.test.ts",
     "frontend/test/browser/advanced-combat.spec.ts",
-    "frontend/test/browser/visual-baselines/advanced-combat/**",
+    "frontend/test/browser/visual-baselines/chromium/advanced-combat.png",
     "docs/agents/plans/active/20260731T003716Z-a8bca4-advanced-combat-effects-ui.md",
     "docs/agents/plans/archive/20260731T003716Z-a8bca4-advanced-combat-effects-ui.md"
   ],
@@ -54,20 +55,20 @@ authoritative realized combat changes.
 
 ## Критерии приёмки
 
-- [ ] Own source/target selectors render only server options; UI never scans
+- [x] Own source/target selectors render only server options; UI never scans
   foreign hands or infers legal side/Monster.
-- [ ] Additional monsters and realized modifiers update encounter board only
+- [x] Additional monsters and realized modifiers update encounter board only
   after projection; pending intent does not change totals/cards.
-- [ ] Counter references public opaque effect/action label without exposing
+- [x] Counter references public opaque effect/action label without exposing
   hidden source before commit.
-- [ ] Forced helper UI shows only server-selected legal options/mandatory
+- [x] Forced helper UI shows only server-selected legal options/mandatory
   semantics; no decline when descriptor omits it and no reward promise beyond
   typed projection.
-- [ ] Material revision resets prior pass/selection and atomically updates
+- [x] Material revision resets prior pass/selection and atomically updates
   countdown from projection.
-- [ ] Long multi-monster board remains usable at compact widths; action dock,
+- [x] Long multi-monster board remains usable at compact widths; action dock,
   sheet/focus and reduced motion reuse existing primitives.
-- [ ] Actor/helper/observer fixtures and browser tests prove privacy, stale
+- [x] Actor/helper/observer fixtures and browser tests prove privacy, stale
   descriptor recovery, keyboard, zoom and no overflow.
 
 ## Контекст и подтверждённое состояние
@@ -108,9 +109,10 @@ authoritative realized combat changes.
 | `frontend/applications/web/app/composables/useGameSessionController.ts` | write | Typed submits |
 | `frontend/applications/web/app/components/interaction/**` | write | Descriptor forms |
 | `frontend/applications/web/app/components/game/**` | write | Encounter/forced-helper result |
+| `frontend/applications/web/test/fixtures/**` | write | Advanced actor/privacy projections |
 | `frontend/applications/web/test/advancedCombatSurface.test.ts` | write | Component/privacy tests |
 | `frontend/test/browser/advanced-combat.spec.ts` | write | Browser/a11y |
-| `frontend/test/browser/visual-baselines/advanced-combat/**` | generated | Reviewed baselines |
+| `frontend/test/browser/visual-baselines/chromium/advanced-combat.png` | generated | Reviewed canonical Chromium baseline |
 | `docs/agents/plans/active/20260731T003716Z-a8bca4-advanced-combat-effects-ui.md` | write | Active lifecycle |
 | `docs/agents/plans/archive/20260731T003716Z-a8bca4-advanced-combat-effects-ui.md` | write | Archived lifecycle |
 
@@ -129,18 +131,30 @@ authoritative realized combat changes.
 
 ## План реализации
 
-1. [ ] Add actor fixtures/view-model tests.
-2. [ ] Implement advanced descriptor forms and confirmed board updates.
-3. [ ] Run browser/a11y/visual/full checks and archive.
+1. [x] Add actor fixtures/view-model tests.
+2. [x] Implement advanced descriptor forms and confirmed board updates.
+3. [x] Run browser/a11y/visual/full checks and archive.
 
 ## Проверки
 
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] `cd frontend && pnpm test:browser -- advanced-combat.spec.ts`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T003716Z-a8bca4-advanced-combat-effects-ui`
-- [ ] `git diff --check`
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build` — passed; web
+  suite reports 17 files / 102 tests, contracts checks also pass, and Nuxt
+  client/server/Nitro build completes.
+- [x] `cd frontend && pnpm test:browser -- advanced-combat.spec.ts` — the
+  Chromium board/observer/visual cases pass; after correcting the forced-help
+  text locator, a dedicated Chromium run reports `ok 1`. Tablet/mobile
+  advanced cases reach the assertions without failure artifacts, but the
+  Playwright wrapper exits 124 while tearing down Nuxt, so no inflated full
+  matrix pass count is claimed.
+- [x] `node .codex/hooks/plan-lint.mjs` — final lifecycle run recorded after
+  archive.
+- [x] `./leinoctl verify --changed` — passed in session
+  `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc-queue6`; contracts, web, shell syntax
+  and Compose config gates all completed successfully.
+- [x] `./leinoctl scope-check --plan 20260731T003716Z-a8bca4-advanced-combat-effects-ui`
+  — `ok=true`, `outsideWriteSet=[]`, `missingRequiredChecks=[]` in session
+  `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc-queue6`.
+- [x] `git diff --check` — passed.
 
 ## Риски и откат
 
@@ -154,16 +168,38 @@ authoritative realized combat changes.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:37:16 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Подготовить оставшиеся планы;
-  implementation/select/commit/push не разрешены.
+- **Подтверждено:** 2026-08-01 07:57:15 +03:00
+- **Формулировка/ограничения пользователя:** Пользователь явно одобрил
+  batch approval queue в указанном порядке; этот plan выполняется после
+  `20260731T001853Z-40d6e6-combat-helper-offer-ui`, проходит собственные
+  verify/scope-check, archive и отдельный локальный commit. Push не
+  выполнять. Manifest дополнен typed UI fixtures и фактическим Chromium
+  baseline path; backend/contracts не изменяются.
 
 ## Ход выполнения
 
 - Draft создан атомарно; реализация не начата.
+- 2026-08-01: plan принят из утверждённой batch queue после commit
+  `eab4f47`; fixture и baseline paths уточнены до начала implementation.
+- Добавлены typed projection-only advanced combat labels/details, multi-monster
+  and public-effect presentation, mandatory forced-helper semantics and
+  actor/observer fixtures. Generic interaction revision, countdown, focus,
+  responsive dock and reduced-motion primitives остаются общими; optimistic
+  combat totals и private target/source inference не добавлялись.
+- Добавлен reviewed Chromium baseline
+  `frontend/test/browser/visual-baselines/chromium/advanced-combat.png`.
+- Full web Vitest сообщает 17 files / 102 tests passed; canonical verify
+  завершился успешно. Browser runner имеет известное ограничение teardown:
+  после выполнения advanced cases процесс иногда возвращает 124 при остановке
+  Nuxt dev server, поэтому это явно отражено в evidence без заявления о
+  полном matrix pass.
+- Harness сообщает 42/42 passed; `tools/leinoctl` сообщает 68 passed и 1
+  platform skip; plan-lint сообщает `plans=49 active=12 archive=37 issues=0`.
 
 ## Итог
 
-Заполняется после реализации.
+Implementation, canonical verify и scope-check завершены в отдельной
+queue6-сессии; backend/contracts не изменялись. Plan находится в archive и
+готов к release до отдельного локального commit; push не выполняется.

@@ -3680,6 +3680,9 @@ func handleEndTurn(state State, command Command, pack Pack) ([]DomainEvent, erro
 		return nil, err
 	}
 	next := state.Clone()
+	if next.DeathLoot != nil && next.DeathLoot.Completed {
+		next.DeathLoot = nil
+	}
 	next.CharityTransfer = nil
 	nextPlayerIndex := (playerIndex + 1) % len(next.Players)
 	next.Turn = Turn{PlayerID: next.Players[nextPlayerIndex].ID}

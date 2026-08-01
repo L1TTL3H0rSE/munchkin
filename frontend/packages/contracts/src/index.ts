@@ -671,13 +671,7 @@ export type CardView = z.infer<typeof cardViewSchema>;
 export type Invalidation = z.infer<typeof invalidationSchema>;
 export type ActionType = z.infer<typeof actionTypeSchema>;
 export type ServerActionDescriptor = z.infer<typeof actionViewSchema>;
-export type ActionDescriptor =
-  Omit<ServerActionDescriptor, "type"> & {
-    type: Exclude<
-      ActionType,
-      "play_target_effect" | "propose_trade" | "propose_gift" | "attempt_theft"
-    >;
-  };
+export type ActionDescriptor = ServerActionDescriptor;
 type ServerProjection = z.infer<typeof projectionSchema>;
 export type Projection = Omit<ServerProjection, "turn"> & {
   turn: Omit<ServerProjection["turn"], "available_actions"> & {

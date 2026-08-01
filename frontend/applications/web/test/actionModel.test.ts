@@ -20,6 +20,20 @@ describe("server-supplied action mapping", () => {
     });
   });
 
+  it("keeps server-described player targets distinct from card targets", () => {
+    const action = {
+      type: "play_card" as const,
+      source_instance_id: "curse-1",
+      target_player_ids: ["player-b"],
+    };
+    expect(selectionIsValid(action, [], "player-b")).toBe(true);
+    expect(buildCommandPayload(action, [], "player-b")).toEqual({
+      instance_id: "curse-1",
+      target_player_id: "player-b",
+    });
+    expect(selectionIsValid(action, [], "forged-player")).toBe(false);
+  });
+
   it("maps charity and effect choices to distinct typed fields", () => {
     const charity = {
       type: "resolve_charity" as const,
@@ -87,6 +101,30 @@ describe("server-supplied action mapping", () => {
     }], selections, targets);
     expect(selections).toEqual({"sell_items:::0": ["kept"]});
     expect(targets).toEqual({});
+  });
+
+  it("keeps a server-supplied player target during reconciliation", () => {
+    const selections = {};
+    const targets = {"play_card:curse-1::0": "player-b"};
+    reconcileActionState([{
+      type: "play_card",
+      source_instance_id: "curse-1",
+      target_player_ids: ["player-b"],
+    }], selections, targets);
+    expect(targets).toEqual({"play_card:curse-1::0": "player-b"});
+  });
+
+  it("keeps contextual selections keyed by their projection index", () => {
+    const selections = {"sell_items:::4": ["kept"]};
+    const targets = {};
+    reconcileActionState([{
+      action: {
+        type: "sell_items",
+        instance_ids: ["kept"],
+      },
+      index: 4,
+    }], selections, targets);
+    expect(selections).toEqual({"sell_items:::4": ["kept"]});
   });
 
   it("provides Russian labels for every core action", () => {

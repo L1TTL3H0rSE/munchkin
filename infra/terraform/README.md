@@ -1,7 +1,7 @@
 # Terraform infrastructure
 
 Этот каталог содержит Terraform foundation для production-инфраструктуры
-Munchkin в Yandex Cloud. Bootstrap apply от 2026-07-30 создал два service
+Munchkin в Yandex Cloud. Bootstrap apply от 2026-07-30 создал три service
 account, KMS key и state bucket. Bootstrap state перенесён в private,
 versioned и KMS-encrypted Yandex Object Storage; ignored local plaintext state
 и backup удалены после повторной remote-проверки.
@@ -164,6 +164,27 @@ Remote state содержит exact десять managed resource addresses и �
 `404` для `.tflock`; полный authenticated production plan завершился exit `0`
 и `No changes`.
 
+### GitHub Actions WIF handoff (repository implementation, not applied)
+
+This plan adds a separate keyless `munchkin-github-images` service account in
+the bootstrap root, one GitHub OIDC federation and one exact federated
+credential for:
+
+`repo:L1TTL3H0rSE@32160016/munchkin@1316069622:environment:production-images`
+
+The production root looks up that service account and adds one authoritative
+registry-scoped `container-registry.images.pusher` binding. The existing
+runtime binding remains `container-registry.images.puller` and keeps only the
+runtime service account. No service-account key, authorized key, state access,
+folder-wide role or cleanup binding is declared for CI.
+
+The new HCL is intentionally not represented as a live apply result yet.
+Owner gates still require a protected GitHub `production-images` environment,
+an observed claim-probe with exact `iss`/`aud`/`sub`/repository IDs, separate
+sanitized bootstrap and production plan review, and separate apply approval.
+Non-secret handoff outputs include the CI service-account ID, federation ID,
+exact subject/audience and image repository prefixes.
+
 VM фиксирует `ru-central1-d`, current family `ubuntu-2404-lts`,
 `standard-v3`, `2 vCPU`, core fraction `50%`, `4 GB RAM`, 35 GB
 `network-ssd` boot disk и standalone 20 GB `network-ssd` data disk.
@@ -263,8 +284,9 @@ terraform fmt -check -recursive infra/terraform
 - требует ровно по одному bucket-scoped `storage.configurer` и
   `storage.editor` binding с exact единственным member — state service
   account — и запрещает folder-wide варианты этих roles;
-- проверяет exact пять deployer roles, runtime-SA handoff, ровно `10`
-  production resources, два data lookup, sensitive SSH boundary,
+- проверяет exact пять deployer roles, runtime-SA handoff, ровно `11`
+  production resources, три data lookup, exact runtime puller plus CI pusher,
+  sensitive SSH boundary,
   IPv4-only ingress, fixed VM/disk profile и cloud-init host baseline;
 - отклоняет tracked state/plan/tfvars/backend artifacts и inline credentials.
 
@@ -281,10 +303,11 @@ focused check. До отдельного CI/toolchain plan `terraform-check.sh` 
 
 До отдельной явной команды владельца запрещены:
 
-1. bootstrap apply новых IAM resources до review exact
-   `7 add / 0 change / 0 destroy`;
+1. bootstrap apply новых IAM resources до review exact plan with only the
+   keyless CI service account, federation and federated credential;
 2. инициализация production remote key до доказанного отсутствия destination;
-3. production apply до review exact `10 add / 0 change / 0 destroy`,
+3. production apply до review exact additive registry pusher plan with no
+   runtime binding replacement,
    повторного budget confirmation и отдельного owner approval;
 4. повторная bootstrap migration, `state push`, ручная правка state или
    переключение bootstrap обратно на local backend;
@@ -294,6 +317,9 @@ focused check. До отдельного CI/toolchain plan `terraform-check.sh` 
    state и lock keys;
 7. восстановление previous version: versioning включён, но recovery drill ещё
    не доказан.
+8. GitHub environment mutation, OIDC claim-probe against the live repository,
+   WIF exchange, registry login and first image publication remain separate
+   owner gates for this repository-only implementation.
 
 Authenticated bootstrap plan и reviewed apply уже были отдельно согласованы и
 завершены. Владелец отдельно разрешил exact `storage.configurer` binding:

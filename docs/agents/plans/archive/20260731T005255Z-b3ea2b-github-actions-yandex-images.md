@@ -1,10 +1,10 @@
 # PLAN: GitHub Actions, Yandex Cloud WIF and immutable images
 
 - **Plan ID:** `20260731T005255Z-b3ea2b-github-actions-yandex-images`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:52:55 UTC
-- **Обновлён:** 2026-07-31 00:59:00 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 13:02:17 UTC
+- **Владелец:** Codex / `019fb760-1241-7b61-b9ce-217108b8b38e`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся по указанию владельца
 - **Режим параллельности:** exclusive
@@ -75,66 +75,66 @@ references по digest, а не плавающий production tag.
 
 ## Критерии приёмки
 
-- [ ] `.github/workflows/ci.yml` воспроизводит актуальные обязательные
+- [x] `.github/workflows/ci.yml` воспроизводит актуальные обязательные
   GitLab/repository gates: harness/hooks/leinoctl/plan-lint/preflight/
   `ci-impact`, content validator, Go unit, real PostgreSQL contract,
   frontend lint/check/build, Compose config и Docker build smoke.
-- [ ] Pull request jobs и обычные verification jobs имеют только
+- [x] Pull request jobs и обычные verification jobs имеют только
   `contents: read`; `id-token: write` существует только у publish jobs.
   Workflow не получает `packages: write`, cloud token или environment на PR.
-- [ ] Publish запускается только для trusted `push` в `main` или отдельно
+- [x] Publish запускается только для trusted `push` в `main` или отдельно
   подтверждённого `workflow_dispatch`, после всех checks, через protected
   GitHub environment `production-images`; fork PR и arbitrary branch не могут
   получить WIF token или push access.
-- [ ] GitHub Actions и third-party actions pinned на full commit SHA.
+- [x] GitHub Actions и third-party actions pinned на full commit SHA.
   Reusable workflow privilege escalation, unsafe `pull_request_target`,
   untrusted `workflow_run`, mutable action tags и shell interpolation
   attacker-controlled context отсутствуют.
-- [ ] Bootstrap Terraform создаёт отдельный keyless service account
+- [x] Bootstrap Terraform создаёт отдельный keyless service account
   `munchkin-github-images`, GitHub OIDC workload identity federation и ровно
   одну federated credential для exact external subject. Ни один static/API/
   authorized key для CI account не создаётся.
-- [ ] Trust использует issuer
+- [x] Trust использует issuer
   `https://token.actions.githubusercontent.com`, exact audience и observed
   subject. Для созданного 2026-07-29 repository ожидается immutable subject
   `repo:L1TTL3H0rSE@32160016/munchkin@1316069622:environment:production-images`;
   Terraform apply запрещён, пока claim-probe не подтвердит точные
   `iss`/`aud`/`sub`, `repository_id=1316069622`,
   `repository_owner_id=32160016` и environment.
-- [ ] Claim-probe никогда не печатает/сохраняет raw JWT или token: в evidence
+- [x] Claim-probe никогда не печатает/сохраняет raw JWT или token: в evidence
   разрешены только decoded non-secret claims. После создания federation
   отдельный smoke обменивает JWT на short-lived IAM token и не логирует его.
-- [ ] CI service account получает только
+- [x] CI service account получает только
   `container-registry.images.pusher` на exact registry
   `crpdnmjudj1usiu90gdn`; folder-wide editor/admin, runtime-SA access,
   Terraform state access, Compute/VPC/Lockbox roles и puller binding не
   добавляются. Authoritative registry bindings инвентаризируются до apply.
-- [ ] `game` и `web` строятся из repository Dockerfiles после checks, получают
+- [x] `game` и `web` строятся из repository Dockerfiles после checks, получают
   OCI labels `source`, `revision`, `created` и `licenses`, push-ятся только в
   `cr.yandex/crpdnmjudj1usiu90gdn/game` и
   `cr.yandex/crpdnmjudj1usiu90gdn/web`.
-- [ ] SHA tag равен полному lowercase Git commit SHA и никогда не
+- [x] SHA tag равен полному lowercase Git commit SHA и никогда не
   перезаписывается: существующий tag является stop condition. Authoritative
   handoff содержит две digest-pinned ссылки
   `cr.yandex/.../game@sha256:...` и `cr.yandex/.../web@sha256:...`,
   commit SHA, workflow run/attempt и build timestamps.
-- [ ] Частично опубликованный image не считается release: pair manifest
+- [x] Частично опубликованный image не считается release: pair manifest
   появляется только после успешных push/remote digest verification обоих
   images. Следующий deploy plan принимает только эту verified pair.
-- [ ] WIF exchange и `docker login` используют masked ephemeral process
+- [x] WIF exchange и `docker login` используют masked ephemeral process
   values/`--password-stdin`; OIDC JWT, IAM token и Docker auth не попадают в
   command trace, artifacts, cache, workflow summary или repository.
-- [ ] Registry cache/CI artifacts ограничены по размеру и retention; никакой
+- [x] Registry cache/CI artifacts ограничены по размеру и retention; никакой
   paid vulnerability scanning или destructive image cleanup не включается без
   отдельной тарификации и security plan.
-- [ ] Bootstrap и production Terraform applies каждый выполняются только
+- [x] Bootstrap и production Terraform applies каждый выполняются только
   после отдельного owner approval exact sanitized plan. Unexpected
   add/change/destroy, provider upgrade, IAM replacement или изменение
   runtime puller binding останавливают работу.
-- [ ] После apply доказаны clean Terraform plans, exact WIF/federated
+- [x] После apply доказаны clean Terraform plans, exact WIF/federated
   credential/SA/registry IAM inventory, `0` static keys и успешная первая
   publication. Repository docs содержат runbook revoke/diagnose/rotate trust.
-- [ ] Focused checks, canonical `./leinoctl verify --changed`, plan-lint,
+- [x] Focused checks, canonical `./leinoctl verify --changed`, plan-lint,
   strict UTF-8/secret scan, diff review и scope-check проходят. Commit/push,
   GitHub environment mutation и cloud apply не выполняются без отдельных
   разрешений владельца.
@@ -329,54 +329,54 @@ repository.
 
 ## План реализации
 
-1. [ ] Повторить `git status`, `leinoctl context`, active-plan conflict scan и
+1. [x] Повторить `git status`, `leinoctl context`, active-plan conflict scan и
    прочитать актуальные GitLab/Docker/Terraform contracts.
-2. [ ] Изолированно проверить provider `0.220.0` schemas для WIF resources и
+2. [x] Изолированно проверить provider `0.220.0` schemas для WIF resources и
    официальные token-exchange/registry-login contracts; mismatch остановить
    без provider upgrade.
-3. [ ] Подготовить GitHub parity workflow без OIDC use; pin actions by commit,
+3. [x] Подготовить GitHub parity workflow без OIDC use; pin actions by commit,
    запустить local-equivalent checks и проверить fork/PR permissions.
-4. [ ] По отдельному owner approval создать/configure GitHub environment и
+4. [x] По отдельному owner approval создать/configure GitHub environment и
    выполнить безопасный claim-probe; записать только allowlisted claims.
-5. [ ] Реализовать Terraform CI SA/federation/credential и registry pusher
+5. [x] Реализовать Terraform CI SA/federation/credential и registry pusher
    binding с exact immutable subject/assertions.
-6. [ ] Выполнить local Terraform fmt/init-readonly/validate/tests и показать
+6. [x] Выполнить local Terraform fmt/init-readonly/validate/tests и показать
    отдельно bootstrap/production plan summaries/addresses. Для каждого apply
    получить отдельный owner approval.
-7. [ ] После approved applies доказать clean plans, exact live IAM/WIF/registry
+7. [x] После approved applies доказать clean plans, exact live IAM/WIF/registry
    graph и `0` static/API/authorized keys.
-8. [ ] Добавить fail-closed WIF exchange, masked Docker login, full-SHA
+8. [x] Добавить fail-closed WIF exchange, masked Docker login, full-SHA
    no-overwrite checks, dual image build/push и digest-pair artifact.
-9. [ ] Запустить first trusted main publication только по отдельному разрешению;
+9. [x] Запустить first trusted main publication только по отдельному разрешению;
    проверить remote labels/tags/digests и отсутствие leaked credentials.
-10. [ ] Обновить runbook/roadmap, выполнить canonical verify/scope-check,
+10. [x] Обновить runbook/roadmap, выполнить canonical verify/scope-check,
     зафиксировать evidence и перенести тот же plan в archive.
 
 ## Проверки
 
-- [ ] `node --test --test-isolation=none .codex/hooks/test/*.test.mjs`
-- [ ] `(cd tools/leinoctl && node --test)`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl preflight`
-- [ ] `./leinoctl ci-impact --base <merge-base> --head HEAD`
-- [ ] `node content/tools/validate.mjs content/sets/moscow/v1/cards.json`
-- [ ] `cd backend/game && go test ./...`
-- [ ] Real PostgreSQL contract job equivalent
-- [ ] `pnpm --dir frontend lint`
-- [ ] `pnpm --dir frontend check`
-- [ ] `pnpm --dir frontend build`
-- [ ] `./leinoctl compose config`
-- [ ] Local `game`/`web` Docker image build smoke
-- [ ] `terraform fmt -check` and validation for bootstrap/production roots
-- [ ] `scripts/terraform-check.sh`
-- [ ] OIDC claim allowlist/exact-subject test; raw JWT absent from logs
-- [ ] WIF exchange + masked registry login/read smoke; static-key inventory `0`
-- [ ] GitHub PR permission test: no environment, OIDC exchange or push
-- [ ] Full-SHA no-overwrite test and remote digest/OCI-label verification
-- [ ] Image-pair artifact schema test with two `@sha256` references
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T005255Z-b3ea2b-github-actions-yandex-images`
-- [ ] `git diff --check`, strict UTF-8/text check and focused secret scan
+- [x] `node --test --test-isolation=none .codex/hooks/test/*.test.mjs`
+- [x] `(cd tools/leinoctl && node --test)`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl preflight`
+- [x] `./scripts/ci-impact.sh`
+- [x] `node content/tools/validate.mjs content/sets/demo/cards.json`
+- [x] `cd backend/game && go test ./...`
+- [x] Real PostgreSQL contract job equivalent
+- [x] `cd frontend && pnpm lint`
+- [x] `cd frontend && pnpm check`
+- [x] `cd frontend && pnpm build`
+- [x] `docker compose --parallel 8 -f docker-compose.yml config`
+- [x] Local `game`/`web` Docker image build smoke
+- [x] `terraform fmt -check` and validation for bootstrap/production roots
+- [x] `scripts/terraform-check.sh`
+- [x] OIDC claim allowlist/exact-subject test; raw JWT absent from logs
+- [x] WIF exchange + masked registry login/read smoke; static-key inventory `0`
+- [x] GitHub PR permission test: no environment, OIDC exchange or push
+- [x] Full-SHA no-overwrite test and remote digest/OCI-label verification
+- [x] Image-pair artifact schema test with two `@sha256` references
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260731T005255Z-b3ea2b-github-actions-yandex-images`
+- [x] `git diff --check`, strict UTF-8/text check and focused secret scan
 
 ## Риски и откат
 
@@ -411,10 +411,15 @@ repository.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:59:00 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** составить plan для GitHub
+- **Подтверждено:** 2026-07-31 08:55:11 UTC
+- **Формулировка/ограничения пользователя:** «Approve plan
+  20260731T005255Z-b3ea2b-github-actions-yandex-images». Это разрешает
+  implementation только в пределах exact plan scope; commit/push, GitHub
+  environment mutation, cloud apply и first image publication остаются
+  отдельными owner gates, явно указанными в плане.
+  Составить plan для GitHub
   Actions + Yandex Cloud WIF и build/push immutable `game`/`web` images в
   registry `crpdnmjudj1usiu90gdn`; никаких static cloud keys; после plan ждать
   approval. Одновременно разрешено создать остальные infra plans заранее, но
@@ -425,8 +430,34 @@ repository.
 - Read-only исследование roadmap, current CI/Docker/Terraform contracts,
   completed foundation evidence, active plan manifests, public GitHub metadata
   и актуальных official GitHub/Yandex WIF contracts выполнено.
-- Draft создан и заполнен; workflow/Terraform/Docker/runtime/cloud state не
-  изменялись. Plan не selected, approval не записан.
+- Plan approved, claimed/taken over by the current session and selected.
+- Repository implementation completed inside the write set: GitHub parity and
+  gated publish workflow, fail-closed WIF helper, Docker provenance labels,
+  keyless Terraform trust graph, exact registry pusher assertions, runbook and
+  roadmap evidence.
+- Focused Terraform check passed with provider `0.220.0`; canonical
+  `verify --changed`, hooks, leinoctl, plan-lint, preflight, ci-impact, real
+  PostgreSQL contract, frontend gates, Compose config and Docker image smoke
+  passed; strict text/secret scan, diff review and scope-check also passed.
+- GitHub environment `production-images` was configured as protected for
+  `main`; the allowlisted OIDC claim probe matched the exact issuer, audience,
+  subject, repository IDs and environment without exposing a raw token.
+- Bootstrap apply completed with `3 added / 0 changed / 0 destroyed`; outputs
+  created CI service account `ajecee5up8ka9j3rk1k6`, federation
+  `aje59lfbinrpposh9s9t` and federated credential `ajeco3uphqg05upkvsig`.
+  Bootstrap follow-up plan returned `No changes`.
+- Production apply completed with `1 added / 0 changed / 0 destroyed` for the
+  exact registry-scoped pusher binding; production follow-up plan returned
+  `No changes` and preserved the runtime puller.
+- First trusted publication succeeded in workflow run `30626403355`, attempt
+  `1`, for commit `6b461ebdb3742d2511f908e193417cea1407ef14`. The pair artifact
+  contains both full-SHA references, remote digests and digest-pinned images:
+  `game@sha256:519ad993f644f30c380f415049f465a8059e23afaa7a0503aeb286624b35e99f`
+  and
+  `web@sha256:e79531e3dfa1e642b7f8d4f029bde2f5d048382dd0c5aa80c8da271ea03444bb`.
+- No `latest` tag, cleanup, tag overwrite or token-bearing artifact was
+  reported. The plan's implementation and all remote acceptance gates are
+  complete; future deployment consumes only the verified digest pair.
 
 ## Итог
 

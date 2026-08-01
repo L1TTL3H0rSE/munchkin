@@ -74,7 +74,7 @@ flowchart LR
 | Область | Что есть сейчас | Следствие |
 |---|---|---|
 | Git | `origin` и `origin/main` уже GitHub | Нужна миграция CI/CD, а не Git remote |
-| CI | `.gitlab-ci.yml`: policy, content, Go, real PostgreSQL contract, frontend, Compose/build | Сохранить parity до удаления GitLab CI |
+| CI | `.gitlab-ci.yml` remains parity source; `.github/workflows/ci.yml` now declares the same verification DAG and a gated publish tail | Run on GitHub and configure required checks before retiring GitLab CI |
 | Runtime | Один dev `docker-compose.yml`: PostgreSQL, `game`, `web` | Нужен отдельный production topology |
 | Network | Host ports `5432`, `8080`, `3000` опубликованы | На VPS наружу оставить только Traefik `80/443` |
 | Images | Multi-stage backend/frontend images, оба запускаются non-root | Можно публиковать в registry после hardening |
@@ -85,7 +85,7 @@ flowchart LR
 | Studio | Local `.card-studio`, production persistence отсутствует | Оставить выключенной на public deployment |
 | Telemetry | Нет OTel, metrics endpoint, structured logs и dashboards | Реализовать vendor-neutral instrumentation |
 | IaC | Bootstrap/state applied; network/registry/compute graph locally validated, cloud apply gated | Завершить два reviewed apply и live host evidence |
-| Delivery | Images не публикуются, VM deployment и rollback отсутствуют | Построить полный GitHub -> Container Registry -> Compute VM path |
+| Delivery | Repository declares immutable image publication and digest-pair evidence; live WIF/apply/publication are not yet proven | Complete the owner-gated GitHub -> Container Registry -> Compute VM path |
 
 ## Неподвижные production-инварианты
 
@@ -148,6 +148,11 @@ observability stack.
 - Его состав не слабее текущего GitLab pipeline.
 - Failure любого canonical check блокирует image publication/deployment.
 
+**Статус 2026-07-31:** repository implementation добавила parity workflow с
+минимальными permissions, отдельным `publish` tail после всех verification jobs,
+protected environment contract и pinned action SHAs. Live green run, branch
+protection и required-check configuration остаются owner-side gates.
+
 ### INFRA-002 — immutable images и Yandex Container Registry
 
 **Работа**
@@ -169,6 +174,14 @@ observability stack.
 - Развёрнутая версия видна в telemetry или диагностическом endpoint.
 - На VPS отсутствуют source checkout и production build toolchain как
   обязательная часть deploy.
+
+**Статус 2026-07-31:** backend/frontend Dockerfiles получили OCI
+`source`/`revision`/`created`/`licenses` labels. Workflow строит только
+full-lowercase-SHA tags, проверяет отсутствие tag до push, получает remote
+digests после обоих push и создаёт non-secret pair manifest только после
+успешной двойной проверки. Terraform HCL добавляет keyless GitHub WIF и
+registry-scoped pusher; cloud apply, claim-probe, first publication и live
+label/digest evidence ещё не выполнялись.
 
 ### INFRA-003 — Yandex Cloud Terraform/Compute bootstrap и host security
 

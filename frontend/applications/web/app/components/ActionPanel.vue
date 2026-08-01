@@ -2,7 +2,6 @@
 import type {
   ActionDescriptor,
   CardView,
-  CommandPayload,
 } from "@munchkin/contracts";
 import {
   actionKey,
@@ -10,24 +9,31 @@ import {
   buildCommandPayload,
   reconcileActionState,
   selectionIsValid,
+  type ActionEntry,
 } from "./actionModel";
 
-const props = defineProps<{
-  actions: ActionDescriptor[];
+const props = withDefaults(defineProps<{
+  entries: ActionEntry[];
   cards: CardView[];
+  playerNames?: Record<string, string>;
   busy: boolean;
-}>();
+  contextCardName?: string;
+}>(), {
+  playerNames: () => ({}),
+  contextCardName: "",
+});
 
 const emit = defineEmits<{
-  execute: [action: ActionDescriptor, payload: CommandPayload];
+  close: [];
+  execute: [entry: ActionEntry, payload: ReturnType<typeof buildCommandPayload>];
 }>();
 
 const selections = reactive<Record<string, string[]>>({});
 const targets = reactive<Record<string, string>>({});
 
 watch(
-  () => props.actions,
-  (actions) => reconcileActionState(actions, selections, targets),
+  () => props.entries,
+  (entries) => reconcileActionState(entries, selections, targets),
   {deep: true, immediate: true},
 );
 
@@ -35,17 +41,16 @@ const cardNames = computed(() => new Map(
   props.cards.map((card) => [card.instance_id, card.name]),
 ));
 
-function selected(action: ActionDescriptor, index: number) {
-  return selections[actionKey(action, index)] ?? [];
+function selected(entry: ActionEntry) {
+  return selections[actionKey(entry.action, entry.index)] ?? [];
 }
 
 function toggle(
-  action: ActionDescriptor,
-  index: number,
+  entry: ActionEntry,
   instanceID: string,
   checked: boolean,
 ) {
-  const key = actionKey(action, index);
+  const key = actionKey(entry.action, entry.index);
   const values = new Set(selections[key] ?? []);
   if (checked) {
     values.add(instanceID);
@@ -56,98 +61,283 @@ function toggle(
 }
 
 function toggleFromEvent(
-  action: ActionDescriptor,
-  index: number,
+  entry: ActionEntry,
   instanceID: string,
   event: Event,
 ) {
   toggle(
-    action,
-    index,
+    entry,
     instanceID,
     (event.target as HTMLInputElement).checked,
   );
 }
 
-function target(action: ActionDescriptor, index: number) {
-  return targets[actionKey(action, index)];
+function target(entry: ActionEntry) {
+  return targets[actionKey(entry.action, entry.index)];
 }
 
-function valid(action: ActionDescriptor, index: number) {
-  return selectionIsValid(
-    action,
-    selected(action, index),
-    target(action, index),
-  );
+function valid(entry: ActionEntry) {
+  return selectionIsValid(entry.action, selected(entry), target(entry));
 }
 
-function submit(action: ActionDescriptor, index: number) {
+function submit(entry: ActionEntry) {
   emit(
     "execute",
-    action,
-    buildCommandPayload(
-      action,
-      selected(action, index),
-      target(action, index),
-    ),
+    entry,
+    buildCommandPayload(entry.action, selected(entry), target(entry)),
   );
 }
 
 function optionLabel(instanceID: string) {
-  return cardNames.value.get(instanceID) ?? instanceID;
+  return cardNames.value.get(instanceID)
+    ?? props.playerNames[instanceID]
+    ?? instanceID;
+}
+
+function targetOptions(action: ActionDescriptor) {
+  return [
+    ...(action.target_instance_ids ?? []),
+    ...(action.target_player_ids ?? []),
+  ];
+}
+
+function isPlayerTarget(action: ActionDescriptor, targetID: string) {
+  return action.target_player_ids?.includes(targetID) ?? false;
 }
 </script>
 
 <template>
-  <div class="action-list">
-    <article
-      v-for="(action, index) in actions"
-      :key="actionKey(action, index)"
-      class="action-choice"
-    >
-      <strong>{{ actionLabel(action) }}</strong>
-
-      <div v-if="action.instance_ids?.length" class="action-options">
-        <label
-          v-for="instanceID in action.instance_ids"
-          :key="instanceID"
-          class="selection-option"
-        >
-          <input
-            type="checkbox"
-            :checked="selected(action, index).includes(instanceID)"
-            @change="toggleFromEvent(action, index, instanceID, $event)"
-          >
-          <span>{{ optionLabel(instanceID) }}</span>
-        </label>
-        <small>
-          Выбрать: {{ action.minimum ?? 0 }}–{{ action.maximum ?? action.minimum ?? 0 }}
-          <template v-if="action.minimum_total">
-            · сумма не меньше {{ action.minimum_total }}
-          </template>
-        </small>
+  <aside
+    class="action-dock"
+    :data-state="busy ? 'pending' : entries.length ? 'available' : 'idle'"
+    :aria-busy="busy"
+    aria-labelledby="action-dock-title"
+  >
+    <header class="action-dock__header">
+      <div>
+        <p class="eyebrow">СЕРВЕРНЫЕ ДЕЙСТВИЯ</p>
+        <h2 id="action-dock-title">
+          {{ contextCardName ? `Карта: ${contextCardName}` : "Что можно сделать" }}
+        </h2>
+        <p class="action-dock__hint">
+          {{ contextCardName
+            ? "Выберите один из вариантов для этой карты."
+            : "Доступные действия появятся здесь после подтверждённого состояния." }}
+        </p>
       </div>
-
-      <label v-if="action.target_instance_ids?.length" class="target-select">
-        Цель
-        <select v-model="targets[actionKey(action, index)]">
-          <option value="" disabled>Выберите предмет</option>
-          <option
-            v-for="instanceID in action.target_instance_ids"
-            :key="instanceID"
-            :value="instanceID"
-          >
-            {{ optionLabel(instanceID) }}
-          </option>
-        </select>
-      </label>
-
       <button
-        :disabled="busy || !valid(action, index)"
-        @click="submit(action, index)"
+        v-if="contextCardName"
+        class="action-dock__close"
+        type="button"
+        aria-label="Закрыть действия карты"
+        @click="emit('close')"
       >
-        {{ actionLabel(action) }}
+        Закрыть
       </button>
-    </article>
-  </div>
+    </header>
+
+    <p v-if="!entries.length" class="action-dock__empty" role="status">
+      Выберите карту с отметкой «Доступно» или дождитесь хода другого игрока.
+    </p>
+
+    <div v-else class="action-list">
+      <article
+        v-for="entry in entries"
+        :key="actionKey(entry.action, entry.index)"
+        class="action-choice"
+        :data-state="busy ? 'pending' : 'available'"
+      >
+        <strong>{{ actionLabel(entry.action) }}</strong>
+        <small v-if="entry.action.source_instance_id" class="action-choice__source">
+          Источник: {{ optionLabel(entry.action.source_instance_id) }}
+        </small>
+
+        <div v-if="entry.action.instance_ids?.length" class="action-options">
+          <label
+            v-for="instanceID in entry.action.instance_ids"
+            :key="instanceID"
+            class="selection-option"
+          >
+            <input
+              type="checkbox"
+              :checked="selected(entry).includes(instanceID)"
+              :disabled="busy"
+              @change="toggleFromEvent(entry, instanceID, $event)"
+            >
+            <span>{{ optionLabel(instanceID) }}</span>
+          </label>
+          <small>
+            Выбрать: {{ entry.action.minimum ?? 0 }}–{{ entry.action.maximum ?? entry.action.minimum ?? 0 }}
+            <template v-if="entry.action.minimum_total">
+              · сумма не меньше {{ entry.action.minimum_total }}
+            </template>
+          </small>
+        </div>
+
+        <label v-if="targetOptions(entry.action).length" class="target-select">
+          Цель
+          <select
+            v-model="targets[actionKey(entry.action, entry.index)]"
+            :disabled="busy"
+          >
+            <option value="" disabled>Выберите цель</option>
+            <option
+              v-for="targetID in targetOptions(entry.action)"
+              :key="targetID"
+              :value="targetID"
+            >
+              {{ optionLabel(targetID) }}
+              <template v-if="isPlayerTarget(entry.action, targetID)">
+                · игрок
+              </template>
+            </option>
+          </select>
+        </label>
+
+        <button
+          class="action-choice__submit"
+          type="button"
+          :disabled="busy || !valid(entry)"
+          @click="submit(entry)"
+        >
+          {{ busy ? "Отправляем…" : actionLabel(entry.action) }}
+        </button>
+      </article>
+    </div>
+  </aside>
 </template>
+
+<style scoped>
+.action-dock {
+  min-width: 0;
+  display: grid;
+  gap: .85rem;
+}
+
+.action-dock__header {
+  min-width: 0;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .5rem .65rem 0;
+}
+
+.action-dock__header h2 {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 1.25rem;
+}
+
+.action-dock__hint,
+.action-dock__empty {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.action-dock__hint {
+  max-width: 60ch;
+  margin-top: .35rem;
+  font-size: .84rem;
+}
+
+.action-dock__empty {
+  border: 1px dashed var(--line);
+  padding: .75rem;
+}
+
+.action-dock__close {
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  border-color: var(--line);
+  color: var(--ink);
+  background: transparent;
+}
+
+.action-list {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: .75rem;
+}
+
+.action-choice {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: .7rem;
+  border: 1px solid var(--line);
+  background: #15160f;
+  padding: .8rem;
+}
+
+.action-choice > strong {
+  color: var(--acid);
+  font-size: .78rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.action-choice__source {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.action-options {
+  display: grid;
+  gap: .4rem;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.selection-option {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.selection-option input {
+  width: auto;
+  margin: 0;
+}
+
+.target-select {
+  display: grid;
+  gap: .4rem;
+}
+
+.target-select select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #10110c;
+  color: var(--ink);
+  padding: .65rem;
+}
+
+.action-choice__submit {
+  width: 100%;
+  min-height: 2.75rem;
+}
+
+@media (width <= 599px) {
+  .action-list {
+    max-height: min(64dvh, 36rem);
+    overflow-y: auto;
+    padding: .1rem;
+  }
+
+  .action-dock__header {
+    padding-inline: .4rem;
+  }
+
+  .action-dock__header h2 {
+    font-size: 1.05rem;
+  }
+}
+</style>

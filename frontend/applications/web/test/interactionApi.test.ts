@@ -164,6 +164,7 @@ describe("interaction API adapter", () => {
       "credential",
       combatProjection.version,
       actionID,
+      {commandID: "helper-command"},
     );
 
     const [url, options] = fetchMock.mock.calls[0] ?? [];
@@ -175,6 +176,7 @@ describe("interaction API adapter", () => {
       expected_version: 12,
       action_id: actionID,
     });
+    expect(options.headers["Idempotency-Key"]).toBe("helper-command");
     expect(options.body).not.toHaveProperty("helper_player_id");
     expect(options.body).not.toHaveProperty("reward_treasures");
     expect(options.body).not.toHaveProperty("deadline_at");

@@ -22,8 +22,6 @@ backend/game/coverage.out
 
 docker/data/
 
-content/reference-local/
-
 .idea/
 .vscode/*
 !.vscode/extensions.json

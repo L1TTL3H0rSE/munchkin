@@ -14,7 +14,6 @@ import {
   lobbySummarySchema,
   projectionSchema,
   commandPayloadSchema,
-  type ActionDescriptor,
   type ActionType,
   type CommandResult,
   type CommandPayload,
@@ -180,6 +179,7 @@ export function useGameApi() {
     interactionID: string,
     actionID: string,
     intent: InteractionIntent,
+    options: GameCommandOptions = {},
   ) {
     const request = parseClientRequest(
       () => interactionCommandRequestSchema.parse({
@@ -192,6 +192,7 @@ export function useGameApi() {
     const path = intent === "pass"
       ? "pass-interaction"
       : "respond-interaction";
+    const commandID = options.commandID ?? crypto.randomUUID();
     return requestGameplay(
       () => $fetch(
         `${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/commands/${path}`,
@@ -199,9 +200,10 @@ export function useGameApi() {
           method: "POST",
           headers: {
             ...authorization(credential),
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": commandID,
           },
           body: request,
+          ...(options.signal ? {signal: options.signal} : {}),
         },
       ),
       clientCommandResult,
@@ -239,6 +241,7 @@ export function useGameApi() {
     credential: string,
     expectedVersion: number,
     actionID: string,
+    options: GameCommandOptions = {},
   ) {
     const request = parseClientRequest(
       () => combatHelpRequestSchema.parse({
@@ -246,6 +249,7 @@ export function useGameApi() {
         action_id: actionID,
       }),
     );
+    const commandID = options.commandID ?? crypto.randomUUID();
     return requestGameplay(
       () => $fetch(
         `${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/commands/combat-help`,
@@ -253,9 +257,10 @@ export function useGameApi() {
           method: "POST",
           headers: {
             ...authorization(credential),
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": commandID,
           },
           body: request,
+          ...(options.signal ? {signal: options.signal} : {}),
         },
       ),
       clientCommandResult,
@@ -270,6 +275,7 @@ export function useGameApi() {
     recipientPlayerID: string,
     offeredInstanceIDs: string[],
     requestedInstanceIDs: string[] = [],
+    options: GameCommandOptions = {},
   ) {
     const request = parseClientRequest(
       () => economyOfferRequestSchema.parse({
@@ -288,9 +294,10 @@ export function useGameApi() {
           method: "POST",
           headers: {
             ...authorization(credential),
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": options.commandID ?? crypto.randomUUID(),
           },
           body: request,
+          ...(options.signal ? {signal: options.signal} : {}),
         },
       ),
       clientCommandResult,
@@ -302,6 +309,7 @@ export function useGameApi() {
     credential: string,
     expectedVersion: number,
     allocations: CharityAllocation[] = [],
+    options: GameCommandOptions = {},
   ) {
     const request = parseClientRequest(
       () => charityRequestSchema.parse({
@@ -316,9 +324,10 @@ export function useGameApi() {
           method: "POST",
           headers: {
             ...authorization(credential),
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": options.commandID ?? crypto.randomUUID(),
           },
           body: request,
+          ...(options.signal ? {signal: options.signal} : {}),
         },
       ),
       clientCommandResult,
@@ -333,6 +342,7 @@ export function useGameApi() {
     abilityIndex: number,
     costInstanceID: string,
     victimPlayerID: string,
+    options: GameCommandOptions = {},
   ) {
     const request = parseClientRequest(
       () => theftRequestSchema.parse({
@@ -350,9 +360,10 @@ export function useGameApi() {
           method: "POST",
           headers: {
             ...authorization(credential),
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": options.commandID ?? crypto.randomUUID(),
           },
           body: request,
+          ...(options.signal ? {signal: options.signal} : {}),
         },
       ),
       clientCommandResult,
@@ -438,21 +449,7 @@ function clientCommandResult(response: unknown): CommandResult {
 }
 
 function clientProjection(response: unknown): Projection {
-  const parsed = projectionSchema.parse(response);
-  return {
-    ...parsed,
-    turn: {
-      ...parsed.turn,
-      available_actions: parsed.turn.available_actions.filter(
-        (action): action is ActionDescriptor =>
-          action.type !== "play_target_effect" &&
-          action.type !== "propose_trade" &&
-          action.type !== "propose_gift" &&
-          action.type !== "resolve_charity" &&
-          action.type !== "attempt_theft",
-      ),
-    },
-  };
+  return projectionSchema.parse(response);
 }
 
 export function parseGameProjection(response: unknown): Projection {

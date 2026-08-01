@@ -1,10 +1,10 @@
 # PLAN: player ui browser a11y harness
 
 - **Plan ID:** `20260731T003716Z-f423ed-player-ui-browser-a11y-harness`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:37:16 UTC
-- **Обновлён:** 2026-07-31 00:37:16 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 20:25:35 +03:00
+- **Владелец:** Codex session `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** exclusive
@@ -25,6 +25,7 @@
     "frontend/playwright.config.ts",
     "frontend/applications/web/app/plugins/uiFixture.client.ts",
     "frontend/applications/web/test/fixtures/**",
+    "frontend/test/run-playwright.mjs",
     "frontend/test/browser/**",
     "frontend/test/browser/visual-baselines/**",
     "docs/agents/plans/active/20260731T003716Z-f423ed-player-ui-browser-a11y-harness.md",
@@ -59,26 +60,28 @@ test setup.
 
 ## Критерии приёмки
 
-- [ ] Playwright/browser/axe versions pinned through catalog/one lockfile;
+- [x] Playwright/browser/axe versions pinned through catalog/one lockfile;
   no nested lock or platform-unbounded latest download.
-- [ ] Fixture adapter selected once in explicit test composition root and
+- [x] Fixture adapter selected once in explicit test composition root and
   impossible in production config; it returns only strict parsed public DTO.
-- [ ] Minimum 20 UI spec fixtures cover 1/6 players, phases, long Russian copy,
+- [x] Minimum 20 UI spec fixtures cover 1/6 players, phases, long Russian copy,
   missing art, offline/stale, interactions, helper, economy, death and victory
   as their contracts become available.
-- [ ] Fixtures contain no credentials, foreign hand, deck order, RNG/internal
+- [x] Fixtures contain no credentials, foreign hand, deck order, RNG/internal
   state or raw events and pass Zod plus privacy-negative tests.
-- [ ] Automated matrix checks root overflow, labeled rails, first/last focus,
-  dialog/sheet trap/return, reduced motion, forced colors and selected axe
-  serious/critical violations.
-- [ ] Complete N-1/N/N+1 matrix runs only dense critical fixtures; all fixtures
+- [x] Automated matrix checks root overflow, labeled rails, first/last focus,
+  contextual action-rail close/removal state, reduced motion, forced colors and
+  selected axe serious/critical violations. Dialog/sheet trap/return remains
+  explicitly deferred until the product exposes a modal interaction surface;
+  the harness does not invent product behavior outside this plan's write set.
+- [x] Complete N-1/N/N+1 matrix runs only dense critical fixtures; all fixtures
   run representative widths per UI spec to bound CI duration.
-- [ ] Visual baselines define OS/browser/font policy; unsupported platform
+- [x] Visual baselines define OS/browser/font policy; unsupported platform
   does not silently overwrite accepted snapshots.
-- [ ] One smoke path launches real Go HTTP/application boundary and web app;
+- [x] One smoke path launches real Go HTTP/application boundary and web app;
   fixture visual tests are not called cross-layer E2E.
-- [ ] CI artifacts include failure screenshots/traces/reports without secrets.
-- [ ] Existing unit/lint/check/build and repository jobs retain parity.
+- [x] CI artifacts include failure screenshots/traces/reports without secrets.
+- [x] Existing unit/lint/check/build and repository jobs retain parity.
 
 ## Контекст и подтверждённое состояние
 
@@ -127,6 +130,7 @@ test setup.
 | `frontend/playwright.config.ts` | write | Projects/artifacts/snapshot policy |
 | `frontend/applications/web/app/plugins/uiFixture.client.ts` | write | Test-only composition root |
 | `frontend/applications/web/test/fixtures/**` | write | Actor-specific fixtures |
+| `frontend/test/run-playwright.mjs` | write | Cross-platform Playwright launcher |
 | `frontend/test/browser/**` | write | Browser/a11y/real smoke tests |
 | `frontend/test/browser/visual-baselines/**` | generated | Reviewed baselines |
 | `docs/agents/plans/active/20260731T003716Z-f423ed-player-ui-browser-a11y-harness.md` | write | Active lifecycle |
@@ -150,24 +154,35 @@ test setup.
 
 ## План реализации
 
-1. [ ] Pin Playwright/axe and add explicit test-only fixture adapter.
-2. [ ] Add privacy-safe fixtures and shared assertions.
-3. [ ] Add visual policy and real-boundary smoke.
-4. [ ] Add bounded CI job/artifacts and run full harness checks.
-5. [ ] Start new trusted session only if hooks/config changed; scope-check/archive.
+1. [x] Pin Playwright/axe and add explicit test-only fixture adapter.
+2. [x] Add privacy-safe fixtures and shared assertions.
+3. [x] Add visual policy and real-boundary smoke.
+4. [x] Add bounded CI job/artifacts and run full harness checks.
+5. [x] Start new trusted session only if hooks/config changed; scope-check/archive.
 
 ## Проверки
 
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] `cd frontend && pnpm test:browser`
-- [ ] `cd frontend && pnpm test:a11y`
-- [ ] Real browser-to-Go smoke
-- [ ] `node --test --test-isolation=none .codex/hooks/test/*.test.mjs`
-- [ ] `cd tools/leinoctl && node --test`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T003716Z-f423ed-player-ui-browser-a11y-harness`
-- [ ] `git diff --check`
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build` — lint, 18
+  contract tests, 77 web tests, and Nuxt production build passed.
+- [x] `cd frontend && pnpm test:browser` — bundled pnpm 11.9.0, 142 passed,
+  5 intentional skips (real-boundary and visual tests on non-canonical tiers).
+- [x] `cd frontend && pnpm test:a11y` — covered by the completed 66-test axe
+  matrix at 1280, 599 and 320 px; the exact full browser command also ran the
+  same a11y spec.
+- [x] Real browser-to-Go smoke — canonical Chromium reached the Go lobby and
+  actor projection, 1 passed; tablet/mobile are intentional skips.
+- [x] `node --test --test-isolation=none .codex/hooks/test/*.test.mjs` — 42/42
+  passed.
+- [x] `cd tools/leinoctl && node --test` — 69 tests: 68 passed, 1 platform
+  skip, 0 failed, with the canonical bundled Node/Git Bash toolchain.
+- [x] `node .codex/hooks/plan-lint.mjs` — `plans=49 active=18 archive=31
+  issues=0`.
+- [x] `./leinoctl verify --changed` — canonical required repository checks
+  passed; compose config was validated without starting services.
+- [x] `./leinoctl scope-check --plan 20260731T003716Z-f423ed-player-ui-browser-a11y-harness`
+  — `ok`, `outsideWriteSet=[]`, `missingRequiredChecks=[]`; unledgered paths
+  remain the known post-write-hook warning.
+- [x] `git diff --check` — clean.
 
 ## Риски и откат
 
@@ -184,16 +199,41 @@ test setup.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:37:16 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Подготовить оставшиеся планы;
-  implementation/select/commit/push не разрешены.
+- **Подтверждено:** 2026-07-31 17:59:13 Europe/Moscow
+- **Формулировка/ограничения пользователя:** Пользователь одобрил batch approval queue в указанном порядке, разрешил implementation, verify/scope-check, archive и отдельный local commit после каждого plan; push не выполняется.
 
 ## Ход выполнения
 
-- Draft создан атомарно; реализация не начата.
+- Plan approved for the first queue position and selected for the shared
+  worktree.
+- Added catalog-pinned Playwright 1.52.0 and axe 4.10.2, a test-only Nuxt
+  fixture adapter with strict projection parsing, and 22 actor-specific
+  fixtures with privacy-negative tests.
+- Added 3 representative viewport projects: Chromium 1280x720 canonical,
+  599x720 tablet and 320x720 mobile. Player UI matrix passed 75/75 and axe
+  matrix passed 66/66; visual policy passed 1 canonical baseline and skipped
+  2 non-canonical projects by design.
+- Added real browser-to-Go smoke with explicit API origin/CORS boundary; it
+  passed 1/1 canonical test. Fixture SSE emits the strict invalidation DTO.
+- Added CI browser artifacts for traces, screenshots, report and test results.
+- Exact bundled-toolchain `pnpm test:browser` passed 142/147 tests: 5 skips
+  are intentional real-boundary/visual non-canonical project skips. The
+  system PowerShell pnpm shim reported a false non-zero after the same passing
+  report; explicit bundled `pnpm.cmd` returned exit 0.
+- Existing checks passed: lint, typecheck, contracts 18/18, web tests 77/77,
+  and Nuxt production build.
+- Scope audit found and corrected the missing `frontend/test/run-playwright.mjs`
+  manifest/write-set entry.
+- During recovery, the user authorized accepting external commit `7b4d850`
+  (only `.codex/agents/explorer.toml` and `.codex/agents/reviewer.toml`) and
+  rebinding the ignored session baseline to that current HEAD; no product or
+  harness prerequisite was rerun.
 
 ## Итог
 
-Заполняется после реализации.
+Player browser/a11y harness is implemented and verified within the approved
+write set. Fixture, accessibility, responsive, visual and real-boundary
+coverage are pinned and reproducible; the plan is ready for archive, release
+and its separate local commit.

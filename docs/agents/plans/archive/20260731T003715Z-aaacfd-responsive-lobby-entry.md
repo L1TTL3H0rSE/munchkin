@@ -1,10 +1,10 @@
 # PLAN: responsive lobby entry
 
 - **Plan ID:** `20260731T003715Z-aaacfd-responsive-lobby-entry`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:37:15 UTC
-- **Обновлён:** 2026-07-31 00:37:15 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-07-31 23:40:20 +03:00
+- **Владелец:** Codex queue session `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc-queue3`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -23,7 +23,7 @@
     "frontend/applications/web/app/assets/main.css",
     "frontend/applications/web/test/lobbyEntry.test.ts",
     "frontend/test/browser/lobby.spec.ts",
-    "frontend/test/browser/visual-baselines/lobby/**",
+    "frontend/test/browser/visual-baselines/chromium/lobby-entry.png",
     "docs/agents/plans/active/20260731T003715Z-aaacfd-responsive-lobby-entry.md",
     "docs/agents/plans/archive/20260731T003715Z-aaacfd-responsive-lobby-entry.md"
   ],
@@ -53,21 +53,21 @@ without changing guest credential or backend lobby contract.
 
 ## Критерии приёмки
 
-- [ ] Create/join forms have independent pending/error states and never block
+- [x] Create/join forms have independent pending/error states and never block
   each other through one global busy flag.
-- [ ] API errors use completed safe taxonomy; field errors linked/focused,
+- [x] API errors use completed safe taxonomy; field errors linked/focused,
   auth/404/offline recovery copy contains no raw message/token.
-- [ ] Native labels/fieldset/autocomplete/input constraints and 44px targets
+- [x] Native labels/fieldset/autocomplete/input constraints and 44px targets
   support keyboard/touch; duplicate submit blocked per form.
-- [ ] Session credential remains sessionStorage-only and never appears in URL,
+- [x] Session credential remains sessionStorage-only and never appears in URL,
   SSR, log or visible error.
-- [ ] Mobile 320 single-column, tablet/desktop composition, long Russian copy
+- [x] Mobile 320 single-column, tablet/desktop composition, long Russian copy
   and keyboard viewport have no root overflow.
-- [ ] Navigation after success is based on parsed server result; failed join
+- [x] Navigation after success is based on parsed server result; failed join
   preserves safe user input and allows retry.
-- [ ] Component/browser tests cover empty/validation/offline/not-found/success,
+- [x] Component/browser tests cover empty/validation/offline/not-found/success,
   keyboard, zoom, forced colors and reduced motion.
-- [ ] Gameplay/Studio styles are not affected; migrated lobby CSS leaves
+- [x] Gameplay/Studio styles are not affected; migrated lobby CSS leaves
   global sheet cleaner.
 
 ## Контекст и подтверждённое состояние
@@ -110,7 +110,7 @@ without changing guest credential or backend lobby contract.
 | `frontend/applications/web/app/assets/main.css` | write | Remove migrated lobby styles |
 | `frontend/applications/web/test/lobbyEntry.test.ts` | write | Component states |
 | `frontend/test/browser/lobby.spec.ts` | write | Browser/a11y matrix |
-| `frontend/test/browser/visual-baselines/lobby/**` | generated | Reviewed snapshots |
+| `frontend/test/browser/visual-baselines/chromium/lobby-entry.png` | generated | Reviewed snapshot |
 | `docs/agents/plans/active/20260731T003715Z-aaacfd-responsive-lobby-entry.md` | write | Active lifecycle |
 | `docs/agents/plans/archive/20260731T003715Z-aaacfd-responsive-lobby-entry.md` | write | Archived lifecycle |
 
@@ -129,20 +129,29 @@ without changing guest credential or backend lobby contract.
 
 ## План реализации
 
-1. [ ] Add create/join state tests and split components.
-2. [ ] Apply typed errors/session-safe navigation.
-3. [ ] Migrate scoped responsive styles.
-4. [ ] Run unit/browser/a11y/visual/full checks and archive.
+1. [x] Add create/join state tests and split components.
+2. [x] Apply typed errors/session-safe navigation.
+3. [x] Migrate scoped responsive styles.
+4. [x] Run unit/browser/a11y/visual/full checks and archive.
 
 ## Проверки
 
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] `cd frontend && pnpm test:browser -- lobby.spec.ts`
-- [ ] Viewport/keyboard/zoom/reduced/forced-colors matrix
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T003715Z-aaacfd-responsive-lobby-entry`
-- [ ] `git diff --check`
+- [x] Web ESLint — passed (`node node_modules/eslint/bin/eslint.js .`).
+- [x] Lobby unit model tests — 3/3 passed (`vitest run test/lobbyEntry.test.ts`).
+- [x] Nuxt typecheck — exit 0; emitted the existing optional Volar
+  `vue-router/volar/sfc-route-blocks` resolution warning without diagnostics.
+- [x] Nuxt production build — passed; client/server/Nitro artifacts generated.
+- [x] Lobby browser semantic matrix — 12/12 passed on Chromium 1280, tablet
+  599 and mobile 320; includes pending isolation, safe 404/503 recovery,
+  keyboard, zoom, reduced-motion and forced-colors checks.
+- [x] Lobby visual baseline — 1/1 passed after hiding the dynamic Nuxt
+  DevTools frame; reviewed `frontend/test/browser/visual-baselines/chromium/lobby-entry.png`.
+- [x] `node .codex/hooks/plan-lint.mjs` — `plans=49 active=16 archive=33 issues=0`.
+- [x] `./leinoctl verify --changed` — passed with the declared Node 24
+  toolchain and isolated Docker config; clean verify fingerprint contains no
+  generated Playwright artifacts.
+- [x] `./leinoctl scope-check --plan 20260731T003715Z-aaacfd-responsive-lobby-entry` — `ok: true`, no outside-write-set or stale checks.
+- [x] `git diff --check`
 
 ## Риски и откат
 
@@ -156,16 +165,25 @@ without changing guest credential or backend lobby contract.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:37:15 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Подготовить оставшиеся планы;
-  implementation/select/commit/push не разрешены.
+- **Подтверждено:** 2026-07-31 22:20:00 Europe/Moscow
+- **Формулировка/ограничения пользователя:** Пользователь одобрил batch
+  approval queue в указанном порядке и разрешил implementation,
+  verify/scope-check, archive и отдельный local commit после каждого plan;
+  push не выполняется.
 
 ## Ход выполнения
 
-- Draft создан атомарно; реализация не начата.
+- Plan выбран следующим после завершённого responsive game table plan;
+  implementation начинается в пределах lobby write set.
 
 ## Итог
 
-Заполняется после реализации.
+Lobby entry decomposed into independently controlled create/join forms with
+typed validation and safe API recovery. Credential handling remains delegated
+to the existing sessionStorage-only adapter; navigation uses parsed server
+results. Scoped responsive styles cover 320px, tablet and desktop layouts,
+while the browser harness waits for Vue hydration and excludes the dynamic
+DevTools frame from the visual baseline. Implementation and local checks are
+complete; the plan is ready to archive and commit as the next lifecycle step.

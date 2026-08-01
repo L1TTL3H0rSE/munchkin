@@ -20,6 +20,11 @@ import {
   type GameSessionAPI,
   type GameSessionScheduler,
 } from "../app/composables/useGameSessionController";
+import {createFixtureAdapter} from "./fixtures/fixtureAdapter";
+import {
+  economyActions,
+  type EconomySubmission,
+} from "../app/components/interaction/economyModel";
 
 const baseProjection = parseGameProjection(JSON.parse(readFileSync(new URL(
   "../../../../backend/game/internal/transport/httpapi/testdata/"
@@ -28,6 +33,20 @@ const baseProjection = parseGameProjection(JSON.parse(readFileSync(new URL(
 ), "utf8")) as unknown);
 
 const action = {type: "end_turn"} satisfies ActionDescriptor;
+const passInteraction = baseProjection.interaction?.actions.find(
+  (candidate) => candidate.type === "pass",
+);
+if (!passInteraction) {
+  throw new Error("pass interaction action was not parsed");
+}
+const fixtureAdapter = createFixtureAdapter();
+const helperOfferProjection = fixtureAdapter.getProjection("helper-offer");
+const helperOfferAction = helperOfferProjection.interaction?.actions.find(
+  (candidate) => candidate.type === "offer_help",
+);
+if (!helperOfferAction) {
+  throw new Error("helper offer action was not parsed");
+}
 
 interface StreamHarness {
   gameID: string;
@@ -104,6 +123,21 @@ function createAPI(initialProjection = projectionAt(7)) {
   const command = vi.fn<GameSessionAPI["command"]>(
     async () => commandResult(initialProjection),
   );
+  const interaction = vi.fn<GameSessionAPI["interaction"]>(
+    async () => commandResult(initialProjection),
+  );
+  const combatHelp = vi.fn<GameSessionAPI["combatHelp"]>(
+    async () => commandResult(initialProjection),
+  );
+  const economyOffer = vi.fn<GameSessionAPI["economyOffer"]>(
+    async () => commandResult(initialProjection),
+  );
+  const resolveCharity = vi.fn<GameSessionAPI["resolveCharity"]>(
+    async () => commandResult(initialProjection),
+  );
+  const attemptTheft = vi.fn<GameSessionAPI["attemptTheft"]>(
+    async () => commandResult(initialProjection),
+  );
   const stream = vi.fn<GameSessionAPI["stream"]>(
     (gameID, _credential, onInvalidation, onDisconnect, onConnected) => {
       const stopped = vi.fn();
@@ -117,8 +151,28 @@ function createAPI(initialProjection = projectionAt(7)) {
       return stopped;
     },
   );
-  const api = {getGame, command, stream} satisfies GameSessionAPI;
-  return {api, getGame, command, stream, streams};
+  const api = {
+    getGame,
+    command,
+    interaction,
+    combatHelp,
+    economyOffer,
+    resolveCharity,
+    attemptTheft,
+    stream,
+  } satisfies GameSessionAPI;
+  return {
+    api,
+    getGame,
+    command,
+    interaction,
+    combatHelp,
+    economyOffer,
+    resolveCharity,
+    attemptTheft,
+    stream,
+    streams,
+  };
 }
 
 function createHarness(options: {
@@ -342,6 +396,148 @@ describe("game session controller", () => {
     expect(firstOptions?.commandID).toBe("stable-command-id");
     expect(secondOptions?.commandID).toBe("stable-command-id");
     expect(harness.controller.projection.value?.version).toBe(8);
+  });
+
+  it("retries one interaction intent with the same command ID", async () => {
+    const apiHarness = createAPI();
+    apiHarness.interaction
+      .mockRejectedValueOnce(new GameApiError(
+        "offline",
+        safeGameApiMessage("offline"),
+      ))
+      .mockResolvedValueOnce(commandResult(projectionAt(8)));
+    const harness = createHarness({api: apiHarness});
+    await harness.controller.start("game-a");
+
+    await harness.controller.submitInteraction(passInteraction);
+
+    expect(harness.interaction).toHaveBeenCalledTimes(2);
+    const firstOptions = harness.interaction.mock.calls[0]?.[6];
+    const secondOptions = harness.interaction.mock.calls[1]?.[6];
+    expect(harness.interaction.mock.calls[0]?.slice(2, 6)).toEqual([
+      7,
+      passInteraction.interaction_id,
+      passInteraction.action_id,
+      "pass",
+    ]);
+    expect(firstOptions?.commandID).toBe("stable-command-id");
+    expect(secondOptions?.commandID).toBe("stable-command-id");
+    expect(harness.controller.projection.value?.version).toBe(8);
+    expect(harness.controller.interactionError.value).toBe("");
+  });
+
+  it("blocks duplicate interaction clicks while the command is pending", async () => {
+    const apiHarness = createAPI();
+    const pending = deferred<CommandResult>();
+    apiHarness.interaction.mockReturnValueOnce(pending.promise);
+    const harness = createHarness({api: apiHarness});
+    await harness.controller.start("game-a");
+
+    const first = harness.controller.submitInteraction(passInteraction);
+    const second = harness.controller.submitInteraction(passInteraction);
+    await flushAsync();
+
+    expect(harness.interaction).toHaveBeenCalledOnce();
+    expect(harness.controller.interactionBusy.value).toBe(true);
+    pending.resolve(commandResult(projectionAt(8)));
+    await Promise.all([first, second]);
+    expect(harness.controller.interactionBusy.value).toBe(false);
+  });
+
+  it("submits helper offer actions through the specialized opaque endpoint", async () => {
+    const apiHarness = createAPI(helperOfferProjection);
+    const nextProjection = {
+      ...helperOfferProjection,
+      version: helperOfferProjection.version + 1,
+    };
+    apiHarness.combatHelp
+      .mockRejectedValueOnce(new GameApiError(
+        "offline",
+        safeGameApiMessage("offline"),
+      ))
+      .mockResolvedValueOnce(commandResult(nextProjection));
+    const harness = createHarness({api: apiHarness});
+    await harness.controller.start(helperOfferProjection.game_id);
+
+    await harness.controller.submitInteraction(helperOfferAction);
+
+    expect(harness.combatHelp).toHaveBeenCalledTimes(2);
+    expect(harness.combatHelp.mock.calls[0]?.slice(2, 4)).toEqual([
+      helperOfferProjection.version,
+      helperOfferAction.action_id,
+    ]);
+    expect(harness.combatHelp.mock.calls[0]?.[4]?.commandID)
+      .toBe("stable-command-id");
+    expect(harness.combatHelp.mock.calls[1]?.[4]?.commandID)
+      .toBe("stable-command-id");
+    expect(harness.controller.projection.value?.version)
+      .toBe(nextProjection.version);
+  });
+
+  it("submits economy clauses with one idempotent retry and no optimistic move", async () => {
+    const economyProjection = fixtureAdapter.getProjection("economy-actions");
+    const giftEntry = economyActions(economyProjection.turn.available_actions)
+      .find(({action}) => action.type === "propose_gift");
+    if (!giftEntry) {
+      throw new Error("economy fixture must expose a gift descriptor");
+    }
+    const nextProjection = {
+      ...economyProjection,
+      version: economyProjection.version + 1,
+    };
+    const apiHarness = createAPI(economyProjection);
+    apiHarness.economyOffer
+      .mockRejectedValueOnce(new GameApiError(
+        "offline",
+        safeGameApiMessage("offline"),
+      ))
+      .mockResolvedValueOnce(commandResult(nextProjection));
+    const harness = createHarness({api: apiHarness});
+    await harness.controller.start(economyProjection.game_id);
+
+    const request: EconomySubmission = {
+      kind: "offer",
+      offerKind: "gift",
+      action: giftEntry.action,
+      recipientPlayerID: "player_1",
+      offeredInstanceIDs: ["transfer-card-1"],
+      requestedInstanceIDs: [],
+    };
+    await harness.controller.submitEconomy(request);
+
+    expect(apiHarness.economyOffer).toHaveBeenCalledTimes(2);
+    expect(apiHarness.economyOffer.mock.calls[0]?.slice(2, 7)).toEqual([
+      economyProjection.version,
+      "gift",
+      "player_1",
+      ["transfer-card-1"],
+      [],
+    ]);
+    expect(apiHarness.economyOffer.mock.calls[0]?.[7]?.commandID)
+      .toBe("stable-command-id");
+    expect(harness.controller.projection.value?.version)
+      .toBe(nextProjection.version);
+  });
+
+  it("resyncs a stale interaction without silently replaying it", async () => {
+    const apiHarness = createAPI();
+    apiHarness.getGame
+      .mockResolvedValueOnce(projectionAt(7))
+      .mockResolvedValueOnce(projectionAt(8));
+    apiHarness.interaction.mockRejectedValue(new GameApiError(
+      "stale_version",
+      safeGameApiMessage("stale_version"),
+    ));
+    const harness = createHarness({api: apiHarness});
+    await harness.controller.start("game-a");
+
+    await harness.controller.submitInteraction(passInteraction);
+
+    expect(harness.interaction).toHaveBeenCalledOnce();
+    expect(harness.getGame).toHaveBeenCalledTimes(2);
+    expect(harness.controller.projection.value?.version).toBe(8);
+    expect(harness.controller.interactionError.value)
+      .toBe(safeGameApiMessage("stale_version"));
   });
 
   it("resyncs a stale intent without silently replaying it", async () => {

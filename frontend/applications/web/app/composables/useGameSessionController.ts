@@ -1,5 +1,6 @@
 import {
   computed,
+  onMounted,
   onBeforeUnmount,
   readonly,
   ref,
@@ -13,9 +14,14 @@ import type {
   ActionDescriptor,
   CommandPayload,
   CommandResult,
+  CharityAllocation,
+  InteractionView,
+  InteractionIntent,
   Invalidation,
   Projection,
 } from "@munchkin/contracts";
+
+import type {EconomySubmission} from "../components/interaction/economyModel";
 
 import {
   GameApiError,
@@ -25,6 +31,8 @@ import {
   type GameCommandOptions,
   type GameRequestOptions,
 } from "./useGameApi";
+
+type InteractionActionView = InteractionView["actions"][number];
 
 export type GameConnectionState =
   | "connecting"
@@ -45,6 +53,49 @@ export interface GameSessionAPI {
     name: ActionDescriptor["type"],
     expectedVersion: number,
     payload?: CommandPayload,
+    options?: GameCommandOptions,
+  ) => Promise<CommandResult>;
+  interaction: (
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    interactionID: string,
+    actionID: string,
+    intent: InteractionIntent,
+    options?: GameCommandOptions,
+  ) => Promise<CommandResult>;
+  combatHelp: (
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    actionID: string,
+    options?: GameCommandOptions,
+  ) => Promise<CommandResult>;
+  economyOffer: (
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    kind: "trade" | "gift",
+    recipientPlayerID: string,
+    offeredInstanceIDs: string[],
+    requestedInstanceIDs?: string[],
+    options?: GameCommandOptions,
+  ) => Promise<CommandResult>;
+  resolveCharity: (
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    allocations?: CharityAllocation[],
+    options?: GameCommandOptions,
+  ) => Promise<CommandResult>;
+  attemptTheft: (
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    sourceInstanceID: string,
+    abilityIndex: number,
+    costInstanceID: string,
+    victimPlayerID: string,
     options?: GameCommandOptions,
   ) => Promise<CommandResult>;
   stream: (
@@ -106,7 +157,9 @@ export function createGameSessionController(
   const projectionState = shallowRef<Projection | null>(null);
   const loadingState = ref(true);
   const actionBusyState = ref(false);
+  const interactionBusyState = ref(false);
   const errorMessageState = ref("");
+  const interactionErrorState = ref("");
   const connectionState = ref<GameConnectionState>("connecting");
 
   let currentGameID = "";
@@ -119,6 +172,14 @@ export function createGameSessionController(
   let streamOwner = 0;
   let pendingCommand:
     | {commandID: string; lifecycle: number}
+    | undefined;
+  let pendingInteraction:
+    | {
+        commandID: string;
+        lifecycle: number;
+        interactionID: string;
+        actionID: string;
+      }
     | undefined;
   const requestControllers = new Set<AbortController>();
   let resyncController = createSessionResync(lifecycle);
@@ -184,7 +245,9 @@ export function createGameSessionController(
     projectionState.value = null;
     loadingState.value = true;
     actionBusyState.value = false;
+    interactionBusyState.value = false;
     errorMessageState.value = "";
+    interactionErrorState.value = "";
     connectionState.value = "connecting";
     reconnectAttempts = 0;
     resyncController = createSessionResync(owner);
@@ -534,6 +597,142 @@ export function createGameSessionController(
     }
   }
 
+  async function submitEconomy(request: EconomySubmission): Promise<void> {
+    const owner = lifecycle;
+    const current = projectionState.value;
+    const credential = currentCredential;
+    if (
+      !isCurrent(owner) ||
+      !current ||
+      !credential ||
+      pendingCommand ||
+      pendingInteraction
+    ) {
+      return;
+    }
+
+    if (request.kind === "charity" && request.interactionID &&
+      current.interaction?.interaction_id !== request.interactionID) {
+      errorMessageState.value = safeGameApiMessage("stale_version");
+      connectionState.value = "resyncing";
+      await resyncController.request().catch((error: unknown) => {
+        reportDiagnostic(normalizeGameApiError(error));
+      });
+      if (isCurrent(owner) && stopStream) {
+        connectionState.value = "connected";
+      }
+      return;
+    }
+
+    if (request.kind !== "charity") {
+      const liveAction = current.turn.available_actions.find((candidate) =>
+        candidate.type === request.action.type &&
+        candidate.source_instance_id === request.action.source_instance_id &&
+        candidate.ability_index === request.action.ability_index,
+      );
+      if (!liveAction) {
+        errorMessageState.value = safeGameApiMessage("stale_version");
+        connectionState.value = "resyncing";
+        await resyncController.request().catch((error: unknown) => {
+          reportDiagnostic(normalizeGameApiError(error));
+        });
+        if (isCurrent(owner) && stopStream) {
+          connectionState.value = "connected";
+        }
+        return;
+      }
+    }
+
+    const commandID = createCommandID();
+    pendingCommand = {commandID, lifecycle: owner};
+    actionBusyState.value = true;
+    errorMessageState.value = "";
+
+    const execute = () => withRequest(
+      owner,
+      (signal) => {
+        switch (request.kind) {
+          case "offer":
+            return options.api.economyOffer(
+              currentGameID,
+              credential,
+              current.version,
+              request.offerKind,
+              request.recipientPlayerID,
+              request.offeredInstanceIDs,
+              request.requestedInstanceIDs,
+              {commandID, signal},
+            );
+          case "charity":
+            return options.api.resolveCharity(
+              currentGameID,
+              credential,
+              current.version,
+              request.allocations,
+              {commandID, signal},
+            );
+          case "theft":
+            return options.api.attemptTheft(
+              currentGameID,
+              credential,
+              current.version,
+              request.action.source_instance_id ?? "",
+              request.action.ability_index ?? 0,
+              request.costInstanceID,
+              request.victimPlayerID,
+              {commandID, signal},
+            );
+        }
+      },
+    );
+
+    try {
+      let result: CommandResult;
+      try {
+        result = await execute();
+      } catch (error) {
+        const normalized = normalizeGameApiError(error);
+        if (
+          normalized.kind !== "offline" &&
+          normalized.kind !== "transient"
+        ) {
+          throw normalized;
+        }
+        result = await execute();
+      }
+      if (!isCurrent(owner)) {
+        return;
+      }
+      if (
+        result.game_id !== currentGameID ||
+        result.projection.game_id !== currentGameID
+      ) {
+        throw new GameApiError(
+          "protocol",
+          safeGameApiMessage("protocol"),
+        );
+      }
+      const visible = projectionState.value;
+      if (!visible || result.projection.version >= visible.version) {
+        projectionState.value = result.projection;
+      }
+      errorMessageState.value = "";
+    } catch (error) {
+      if (!isCurrent(owner)) {
+        return;
+      }
+      await handleActionFailure(normalizeGameApiError(error), owner);
+    } finally {
+      if (
+        pendingCommand?.commandID === commandID &&
+        pendingCommand.lifecycle === owner
+      ) {
+        pendingCommand = undefined;
+        actionBusyState.value = false;
+      }
+    }
+  }
+
   async function handleActionFailure(
     error: GameApiError,
     owner: number,
@@ -588,6 +787,172 @@ export function createGameSessionController(
     }
   }
 
+  async function submitInteraction(
+    action: InteractionActionView,
+  ): Promise<void> {
+    const owner = lifecycle;
+    const current = projectionState.value;
+    const credential = currentCredential;
+    const visibleInteraction = current?.interaction;
+    if (
+      !isCurrent(owner) ||
+      !current ||
+      !credential ||
+      !visibleInteraction ||
+      pendingInteraction
+    ) {
+      return;
+    }
+
+    const descriptor = visibleInteraction.actions.find((candidate) =>
+      candidate.interaction_id === action.interaction_id &&
+      candidate.action_id === action.action_id,
+    );
+    const isCombatHelpAction = descriptor?.type === "offer_help" ||
+      descriptor?.type === "cancel_help";
+    const intent = isCombatHelpAction
+      ? undefined
+      : descriptor?.type as InteractionIntent | undefined;
+    if (
+      !descriptor ||
+      (!isCombatHelpAction && intent === undefined) ||
+      (!isCombatHelpAction && descriptor.type !== intent)
+    ) {
+      interactionErrorState.value = safeGameApiMessage("validation");
+      return;
+    }
+
+    const commandID = createCommandID();
+    pendingInteraction = {
+      commandID,
+      lifecycle: owner,
+      interactionID: descriptor.interaction_id,
+      actionID: descriptor.action_id,
+    };
+    interactionBusyState.value = true;
+    interactionErrorState.value = "";
+
+    const execute = () => withRequest(
+      owner,
+      (signal) => isCombatHelpAction
+        ? options.api.combatHelp(
+          currentGameID,
+          credential,
+          current.version,
+          descriptor.action_id,
+          {commandID, signal},
+        )
+        : options.api.interaction(
+          currentGameID,
+          credential,
+          current.version,
+          descriptor.interaction_id,
+          descriptor.action_id,
+          intent as InteractionIntent,
+          {commandID, signal},
+        ),
+    );
+
+    try {
+      let result: CommandResult;
+      try {
+        result = await execute();
+      } catch (error) {
+        const normalized = normalizeGameApiError(error);
+        if (
+          normalized.kind !== "offline" &&
+          normalized.kind !== "transient"
+        ) {
+          throw normalized;
+        }
+        result = await execute();
+      }
+      if (!isCurrent(owner)) {
+        return;
+      }
+      if (
+        result.game_id !== currentGameID ||
+        result.projection.game_id !== currentGameID
+      ) {
+        throw new GameApiError(
+          "protocol",
+          safeGameApiMessage("protocol"),
+        );
+      }
+      const visible = projectionState.value;
+      if (!visible || result.projection.version >= visible.version) {
+        projectionState.value = result.projection;
+      }
+      interactionErrorState.value = "";
+    } catch (error) {
+      if (!isCurrent(owner)) {
+        return;
+      }
+      await handleInteractionFailure(normalizeGameApiError(error), owner);
+    } finally {
+      if (
+        pendingInteraction?.commandID === commandID &&
+        pendingInteraction.lifecycle === owner
+      ) {
+        pendingInteraction = undefined;
+        interactionBusyState.value = false;
+      }
+    }
+  }
+
+  async function handleInteractionFailure(
+    error: GameApiError,
+    owner: number,
+  ): Promise<void> {
+    reportDiagnostic(error);
+    switch (error.kind) {
+      case "aborted":
+        return;
+      case "auth":
+        finishTerminalAuth(owner);
+        return;
+      case "stale_version":
+      case "conflict":
+      case "protocol":
+        interactionErrorState.value = error.message;
+        connectionState.value = "resyncing";
+        try {
+          await resyncController.request();
+          if (isCurrent(owner) && stopStream) {
+            connectionState.value = "connected";
+          }
+        } catch (refreshError) {
+          if (!isCurrent(owner)) {
+            return;
+          }
+          const normalized = normalizeGameApiError(refreshError);
+          reportDiagnostic(normalized);
+          if (normalized.kind === "auth") {
+            finishTerminalAuth(owner);
+          } else if (
+            normalized.kind === "offline" ||
+            normalized.kind === "transient"
+          ) {
+            interactionErrorState.value = normalized.message;
+            scheduleRecovery(owner);
+          } else {
+            interactionErrorState.value = normalized.message;
+            connectionState.value = "failed";
+          }
+        }
+        return;
+      case "offline":
+      case "transient":
+        interactionErrorState.value = error.message;
+        scheduleRecovery(owner);
+        return;
+      case "validation":
+      case "not_found":
+      case "unexpected":
+        interactionErrorState.value = error.message;
+    }
+  }
+
   function finishInitialFailure(error: GameApiError, owner: number): void {
     if (!isCurrent(owner)) {
       return;
@@ -617,8 +982,11 @@ export function createGameSessionController(
     abortRequests();
     loadingState.value = false;
     actionBusyState.value = false;
+    interactionBusyState.value = false;
+    pendingInteraction = undefined;
     connectionState.value = "failed";
     errorMessageState.value = safeGameApiMessage("auth");
+    interactionErrorState.value = "";
     try {
       options.credentials.clearCurrentGame(gameID);
     } catch (error) {
@@ -675,6 +1043,7 @@ export function createGameSessionController(
     clearReconnectTimer();
     abortRequests();
     pendingCommand = undefined;
+    pendingInteraction = undefined;
     currentCredential = null;
   }
 
@@ -684,17 +1053,21 @@ export function createGameSessionController(
     closeCurrentSession();
     loadingState.value = false;
     actionBusyState.value = false;
+    interactionBusyState.value = false;
   }
 
   return {
     projection: computed<Projection | null>(() => projectionState.value),
     loading: readonly(loadingState),
     actionBusy: readonly(actionBusyState),
+    interactionBusy: readonly(interactionBusyState),
     errorMessage: readonly(errorMessageState),
+    interactionError: readonly(interactionErrorState),
     connectionState: readonly(connectionState),
     isBusy: computed(() =>
       loadingState.value ||
       actionBusyState.value ||
+      interactionBusyState.value ||
       connectionState.value === "connecting" ||
       connectionState.value === "resyncing"
     ),
@@ -703,6 +1076,8 @@ export function createGameSessionController(
     refresh,
     retry,
     submitAction,
+    submitEconomy,
+    submitInteraction,
   };
 }
 
@@ -710,13 +1085,15 @@ export function useGameSessionController(
   options: UseGameSessionControllerOptions,
 ) {
   const controller = createGameSessionController(options);
-  watch(
-    () => toValue(options.gameID),
-    (gameID) => {
-      void controller.start(gameID);
-    },
-    {immediate: true},
-  );
+  onMounted(() => {
+    watch(
+      () => toValue(options.gameID),
+      (gameID) => {
+        void controller.start(gameID);
+      },
+      {immediate: true},
+    );
+  });
   onBeforeUnmount(() => controller.stop());
   return controller;
 }
