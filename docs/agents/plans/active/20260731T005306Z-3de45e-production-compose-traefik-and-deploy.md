@@ -1,12 +1,12 @@
 # PLAN: production Compose, Traefik, DNS, TLS and controlled deploy
 
 - **Plan ID:** `20260731T005306Z-3de45e-production-compose-traefik-and-deploy`
-- **Статус:** draft
+- **Статус:** approved
 - **Создан:** 2026-07-31 00:53:06 UTC
-- **Обновлён:** 2026-07-31 01:02:00 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-08-01 15:15:14 UTC
+- **Владелец:** Codex / `019fbde1-fd6a-79e3-8b47-9f217363607f`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
-- **Ветка:** current
+- **Ветка:** `main`; отдельная ветка не создаётся по указанию владельца
 - **Режим параллельности:** exclusive
 - **Зависит от:** plan `20260731T005306Z-fb49f6-backend-readiness-and-opentelemetry`.
 - **Блокирует:**
@@ -23,7 +23,9 @@
   "paths": [
     ".github/workflows/deploy-production.yml",
     "compose.production.yml",
-    "infra/compose/**",
+    "infra/compose/traefik-static.yml",
+    "infra/compose/traefik-dynamic.yml",
+    "infra/release/production-release-evidence.schema.json",
     "infra/terraform/bootstrap/github_actions.tf",
     "infra/terraform/bootstrap/outputs.tf",
     "infra/terraform/environments/production/dns.tf",
@@ -32,7 +34,12 @@
     "infra/terraform/environments/production/outputs.tf",
     "infra/terraform/environments/production/variables.tf",
     "infra/terraform/README.md",
-    "scripts/production/**",
+    "scripts/production/bootstrap-host.sh",
+    "scripts/production/deploy.sh",
+    "scripts/production/rollback.sh",
+    "scripts/production/status.sh",
+    "scripts/production/smoke.sh",
+    "scripts/production/systemd/munchkin-compose.service",
     "scripts/terraform-check.sh",
     "docs/agents/INFRASTRUCTURE_ROADMAP.md",
     "docs/operations/PRODUCTION_DEPLOYMENT.md",
@@ -49,6 +56,7 @@
   "contracts": [
     "delivery:production-compose-v1",
     "delivery:digest-rollout-v1",
+    "delivery:production-release-evidence-v1",
     "operations:dns-tls-v1",
     "operations:runtime-secrets-v1"
   ],
@@ -63,7 +71,8 @@
     "github:environment:production-deploy",
     "dns:munchkin.l1ttl3h0rse.ru",
     "runtime:production-health-v1",
-    "delivery:immutable-image-pair-v1"
+    "delivery:immutable-image-pair-v1",
+    "delivery:production-release-evidence-v1"
   ]
 }
 ```
@@ -92,18 +101,36 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
   делает HTTP→HTTPS redirect и не получает unrestricted raw Docker socket.
   До INFRA-B10 используется безопасный file provider или socket proxy.
 - [ ] DNS A record указывает на reserved IPv4 `81.26.187.230`; DNS zone/NS
-  ownership и registrar mutation подтверждаются отдельно. TLS public smoke
-  проверяет certificate chain, hostname и expiry.
+  ownership и registrar mutation подтверждаются отдельно. Owner подтвердил
+  домен `l1ttl3h0rse.ru`, production hostname
+  `munchkin.l1ttl3h0rse.ru`, registrar Timeweb и целевую authoritative zone в
+  Yandex Cloud DNS. Delegation/record остаются live evidence gate. TLS public
+  smoke проверяет certificate chain, hostname и expiry.
 - [ ] Lockbox metadata/ACL могут управляться Terraform, но secret payload,
   database password, deploy private key и ACME account data не попадают в
   Terraform state/Git. Payload создаётся/rotates owner-side через отдельный
   runbook.
+- [ ] Production secret inventory ограничен PostgreSQL password/derived DSN,
+  scoped deploy SSH private key и будущими destination credentials из
+  последующих plans. Card Studio выключен; `OPENAI_API_KEY`/authoring token и
+  общий game-signing secret в public production отсутствуют.
 - [ ] Host получает secrets через instance-attached keyless runtime identity
   либо другой заранее одобренный short-lived mechanism; static Yandex cloud
   keys на VM/GitHub запрещены.
 - [ ] Automation deploy user не входит в `docker` group, не имеет general root
   shell и может через pinned SSH host key/sudo запустить только root-owned
   allowlisted deploy/status/rollback commands.
+- [ ] Выбран отдельный scoped deploy SSH key в protected GitHub environment:
+  dedicated deploy user, pinned host key, no root login/general shell/docker
+  group, root-owned allowlisted sudo commands and documented rotation. OS
+  Login/short-lived SSH остаётся возможной последующей migration, не блокером
+  contest deploy.
+- [ ] ACME сначала использует staging, затем production. Owner-supplied ACME
+  email передаётся только owner-side при deploy и не сохраняется в Git/plan;
+  ACME account state имеет root-only permissions на VM.
+- [ ] Первый controlled deploy/maintenance window зафиксирован на
+  `2026-08-02 09:00–11:00 Europe/Moscow`; если readiness не становится green
+  за 5 минут, rollout останавливается и запускается совместимый rollback.
 - [ ] GitHub deploy job работает только через protected
   `production-deploy`, main/full-SHA release pair and concurrency lock.
   Cloud access, если нужен registry verification, только через отдельный exact
@@ -111,6 +138,19 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
 - [ ] Deploy state хранит current/previous digest pair atomically. Rollback не
   откатывает database schema вслепую и использует только совместимый previous
   image pair.
+- [ ] `delivery:production-release-evidence-v1` валидируется JSON Schema
+  `infra/release/production-release-evidence.schema.json`. Каждый deploy и
+  rollback, включая failed attempt, создаёт `release-evidence.json` с
+  `schemaVersion`, operation/result, full commit SHA, immutable game/web
+  digests, GitHub workflow run ID/attempt/URL, started/completed timestamps,
+  migration/readiness/smoke results and previous release reference.
+- [ ] Successful operation atomically updates root-owned
+  `/srv/munchkin/state/current-release.json` and preserves
+  `/srv/munchkin/state/previous-release.json`; failed operation leaves current
+  unchanged. GitHub artifact name is
+  `production-release-evidence-<run-id>-<run-attempt>`, retention is 30 days,
+  payload contains no secrets and downstream jobs receive read-only
+  `actions:read` access only after their own plan/approval.
 - [ ] Reboot recovery проверена: mounted data disk, Docker, Compose stack,
   secrets availability, TLS and readiness возвращаются без manual drift.
 - [ ] Terraform/Compose/scripts/tests, public/internal smoke, rollback/reboot
@@ -124,6 +164,17 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
   database и management ports не открыты.
 - Registry/runtime pull identity существует, но images/application Compose,
   DNS/TLS, Lockbox payload и deploy automation ещё отсутствуют.
+- Owner подтвердил Timeweb/domain/Yandex Cloud DNS target, owner-side ACME
+  email policy и первое окно `2026-08-02 09:00–11:00 MSK`. Scoped deploy SSH
+  и runtime-only secret injection выбраны аудитом как безопасные defaults и
+  остаются частью formal plan review. Фактическая public NS/A/TLS делегация
+  проверяется отдельно перед mutation и после propagation.
+- Public DNS audit `2026-08-01` показывает текущую, ещё не production-ready
+  конфигурацию: delegation остаётся на `ns1.timeweb.ru`, `ns2.timeweb.ru`,
+  `ns3.timeweb.org`, `ns4.timeweb.org`; apex указывает на Timeweb
+  `92.53.96.223`/`2a03:6f00:1::5c35:60df`, а
+  `munchkin.l1ttl3h0rse.ru` отвечает `NXDOMAIN`. Yandex Cloud DNS delegation и
+  production A record `81.26.187.230` ещё не применены публично.
 - Dev Compose публикует local ports и остаётся development-only; production
   topology создаётся отдельным file.
 - Dependency plan предоставляет exact readiness/migration/OTLP contracts.
@@ -156,10 +207,12 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
    dependency order, waits readiness, runs internal/public smoke and commits
    release state atomically.
 3. GitHub environment permits main-only deploy; SSH host key is pinned from
-   authenticated serial evidence. Scoped SSH deploy credential is not a cloud
-   key, but its storage/rotation requires explicit owner approval.
+   authenticated serial evidence. Selected scoped deploy credential lives
+   only in the protected GitHub environment, rotates by runbook and grants no
+   general root/Docker access.
 4. Terraform manages only non-secret DNS/Lockbox/IAM metadata. Secret payload
-   and registrar changes are independent owner gates.
+   and registrar changes are independent owner gates. ACME contact value is
+   owner-side input, not repository data.
 
 ## Затронутые компоненты и контракты
 
@@ -179,7 +232,9 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
 |---|---|---|
 | `.github/workflows/deploy-production.yml` | write | Controlled CD |
 | `compose.production.yml` | write | Production topology |
-| `infra/compose/**` | write | Traefik/Compose runtime config |
+| `infra/compose/traefik-static.yml` | write | Traefik entrypoints/providers/TLS config |
+| `infra/compose/traefik-dynamic.yml` | write | Versioned routers/middleware/services config |
+| `infra/release/production-release-evidence.schema.json` | write | Canonical deploy/rollback evidence contract |
 | `infra/terraform/bootstrap/github_actions.tf` | write | Optional exact deploy WIF identity |
 | `infra/terraform/bootstrap/outputs.tf` | write | Deploy identity outputs |
 | `infra/terraform/environments/production/dns.tf` | write | DNS zone/records |
@@ -188,7 +243,12 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
 | `infra/terraform/environments/production/outputs.tf` | write | Non-secret deploy handoff |
 | `infra/terraform/environments/production/variables.tf` | write | Non-secret/sensitive inputs |
 | `infra/terraform/README.md` | write | Root/state/credential documentation |
-| `scripts/production/**` | write | Host install/deploy/status/rollback/smoke |
+| `scripts/production/bootstrap-host.sh` | write | Idempotent host/user/layout bootstrap |
+| `scripts/production/deploy.sh` | write | Digest deploy and release evidence |
+| `scripts/production/rollback.sh` | write | Compatible previous-pair rollback |
+| `scripts/production/status.sh` | write | Non-secret release/readiness status |
+| `scripts/production/smoke.sh` | write | Public/internal production smoke |
+| `scripts/production/systemd/munchkin-compose.service` | write | Root-owned boot/runtime unit |
 | `scripts/terraform-check.sh` | write | DNS/Lockbox/IAM assertions |
 | `docs/agents/INFRASTRUCTURE_ROADMAP.md` | write | INFRA-003/004/005/007 status |
 | `docs/operations/PRODUCTION_DEPLOYMENT.md` | write | Deployment runbook |
@@ -206,7 +266,7 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
 | DNS zone/records/registrar NS | create/update | Production hostname |
 | Lockbox metadata/version payload | create/update separately | Runtime secrets |
 | Runtime IAM | exact additive role | Secret payload and registry pull |
-| Production VM | controlled file/user/systemd/Compose change | First app deploy |
+| Production VM/release evidence | controlled file/user/systemd/Compose change | First app deploy and exact current/previous proof |
 
 ### Shared resources
 
@@ -215,29 +275,33 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
 | Image pair | WIF/images plan | dependency | Accept only verified digests |
 | Health/migrations/Collector | readiness/OTel plan | dependency | Consume exact contracts |
 | Production VM/data disk | foundation/backup/telemetry | this deploy plan | Root-owned serialized deploy lock |
-| DNS/TLS/Traefik | security/P1 plans | this plan first | Later hardening extends after archive |
+| DNS/TLS/Traefik | security plan | this plan first | Exact P0 security hardening extends after archive; P1 is deferred |
 
 ### Проверка конфликтов
 
-- **Проверены active plans:** 2026-07-31 01:02:00 UTC.
+- **Проверены active plans:** 2026-08-01 14:44:19 UTC.
 - **Обнаруженные пересечения:** later telemetry, backup, security and docs
   plans consume the same production Compose/Terraform/roadmap files.
 - **Решение:** strict dependency chain; this plan starts only after readiness/
-  OTel archive. Exact DNS, secret and SSH choices require scope revalidation
-  before approval.
+  OTel archive. Domain/registrar/target DNS, secret inventory, scoped SSH,
+  ACME handling and maintenance window are settled for this draft; live DNS,
+  exact cloud plans and remote mutations still require evidence/approval.
 
 ## План реализации
 
-1. [ ] Resolve owner gates: hostname/zone/registrar, secret inventory,
-   deploy identity/SSH rotation, ACME email/staging and rollback window.
+1. [ ] Validate the recorded owner decisions with public NS/SOA/A evidence,
+   secret-boundary tests, pinned SSH host identity and ACME staging preflight.
 2. [ ] Define production Compose/Traefik/file-provider/secrets contracts and
    config tests.
-3. [ ] Implement root-owned host deploy boundary and idempotent bootstrap.
-4. [ ] Implement Terraform DNS/Lockbox/IAM metadata; show exact plans and
-   obtain separate approvals for each cloud/DNS mutation.
-5. [ ] Implement protected GitHub deploy workflow using digest pair and pinned
-   host identity.
-6. [ ] Run first migration/deploy/TLS smoke only after separate owner approval.
+3. [ ] Implement host bootstrap/deploy/release-evidence files and validate them
+   against local fixtures only; do not mutate the production VM.
+4. [ ] Implement Terraform/GitHub workflow definitions locally, then show the
+   exact cloud/GitHub/DNS/Lockbox/IAM/SSH/VM mutation plan and obtain separate
+   approvals for apply, registrar, payload and host-bootstrap actions.
+5. [ ] Only after those approvals apply the non-secret graph, perform
+   owner-gated NS/payload insertion and bootstrap the host.
+6. [ ] Run first migration/deploy/ACME/TLS smoke only after separate rollout
+   approval in the recorded maintenance window.
 7. [ ] Perform failed-rollout, rollback and reboot-recovery drills.
 8. [ ] Update runbooks/roadmap, verify/scope-check and archive.
 
@@ -274,24 +338,52 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
 
 ## Открытые вопросы
 
-- Final domain/zone authority and registrar workflow.
-- Exact production secret list and owner-side payload insertion/rotation.
-- Scoped deploy SSH credential vs an approved short-lived SSH mechanism.
-- ACME email/rate-limit policy and maintenance window.
-- These must be resolved and reflected in an updated exact plan before approval.
+- Owner inputs settled for this draft: Timeweb owns `l1ttl3h0rse.ru`, Yandex
+  Cloud DNS is the authoritative target, ACME uses an owner-side email and the
+  first window is `2026-08-02 09:00–11:00 MSK`. The audit recommends mapping
+  `munchkin.l1ttl3h0rse.ru` to reserved `81.26.187.230`, scoped deploy SSH,
+  runtime-only secrets and ACME staging→production.
+- Personal email, secret payloads and private keys are intentionally not
+  recorded in this public plan; owner supplies them only through the runtime
+  secret/configuration boundary.
+- Remaining gates are evidence/mutation gates: current registrar delegation,
+  authoritative NS/SOA/A responses, exact Terraform plans, GitHub environment
+  protection, SSH serial/host-key proof and ACME staging smoke.
+- Current DNS evidence is not ambiguous: Timeweb remains authoritative and the
+  production hostname does not exist. Plan implementation must first obtain
+  exact Yandex zone NS names, show the registrar NS mutation, wait propagation,
+  verify via at least two recursive resolvers plus direct authoritative query,
+  and only then request the production ACME certificate.
 
 ## Согласование
 
-- **Статус:** not requested; prerequisite draft
-- **Запрошено:** —
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** заранее создать базовые plans по
-  infrastructure roadmap; unfinished base is acceptable. No static cloud keys.
-  Select/implementation/commit/push не разрешены.
+- **Статус:** approved
+- **Запрошено:** 2026-08-01 15:15:14 UTC
+- **Подтверждено:** 2026-08-01 15:15:14 UTC
+- **Формулировка/ограничения пользователя:** пользователь формально одобрил
+  последовательную очередь exact plans начиная с этого plan и разрешил
+  approvals, select, implementation, verify, scope-check, archive/release,
+  подготовительный local commit plan-файлов и отдельный local commit после
+  каждого завершённого plan. Подтверждены audit defaults и сокращённый
+  Monium soak на 60 минут; ветка не создаётся. Разрешён обычный push в
+  `origin/main` только после успешных проверок. PostgreSQL password и
+  dedicated deploy SSH key разрешено безопасно сгенерировать и передать
+  непосредственно в утверждённые secret stores без вывода или сохранения в
+  Git, plan, chat или logs. Remote mutations, Terraform apply, изменение
+  Timeweb NS, secret payload insertion, GitHub/Yandex settings, production VM
+  bootstrap/deploy и платные/destructive actions не одобрены заранее:
+  перед каждым таким этапом нужен sanitized exact mutation plan и отдельное
+  approval. Owner email для ACME применяется только owner-side вне Git.
 
 ## Ход выполнения
 
-- Base draft создан; unresolved owner/cloud gates deliberately left explicit.
+- Base draft создан; remote mutation and evidence gates left explicit.
+- 2026-08-01 owner decisions recorded without persisting email or secrets.
+- 2026-08-01 public DNS audit recorded Timeweb delegation and production-host
+  NXDOMAIN; no DNS/registrar mutation was performed.
+- 2026-08-01 formal queue approval recorded with all remote-mutation gates
+  above; implementation remains gated by readiness archive and separate
+  mutation approvals.
 - Implementation не начата, plan не selected.
 
 ## Итог

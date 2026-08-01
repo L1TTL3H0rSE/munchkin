@@ -1,14 +1,14 @@
 # PLAN: telemetry backend, dashboards and alerts
 
 - **Plan ID:** `20260731T005307Z-54ac2f-telemetry-backend-dashboards-and-alerts`
-- **Статус:** draft
+- **Статус:** approved
 - **Создан:** 2026-07-31 00:53:07 UTC
-- **Обновлён:** 2026-07-31 01:03:00 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-08-01 15:15:14 UTC
+- **Владелец:** Codex / `019fbde1-fd6a-79e3-8b47-9f217363607f`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
-- **Ветка:** current
+- **Ветка:** `main`; отдельная ветка не создаётся по указанию владельца
 - **Режим параллельности:** exclusive
-- **Зависит от:** plan `20260731T005306Z-3de45e-production-compose-traefik-and-deploy`.
+- **Зависит от:** plans `20260731T005306Z-fb49f6-backend-readiness-and-opentelemetry`, `20260731T005306Z-3de45e-production-compose-traefik-and-deploy`.
 - **Блокирует:**
   `20260731T005307Z-5662b5-postgres-object-storage-backup-and-restore`
 - **Связанные ADR/handoff:** ADR-0007, ADR-0009,
@@ -21,9 +21,9 @@
   "schemaVersion": 1,
   "paths": [
     "compose.production.yml",
-    "infra/compose/**",
-    "infra/otel/**",
-    "infra/observability/**",
+    "infra/otel/collector.production.yaml",
+    "infra/observability/monium/production-dashboard.json",
+    "infra/observability/monium/production-alerts.yaml",
     "infra/terraform/environments/production/telemetry.tf",
     "infra/terraform/environments/production/iam.tf",
     "infra/terraform/environments/production/outputs.tf",
@@ -47,6 +47,7 @@
     "observability:production-alerts-v1"
   ],
   "dependsOn": [
+    "20260731T005306Z-fb49f6-backend-readiness-and-opentelemetry",
     "20260731T005306Z-3de45e-production-compose-traefik-and-deploy"
   ],
   "sharedResources": [
@@ -60,29 +61,40 @@
 
 ## Цель
 
-Закрыть INFRA-009: выбрать и развернуть один оплачиваемый/ограниченный
-telemetry destination для уже существующего OTLP contract, создать
-version-controlled dashboard и actionable alerts, доказать trace/metric path
-от production request до UI без утечки credentials, player/game/card IDs или
-raw gameplay payloads.
+Закрыть INFRA-009: подключить уже существующий OTLP contract к выбранному
+managed Yandex Monium, создать version-controlled dashboard и actionable
+email alerts, доказать trace/metric path от production request до UI без
+утечки credentials, player/game/card IDs или raw gameplay payloads и удержать
+incremental telemetry spend в soft ceiling `500 RUB/month`.
 
 ## Критерии приёмки
 
-- [ ] До approval сравниваются минимум managed Yandex и self-hosted/external
-  варианты по monthly cost, VM pressure, auth, retention, exportability and
-  operator burden; выбран один вариант и budget ceiling.
+- [ ] Provider decision зафиксирован: managed Yandex Monium для metrics и
+  traces, без logs и без self-hosted Grafana/Prometheus/Loki на production VM.
+  Incremental soft ceiling — `500 RUB/month`; alert на 70% и stop/review при
+  прогнозе превышения 100%. Общий cloud budget notification не считается hard
+  spend cap.
 - [ ] Collector exporter credentials приходят только через runtime secret
-  boundary, не Terraform state/Git/image/log; static cloud keys не создаются,
-  если destination поддерживает workload/runtime IAM.
+  boundary, не Terraform state/Git/image/log. Dedicated service account имеет
+  только `monium.metrics.writer` и `monium.traces.writer`; API key ограничен scopes
+  `yc.monium.metrics.write` и `yc.monium.traces.write`, имеет owner-managed
+  expiry/rotation не более 90 дней и хранится в Lockbox. Static cloud keys и
+  log-write scope отсутствуют.
 - [ ] OTLP receivers остаются private; destination/UI management endpoint не
   открывается публично без отдельной identity/TLS boundary.
-- [ ] Retention, queue, retry, memory limiter, disk buffering and failure
-  behavior заданы явно. Недоступность destination не ломает game/web.
+- [ ] Service retention принят: traces — 4 дня; metrics живут, пока поступают
+  samples, и удаляются после 30 дней без новых values; logs не ingest-ятся.
+  Queue, retry, memory limiter, bounded buffering/sampling and failure behavior
+  заданы явно. Недоступность destination не ломает game/web.
 - [ ] Version-controlled dashboard показывает request rate/error/latency,
   readiness, PostgreSQL dependency, migration/deploy revision и bounded
   gameplay interaction signals без high-cardinality labels.
-- [ ] Alerts имеют owner-confirmed channel, thresholds, `for`, severity,
-  runbook links and dedup/silence behavior; test alert проходит end-to-end.
+- [ ] Alerts отправляются только owner на owner-supplied email; адрес хранится
+  вне Git/plan. Base rules: readiness unavailable `>2m`, sustained 5xx `>1%`,
+  disk free `<15%` и p95 above measured baseline. Rules имеют `for`, severity,
+  runbook links, dedup/silence behavior; test email проходит end-to-end.
+  Backup freshness/failure signal and exact alert rule are owned by the later
+  backup plan after its metric exists.
 - [ ] Telemetry smoke связывает one synthetic request с trace/metrics и exact
   release SHA, затем negative scan подтверждает отсутствие forbidden data.
 - [ ] Resource/cost usage после soak остаётся в approved limits; clean
@@ -92,11 +104,12 @@ raw gameplay payloads.
 
 - Dependency plans создают private Collector/OTLP contract, production
   Compose, TLS and digest rollout.
-- Destination, dashboard, alert receiver, retention and price не выбраны.
+- Destination выбран: managed Yandex Monium, metrics+traces only, soft ceiling
+  `500 RUB/month`, service retention выше, email receiver — owner only.
 - ADR-0007 требует privacy-safe bounded-cardinality telemetry и
   failure-isolation; event log остаётся authoritative gameplay history.
-- Single `2 vCPU / 4 GB` VM ограничивает self-hosted stack; выбор нельзя делать
-  без measured memory/disk budget.
+- Single `2 vCPU / 4 GB` VM исключает self-hosted stack из этого P0 plan;
+  Collector overhead всё равно проверяется measured soak.
 
 ## Scope
 
@@ -109,16 +122,22 @@ raw gameplay payloads.
 ### Не входит
 
 - Browser RUM, user analytics, raw event export, admin console.
-- Full Loki/Alloy/node/cAdvisor/PostgreSQL/Traefik bonus stack; это P1 plan.
+- Full Loki/Alloy/node/cAdvisor/PostgreSQL/Traefik bonus stack; it is deferred
+  with no implementation owner in the contest P1 decision plan.
 - Backup, supply-chain scanning/signing, application feature metrics.
 
 ## Архитектурный подход
 
-1. Measure base VM headroom and vendor prices; stop if no option fits ceiling.
+1. Measure base VM headroom and actual Monium ingest/alert price; stop if the
+   selected configuration cannot fit `500 RUB/month`.
 2. Keep app exporters OTLP-only; only Collector knows destination.
-3. Provision non-secret resources/IAM with Terraform and inject payload
-   separately through Lockbox/runtime identity.
-4. Store dashboards/alert rules as code; every alert links a versioned runbook.
+3. Provision non-secret Monium/IAM metadata with Terraform where provider
+   coverage is proven; inject scoped API-key payload separately through
+   Lockbox/runtime secret boundary.
+4. Store dashboards as code. If current Terraform provider does not cover
+   alerts/channels, keep version-controlled definitions and apply/import them
+   through a documented API/UI procedure rather than claiming unsupported
+   Terraform management. Every alert links a versioned runbook.
 
 ## Затронутые компоненты и контракты
 
@@ -136,9 +155,9 @@ raw gameplay payloads.
 | Путь/ресурс | Режим | Причина |
 |---|---|---|
 | `compose.production.yml` | write | Destination service wiring |
-| `infra/compose/**` | write | Production telemetry config |
-| `infra/otel/**` | write | Collector exporter |
-| `infra/observability/**` | write | Dashboard/alert definitions |
+| `infra/otel/collector.production.yaml` | write | Collector/exporter config |
+| `infra/observability/monium/production-dashboard.json` | write | Base dashboard as code |
+| `infra/observability/monium/production-alerts.yaml` | write | Base non-backup alerts as code |
 | `infra/terraform/environments/production/telemetry.tf` | write | Managed telemetry resources |
 | `infra/terraform/environments/production/iam.tf` | write | Runtime exporter access |
 | `infra/terraform/environments/production/outputs.tf` | write | Non-secret telemetry outputs |
@@ -155,9 +174,9 @@ raw gameplay payloads.
 
 | Resource | Режим | Причина |
 |---|---|---|
-| Selected telemetry service | create/configure | Traces/metrics destination |
-| Runtime IAM/Lockbox payload | exact additive/update separately | Exporter auth |
-| Alert destination | create/configure | Owner notification |
+| Yandex Monium project/resources | create/configure | Metrics/traces destination |
+| Dedicated Monium writer SA/API key/Lockbox payload | exact additive/update separately | Scoped exporter auth |
+| Owner-only email alert destination | create/configure | Owner notification; address outside Git |
 | Production VM/Compose | controlled update | Collector exporter |
 
 ### Shared resources
@@ -166,21 +185,24 @@ raw gameplay payloads.
 |---|---|---|---|
 | OTLP foundation | readiness/OTel plan | dependency | Do not change app privacy schema |
 | Compose/Lockbox | deploy plan | dependency | Extend through same deploy lock |
-| Alerts/logs/metrics | P1 bonus plan | this plan first | P1 extends after base proof |
+| Base alerts/dashboard | backup plan | this plan first | Backup adds only its exact signal/rule after archive |
 
 ### Проверка конфликтов
 
-- **Проверены active plans:** 2026-07-31 01:03:00 UTC.
+- **Проверены active plans:** 2026-08-01 14:44:19 UTC.
 - **Обнаруженные пересечения:** production Compose/Terraform/roadmap are shared
   with predecessor and all later infra plans.
-- **Решение:** strict dependency chain; exact provider, resources, price,
-  paths and remote mutations must be refreshed before approval.
+- **Решение:** strict dependency chain. Provider, no-logs boundary, retention,
+  soft ceiling, writer auth and owner-only email channel are settled for this
+  draft; implementation must still prove provider coverage, exact resource
+  plan, test delivery and measured cost before remote mutation approval.
 
 ## План реализации
 
-1. [ ] Measure VM/cost headroom and compare destination options.
-2. [ ] Update this plan with selected provider, exact monthly ceiling,
-   retention/auth/IAM and receive owner re-approval.
+1. [ ] Measure VM/cost headroom and validate current Monium pricing/quotas for
+   the recorded metrics+traces/no-logs design.
+2. [ ] Freeze exact Monium resources, dashboard/alert provisioning mechanism,
+   IAM/API-key/Lockbox edges and request formal owner approval.
 3. [ ] Implement Terraform/config/secret wiring and local validation.
 4. [ ] Show exact cloud plan; apply only after separate owner approval.
 5. [ ] Deploy Collector exporter and import dashboards/alerts.
@@ -213,23 +235,45 @@ raw gameplay payloads.
 
 ## Открытые вопросы
 
-- Destination/provider, exact price ceiling and retention.
-- Alert channel/recipients and acceptable test notification.
-- Managed IAM vs runtime secret auth.
-- Plan is intentionally incomplete and not eligible for approval until these
-  choices and an exact remote mutation set are recorded.
+- Owner selected email alerts to owner only. The audit recommends Yandex
+  Monium, metrics+traces only, no logs, `500 RUB/month` soft ceiling, service
+  retention and a dedicated scoped writer API key in Lockbox.
+- Personal email is intentionally not persisted in this public plan; owner
+  enters it directly in the notification/runtime boundary and permits one
+  controlled test message during plan execution.
+- Remaining evidence gates: current Terraform/API coverage, exact Monium
+  project/header/resource IDs, full cost estimate, 24h or owner-approved
+  shorter soak, test email and remote mutation plan.
+- Plan stays draft/unapproved until predecessor archive and exact mutation set
+  are reviewed.
 
 ## Согласование
 
-- **Статус:** not requested; incomplete prerequisite draft
-- **Запрошено:** —
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** заранее создать базовые plans по
-  infrastructure roadmap; incomplete base permitted. No static cloud keys.
+- **Статус:** approved
+- **Запрошено:** 2026-08-01 15:15:14 UTC
+- **Подтверждено:** 2026-08-01 15:15:14 UTC
+- **Формулировка/ограничения пользователя:** пользователь формально одобрил
+  последовательную очередь exact plans начиная с этого plan и разрешил
+  approvals, select, implementation, verify, scope-check, archive/release,
+  подготовительный local commit plan-файлов и отдельный local commit после
+  каждого завершённого plan. Подтверждены audit defaults, включая managed
+  Monium metrics+traces only, owner-only alerts, soft ceiling `500 RUB/month`
+  и сокращённый Monium soak длительностью 60 минут; ветка не создаётся.
+  Разрешён обычный push в `origin/main` только после успешных проверок.
+  PostgreSQL password и dedicated deploy SSH key разрешено безопасно
+  сгенерировать и передать непосредственно в утверждённые secret stores без
+  вывода или сохранения в Git, plan, chat или logs. Remote mutations,
+  Terraform apply, secret payload insertion, GitHub/Yandex settings,
+  production VM bootstrap/deploy и любые платные/destructive actions не
+  одобрены заранее: перед каждым таким этапом нужен sanitized exact mutation
+  plan и отдельное approval. Owner email для alerts остаётся вне Git/plan.
 
 ## Ход выполнения
 
 - Base draft created with explicit decision/budget gates.
+- 2026-08-01 owner decisions recorded; personal email not persisted.
+- 2026-08-01 formal queue approval recorded with the 60-minute soak and
+  remote-mutation gates above; implementation remains dependency-gated.
 - Implementation не начата, plan не selected.
 
 ## Итог

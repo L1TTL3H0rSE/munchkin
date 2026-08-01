@@ -1,14 +1,14 @@
 # PLAN: production security and supply-chain baseline
 
 - **Plan ID:** `20260731T005308Z-3beea1-production-security-and-supply-chain`
-- **Статус:** draft
+- **Статус:** approved
 - **Создан:** 2026-07-31 00:53:08 UTC
-- **Обновлён:** 2026-07-31 01:05:00 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-08-01 15:15:14 UTC
+- **Владелец:** Codex / `019fbde1-fd6a-79e3-8b47-9f217363607f`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
-- **Ветка:** current
+- **Ветка:** `main`; отдельная ветка не создаётся по указанию владельца
 - **Режим параллельности:** exclusive
-- **Зависит от:** plan `20260731T005307Z-5662b5-postgres-object-storage-backup-and-restore`.
+- **Зависит от:** plans `20260731T005306Z-fb49f6-backend-readiness-and-opentelemetry`, `20260731T005306Z-3de45e-production-compose-traefik-and-deploy`, `20260731T005307Z-54ac2f-telemetry-backend-dashboards-and-alerts`, `20260731T005307Z-5662b5-postgres-object-storage-backup-and-restore`.
 - **Блокирует:** `20260731T005308Z-5ec80f-contest-readme-runbooks-and-demo`
 - **Связанные ADR/handoff:** ADR-0007, ADR-0009,
   `docs/agents/INFRASTRUCTURE_ROADMAP.md`
@@ -26,12 +26,19 @@
     "backend/game/Dockerfile",
     "frontend/Dockerfile",
     "compose.production.yml",
-    "infra/compose/**",
-    "infra/terraform/bootstrap/**",
-    "infra/terraform/environments/production/**",
+    "infra/compose/traefik-static.yml",
+    "infra/compose/traefik-dynamic.yml",
+    "infra/terraform/bootstrap/github_actions.tf",
+    "infra/terraform/environments/production/compute.tf",
+    "infra/terraform/environments/production/iam.tf",
+    "infra/terraform/environments/production/network.tf",
+    "infra/terraform/environments/production/registry.tf",
     "infra/terraform/README.md",
-    "scripts/ci/**",
-    "scripts/production/**",
+    "scripts/ci/security-scan.sh",
+    "scripts/ci/verify-action-pins.mjs",
+    "scripts/production/security-audit.sh",
+    "scripts/production/verify-release-evidence.sh",
+    "scripts/production/registry-retention-plan.sh",
     "scripts/terraform-check.sh",
     "docs/agents/INFRASTRUCTURE_ROADMAP.md",
     "docs/operations/PRODUCTION_SECURITY.md",
@@ -52,6 +59,9 @@
     "security:least-privilege-audit-v1"
   ],
   "dependsOn": [
+    "20260731T005306Z-fb49f6-backend-readiness-and-opentelemetry",
+    "20260731T005306Z-3de45e-production-compose-traefik-and-deploy",
+    "20260731T005307Z-54ac2f-telemetry-backend-dashboards-and-alerts",
     "20260731T005307Z-5662b5-postgres-object-storage-backup-and-restore"
   ],
   "sharedResources": [
@@ -81,24 +91,39 @@ rollback digest.
 - [ ] GitHub workflow permissions explicit/minimal, actions pinned by full SHA,
   environments protected, WIF subjects exact, fork PR не получает privileged
   token/secrets. Branch/check/environment settings documented and tested.
-- [ ] CI выполняет pinned secret, dependency, SAST/IaC/Compose/Dockerfile and
-  container vulnerability scans with owner-approved severity/exception/SLA
-  policy. Findings never print secrets or upload source outside approved tools.
-- [ ] Для каждого `game`/`web` digest создаётся SBOM and provenance/attestation
-  tied to full commit SHA. Signing/attestation keyless through GitHub OIDC or
-  another approved short-lived identity; static signing key запрещён.
+- [ ] GitHub connector confirms repository `L1TTL3H0rSE/munchkin` is public and
+  authenticated owner `L1TTL3H0rSE` has admin permission. GitHub Free public
+  features are used; implementation configures/proves protected `main`, unique
+  required CI/security checks and protected production environment where the
+  plan's exact settings support them.
+- [ ] Free pinned CI stack: Gitleaks `8.30.1` (secrets), Trivy CLI `0.70.0`
+  (filesystem/image/IaC/Compose/Dockerfile), OSV-Scanner `2.3.8` and
+  govulncheck `1.6.0` (dependencies/Go), Syft `1.44.0` (SPDX/CycloneDX SBOM),
+  CodeQL Action release `v4.37.3` for Go + JavaScript/TypeScript pinned to full SHA
+  `c54b30b7df092240050e69945842bc67aee0f0f4`. CLI binaries/images use verified
+  checksum/digest; no mutable action tag or `latest` is executable authority.
+- [ ] Severity/SLA policy: Critical always blocks release and is fixed or
+  explicitly waived within `24h`; High is fixed within `7d` and blocks when
+  reachable/runtime-impacting; Medium within `30d`; Low at next maintenance.
+  Exception owner is repository owner `L1TTL3H0rSE`; every exception records
+  rationale, scope, compensating control and expiry no longer than `30d`.
+- [ ] Для каждого `game`/`web` digest Syft SBOM and GitHub Artifact Attestation
+  are tied to full commit SHA. `actions/attest` release `v4.2.0` is pinned to full SHA
+  `f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6`; GitHub OIDC is the selected
+  keyless signing/provenance mechanism and static signing keys are forbidden.
 - [ ] Deploy verifies digest belongs to expected registry/repository/SHA and
   satisfies evidence policy before rollout. Missing/mismatched evidence fails
   closed once enforcement is enabled.
 - [ ] Image cleanup first produces dry-run protected set containing current,
   previous, pending release and minimum recovery generations. Destructive
   deletion and paid Yandex scanner require separate price/owner approval.
+  This baseline has incremental security-tool budget `0 RUB/month`.
 - [ ] Runtime audit confirms public listeners only `80/443` plus CIDR-limited
   SSH, no Docker socket/API exposure, no deploy user in Docker group, root-only
   secrets, patched host and bounded logs.
 - [ ] Traefik baseline headers/rate/body/timeouts and TLS policy are
   application-compatible and tested; CSP/socket-proxy advanced hardening may
-  remain P1 if it needs product/browser work.
+  remain deferred for a separate future plan if it needs product/browser work.
 - [ ] Backup bucket/state bucket/Lockbox/registry public access and encryption/
   lifecycle/IAM policies pass focused assertions.
 - [ ] Clean scans, host/cloud inventory, deploy verification, canonical verify
@@ -112,8 +137,12 @@ rollback digest.
   Docker-group admin and static runtime keys.
 - `container-registry.images.pusher` is broader than append-only; no-overwrite
   workflow policy alone is not a cloud-enforced deny.
-- Paid scan/retention/signing compatibility and current action/tool versions
-  are time-sensitive and must be re-priced/researched before approval.
+- GitHub connector confirms the repo is already public and the authenticated
+  owner has admin permission; user confirms GitHub Free and access to required
+  GitHub/Yandex settings. The free pins/SLA above are selected for this draft.
+- Paid Yandex vulnerability scanner is deferred. Yandex-native keyless OCI
+  signature support is not claimed; deploy consumes GitHub digest-bound
+  attestation evidence unless a later approved integration proves otherwise.
 
 ## Scope
 
@@ -128,14 +157,16 @@ rollback digest.
 
 - Feature authorization/admin console, DDoS service, WAF, SOC/SIEM.
 - Guaranteed zero vulnerabilities without documented exception lifecycle.
-- P1 full log/metrics/synthetic/load stack.
+- Full log/metrics/synthetic/load bonus stack, currently deferred with no
+  implementation owner.
 - Destructive key/resource/image cleanup without separate approval.
 
 ## Архитектурный подход
 
 1. Inventory actual trust graph first; compare with machine-readable allowlist.
-2. Generate evidence in unprivileged build jobs, then keylessly attest exact
-   digest; privileged publish/deploy jobs only consume verified outputs.
+2. Run the selected free pinned scanners in unprivileged jobs, generate Syft
+   SBOM, then use exact-SHA `actions/attest` with GitHub OIDC for each digest;
+   privileged publish/deploy jobs only consume verified outputs.
 3. Use policy-as-code checks with staged warn→enforce transition to avoid
    silently blocking production.
 4. Cleanup computes protected digests from current/previous/pending state and
@@ -164,12 +195,19 @@ rollback digest.
 | `backend/game/Dockerfile` | write | Backend image hardening |
 | `frontend/Dockerfile` | write | Frontend image hardening |
 | `compose.production.yml` | write | Runtime hardening |
-| `infra/compose/**` | write | Traefik/container security config |
-| `infra/terraform/bootstrap/**` | write | WIF/IAM hardening |
-| `infra/terraform/environments/production/**` | write | Production IAM/security assertions |
+| `infra/compose/traefik-static.yml` | write | Traefik provider/socket boundary hardening |
+| `infra/compose/traefik-dynamic.yml` | write | Exact security headers/middleware |
+| `infra/terraform/bootstrap/github_actions.tf` | write | Exact GitHub WIF subject/role hardening |
+| `infra/terraform/environments/production/compute.tf` | write | VM metadata/runtime assertions |
+| `infra/terraform/environments/production/iam.tf` | write | Production least privilege |
+| `infra/terraform/environments/production/network.tf` | write | Listener/security-group assertions |
+| `infra/terraform/environments/production/registry.tf` | write | Registry policy/retention inputs |
 | `infra/terraform/README.md` | write | Security/auth documentation |
-| `scripts/ci/**` | write | Scan/evidence helpers |
-| `scripts/production/**` | write | Verification/retention audit |
+| `scripts/ci/security-scan.sh` | write | Pinned scanner orchestration |
+| `scripts/ci/verify-action-pins.mjs` | write | Full-SHA action policy |
+| `scripts/production/security-audit.sh` | write | Runtime/IAM/listener verification |
+| `scripts/production/verify-release-evidence.sh` | write | Digest/SHA/attestation gate |
+| `scripts/production/registry-retention-plan.sh` | write | Dry-run protected-digest retention plan |
 | `scripts/terraform-check.sh` | write | IAM/network/storage assertions |
 | `docs/agents/INFRASTRUCTURE_ROADMAP.md` | write | INFRA-011 status |
 | `docs/operations/PRODUCTION_SECURITY.md` | write | Production security runbook |
@@ -193,23 +231,23 @@ rollback digest.
 |---|---|---|---|
 | All production identities/resources | all previous infra plans | this audit after them | No mutation before exact inventory |
 | Image/deploy workflows | WIF/deploy plans | dependencies | Extend without changing digest contract |
-| P1 B04/B08/B10 | P1 bonus plan | baseline here | P1 adds advanced evidence/headers/socket proxy |
+| Deferred B04/B08/B10 ideas | none | no implementation owner | This plan delivers only its exact P0 security baseline |
 
 ### Проверка конфликтов
 
-- **Проверены active plans:** 2026-07-31 01:05:00 UTC.
-- **Обнаруженные пересечения:** intentionally cross-cuts all prior infra files
-  and future P1 hardening.
+- **Проверены active plans:** 2026-08-01 14:44:19 UTC.
+- **Обнаруженные пересечения:** exact workflow/Compose/Traefik/Terraform files
+  extend archived P0 predecessors; contest P1 has no implementation write set.
 - **Решение:** runs only after backup plan archive; inventory may narrow write
   set. Any role removal, image deletion, provider/action/tool change or paid
   service needs updated exact plan and separate approval.
 
 ## План реализации
 
-1. [ ] Refresh official threat/tool/pricing contracts and actual IAM/network/
-   secret/listener/image inventory.
-2. [ ] Update exact findings, exceptions, scanner/attestation tools and budget;
-   request owner approval.
+1. [ ] Revalidate the recorded release versions/full SHAs and refresh actual
+   IAM/network/secret/listener/image inventory.
+2. [ ] Record exact findings against the settled free-stack/SLA/exception
+   policy and request formal owner approval.
 3. [ ] Implement pinned CI scanners, SBOM/provenance/keyless evidence.
 4. [ ] Add deploy evidence verification and repository settings checks.
 5. [ ] Harden Terraform/Compose/host only for proven gaps; apply/deploy through
@@ -249,23 +287,50 @@ rollback digest.
 
 ## Открытые вопросы
 
-- Exact scanners/versions, severity SLA and exception owner.
-- Yandex registry OCI attestation/signature support and keyless verifier.
-- Paid Yandex vulnerability scan and retention pricing.
-- Required GitHub settings available for public personal repository.
-- Plan is base draft; decisions must be refreshed before approval.
+- Audit-selected tool releases, SLA and exception-owner policy are settled for
+  review; implementation must revalidate binary checksums/digests and all
+  remaining third-party action full SHAs before execution.
+- GitHub public Free/admin capability is confirmed. Actual branch protection,
+  required checks and environment enforcement remain implementation evidence;
+  the connector does not expose those settings and local `gh` is unavailable.
+- Yandex-native keyless OCI signature is not assumed. GitHub attestation to
+  exact Yandex image digest verification is an implementation gate.
+- Paid Yandex scanner is deferred; activation requires a new exact price and
+  owner approval. Base incremental tool budget is `0 RUB/month`.
+- Plan remains draft/unapproved until backup archive and exact live inventory/
+  mutation set are reviewed.
 
 ## Согласование
 
-- **Статус:** not requested; prerequisite draft
-- **Запрошено:** —
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** заранее создать все infra plans;
-  no static cloud keys; no select/implementation/commit/push.
+- **Статус:** approved
+- **Запрошено:** 2026-08-01 15:15:14 UTC
+- **Подтверждено:** 2026-08-01 15:15:14 UTC
+- **Формулировка/ограничения пользователя:** пользователь формально одобрил
+  последовательную очередь exact plans начиная с этого plan и разрешил
+  approvals, select, implementation, verify, scope-check, archive/release,
+  подготовительный local commit plan-файлов и отдельный local commit после
+  каждого завершённого plan. Подтверждены зафиксированные audit defaults,
+  free security stack с базовым бюджетом `0 RUB/month` и сокращённый Monium
+  soak на 60 минут; ветка не создаётся. Разрешён обычный push в `origin/main`
+  только после успешных проверок. PostgreSQL password и dedicated deploy SSH
+  key разрешено безопасно сгенерировать и передать непосредственно в
+  утверждённые secret stores без вывода или сохранения в Git, plan, chat или
+  logs. Remote mutations, Terraform apply, secret payload insertion,
+  GitHub/Yandex settings, production VM bootstrap/deploy и любые
+  платные/destructive actions не одобрены заранее: перед каждым таким этапом
+  нужен sanitized exact mutation plan и отдельное approval. Owner email
+  остаётся вне Git/plan.
 
 ## Ход выполнения
 
 - Baseline cross-cut plan created; destructive/premium gates are explicit.
+- 2026-08-01 GitHub connector verified public visibility and owner admin access;
+  selected free versions and exception policy recorded.
+- 2026-08-01 read-only `git ls-remote` verified CodeQL `v4.37.3` at
+  `c54b30b7df092240050e69945842bc67aee0f0f4` and `actions/attest@v4.2.0` at
+  `f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6`.
+- 2026-08-01 formal queue approval recorded with the remote-mutation gates
+  above; implementation remains dependency-gated.
 - Implementation не начата, plan не selected.
 
 ## Итог
