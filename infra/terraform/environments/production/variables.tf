@@ -51,3 +51,30 @@ variable "production_hostname" {
     error_message = "production_hostname must be a lowercase DNS name without a wildcard."
   }
 }
+
+variable "monium_project" {
+  type        = string
+  description = "Public Monium project label; defaults to the production folder project and never contains a credential."
+  nullable    = false
+  default     = ""
+
+  validation {
+    condition = trimspace(var.monium_project) == "" || can(regex(
+      "^folder__[a-z0-9]+$",
+      trimspace(var.monium_project),
+    ))
+    error_message = "monium_project must be empty or a folder__<id> project label."
+  }
+}
+
+variable "monium_api_key_expiry_days" {
+  type        = number
+  description = "Owner-managed maximum lifetime for the separately inserted Monium API key. The key is not a Terraform resource."
+  nullable    = false
+  default     = 90
+
+  validation {
+    condition     = floor(var.monium_api_key_expiry_days) == var.monium_api_key_expiry_days && var.monium_api_key_expiry_days >= 1 && var.monium_api_key_expiry_days <= 90
+    error_message = "monium_api_key_expiry_days must be an integer between 1 and 90 days."
+  }
+}

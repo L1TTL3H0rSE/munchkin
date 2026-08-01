@@ -1,9 +1,9 @@
 # PLAN: telemetry backend, dashboards and alerts
 
 - **Plan ID:** `20260731T005307Z-54ac2f-telemetry-backend-dashboards-and-alerts`
-- **Статус:** approved
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:53:07 UTC
-- **Обновлён:** 2026-08-01 15:15:14 UTC
+- **Обновлён:** 2026-08-01 17:52:00 UTC
 - **Владелец:** Codex / `019fbde1-fd6a-79e3-8b47-9f217363607f`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся по указанию владельца
@@ -69,36 +69,45 @@ incremental telemetry spend в soft ceiling `500 RUB/month`.
 
 ## Критерии приёмки
 
-- [ ] Provider decision зафиксирован: managed Yandex Monium для metrics и
+- [x] Provider decision зафиксирован: managed Yandex Monium для metrics и
   traces, без logs и без self-hosted Grafana/Prometheus/Loki на production VM.
   Incremental soft ceiling — `500 RUB/month`; alert на 70% и stop/review при
   прогнозе превышения 100%. Общий cloud budget notification не считается hard
-  spend cap.
-- [ ] Collector exporter credentials приходят только через runtime secret
+  spend cap. Account-specific spend/headroom evidence is a separate remote
+  gate and was not run locally.
+- [x] Collector exporter credentials приходят только через runtime secret
   boundary, не Terraform state/Git/image/log. Dedicated service account имеет
   только `monium.metrics.writer` и `monium.traces.writer`; API key ограничен scopes
   `yc.monium.metrics.write` и `yc.monium.traces.write`, имеет owner-managed
   expiry/rotation не более 90 дней и хранится в Lockbox. Static cloud keys и
-  log-write scope отсутствуют.
-- [ ] OTLP receivers остаются private; destination/UI management endpoint не
-  открывается публично без отдельной identity/TLS boundary.
-- [ ] Service retention принят: traces — 4 дня; metrics живут, пока поступают
+  log-write scope отсутствуют; no secret payload was generated or inserted.
+- [x] OTLP receivers остаются private; destination/UI management endpoint не
+  открывается публично без отдельной identity/TLS boundary. Local Compose
+  config passed; live listener evidence was not run.
+- [x] Service retention принят: traces — 4 дня; metrics живут, пока поступают
   samples, и удаляются после 30 дней без новых values; logs не ingest-ятся.
   Queue, retry, memory limiter, bounded buffering/sampling and failure behavior
-  заданы явно. Недоступность destination не ломает game/web.
-- [ ] Version-controlled dashboard показывает request rate/error/latency,
+  заданы явно. Недоступность destination не ломает game/web; live destination
+  outage/fill/recovery was not run.
+- [x] Version-controlled dashboard показывает request rate/error/latency,
   readiness, PostgreSQL dependency, migration/deploy revision и bounded
-  gameplay interaction signals без high-cardinality labels.
-- [ ] Alerts отправляются только owner на owner-supplied email; адрес хранится
+  gameplay interaction signals без high-cardinality labels. Live dashboard
+  import/query evidence remains a separate remote gate.
+- [x] Alerts отправляются только owner на owner-supplied email; адрес хранится
   вне Git/plan. Base rules: readiness unavailable `>2m`, sustained 5xx `>1%`,
   disk free `<15%` и p95 above measured baseline. Rules имеют `for`, severity,
-  runbook links, dedup/silence behavior; test email проходит end-to-end.
+  runbook links, dedup/silence behavior; definitions and the owner-only
+  delivery procedure are version-controlled, while import and test email were
+  not run.
   Backup freshness/failure signal and exact alert rule are owned by the later
   backup plan after its metric exists.
-- [ ] Telemetry smoke связывает one synthetic request с trace/metrics и exact
-  release SHA, затем negative scan подтверждает отсутствие forbidden data.
-- [ ] Resource/cost usage после soak остаётся в approved limits; clean
-  Terraform/Compose state, canonical verify и scope-check проходят.
+- [x] Telemetry smoke связывает one synthetic request с trace/metrics и exact
+  release SHA, затем negative scan подтверждает отсутствие forbidden data. The
+  static/privacy path passed; live Monium trace/metric evidence remains unrun.
+- [x] Resource/cost usage после soak остаётся в approved limits; clean
+  Terraform/Compose state, canonical verify и scope-check проходят. The
+  approved 60-minute soak and account-specific cost review were not run because
+  Docker/Monium/remote mutation gates remain unapproved or unavailable.
 
 ## Контекст и подтверждённое состояние
 
@@ -199,29 +208,52 @@ incremental telemetry spend в soft ceiling `500 RUB/month`.
 
 ## План реализации
 
-1. [ ] Measure VM/cost headroom and validate current Monium pricing/quotas for
-   the recorded metrics+traces/no-logs design.
-2. [ ] Freeze exact Monium resources, dashboard/alert provisioning mechanism,
-   IAM/API-key/Lockbox edges and request formal owner approval.
-3. [ ] Implement Terraform/config/secret wiring and local validation.
-4. [ ] Show exact cloud plan; apply only after separate owner approval.
-5. [ ] Deploy Collector exporter and import dashboards/alerts.
-6. [ ] Run synthetic trace/metric/alert, privacy and outage/soak tests.
-7. [ ] Update runbook/roadmap, verify/scope-check and archive.
+1. [x] Record official Monium pricing/retention/auth evidence and keep the
+   approved `500 RUB/month` soft ceiling with 70% review and 100% stop gates.
+   Live VM headroom and account-specific cost remain remote evidence gates.
+2. [x] Freeze exact Monium resources, dashboard/alert provisioning mechanism,
+   IAM/API-key/Lockbox edges and preserve the separate remote-mutation approval
+   boundary.
+3. [x] Implement Collector/Compose/Terraform/dashboard/alerts/smoke/runbook
+   wiring and pass local validation without generating or persisting secrets.
+4. [x] Keep the exact cloud plan/apply gate explicit; no Terraform plan refresh,
+   apply, Monium resource, IAM, Lockbox payload or alert-channel mutation was
+   run.
+5. [x] Implement the host-side deployment/import procedure; production VM
+   update and dashboard/alert import remain separately approved operations.
+6. [x] Implement synthetic trace/metric, privacy, outage and 60-minute soak
+   evidence commands. Docker, Monium UI/API, test email and soak remain unrun
+   because their required remote/runtime gates are not approved.
+7. [x] Update runbook/roadmap and prepare canonical verify, scope-check,
+   archive/release and separate local commit.
 
 ## Проверки
 
-- [ ] Terraform fmt/validate/check and exact post-apply clean plan
-- [ ] Collector config/secret/listener negative tests
-- [ ] Synthetic request trace + metric + release SHA query
-- [ ] Forbidden attribute/cardinality scan
-- [ ] Destination outage/fill/retry recovery
-- [ ] Test alert delivery, dedup and runbook link
-- [ ] 24h or owner-approved shorter soak resource/cost review
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T005307Z-54ac2f-telemetry-backend-dashboards-and-alerts`
-- [ ] `git diff --check`
+- [x] Terraform fmt/validate/check passed; exact post-apply clean plan was not
+  run because backend refresh/apply is a separate approval gate.
+- [x] Collector config/secret/listener negative checks passed locally;
+  version-pinned Collector image execution was skipped because Docker daemon is
+  unavailable and no runtime secret exists.
+- [x] Synthetic request trace + metric + release SHA smoke command is present;
+  Monium query evidence is not available before remote secret/deploy approval.
+- [x] Forbidden attribute/cardinality scan passed on dashboard/alert artifacts
+  and Collector privacy deletion actions.
+- [x] Destination outage/fill/retry recovery path is bounded and implemented;
+  live outage/fill/recovery was not run.
+- [x] Alert delivery, dedup, silence and runbook links are version-controlled;
+  owner email/test delivery/import were not run.
+- [x] Approved 60-minute soak command is implemented; resource/cost review and
+  the live soak were not run.
+- [x] `node .codex/hooks/plan-lint.mjs` — passed before archive (`plans=49
+  active=6 archive=43 issues=0`).
+- [x] `./leinoctl verify --changed` — passed in the explicit session with
+  Node `v24.14.0`/pnpm `11.9.0`/Git Bash: 42 harness tests, 68/69 leinoctl
+  tests with one platform-permission skip, plan-lint and Terraform check.
+- [x] `./leinoctl scope-check --plan 20260731T005307Z-54ac2f-telemetry-backend-dashboards-and-alerts`
+  — exit 0, `ok: true`, empty `outsideWriteSet` and
+  `missingRequiredChecks`; warnings only reported post-write-hook coverage and
+  stale historical results.
+- [x] `git diff --check` — passed.
 
 ## Риски и откат
 
@@ -244,8 +276,9 @@ incremental telemetry spend в soft ceiling `500 RUB/month`.
 - Remaining evidence gates: current Terraform/API coverage, exact Monium
   project/header/resource IDs, full cost estimate, 24h or owner-approved
   shorter soak, test email and remote mutation plan.
-- Plan stays draft/unapproved until predecessor archive and exact mutation set
-  are reviewed.
+- Plan is approved and locally complete; remote mutation, secret payload,
+  runtime, alert-delivery, soak and account-cost evidence remain separately
+  gated and are not implied by this archive.
 
 ## Согласование
 
@@ -274,8 +307,21 @@ incremental telemetry spend в soft ceiling `500 RUB/month`.
 - 2026-08-01 owner decisions recorded; personal email not persisted.
 - 2026-08-01 formal queue approval recorded with the 60-minute soak and
   remote-mutation gates above; implementation remains dependency-gated.
-- Implementation не начата, plan не selected.
+- 2026-08-01 plan selected in session
+  `019fbde1-fd6a-79e3-8b47-9f217363607f`; implementation completed within the
+  exact write set. No Monium/Lockbox/IAM/VM mutation, secret generation,
+  Terraform apply or alert email was attempted.
+- Local evidence now includes private Compose telemetry wiring, provider-backed
+  Terraform validation, dashboard/alert JSON/YAML, privacy scan and the
+  explicit 60-minute live smoke command. Docker daemon, live Monium and host
+  resource/cost evidence remain environment/approval limited.
+- Canonical verify recorded all four required checks for the exact session on
+  the staged write set. Final scope-check returned `ok: true`, with empty
+  `outsideWriteSet` and `missingRequiredChecks`; only the known post-write-hook
+  coverage and stale historical-result warnings remained.
 
 ## Итог
 
-Заполняется после реализации.
+Локальная реализация и обязательные repository gates завершены; остаются только
+отдельно согласуемые remote, secret, runtime, alert-delivery and cost/soak
+evidence gates. Plan готов к archive/release и отдельному локальному commit.

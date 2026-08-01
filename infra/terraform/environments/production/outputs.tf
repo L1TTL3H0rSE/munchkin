@@ -69,6 +69,26 @@ output "runtime_lockbox_secret_id" {
   value       = yandex_lockbox_secret.production.id
 }
 
+output "monium_writer_service_account_id" {
+  description = "Dedicated keyless service account for Monium metrics and traces ingestion; no API key payload is managed here."
+  value       = yandex_iam_service_account.monium_writer.id
+}
+
+output "monium_project" {
+  description = "Monium project label used by the Collector header."
+  value       = local.monium_project
+}
+
+output "monium_dashboard_id" {
+  description = "Terraform-managed Monium dashboard ID."
+  value       = yandex_monitoring_dashboard.production.dashboard_id
+}
+
+output "monium_api_key_expiry_days" {
+  description = "Maximum owner-managed API-key lifetime; the key itself is outside Terraform state."
+  value       = var.monium_api_key_expiry_days
+}
+
 output "instance_id" {
   description = "Production Compute instance."
   value       = yandex_compute_instance.production.id

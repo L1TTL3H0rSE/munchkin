@@ -473,6 +473,16 @@ stdout с `trace_id`/`span_id` и bounded Docker log rotation.
 - Telemetry имеет bounded retention и не публикуется без authentication.
 - Deploy SHA отмечен на dashboard или доступен как filter/annotation.
 
+**Статус 2026-08-01:** managed Yandex Monium is fixed as the metrics/traces-
+only destination. Local Collector wiring now has private OTLP receivers,
+privacy deletion, bounded tail sampling/queue/retry, no logs pipeline and the
+owner-only runtime secret boundary. Terraform declares only the dedicated
+keyless writer identity, the exact two Monium writer roles and a
+low-cardinality dashboard; alert/channel YAML remains an owner-approved
+Monium import. The 60-minute live soak, trace/metric query evidence, alert
+delivery, host disk metric and resource/cost review remain unrun because they
+require separate remote/secret/mutation approvals.
+
 ### INFRA-010 — off-host PostgreSQL backup и restore
 
 **Работа**

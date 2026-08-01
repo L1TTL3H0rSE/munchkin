@@ -721,6 +721,9 @@ production_network="$production_root/network.tf"
 production_registry="$production_root/registry.tf"
 production_compute="$production_root/compute.tf"
 production_cloud_init="$production_root/cloud-init.yaml.tftpl"
+production_telemetry="$production_root/telemetry.tf"
+production_dashboard="$repo_root/infra/observability/monium/production-dashboard.json"
+production_alerts="$repo_root/infra/observability/monium/production-alerts.yaml"
 
 for required_file in \
   "$production_variables" \
@@ -731,6 +734,9 @@ for required_file in \
   "$production_registry" \
   "$production_compute" \
   "$production_cloud_init" \
+  "$production_telemetry" \
+  "$production_dashboard" \
+  "$production_alerts" \
   "$production_root/outputs.tf"; do
   if [[ ! -f "$required_file" ]]; then
     echo "production graph is missing required file: $required_file" >&2
@@ -743,8 +749,8 @@ production_resource_count="$(
     wc -l |
     tr -d '[:space:]'
 )"
-if [[ "$production_resource_count" != "15" ]]; then
-  echo "production graph must contain exactly 15 managed resources; got $production_resource_count" >&2
+if [[ "$production_resource_count" != "19" ]]; then
+  echo "production graph must contain exactly 19 managed resources; got $production_resource_count" >&2
   exit 1
 fi
 
@@ -756,6 +762,9 @@ declare -A expected_production_resource_counts=(
   [yandex_container_registry]=1
   [yandex_container_repository]=2
   [yandex_container_registry_iam_binding]=2
+  [yandex_iam_service_account]=1
+  [yandex_resourcemanager_folder_iam_member]=2
+  [yandex_monitoring_dashboard]=1
   [yandex_dns_zone]=1
   [yandex_dns_recordset]=1
   [yandex_lockbox_secret]=1
@@ -816,6 +825,39 @@ if ! rg -q '^[[:space:]]*sensitive[[:space:]]*=[[:space:]]*true$' \
   [[ "$(rg -c '^[[:space:]]*sensitive[[:space:]]*=[[:space:]]*true$' "$production_variables")" != "2" ]] ||
   ! rg -q 'cidr[[:space:]]*!=[[:space:]]*"0\.0\.0\.0/0"' "$production_variables"; then
   echo "owner SSH inputs must remain sensitive and reject world-open SSH" >&2
+  exit 1
+fi
+
+if ! rg -q '^resource "yandex_iam_service_account" "monium_writer"' "$production_telemetry" ||
+  ! rg -q 'name[[:space:]]*=[[:space:]]*"munchkin-monium-writer"' "$production_telemetry" ||
+  [[ "$(rg -c 'prevent_destroy[[:space:]]*=[[:space:]]*true' "$production_telemetry")" != "1" ]]; then
+  echo "Monium writer identity must be one dedicated protected service account" >&2
+  exit 1
+fi
+
+for expected_monium_role in monium.metrics.writer monium.traces.writer; do
+  if [[ "$(rg -c "role[[:space:]]*=[[:space:]]*\"$expected_monium_role\"" "$production_telemetry")" != "1" ]]; then
+    echo "Monium writer identity must have exactly one $expected_monium_role binding" >&2
+    exit 1
+  fi
+done
+if ! rg -q 'yc\.monium\.metrics\.write' "$production_telemetry" ||
+  ! rg -q 'yc\.monium\.traces\.write' "$production_telemetry" ||
+  rg -q 'yc\.monium\.logs\.write|static_access_key|service_account_key' "$production_root"; then
+  echo "Monium auth must be metrics/traces-only and keyless in Terraform" >&2
+  exit 1
+fi
+
+if ! rg -q 'monium_api_key_expiry_days' "$production_root/variables.tf" ||
+  ! rg -q 'var\.monium_api_key_expiry_days <= 90' "$production_root/variables.tf" ||
+  ! rg -qi 'owner-managed' "$production_root/variables.tf" ||
+  ! rg -q 'resource "yandex_monitoring_dashboard" "production"' "$production_telemetry" ||
+  ! rg -q -F 'munchkin-production-telemetry' "$production_dashboard" ||
+  ! rg -q 'readiness|http\.server\.request|game\.interaction' "$production_dashboard" ||
+  ! rg -q 'readiness-unavailable|sustained-http-5xx|disk-free-low|http-p95-above-baseline' "$production_alerts" ||
+  ! rg -q 'owner-only-email-outside-repository|address_is_not_stored_here' "$production_alerts" ||
+  ! rg -q 'for:' "$production_alerts"; then
+  echo "Monium dashboard/alert contract or owner-only delivery boundary is incomplete" >&2
   exit 1
 fi
 

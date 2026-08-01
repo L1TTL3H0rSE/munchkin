@@ -8,6 +8,9 @@ data "yandex_iam_service_account" "github_images" {
   name      = "munchkin-github-images"
 }
 
+# The dedicated Monium writer identity and its exact metrics/traces roles are
+# declared in telemetry.tf. No static service-account key is managed here.
+
 resource "yandex_container_registry_iam_binding" "runtime_puller" {
   registry_id = yandex_container_registry.production.id
   role        = "container-registry.images.puller"

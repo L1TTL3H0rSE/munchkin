@@ -1,0 +1,143 @@
+{
+  "name": "munchkin-production-telemetry",
+  "title": "Munchkin production telemetry",
+  "description": "Low-cardinality metrics for the Munchkin production API, readiness boundary and bounded gameplay interactions.",
+  "labels": {
+    "environment": "production",
+    "managed_by": "repository",
+    "component": "observability"
+  },
+  "widgets": [
+    {
+      "chart": {
+        "title": "Request rate",
+        "description": "Aggregated application request counter across the game and web services.",
+        "display_legend": false,
+        "freeze": "FREEZE_DURATION_HOUR",
+        "queries": [
+          {
+            "target": {
+              "query": "series_sum({project=\"folder__b1g55l8i2mtpv23b5ql7\", cluster=\"production\", service=\"munchkin-game|munchkin-web\", env=\"production\", name=\"http.server.request.count\"})"
+            }
+          }
+        ]
+      },
+      "position": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "chart": {
+        "title": "HTTP errors",
+        "description": "5xx request rate remains bounded by the alert definition; 4xx is shown for context.",
+        "display_legend": true,
+        "freeze": "FREEZE_DURATION_HOUR",
+        "queries": [
+          {
+            "target": {
+              "query": "series_sum({project=\"folder__b1g55l8i2mtpv23b5ql7\", cluster=\"production\", service=\"munchkin-game|munchkin-web\", env=\"production\", name=\"http.server.request.count\", http.response.status_class=\"5xx\"})"
+            }
+          },
+          {
+            "target": {
+              "query": "series_sum({project=\"folder__b1g55l8i2mtpv23b5ql7\", cluster=\"production\", service=\"munchkin-game|munchkin-web\", env=\"production\", name=\"http.server.request.count\", http.response.status_class=\"4xx\"})"
+            }
+          }
+        ]
+      },
+      "position": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "chart": {
+        "title": "HTTP p95 latency",
+        "description": "Histogram percentile over the bounded route-class and status dimensions.",
+        "display_legend": true,
+        "freeze": "FREEZE_DURATION_HOUR",
+        "queries": [
+          {
+            "target": {
+              "query": "histogram_percentile(95, {project=\"folder__b1g55l8i2mtpv23b5ql7\", cluster=\"production\", service=\"munchkin-game|munchkin-web\", env=\"production\", name=\"http.server.request.duration\"})"
+            }
+          }
+        ]
+      },
+      "position": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      }
+    },
+    {
+      "chart": {
+        "title": "Readiness and PostgreSQL dependency",
+        "description": "The readiness route is backed by the bounded PostgreSQL probe; a 5xx series is the dependency failure signal.",
+        "display_legend": false,
+        "freeze": "FREEZE_DURATION_HOUR",
+        "queries": [
+          {
+            "target": {
+              "query": "series_sum({project=\"folder__b1g55l8i2mtpv23b5ql7\", cluster=\"production\", service=\"munchkin-game\", env=\"production\", name=\"http.server.request.count\", http.route.class=\"health_ready\", http.response.status_class=\"5xx\"})"
+            }
+          },
+          {
+            "target": {
+              "query": "series_sum({project=\"folder__b1g55l8i2mtpv23b5ql7\", cluster=\"production\", service=\"munchkin-game\", env=\"production\", name=\"http.server.request.count\", http.route.class=\"health_ready\", http.response.status_class=\"2xx\"})"
+            }
+          }
+        ]
+      },
+      "position": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      }
+    },
+    {
+      "chart": {
+        "title": "Bounded gameplay interactions",
+        "description": "Interaction outcomes and timeouts use allowlisted enums only; no game, player, card or command identifiers are labels.",
+        "display_legend": true,
+        "freeze": "FREEZE_DURATION_HOUR",
+        "queries": [
+          {
+            "target": {
+              "query": "series_sum({project=\"folder__b1g55l8i2mtpv23b5ql7\", cluster=\"production\", service=\"munchkin-game\", env=\"production\", name=\"game.interaction.response.count\"})"
+            }
+          },
+          {
+            "target": {
+              "query": "series_sum({project=\"folder__b1g55l8i2mtpv23b5ql7\", cluster=\"production\", service=\"munchkin-game\", env=\"production\", name=\"game.interaction.timeout.count\"})"
+            }
+          }
+        ]
+      },
+      "position": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      }
+    },
+    {
+      "text": {
+        "text": "Deploy and migration revision: inspect the `service.revision` resource attribute on the trace and the immutable release evidence. Migration contract: `health-migrations-v1`. Traces are retained for 4 days; metrics expire after 30 days without new values. No logs are ingested."
+      },
+      "position": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      }
+    }
+  ]
+}

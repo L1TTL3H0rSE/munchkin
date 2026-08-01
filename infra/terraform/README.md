@@ -170,10 +170,12 @@ The approved production delivery plan adds four non-secret resources to the
 local production graph: one public Yandex Cloud DNS zone, one exact-hostname
 `A` record targeting the already reserved `81.26.187.230`, one deletion-
 protected Lockbox secret container and one exact runtime `viewer` IAM member.
-The repository graph is therefore checked as `15` resources, while the live
-remote state remains the previously applied `10` until a separate sanitized
-Terraform plan and owner approval. The DNS zone/record and registrar NS
-delegation are separate mutation gates.
+The telemetry plan adds a dedicated Monium writer service account, two exact
+folder IAM member roles and one dashboard. The repository graph is therefore
+checked as `19` resources, while the live remote state remains the previously
+applied `10` until separate sanitized Terraform plans and owner approvals. The
+DNS/record, Monium/IAM/dashboard and registrar NS delegation are separate
+mutation gates.
 
 The Lockbox resource deliberately contains no password generation block,
 secret version, entry or payload value. PostgreSQL password, derived DSN,
@@ -181,6 +183,24 @@ deploy SSH private key and ACME account data are owner-side runtime inputs;
 none is accepted by Terraform or written to state. The deploy workflow uses
 the protected SSH boundary and does not require a new cloud key or a broader
 GitHub/Yandex setting mutation in this local slice.
+
+### Managed Monium telemetry (local-only, not applied)
+
+The production root now contains one protected `munchkin-monium-writer` service
+account, exactly two folder IAM member bindings (`monium.metrics.writer` and
+`monium.traces.writer`) and one low-cardinality monitoring dashboard. Terraform
+does not create an API key, static service-account key, Lockbox version or
+payload. The owner-managed API key is limited to
+`yc.monium.metrics.write`/`yc.monium.traces.write`, expires within 90 days and
+is injected only into the root-owned Collector `telemetry.env` boundary.
+
+The dashboard resource is Terraform-managed because provider coverage is
+available. Alert/channel definitions remain in
+`infra/observability/monium/production-alerts.yaml` and require an explicit
+owner-approved Monium API/UI import; no owner email is stored in the
+repository. The Collector sends metrics and traces only, with bounded
+sampling/queue/retry and no logs. A clean local graph is not evidence of a
+remote apply or of a live dashboard, alert delivery or cost/soak result.
 
 ### GitHub Actions WIF handoff (repository implementation, not applied)
 
@@ -302,9 +322,9 @@ terraform fmt -check -recursive infra/terraform
 - требует ровно по одному bucket-scoped `storage.configurer` и
   `storage.editor` binding с exact единственным member — state service
   account — и запрещает folder-wide варианты этих roles;
-- проверяет exact пять deployer roles, runtime-SA handoff, ровно `15`
-  local production resources (including DNS and metadata-only Lockbox), три
-  data lookup, exact runtime puller plus CI pusher,
+- проверяет exact пять deployer roles, runtime-SA handoff, ровно `19`
+  local production resources (including DNS, metadata-only Lockbox and
+  Monium telemetry), три data lookup, exact runtime puller plus CI pusher,
   sensitive SSH boundary,
   IPv4-only ingress, fixed VM/disk profile и cloud-init host baseline;
 - отклоняет tracked state/plan/tfvars/backend artifacts и inline credentials.

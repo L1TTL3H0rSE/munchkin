@@ -1,0 +1,111 @@
+apiVersion: observability.munchkin/v1
+kind: AlertSet
+metadata:
+  name: munchkin-production-alerts
+  owner: repository
+  environment: production
+spec:
+  provider: yandex-monium
+  project: folder__b1g55l8i2mtpv23b5ql7
+  provisioning: manual-import-after-separate-remote-approval
+  budget:
+    currency: RUB
+    soft_ceiling_monthly: 500
+    review_at_percent: 70
+    stop_at_percent: 100
+    include_alert_calculation_cost: true
+  retention:
+    traces: 4d
+    metrics_without_new_values: 30d
+    logs: disabled
+  delivery:
+    destination_ref: owner-only-email-outside-repository
+    address_source: approved-owner-secret-store
+    address_is_not_stored_here: true
+    test_delivery_requires_separate_approval: true
+    deduplication:
+      key: munchkin-production/{{ rule.id }}
+      group_by:
+        - rule.id
+        - service
+        - deployment.environment
+    silence:
+      default_duration: 30m
+      manual_only: true
+      require_reason: true
+      auto_resolve_after: 15m
+  rules:
+    - id: readiness-unavailable
+      name: Readiness unavailable
+      severity: critical
+      for: 2m
+      condition:
+        query: readiness_5xx
+        expression: "last(readiness_5xx) > 0"
+      queries:
+        readiness_5xx: >-
+          series_sum({project="folder__b1g55l8i2mtpv23b5ql7", cluster="production",
+          service="munchkin-game", env="production", name="http.server.request.count",
+          http.route.class="health_ready", http.response.status_class="5xx"})
+      runbook: https://github.com/L1TTL3H0rSE/munchkin/blob/main/docs/operations/OBSERVABILITY.md#readiness-and-postgresql
+      annotations:
+        summary: Production readiness has returned a dependency failure for two minutes.
+        action: Check PostgreSQL health, migration evidence and the bounded readiness probe.
+
+    - id: sustained-http-5xx
+      name: Sustained HTTP 5xx rate
+      severity: high
+      for: 10m
+      condition:
+        query: error_ratio_percent
+        expression: "last(error_ratio_percent) > 1"
+      queries:
+        total_requests: >-
+          series_sum({project="folder__b1g55l8i2mtpv23b5ql7", cluster="production",
+          service="munchkin-game|munchkin-web", env="production", name="http.server.request.count"})
+        server_errors: >-
+          series_sum({project="folder__b1g55l8i2mtpv23b5ql7", cluster="production",
+          service="munchkin-game|munchkin-web", env="production", name="http.server.request.count",
+          http.response.status_class="5xx"})
+        error_ratio_percent: "100 * server_errors / max(total_requests, 1)"
+      runbook: https://github.com/L1TTL3H0rSE/munchkin/blob/main/docs/operations/OBSERVABILITY.md#http-errors-and-latency
+      annotations:
+        summary: More than one percent of aggregated game/web requests are 5xx for ten minutes.
+        action: Inspect the release evidence and trace sample before rollback.
+
+    - id: disk-free-low
+      name: Production disk free below safety margin
+      severity: high
+      for: 10m
+      condition:
+        query: disk_free_ratio
+        expression: "last(disk_free_ratio) < 0.15"
+      queries:
+        disk_free_ratio: >-
+          series_min({project="folder__b1g55l8i2mtpv23b5ql7", cluster="production",
+          service="munchkin-host", env="production", name="host.disk.free_ratio"})
+      prerequisite: host.disk.free_ratio must be published by a separately approved host metric source.
+      runbook: https://github.com/L1TTL3H0rSE/munchkin/blob/main/docs/operations/OBSERVABILITY.md#disk-and-cost-guardrails
+      annotations:
+        summary: The production data volume has less than fifteen percent free space.
+        action: Stop ingest growth, inspect backups and rotate or extend storage under an approved change.
+
+    - id: http-p95-above-baseline
+      name: HTTP p95 above measured baseline
+      severity: warning
+      for: 15m
+      condition:
+        query: http_p95_ms
+        expression: "last(http_p95_ms) > baseline_p95_ms * 1.25"
+      queries:
+        http_p95_ms: >-
+          histogram_percentile(95, {project="folder__b1g55l8i2mtpv23b5ql7", cluster="production",
+          service="munchkin-game|munchkin-web", env="production", name="http.server.request.duration"})
+      baseline:
+        source: owner-measured-60-minute-soak
+        variable: baseline_p95_ms
+        recalibrate_on: release-or-runtime-shape-change
+      runbook: https://github.com/L1TTL3H0rSE/munchkin/blob/main/docs/operations/OBSERVABILITY.md#http-errors-and-latency
+      annotations:
+        summary: HTTP p95 is twenty-five percent above the measured production baseline.
+        action: Compare route-class mix and deploy revision; do not page on a single sample.

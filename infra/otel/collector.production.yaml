@@ -10,16 +10,77 @@ processors:
     check_interval: 1s
     limit_mib: 128
     spike_limit_mib: 32
+  tail_sampling:
+    decision_wait: 5s
+    num_traces: 512
+    expected_new_traces_per_sec: 10
+    policies:
+      - name: keep-errors
+        type: status_code
+        status_code:
+          status_codes:
+            - ERROR
+      - name: keep-slow
+        type: latency
+        latency:
+          threshold_ms: 1000
+      - name: bounded-success-sample
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+  attributes/privacy:
+    actions:
+      - key: authorization
+        action: delete
+      - key: api_key
+        action: delete
+      - key: bearer_token
+        action: delete
+      - key: database_url
+        action: delete
+      - key: game_id
+        action: delete
+      - key: player_id
+        action: delete
+      - key: card_id
+        action: delete
+      - key: command_id
+        action: delete
+      - key: request_id
+        action: delete
+      - key: source_instance_id
+        action: delete
+      - key: http.request.body
+        action: delete
+      - key: http.response.body
+        action: delete
+      - key: db.statement
+        action: delete
+      - key: db.query.text
+        action: delete
   batch:
     send_batch_size: 128
     send_batch_max_size: 512
     timeout: 5s
 
 exporters:
-  # The destination exporter is selected by the next telemetry plan. Keeping a
-  # local debug sink makes this foundation credential-free and vendor-neutral.
-  debug:
-    verbosity: basic
+  otlp/monium:
+    endpoint: ingest.monium.yandex.cloud:443
+    headers:
+      Authorization: "Api-Key ${env:MONIUM_API_KEY}"
+      x-monium-project: "${env:MONIUM_PROJECT}"
+      x-monium-cluster: production
+    compression: gzip
+    timeout: 5s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 120s
+    sending_queue:
+      enabled: true
+      num_consumers: 2
+      queue_size: 256
 
 extensions:
   health_check:
@@ -31,9 +92,9 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [debug]
+      processors: [memory_limiter, tail_sampling, attributes/privacy, batch]
+      exporters: [otlp/monium]
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [debug]
+      processors: [memory_limiter, attributes/privacy, batch]
+      exporters: [otlp/monium]
