@@ -6,6 +6,12 @@ packages:
   - docker-compose-v2
   - e2fsprogs
   - unattended-upgrades
+  - auditd
+  - ca-certificates
+  - curl
+  - jq
+  - nftables
+  - ufw
 
 users:
   - name: munchkin-admin
@@ -41,7 +47,9 @@ write_files:
         "log-opts": {
           "max-size": "10m",
           "max-file": "3"
-        }
+        },
+        "live-restore": true,
+        "userland-proxy": false
       }
 
   - path: /etc/apt/apt.conf.d/20auto-upgrades
@@ -50,6 +58,56 @@ write_files:
     content: |
       APT::Periodic::Update-Package-Lists "1";
       APT::Periodic::Unattended-Upgrade "1";
+
+  - path: /etc/sysctl.d/99-munchkin-hardening.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      net.ipv4.conf.all.accept_redirects = 0
+      net.ipv4.conf.default.accept_redirects = 0
+      net.ipv4.conf.all.send_redirects = 0
+      net.ipv4.conf.default.send_redirects = 0
+      net.ipv4.conf.all.accept_source_route = 0
+      net.ipv4.conf.default.accept_source_route = 0
+      net.ipv4.tcp_syncookies = 1
+      kernel.kptr_restrict = 2
+      fs.protected_hardlinks = 1
+      fs.protected_symlinks = 1
+
+  - path: /etc/audit/rules.d/99-munchkin.rules
+    owner: root:root
+    permissions: "0640"
+    content: |
+      -w /srv/munchkin/secrets -p wa -k munchkin-secrets
+      -w /srv/munchkin/traefik/acme -p wa -k munchkin-acme
+      -w /etc/docker/daemon.json -p wa -k munchkin-docker
+      -w /etc/ssh/sshd_config.d -p wa -k munchkin-ssh
+
+  - path: /usr/local/sbin/munchkin-host-security
+    owner: root:root
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      ssh_ingress_cidrs_json='${ssh_ingress_cidrs_json}'
+      mapfile -t ssh_ingress_cidrs < <(printf '%s' "$ssh_ingress_cidrs_json" | jq -r '.[]')
+      (($${#ssh_ingress_cidrs[@]} > 0))
+
+      ufw --force reset >/dev/null
+      ufw default deny incoming >/dev/null
+      ufw default allow outgoing >/dev/null
+      for cidr in "$${ssh_ingress_cidrs[@]}"; do
+        ufw allow from "$cidr" to any port 22 proto tcp >/dev/null
+      done
+      ufw allow 80/tcp >/dev/null
+      ufw allow 443/tcp >/dev/null
+      ufw --force enable >/dev/null
+
+      sysctl --system >/dev/null
+      systemctl enable --now auditd
+      systemctl enable --now unattended-upgrades
+      systemctl restart docker
 
   - path: /usr/local/sbin/munchkin-host-bootstrap
     owner: root:root
@@ -130,5 +188,6 @@ runcmd:
   - [systemctl, restart, ssh]
   - [systemctl, enable, --now, docker]
   - [/usr/local/sbin/munchkin-host-bootstrap]
+  - [/usr/local/sbin/munchkin-host-security]
 
 final_message: Munchkin host bootstrap completed successfully.

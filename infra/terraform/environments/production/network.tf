@@ -44,7 +44,7 @@ resource "yandex_vpc_security_group" "production" {
   }
 
   egress {
-    description    = "Required package, registry and future ACME access"
+    description    = "Required package, registry, metadata, telemetry and ACME access; no inbound service ports"
     protocol       = "ANY"
     v4_cidr_blocks = ["0.0.0.0/0"]
   }

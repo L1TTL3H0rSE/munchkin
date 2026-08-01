@@ -843,6 +843,20 @@ if ! rg -q '^resource "yandex_iam_service_account" "monium_writer"' "$production
   exit 1
 fi
 
+if [[ "$(rg -c 'prevent_destroy[[:space:]]*=[[:space:]]*true' "$production_registry")" != "3" ]] ||
+  rg -q 'force_destroy[[:space:]]*=[[:space:]]*true' "$production_registry"; then
+  echo "registry and both repositories must be deletion-protected" >&2
+  exit 1
+fi
+
+if ! rg -q 'github_oidc_subject[[:space:]]*=[[:space:]]*"repo:L1TTL3H0rSE@32160016/munchkin@1316069622:environment:production-images"' \
+  "$bootstrap_github_actions" ||
+  rg -q 'yandex_iam_service_account_(key|authorized_key)|access_key|secret_key|YC_TOKEN|AWS_' \
+    "$bootstrap_github_actions"; then
+  echo "GitHub image publication must use the exact keyless WIF subject without static credentials" >&2
+  exit 1
+fi
+
 for expected_monium_role in monium.metrics.writer monium.traces.writer; do
   if [[ "$(rg -c "role[[:space:]]*=[[:space:]]*\"$expected_monium_role\"" "$production_telemetry")" != "1" ]]; then
     echo "Monium writer identity must have exactly one $expected_monium_role binding" >&2
@@ -966,12 +980,26 @@ for expected_cloud_init_setting in \
   '"max-size": "10m"' \
   '"max-file": "3"' \
   '/dev/disk/by-id/virtio-munchkin-data' \
-  'var/lib/munchkin/bootstrap-success'; do
+  'var/lib/munchkin/bootstrap-success' \
+  'auditd' \
+  'unattended-upgrades' \
+  'ufw default deny incoming' \
+  'ufw default allow outgoing' \
+  'sysctl --system' \
+  'munchkin-secrets' \
+  'live-restore' \
+  'userland-proxy'; do
   if ! rg -q -F "$expected_cloud_init_setting" "$production_cloud_init"; then
     echo "cloud-init is missing reviewed host baseline: $expected_cloud_init_setting" >&2
     exit 1
   fi
 done
+if ! rg -q 'ssh_public_key[[:space:]]*=[[:space:]]*trimspace\(var\.ssh_public_key\)' "$production_compute" ||
+  ! rg -q 'ssh_ingress_cidrs_json[[:space:]]*=[[:space:]]*jsonencode\(var\.ssh_ingress_cidrs\)' "$production_compute" ||
+  ! rg -q 'ssh_ingress_cidrs_json' "$production_cloud_init"; then
+  echo "compute metadata must pass only the reviewed public-key and SSH-CIDR inputs to cloud-init" >&2
+  exit 1
+fi
 if rg -q '^[[:space:]]*-[[:space:]]+docker[[:space:]]*$' "$production_cloud_init"; then
   echo "bootstrap user must not receive root-equivalent Docker group membership" >&2
   exit 1

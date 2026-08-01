@@ -540,6 +540,17 @@ requires a separate remote/runtime approval or unavailable Docker/Monium state.
 - Public surface соответствует ожидаемым routes/ports.
 - Image и dependency risk видим в CI, а не обнаруживается только после deploy.
 
+**Статус 2026-08-01:** repository baseline implemented locally: least-privilege
+IAM/WIF assertions, no managed static keys, UFW/audit/sysctl and container
+hardening, exact-SHA free scanner workflow, digest-bound SPDX/provenance
+evidence, fail-closed deploy verification and report-only registry retention.
+Production secrets remain outside the repository. Live GitHub branch/check/
+environment settings, Yandex IAM/network/registry convergence, first image and
+attestation publication, host audit and any destructive/paid action remain
+separate owner-approved gates. See
+[`PRODUCTION_SECURITY.md`](../operations/PRODUCTION_SECURITY.md) and
+[`SUPPLY_CHAIN.md`](../operations/SUPPLY_CHAIN.md).
+
 ### INFRA-012 — documentation и конкурсный demo
 
 **README/runbooks**

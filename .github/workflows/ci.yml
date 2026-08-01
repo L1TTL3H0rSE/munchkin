@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
         env:
           POSTGRES_DB: munchkin_test
           POSTGRES_USER: munchkin
@@ -178,6 +178,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      attestations: write
+      artifact-metadata: write
     concurrency:
       group: munchkin-image-publication
       cancel-in-progress: false
@@ -196,6 +198,11 @@ jobs:
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
         with:
           fetch-depth: 0
+      - name: Set up Go for security tooling
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version: 1.25.1
+          cache: false
       - name: Claim probe
         run: |
           chmod +x scripts/ci/yandex-wif-token.sh
@@ -211,7 +218,8 @@ jobs:
           test -n "$access_token"
           printf '%s' "$access_token" | docker login cr.yandex --username iam --password-stdin
           unset access_token
-      - name: Build and publish immutable images
+      - name: Build, scan and publish immutable images
+        id: publish-images
         env:
           COMMIT_SHA: ${{ github.sha }}
           SOURCE_REPOSITORY: https://github.com/L1TTL3H0rSE/munchkin
@@ -254,11 +262,26 @@ jobs:
             licenses="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.licenses" }}' "$image_ref")"
             [[ "$revision" == "$COMMIT_SHA" && "$source" == "$SOURCE_REPOSITORY" && "$created_label" == "$created" && "$licenses" == MIT ]]
           done
+          chmod +x scripts/ci/security-scan.sh
+          scripts/ci/security-scan.sh \
+            --game-image "$game_ref" \
+            --web-image "$web_ref" \
+            --release-commit "$COMMIT_SHA"
           docker push "$game_ref"
           docker push "$web_ref"
           game_digest="$(docker manifest inspect --verbose "$game_ref" | jq -er 'if type == "array" then .[0].Descriptor.digest else .Descriptor.digest end')"
           web_digest="$(docker manifest inspect --verbose "$web_ref" | jq -er 'if type == "array" then .[0].Descriptor.digest else .Descriptor.digest end')"
           [[ "$game_digest" =~ ^sha256:[0-9a-f]{64}$ && "$web_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          security_evidence="release/security/security-evidence-${COMMIT_SHA}.json"
+          jq --arg game "${REGISTRY}/game@${game_digest}" \
+            --arg web "${REGISTRY}/web@${web_digest}" \
+            '.images.game.image = $game | .images.web.image = $web' \
+            "$security_evidence" >"${security_evidence}.tmp"
+          mv -f "${security_evidence}.tmp" "$security_evidence"
+          {
+            printf 'game_digest=%s\n' "$game_digest"
+            printf 'web_digest=%s\n' "$web_digest"
+          } >>"$GITHUB_OUTPUT"
           mkdir -p release
           jq -n \
             --arg repository 'L1TTL3H0rSE/munchkin' \
@@ -272,10 +295,61 @@ jobs:
             --arg web_digest "$web_digest" \
             '{schemaVersion: 1, repository: $repository, commit: $commit, workflowRunId: $run_id, workflowRunAttempt: $run_attempt, created: $created, images: {game: {ref: $game_ref, digest: $game_digest, image: ($game_ref + "@" + $game_digest)}, web: {ref: $web_ref, digest: $web_digest, image: ($web_ref + "@" + $web_digest)}}}' \
             > "release/munchkin-images-${COMMIT_SHA}.json"
+      - name: Attest game provenance
+        id: attest-game-provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
+        with:
+          subject-name: ${{ env.REGISTRY }}/game
+          subject-digest: ${{ steps.publish-images.outputs.game_digest }}
+      - name: Attest web provenance
+        id: attest-web-provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
+        with:
+          subject-name: ${{ env.REGISTRY }}/web
+          subject-digest: ${{ steps.publish-images.outputs.web_digest }}
+      - name: Attest game SBOM
+        id: attest-game-sbom
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
+        with:
+          subject-name: ${{ env.REGISTRY }}/game
+          subject-digest: ${{ steps.publish-images.outputs.game_digest }}
+          sbom-path: release/security/game.sbom.spdx.json
+      - name: Attest web SBOM
+        id: attest-web-sbom
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
+        with:
+          subject-name: ${{ env.REGISTRY }}/web
+          subject-digest: ${{ steps.publish-images.outputs.web_digest }}
+          sbom-path: release/security/web.sbom.spdx.json
+      - name: Finalize attestation evidence
+        env:
+          GAME_PROVENANCE_BUNDLE: ${{ steps.attest-game-provenance.outputs.bundle-path }}
+          WEB_PROVENANCE_BUNDLE: ${{ steps.attest-web-provenance.outputs.bundle-path }}
+          GAME_SBOM_BUNDLE: ${{ steps.attest-game-sbom.outputs.bundle-path }}
+          WEB_SBOM_BUNDLE: ${{ steps.attest-web-sbom.outputs.bundle-path }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          for bundle in "$GAME_PROVENANCE_BUNDLE" "$WEB_PROVENANCE_BUNDLE" "$GAME_SBOM_BUNDLE" "$WEB_SBOM_BUNDLE"; do
+            test -f "$bundle"
+          done
+          cp "$GAME_PROVENANCE_BUNDLE" "release/security/game-provenance.bundle.jsonl"
+          cp "$WEB_PROVENANCE_BUNDLE" "release/security/web-provenance.bundle.jsonl"
+          cp "$GAME_SBOM_BUNDLE" "release/security/game-sbom.bundle.jsonl"
+          cp "$WEB_SBOM_BUNDLE" "release/security/web-sbom.bundle.jsonl"
+          security_evidence="release/security/security-evidence-${COMMIT_SHA}.json"
+          jq \
+            --arg gameProvenance game-provenance.bundle.jsonl \
+            --arg webProvenance web-provenance.bundle.jsonl \
+            --arg gameSbom game-sbom.bundle.jsonl \
+            --arg webSbom web-sbom.bundle.jsonl \
+            '.attestations += {game:{provenanceBundle:$gameProvenance,sbomBundle:$gameSbom},web:{provenanceBundle:$webProvenance,sbomBundle:$webSbom}}' \
+            "$security_evidence" >"${security_evidence}.tmp"
+          mv -f "${security_evidence}.tmp" "$security_evidence"
       - name: Upload verified image pair evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: munchkin-images-${{ github.sha }}
-          path: release/munchkin-images-${{ github.sha }}.json
+          path: release
           if-no-files-found: error
           retention-days: 14

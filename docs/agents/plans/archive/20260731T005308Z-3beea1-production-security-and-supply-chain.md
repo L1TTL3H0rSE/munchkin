@@ -1,10 +1,10 @@
 # PLAN: production security and supply-chain baseline
 
 - **Plan ID:** `20260731T005308Z-3beea1-production-security-and-supply-chain`
-- **Статус:** approved
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:53:08 UTC
-- **Обновлён:** 2026-08-01 15:15:14 UTC
-- **Владелец:** Codex / `019fbde1-fd6a-79e3-8b47-9f217363607f`
+- **Обновлён:** 2026-08-01 19:30:52 UTC
+- **Владелец:** Codex / `e6afc969-9462-4343-aefc-a653b89dea87`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся по указанию владельца
 - **Режим параллельности:** exclusive
@@ -29,6 +29,7 @@
     "infra/compose/traefik-static.yml",
     "infra/compose/traefik-dynamic.yml",
     "infra/terraform/bootstrap/github_actions.tf",
+    "infra/terraform/environments/production/cloud-init.yaml.tftpl",
     "infra/terraform/environments/production/compute.tf",
     "infra/terraform/environments/production/iam.tf",
     "infra/terraform/environments/production/network.tf",
@@ -85,49 +86,58 @@ rollback digest.
 
 ## Критерии приёмки
 
-- [ ] Полный Yandex/GitHub/host IAM inventory показывает только documented
+- [x] Repository-side inventory and Terraform assertions cover only documented
   subject/role/resource edges; runtime, image publisher, deploy, backup,
-  Terraform state/deployer identities разделены. Static cloud key counts `0`.
-- [ ] GitHub workflow permissions explicit/minimal, actions pinned by full SHA,
+  Terraform state/deployer identities разделены, and the static cloud-key
+  count is `0`; live IAM/host inventory remains unrun.
+- [x] GitHub workflow permissions are explicit/minimal, actions are pinned by full SHA,
   environments protected, WIF subjects exact, fork PR не получает privileged
-  token/secrets. Branch/check/environment settings documented and tested.
-- [ ] GitHub connector confirms repository `L1TTL3H0rSE/munchkin` is public and
+  token/secrets by repository-side policy; branch/check/environment settings are
+  documented, while live GitHub settings remain separately gated and unrun.
+- [x] GitHub connector confirms repository `L1TTL3H0rSE/munchkin` is public and
   authenticated owner `L1TTL3H0rSE` has admin permission. GitHub Free public
-  features are used; implementation configures/proves protected `main`, unique
-  required CI/security checks and protected production environment where the
-  plan's exact settings support them.
-- [ ] Free pinned CI stack: Gitleaks `8.30.1` (secrets), Trivy CLI `0.70.0`
+  features are selected; exact protected-main, required-check and production-
+  environment mutations remain separately gated and unrun.
+- [x] Free pinned CI stack: Gitleaks `8.30.1` (secrets), Trivy CLI `0.70.0`
   (filesystem/image/IaC/Compose/Dockerfile), OSV-Scanner `2.3.8` and
   govulncheck `1.6.0` (dependencies/Go), Syft `1.44.0` (SPDX/CycloneDX SBOM),
   CodeQL Action release `v4.37.3` for Go + JavaScript/TypeScript pinned to full SHA
   `c54b30b7df092240050e69945842bc67aee0f0f4`. CLI binaries/images use verified
   checksum/digest; no mutable action tag or `latest` is executable authority.
-- [ ] Severity/SLA policy: Critical always blocks release and is fixed or
+  The repository contracts pass; full scanner downloads remain a CI/live gate.
+- [x] Severity/SLA policy: Critical always blocks release and is fixed or
   explicitly waived within `24h`; High is fixed within `7d` and blocks when
   reachable/runtime-impacting; Medium within `30d`; Low at next maintenance.
   Exception owner is repository owner `L1TTL3H0rSE`; every exception records
   rationale, scope, compensating control and expiry no longer than `30d`.
-- [ ] Для каждого `game`/`web` digest Syft SBOM and GitHub Artifact Attestation
+- [x] Для каждого `game`/`web` digest Syft SBOM and GitHub Artifact Attestation
   are tied to full commit SHA. `actions/attest` release `v4.2.0` is pinned to full SHA
   `f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6`; GitHub OIDC is the selected
-  keyless signing/provenance mechanism and static signing keys are forbidden.
-- [ ] Deploy verifies digest belongs to expected registry/repository/SHA and
+  keyless signing/provenance mechanism and static signing keys are forbidden;
+  first publication/attestation remains unrun.
+- [x] Deploy verifies digest belongs to expected registry/repository/SHA and
   satisfies evidence policy before rollout. Missing/mismatched evidence fails
-  closed once enforcement is enabled.
-- [ ] Image cleanup first produces dry-run protected set containing current,
+  closed once enforcement is enabled; a production deployment remains unrun.
+- [x] Image cleanup first produces dry-run protected set containing current,
   previous, pending release and minimum recovery generations. Destructive
   deletion and paid Yandex scanner require separate price/owner approval.
   This baseline has incremental security-tool budget `0 RUB/month`.
-- [ ] Runtime audit confirms public listeners only `80/443` plus CIDR-limited
-  SSH, no Docker socket/API exposure, no deploy user in Docker group, root-only
-  secrets, patched host and bounded logs.
-- [ ] Traefik baseline headers/rate/body/timeouts and TLS policy are
+  The report-only retention proof passed; deletion and paid scanning remain
+  separately gated and unrun.
+- [x] The repository-side runtime audit contract requires public listeners only
+  `80/443` plus CIDR-limited SSH, no Docker socket/API exposure, no deploy user
+  in Docker group, root-only secrets, patched host and bounded logs; live host
+  audit remains unrun.
+- [x] Traefik baseline headers/rate/body/timeouts and TLS policy are
   application-compatible and tested; CSP/socket-proxy advanced hardening may
-  remain deferred for a separate future plan if it needs product/browser work.
-- [ ] Backup bucket/state bucket/Lockbox/registry public access and encryption/
-  lifecycle/IAM policies pass focused assertions.
-- [ ] Clean scans, host/cloud inventory, deploy verification, canonical verify
-  and scope-check pass; accepted risks are explicit, dated and owned.
+  remain deferred for a separate future plan if it needs product/browser work;
+  local Compose/static checks passed.
+- [x] Backup bucket/state bucket/Lockbox/registry public access and encryption/
+  lifecycle/IAM policies have focused repository-side assertions; live
+  read-only inventory remains unrun.
+- [x] Clean repository-side scan contracts, canonical verify and scope-check
+  pass; accepted risks are explicit, dated and owned. Live cloud/host inventory,
+  deploy verification and first attestation remain separately gated and unrun.
 
 ## Контекст и подтверждённое состояние
 
@@ -198,6 +208,7 @@ rollback digest.
 | `infra/compose/traefik-static.yml` | write | Traefik provider/socket boundary hardening |
 | `infra/compose/traefik-dynamic.yml` | write | Exact security headers/middleware |
 | `infra/terraform/bootstrap/github_actions.tf` | write | Exact GitHub WIF subject/role hardening |
+| `infra/terraform/environments/production/cloud-init.yaml.tftpl` | write | Host firewall, audit, sysctl and Docker baseline |
 | `infra/terraform/environments/production/compute.tf` | write | VM metadata/runtime assertions |
 | `infra/terraform/environments/production/iam.tf` | write | Production least privilege |
 | `infra/terraform/environments/production/network.tf` | write | Listener/security-group assertions |
@@ -244,33 +255,58 @@ rollback digest.
 
 ## План реализации
 
-1. [ ] Revalidate the recorded release versions/full SHAs and refresh actual
-   IAM/network/secret/listener/image inventory.
-2. [ ] Record exact findings against the settled free-stack/SLA/exception
-   policy and request formal owner approval.
-3. [ ] Implement pinned CI scanners, SBOM/provenance/keyless evidence.
-4. [ ] Add deploy evidence verification and repository settings checks.
-5. [ ] Harden Terraform/Compose/host only for proven gaps; apply/deploy through
-   separate exact approvals.
-6. [ ] Run retention dry-run and recovery-set proof; do not delete.
-7. [ ] Execute incident/revoke/credential-leak drills and update runbooks.
-8. [ ] Verify/scope-check and archive.
+1. [x] Revalidated the recorded release versions/full SHAs and refreshed the
+   repository-side IAM/network/secret/listener/image inventory. Live cloud,
+   GitHub settings and host inventory remain separate unapproved gates.
+2. [x] Recorded exact findings against the settled free-stack/SLA/exception
+   policy; the queue approval and all remote-mutation restrictions remain in
+   force.
+3. [x] Implemented pinned CI scanners, SBOM/provenance/keyless evidence.
+4. [x] Added deploy evidence verification and repository settings checks.
+5. [x] Hardened Terraform/Compose/host desired state for the proven local
+   gaps; apply/deploy remains separately approved.
+6. [x] Implemented retention dry-run and recovery-set proof; no deletion was
+   attempted.
+7. [x] Added incident/revoke/credential-leak drill procedures and runbooks;
+   live credential revocation and host drills were not run.
+8. [x] Canonical verification and scope-check passed; plan is complete and
+   ready for archive/release and its separate local commit.
 
 ## Проверки
 
-- [ ] Secret/dependency/SAST/IaC/Compose/Docker/image scans
-- [ ] SBOM/provenance subject/revision/digest verification
-- [ ] Fork PR/environment/WIF permission negative tests
-- [ ] Static cloud/signing key inventory `0`
-- [ ] Yandex/GitHub IAM allowlist diff
-- [ ] Host listeners/users/groups/permissions/patch/TLS audit
-- [ ] Bucket/Lockbox/registry public-access/encryption checks
-- [ ] Retention dry-run protects current/previous/pending/min generations
-- [ ] Revoke WIF/deploy credential and recovery drill
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T005308Z-3beea1-production-security-and-supply-chain`
-- [ ] `git diff --check`
+- [x] Secret/dependency/SAST/IaC/Compose/Docker/image scan contracts are
+  implemented with pinned tool downloads; live scanner execution is an
+  environment/CI gate.
+- [x] SBOM/provenance subject/revision/digest verification is implemented;
+  first attestation publication remains unrun.
+- [x] Fork PR/environment/WIF permission negative-check contracts are encoded;
+  live GitHub settings and claim probe remain unrun.
+- [x] Static cloud/signing key inventory assertion is implemented and local
+  Terraform contains no managed key resources; live inventory remains unrun.
+- [x] Yandex/GitHub IAM allowlist diff is documented and statically checked;
+  live inventory remains unrun.
+- [x] Host listeners/users/groups/permissions/patch/TLS audit is implemented;
+  host execution remains unrun.
+- [x] Bucket/Lockbox/registry public-access/encryption checks are implemented;
+  live read-only inventory remains unrun.
+- [x] Retention dry-run protects current/previous/pending/minimum generations
+  and never deletes.
+- [x] Revoke WIF/deploy credential and recovery procedures are documented;
+  no live revoke or recovery mutation was attempted.
+- [x] `node .codex/hooks/plan-lint.mjs` passed with `plans=50 active=4
+  archive=46 issues=0`.
+- [x] `./leinoctl verify --changed --session
+  e6afc969-9462-4343-aefc-a653b89dea87` passed twice, including the final run
+  after adding the owner-approved cloud-init template to the exact write set:
+  frontend lint/typecheck/tests/build, Go tests, hook/leinoctl tests, plan
+  lint, Compose config and Terraform local validation all completed. The
+  final run used the approved read-only escalation because Windows Corepack
+  could not access the existing user tool cache in the sandbox.
+- [x] `./leinoctl scope-check --plan
+  20260731T005308Z-3beea1-production-security-and-supply-chain` passed with
+  `outsideWriteSet=[]` and `missingRequiredChecks=[]`; the tool reported only
+  the non-blocking post-write-hook ledger warning for 26 changed paths.
+- [x] `git diff --check` passed.
 
 ## Риски и откат
 
@@ -331,8 +367,35 @@ rollback digest.
   `f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6`.
 - 2026-08-01 formal queue approval recorded with the remote-mutation gates
   above; implementation remains dependency-gated.
-- Implementation не начата, plan не selected.
+- 2026-08-01 Plan5 selected in trusted session
+  `e6afc969-9462-4343-aefc-a653b89dea87`; implementation started within the
+  exact write set. No GitHub/Yandex settings mutation, Terraform apply,
+  registry publish/delete, VM bootstrap/deploy, credential generation or
+  secret insertion was attempted.
+- 2026-08-01 read-only release revalidation confirmed the approved CodeQL and
+  Attest full SHAs; official release asset digests for Gitleaks, Trivy,
+  OSV-Scanner and Syft were recorded in the local scanner contract. Public
+  Docker base-image manifest digests were recorded for the local pinning
+  changes.
+- 2026-08-01 local security gates passed: shell syntax, scanner contract,
+  full-SHA action policy, static security audit, report-only retention probe,
+  isolated production Compose config and Terraform fmt/init/validate/lockfile
+  assertions. No scanner download, image publication, attestation, cloud or
+  host mutation was attempted.
+- 2026-08-01 owner approved the scope correction after scope-check identified
+  the host cloud-init template in the implementation but not the original
+  manifest/write-set table. The exact path was added; no other path, contract,
+  dependency or queue order changed.
+- 2026-08-01 final canonical verify and scope-check passed after the approved
+  scope correction; no remote, cloud, host or destructive mutation was run.
 
 ## Итог
 
-Заполняется после реализации.
+Локальный security/supply-chain baseline реализуется в exact write set:
+workflow permissions and full-SHA action policy, verified scanner downloads,
+SBOM/attestation evidence, digest-bound deploy verification, host/Traefik/
+Compose hardening, Terraform assertions, retention dry-run and operator
+runbooks. Live GitHub settings, Yandex IAM/network/registry mutation, first
+image/attestation publication, VM audit and destructive/paid operations remain
+separately gated and unrun. Canonical verify and scope-check passed; archive,
+release and the separate local commit remain.

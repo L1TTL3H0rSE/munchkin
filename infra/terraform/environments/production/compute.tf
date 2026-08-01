@@ -61,7 +61,8 @@ resource "yandex_compute_instance" "production" {
   metadata = {
     serial-port-enable = "1"
     user-data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-      ssh_public_key = trimspace(var.ssh_public_key)
+      ssh_public_key         = trimspace(var.ssh_public_key)
+      ssh_ingress_cidrs_json = jsonencode(var.ssh_ingress_cidrs)
     })
   }
 }

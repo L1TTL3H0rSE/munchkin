@@ -12,8 +12,18 @@ ping:
 entryPoints:
   web:
     address: ":8080"
+    transport:
+      respondingTimeouts:
+        readTimeout: 60s
+        writeTimeout: 60s
+        idleTimeout: 120s
   websecure:
     address: ":8443"
+    transport:
+      respondingTimeouts:
+        readTimeout: 60s
+        writeTimeout: 60s
+        idleTimeout: 120s
 
 providers:
   file:
@@ -34,6 +44,9 @@ log:
 accessLog:
   format: json
   bufferingSize: 100
+  fields:
+    headers:
+      defaultMode: drop
 
 metrics:
   prometheus: {}

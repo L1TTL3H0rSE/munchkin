@@ -1,4 +1,4 @@
-FROM golang:1.25.1-alpine AS build
+FROM golang:1.25.1-alpine@sha256:b6ed3fd0452c0e9bcdef5597f29cc1418f61672e9d3a2f55bf02e7222c014abd AS build
 
 WORKDIR /src/backend/game
 COPY backend/game/go.mod backend/game/go.sum ./
@@ -7,7 +7,7 @@ COPY backend/game/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/game ./cmd/server
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 
-FROM alpine:3.23
+FROM alpine:3.23@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40
 
 ARG OCI_SOURCE="https://github.com/L1TTL3H0rSE/munchkin"
 ARG OCI_REVISION="unknown"

@@ -15,9 +15,14 @@ on:
         description: Full lowercase commit SHA represented by the images
         required: true
         type: string
+      release_run_id:
+        description: Successful CI run that produced the image, SBOM and attestation evidence
+        required: true
+        type: string
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: production-deploy
@@ -33,9 +38,14 @@ jobs:
       GAME_IMAGE: ${{ inputs.game_image }}
       WEB_IMAGE: ${{ inputs.web_image }}
       RELEASE_COMMIT: ${{ inputs.commit }}
+      RELEASE_RUN_ID: ${{ inputs.release_run_id }}
       DEPLOY_HOST: ${{ secrets.PRODUCTION_DEPLOY_HOST }}
       DEPLOY_USER: munchkin-deploy
     steps:
+      - name: Checkout release verification contract
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        with:
+          fetch-depth: 1
       - name: Validate immutable release inputs
         shell: bash
         run: |
@@ -43,7 +53,34 @@ jobs:
           [[ "$GAME_IMAGE" =~ ^cr\.yandex/crpdnmjudj1usiu90gdn/game@sha256:[0-9a-f]{64}$ ]]
           [[ "$WEB_IMAGE" =~ ^cr\.yandex/crpdnmjudj1usiu90gdn/web@sha256:[0-9a-f]{64}$ ]]
           [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ -n "$DEPLOY_HOST" && "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+
+      - name: Verify release SBOM and keyless attestation evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          evidence_dir="$RUNNER_TEMP/munchkin-release-evidence"
+          rm -rf -- "$evidence_dir"
+          mkdir -p -- "$evidence_dir"
+          gh run download "$RELEASE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "munchkin-images-${RELEASE_COMMIT}" \
+            --dir "$evidence_dir"
+          manifest="$(find "$evidence_dir" -type f -name "munchkin-images-${RELEASE_COMMIT}.json" -print -quit)"
+          security_evidence="$(find "$evidence_dir" -type f -name "security-evidence-${RELEASE_COMMIT}.json" -print -quit)"
+          [[ -n "$manifest" && -n "$security_evidence" ]]
+          jq -e --arg run "$RELEASE_RUN_ID" '.workflowRunId == $run' "$manifest" >/dev/null
+          scripts/production/verify-release-evidence.sh \
+            --game-image "$GAME_IMAGE" \
+            --web-image "$WEB_IMAGE" \
+            --commit "$RELEASE_COMMIT" \
+            --release-manifest "$manifest" \
+            --security-evidence "$security_evidence" \
+            --github-repo "$GITHUB_REPOSITORY" \
+            --require-attestation
 
       - name: Prepare protected SSH material
         shell: bash

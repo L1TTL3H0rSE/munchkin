@@ -1,4 +1,4 @@
-FROM node:24-alpine AS build
+FROM node:24-alpine@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS build
 
 RUN corepack enable && corepack prepare pnpm@10.8.0 --activate
 WORKDIR /app
@@ -11,7 +11,7 @@ RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
 RUN pnpm build
 
-FROM node:24-alpine
+FROM node:24-alpine@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3
 
 ARG OCI_SOURCE="https://github.com/L1TTL3H0rSE/munchkin"
 ARG OCI_REVISION="unknown"

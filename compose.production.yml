@@ -21,7 +21,7 @@ x-runtime-security: &runtime-security
 
 services:
   postgres:
-    image: postgres:17.10-alpine
+    image: postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
     env_file:
       - path: ${MUNCHKIN_SECRETS_DIR:-/srv/munchkin/secrets}/postgres.env
         required: false
@@ -43,6 +43,8 @@ services:
       retries: 20
       start_period: 10s
     restart: unless-stopped
+    init: true
+    pids_limit: 256
     stop_grace_period: 60s
     mem_limit: 768m
     cpus: 1.0
@@ -66,6 +68,8 @@ services:
     command:
       - /app/migrate
     restart: "no"
+    init: true
+    pids_limit: 128
     mem_limit: 256m
     cpus: 0.5
     <<: *runtime-security
@@ -107,6 +111,8 @@ services:
       retries: 12
       start_period: 10s
     restart: unless-stopped
+    init: true
+    pids_limit: 256
     stop_grace_period: 20s
     mem_limit: 512m
     cpus: 1.0
@@ -143,6 +149,8 @@ services:
       retries: 12
       start_period: 10s
     restart: unless-stopped
+    init: true
+    pids_limit: 256
     stop_grace_period: 20s
     mem_limit: 512m
     cpus: 1.0
@@ -150,7 +158,7 @@ services:
     logging: *bounded-logging
 
   traefik:
-    image: traefik:v3.5.0
+    image: traefik:v3.5.0@sha256:4e7175cfe19be83c6b928cae49dde2f2788fb307189a4dc9550b67acf30c11a5
     env_file:
       - path: ${MUNCHKIN_SECRETS_DIR:-/srv/munchkin/secrets}/traefik.env
         required: false
@@ -193,6 +201,8 @@ services:
       retries: 12
       start_period: 10s
     restart: unless-stopped
+    init: true
+    pids_limit: 128
     stop_grace_period: 20s
     mem_limit: 256m
     cpus: 0.5
@@ -206,7 +216,7 @@ services:
     logging: *bounded-logging
 
   collector:
-    image: otel/opentelemetry-collector-contrib:0.153.0
+    image: otel/opentelemetry-collector-contrib:0.153.0@sha256:93aad750175cbf1a973ae1c5886c3371f4d800f61be25cdd26870b8441ffe9fa
     profiles:
       - telemetry
     env_file:
@@ -234,6 +244,8 @@ services:
       timeout: 3s
       retries: 6
     restart: unless-stopped
+    init: true
+    pids_limit: 128
     mem_limit: 256m
     cpus: 0.5
     <<: *runtime-security

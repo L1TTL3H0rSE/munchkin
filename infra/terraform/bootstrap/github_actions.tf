@@ -39,6 +39,9 @@ resource "yandex_iam_workload_identity_federated_credential" "github_images" {
   federation_id       = yandex_iam_workload_identity_oidc_federation.github_actions.id
   external_subject_id = local.github_oidc_subject
 
+  # This exact environment subject is the only GitHub trust edge. Branch,
+  # repository-name and owner wildcards are intentionally not accepted.
+
   lifecycle {
     prevent_destroy = true
   }

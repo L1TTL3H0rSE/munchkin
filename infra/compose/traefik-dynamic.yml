@@ -10,9 +10,25 @@ http:
         contentTypeNosniff: true
         frameDeny: true
         referrerPolicy: strict-origin-when-cross-origin
+        permissionsPolicy: "camera=(), geolocation=(), microphone=()"
         stsSeconds: 86400
         stsIncludeSubdomains: true
         stsPreload: false
+        customResponseHeaders:
+          Cross-Origin-Opener-Policy: same-origin
+          Cross-Origin-Resource-Policy: same-origin
+          X-Permitted-Cross-Domain-Policies: none
+
+    production-rate-limit:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: 1s
+
+    production-request-body:
+      buffering:
+        maxRequestBodyBytes: 1048576
+        memRequestBodyBytes: 1048576
 
     production-compress:
       compress: {}
@@ -36,6 +52,7 @@ http:
         - production-security-headers
       tls:
         certResolver: le
+        options: production
 
     game-api:
       entryPoints:
@@ -45,9 +62,12 @@ http:
       service: game
       middlewares:
         - production-security-headers
+        - production-rate-limit
+        - production-request-body
         - production-compress
       tls:
         certResolver: le
+        options: production
 
     web:
       entryPoints:
@@ -60,15 +80,18 @@ http:
         - production-compress
       tls:
         certResolver: le
+        options: production
 
   services:
     game:
       loadBalancer:
+        serversTransport: production
         passHostHeader: true
         servers:
           - url: http://game:8080
     web:
       loadBalancer:
+        serversTransport: production
         passHostHeader: true
         servers:
           - url: http://web:3000

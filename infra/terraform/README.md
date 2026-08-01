@@ -320,6 +320,28 @@ Object-level grant в текущей policy остаётся только у
 требуют отдельного review и cloud audit; прямой API вызов не защищён Terraform
 `prevent_destroy`.
 
+## Security и supply-chain boundary
+
+Production graph разделяет runtime, keyless GitHub image publisher, Monium
+writer, backup uploader/operator, Terraform state и deploy gateway. Runtime
+registry binding остаётся pull-only. GitHub publisher доверен только через
+exact owner/repository/environment subject из `bootstrap/github_actions.tf`;
+branch/owner wildcards и static service-account keys не объявлены. Registry,
+repositories, address, data disk, Lockbox metadata, KMS и identity resources
+защищены `prevent_destroy`, где graph владеет их lifecycle.
+
+VM baseline добавляет password/root SSH denial, owner-CIDR SSH firewall rules,
+UFW default-deny incoming, audit rules для secrets/ACME/Docker/SSH, sysctl
+hardening, unattended upgrades и Docker live-restore без Docker-group grant
+deploy user. Compose и Traefik держат application, database, telemetry и
+management ports private; наружу публикуются только `80:8080` и `443:8443`.
+
+Terraform содержит только non-payload Lockbox metadata. PostgreSQL password,
+deploy private key, ACME email и tokens генерируются/вставляются напрямую в
+утверждённые stores отдельным approval. Их нельзя помещать в tfvars, state
+payloads, plans, repository files или logs. Этот local hardening slice не
+применяет graph и не меняет live environment.
+
 ## Разрешённая локальная проверка
 
 Из корня repository в PowerShell:
@@ -347,7 +369,10 @@ terraform fmt -check -recursive infra/terraform
   local production resources (including DNS, metadata-only Lockbox, Monium
   telemetry and the private encrypted backup graph), три data lookup, exact runtime puller plus CI pusher,
   sensitive SSH boundary,
-  IPv4-only ingress, fixed VM/disk profile и cloud-init host baseline;
+  IPv4-only ingress, fixed VM/disk profile, registry lifecycle protection и
+  cloud-init host security baseline;
+- проверяет exact GitHub WIF subject, отсутствие managed static keys и
+  runtime pull-only versus CI-publisher IAM separation;
 - отклоняет tracked state/plan/tfvars/backend artifacts и inline credentials.
 
 Скрипт может скачать pinned provider из Terraform Registry, но не обращается к
