@@ -20,6 +20,7 @@ type Config struct {
 	Enabled     bool
 	ServiceName string
 	Version     string
+	Revision    string
 	Environment string
 }
 
@@ -33,6 +34,7 @@ func ConfigFromEnvironment() Config {
 		Enabled:     endpointConfigured,
 		ServiceName: "munchkin-game",
 		Version:     valueOrDefault("SERVICE_VERSION", BuildVersion()),
+		Revision:    valueOrDefault("SERVICE_REVISION", "unknown"),
 		Environment: environmentClass(
 			valueOrDefault("DEPLOYMENT_ENVIRONMENT", "development"),
 		),
@@ -60,6 +62,7 @@ func New(
 		resource.WithAttributes(
 			attribute.String("service.name", serviceName(config.ServiceName)),
 			attribute.String("service.version", versionValue(config.Version)),
+			attribute.String("service.revision", versionValue(config.Revision)),
 			attribute.String(
 				"deployment.environment",
 				environmentClass(config.Environment),
@@ -72,12 +75,19 @@ func New(
 		return Noop(), func(context.Context) error { return nil }, err
 	}
 	tracerProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(traceExporter),
+		sdktrace.WithBatcher(
+			traceExporter,
+			sdktrace.WithMaxQueueSize(512),
+			sdktrace.WithMaxExportBatchSize(128),
+			sdktrace.WithBatchTimeout(5*time.Second),
+			sdktrace.WithExportTimeout(5*time.Second),
+		),
 		sdktrace.WithResource(res),
 	)
 	metricReader := sdkmetric.NewPeriodicReader(
 		metricExporter,
 		sdkmetric.WithInterval(10*time.Second),
+		sdkmetric.WithTimeout(5*time.Second),
 	)
 	meterProvider := sdkmetric.NewMeterProvider(
 		sdkmetric.WithReader(metricReader),

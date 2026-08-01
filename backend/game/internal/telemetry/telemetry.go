@@ -170,9 +170,15 @@ func (recorder *otelRecorder) StartHTTP(
 	start HTTPStart,
 ) (context.Context, func(HTTPEnd)) {
 	startedAt := time.Now().UTC()
+	carrier := make(http.Header)
+	for _, key := range []string{"Traceparent", "Tracestate"} {
+		if value := start.Header.Get(key); value != "" {
+			carrier.Set(key, value)
+		}
+	}
 	ctx = recorder.propagator.Extract(
 		ctx,
-		propagation.HeaderCarrier(start.Header),
+		propagation.HeaderCarrier(carrier),
 	)
 	ctx, span := recorder.tracer.Start(
 		ctx,
@@ -373,8 +379,12 @@ func methodClass(value string) string {
 
 func routeClass(pattern string) string {
 	switch {
+	case pattern == "GET /health/live":
+		return "health_live"
+	case pattern == "GET /health/ready":
+		return "health_ready"
 	case pattern == "GET /healthz":
-		return "health"
+		return "health_live"
 	case pattern == "POST /api/v1/lobbies":
 		return "lobby_create"
 	case pattern == "GET /api/v1/lobbies/{gameID}":

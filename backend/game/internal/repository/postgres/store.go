@@ -5,11 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -44,26 +40,8 @@ func (store *Store) Close() {
 	store.pool.Close()
 }
 
-func (store *Store) Migrate(ctx context.Context, filePath string) error {
-	paths, err := migrationPaths(filePath)
-	if err != nil {
-		return err
-	}
-	tx, err := store.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	for _, migrationPath := range paths {
-		raw, err := os.ReadFile(migrationPath)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, string(raw)); err != nil {
-			return fmt.Errorf("apply migration %s: %w", filepath.Base(migrationPath), err)
-		}
-	}
-	return tx.Commit(ctx)
+func (store *Store) Ready(ctx context.Context) error {
+	return store.pool.Ping(ctx)
 }
 
 func (store *Store) Create(
@@ -440,30 +418,4 @@ func uniqueViolation(err error) bool {
 func serializationFailure(err error) bool {
 	var pgError *pgconn.PgError
 	return errors.As(err, &pgError) && pgError.Code == "40001"
-}
-
-func migrationPaths(configuredPath string) ([]string, error) {
-	info, err := os.Stat(configuredPath)
-	if err != nil {
-		return nil, err
-	}
-	if !info.IsDir() {
-		return []string{configuredPath}, nil
-	}
-	entries, err := os.ReadDir(configuredPath)
-	if err != nil {
-		return nil, err
-	}
-	paths := make([]string, 0)
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".up.sql") {
-			continue
-		}
-		paths = append(paths, filepath.Join(configuredPath, entry.Name()))
-	}
-	sort.Strings(paths)
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("no .up.sql migrations in %s", configuredPath)
-	}
-	return paths, nil
 }

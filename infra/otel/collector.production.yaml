@@ -1,0 +1,39 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        # This listener is reachable only from the private observability network.
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 128
+    spike_limit_mib: 32
+  batch:
+    send_batch_size: 128
+    send_batch_max_size: 512
+    timeout: 5s
+
+exporters:
+  # The destination exporter is selected by the next telemetry plan. Keeping a
+  # local debug sink makes this foundation credential-free and vendor-neutral.
+  debug:
+    verbosity: basic
+
+extensions:
+  health_check:
+    # Do not publish this port through the host or public edge.
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]

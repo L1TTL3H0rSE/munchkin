@@ -1,3 +1,5 @@
+const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "";
+
 export default defineNuxtConfig({
   compatibilityDate: "2026-07-29",
   devtools: {enabled: true},
@@ -17,6 +19,14 @@ export default defineNuxtConfig({
         apiKey: process.env.OPENAI_API_KEY ?? "",
         model: process.env.CARD_STUDIO_OPENAI_MODEL || "gpt-image-2",
       },
+    },
+    telemetry: {
+      enabled: process.env.NUXT_OTEL_ENABLED !== "false" && otelEndpoint !== "",
+      endpoint: otelEndpoint,
+      serviceName: process.env.OTEL_SERVICE_NAME || "munchkin-web",
+      version: process.env.SERVICE_VERSION || "unknown",
+      revision: process.env.SERVICE_REVISION || "unknown",
+      environment: process.env.DEPLOYMENT_ENVIRONMENT || "development",
     },
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE ?? "http://localhost:8080",

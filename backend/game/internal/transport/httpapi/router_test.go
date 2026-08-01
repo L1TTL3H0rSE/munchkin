@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leinodev/munchkin/backend/game/internal/application"
 	"github.com/leinodev/munchkin/backend/game/internal/game"
@@ -39,6 +41,83 @@ func routerPack(t *testing.T) game.Pack {
 func testRouter(t *testing.T) (*application.Service, *httptest.Server) {
 	t.Helper()
 	return testRouterWithPack(t, routerPack(t))
+}
+
+func TestHealthEndpointsExposeLiveAliasAndDependencyReady(t *testing.T) {
+	pack := routerPack(t)
+	service := application.NewService(
+		memory.New(),
+		pack,
+		application.SystemClock{},
+		application.NoopPublisher{},
+	)
+	probeErr := errors.New("database unavailable")
+	handler := NewWithOptions(service, Options{
+		ReadinessProbe: func(context.Context) error { return probeErr },
+		ReadinessLimit: 20 * time.Millisecond,
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	for _, path := range []string{"/health/live", "/healthz"} {
+		response, err := server.Client().Get(server.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body map[string]string
+		if response.StatusCode != http.StatusOK {
+			response.Body.Close()
+			t.Fatalf("%s status=%d", path, response.StatusCode)
+		}
+		if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+			response.Body.Close()
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if body["status"] != "ok" {
+			t.Fatalf("%s body=%#v", path, body)
+		}
+	}
+
+	response, err := server.Client().Get(server.URL + "/health/ready")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var body map[string]string
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusServiceUnavailable || body["status"] != "not_ready" {
+		t.Fatalf("ready status=%d body=%#v", response.StatusCode, body)
+	}
+}
+
+func TestReadinessProbeIsBounded(t *testing.T) {
+	pack := routerPack(t)
+	service := application.NewService(
+		memory.New(),
+		pack,
+		application.SystemClock{},
+		application.NoopPublisher{},
+	)
+	handler := NewWithOptions(service, Options{
+		ReadinessProbe: func(ctx context.Context) error {
+			<-ctx.Done()
+			return ctx.Err()
+		},
+		ReadinessLimit: 10 * time.Millisecond,
+	})
+	request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
+	recorder := httptest.NewRecorder()
+	started := time.Now()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status=%d", recorder.Code)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("readiness exceeded bound: %s", elapsed)
+	}
 }
 
 func testRouterWithPack(

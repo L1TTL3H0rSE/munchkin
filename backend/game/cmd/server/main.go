@@ -45,20 +45,14 @@ func main() {
 		}
 	}()
 	var store application.Store
+	readinessProbe := func(context.Context) error { return nil }
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
 		postgresStore, err := postgres.Open(ctx, databaseURL)
 		if err != nil {
 			log.Fatalf("connect database: %v", err)
 		}
 		defer postgresStore.Close()
-		if valueOrDefault("AUTO_MIGRATE", "false") == "true" {
-			if err := postgresStore.Migrate(
-				ctx,
-				valueOrDefault("MIGRATION_PATH", "migrations"),
-			); err != nil {
-				log.Fatalf("migrate database: %v", err)
-			}
-		}
+		readinessProbe = postgresStore.Ready
 		store = postgresStore
 	} else {
 		log.Printf("DATABASE_URL is empty; using in-memory repository")
@@ -79,6 +73,8 @@ func main() {
 			ContentSetID:   pack.SetID,
 			AssetDirectory: filepath.Join(filepath.Dir(contentPath), "assets"),
 			Telemetry:      instrumentation,
+			ReadinessProbe: readinessProbe,
+			ReadinessLimit: 2 * time.Second,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

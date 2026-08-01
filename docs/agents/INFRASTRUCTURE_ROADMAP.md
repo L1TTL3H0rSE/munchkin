@@ -78,12 +78,12 @@ flowchart LR
 | Runtime | Один dev `docker-compose.yml`: PostgreSQL, `game`, `web` | Нужен отдельный production topology |
 | Network | Host ports `5432`, `8080`, `3000` опубликованы | На VPS наружу оставить только Traefik `80/443` |
 | Images | Multi-stage backend/frontend images, оба запускаются non-root | Можно публиковать в registry после hardening |
-| Health | `/healthz` всегда возвращает process-level `ok` | Не хватает readiness PostgreSQL/content |
+| Health | `/health/live` и compatibility `/healthz` возвращают process-level `ok`; `/health/ready` выполняет bounded dependency probe | Public Traefik/readiness wiring remains in the production Compose plan |
 | Shutdown | Backend делает graceful shutdown с timeout 10 секунд | Сохранить и проверить при rollout |
-| Database | Named volume, application `AUTO_MIGRATE=true`, один SQL-файл | Нужны migration job, backup и restore |
+| Database | Named volume and explicit checksum-ledger migration job; application startup does not mutate schema | Production job wiring, backup and restore remain later gates |
 | Realtime | Authenticated SSE с heartbeat/version invalidation | Нужен long-lived proxy smoke через Traefik |
 | Studio | Local `.card-studio`, production persistence отсутствует | Оставить выключенной на public deployment |
-| Telemetry | Нет OTel, metrics endpoint, structured logs и dashboards | Реализовать vendor-neutral instrumentation |
+| Telemetry | Go/Nitro privacy-safe OTLP foundation and private Collector fixtures are repository-local; no external sink or dashboard yet | Complete destination, retention, dashboards and alerts in the telemetry plan |
 | IaC | Bootstrap/state applied; network/registry/compute graph locally validated, cloud apply gated | Завершить два reviewed apply и live host evidence |
 | Delivery | Repository declares immutable image publication and digest-pair evidence; live WIF/apply/publication are not yet proven | Complete the owner-gated GitHub -> Container Registry -> Compute VM path |
 
@@ -305,6 +305,12 @@ automation и поддержка выбранным ACME client проверяю
 - Migration выполняется ровно один раз до rollout и имеет наблюдаемый exit
   status.
 
+**Статус 2026-08-01:** repository contract implemented: `/health/live`,
+bounded dependency-aware `/health/ready`, compatibility `/healthz`, and the
+one-shot `/app/migrate` command with PostgreSQL advisory lock, ordered files,
+checksum ledger and distinct exit codes. Production Compose rollout evidence
+and real PostgreSQL smoke remain gates of the next deployment slice.
+
 ### INFRA-007 — controlled CD, smoke и rollback
 
 **Работа**
@@ -403,6 +409,12 @@ deployment annotation либо dashboard variable с контролируемо�
 - Dashboard различает version/deployment environment.
 - Отключение telemetry backend не ломает game API.
 - Automated test/inspection не находит denylisted attributes.
+
+**Статус 2026-08-01:** Go and Nitro server-only OTLP wiring, bounded resource
+attributes, allowlisted W3C propagation, failure isolation and private
+Collector fixtures are implemented and locally build-tested. External sink,
+tail sampling, retention, dashboards, alerts and live trace evidence remain
+owned by the subsequent telemetry plans.
 
 ### INFRA-009 — telemetry destination и golden dashboard
 

@@ -3,8 +3,10 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -275,39 +277,99 @@ func TestPostgresServiceContract(t *testing.T) {
 	}
 }
 
+func TestPostgresMigrationsSerializeAndRetryAfterFailure(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not configured")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	tableName := "munchkin_migration_probe_" + suffix
+	path := filepath.Join(t.TempDir(), "000001_probe_"+suffix+".up.sql")
+	if err := os.WriteFile(path, []byte(
+		"CREATE TABLE "+tableName+" (id TEXT PRIMARY KEY); SELECT pg_sleep(0.15);\n",
+	), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), "DROP TABLE IF EXISTS "+tableName)
+		_, _ = store.pool.Exec(
+			context.Background(),
+			"DELETE FROM munchkin_schema_migrations WHERE version = $1",
+			filepath.Base(path),
+		)
+	}()
+
+	var group sync.WaitGroup
+	results := make(chan error, 2)
+	for range 2 {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			results <- store.Migrate(ctx, path)
+		}()
+	}
+	group.Wait()
+	close(results)
+	for migrationErr := range results {
+		if migrationErr != nil {
+			t.Fatal(migrationErr)
+		}
+	}
+	var applied int
+	if err := store.pool.QueryRow(
+		ctx,
+		"SELECT count(*) FROM munchkin_schema_migrations WHERE version = $1",
+		filepath.Base(path),
+	).Scan(&applied); err != nil {
+		t.Fatal(err)
+	}
+	if applied != 1 {
+		t.Fatalf("applied migration rows=%d", applied)
+	}
+
+	failingPath := filepath.Join(t.TempDir(), "000002_fail_"+suffix+".up.sql")
+	if err := os.WriteFile(failingPath, []byte(
+		"CREATE TABLE "+tableName+"_partial (id TEXT); SELECT 1 / 0;\n",
+	), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Migrate(ctx, failingPath); err == nil {
+		t.Fatal("failed migration unexpectedly succeeded")
+	}
+	var exists *string
+	if err := store.pool.QueryRow(
+		ctx,
+		"SELECT to_regclass($1)",
+		tableName+"_partial",
+	).Scan(&exists); err != nil {
+		t.Fatal(err)
+	}
+	if exists != nil {
+		t.Fatalf("partial migration table survived: %s", *exists)
+	}
+	if err := os.WriteFile(failingPath, []byte(
+		"CREATE TABLE "+tableName+"_partial (id TEXT);\n",
+	), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Migrate(ctx, failingPath); err != nil {
+		t.Fatal(err)
+	}
+}
+
 type postgresClock struct {
 	value time.Time
 }
 
 func (clock *postgresClock) Now() int64 {
 	return clock.value.UnixNano()
-}
-
-func TestMigrationPathsSelectOnlySortedUpFiles(t *testing.T) {
-	directory := t.TempDir()
-	for _, name := range []string{
-		"000002_second.up.sql",
-		"000001_first.up.sql",
-		"000002_second.down.sql",
-		"README.md",
-	} {
-		if err := os.WriteFile(
-			filepath.Join(directory, name),
-			[]byte("-- fixture"),
-			0o600,
-		); err != nil {
-			t.Fatal(err)
-		}
-	}
-	paths, err := migrationPaths(directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(paths) != 2 ||
-		filepath.Base(paths[0]) != "000001_first.up.sql" ||
-		filepath.Base(paths[1]) != "000002_second.up.sql" {
-		t.Fatalf("migration paths: %#v", paths)
-	}
 }
 
 func postgresPack(t *testing.T) game.Pack {

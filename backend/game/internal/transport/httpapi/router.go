@@ -23,6 +23,8 @@ type Router struct {
 	subscriber     Subscriber
 	contentSetID   string
 	assetDirectory string
+	readinessProbe func(context.Context) error
+	readinessLimit time.Duration
 }
 
 type Subscriber interface {
@@ -37,6 +39,8 @@ type Options struct {
 	ContentSetID   string
 	AssetDirectory string
 	Telemetry      telemetry.Recorder
+	ReadinessProbe func(context.Context) error
+	ReadinessLimit time.Duration
 }
 
 func New(service *application.Service, subscribers ...Subscriber) http.Handler {
@@ -48,11 +52,22 @@ func New(service *application.Service, subscribers ...Subscriber) http.Handler {
 }
 
 func NewWithOptions(service *application.Service, options Options) http.Handler {
+	readinessProbe := options.ReadinessProbe
+	if readinessProbe == nil {
+		readinessProbe = func(context.Context) error { return nil }
+	}
+	readinessLimit := options.ReadinessLimit
+	if readinessLimit <= 0 {
+		readinessLimit = 2 * time.Second
+	}
 	router := &Router{
 		service: service, subscriber: options.Subscriber,
 		contentSetID: options.ContentSetID, assetDirectory: options.AssetDirectory,
+		readinessProbe: readinessProbe, readinessLimit: readinessLimit,
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health/live", router.live)
+	mux.HandleFunc("GET /health/ready", router.ready)
 	mux.HandleFunc("GET /healthz", router.health)
 	mux.HandleFunc("POST /api/v1/lobbies", router.createLobby)
 	mux.HandleFunc("GET /api/v1/lobbies/{gameID}", router.getLobby)
@@ -179,6 +194,20 @@ type theftRequest struct {
 
 func (router *Router) health(writer http.ResponseWriter, _ *http.Request) {
 	writeJSON(writer, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (router *Router) live(writer http.ResponseWriter, _ *http.Request) {
+	router.health(writer, nil)
+}
+
+func (router *Router) ready(writer http.ResponseWriter, request *http.Request) {
+	ctx, cancel := context.WithTimeout(request.Context(), router.readinessLimit)
+	defer cancel()
+	if err := router.readinessProbe(ctx); err != nil {
+		writeJSON(writer, http.StatusServiceUnavailable, map[string]string{"status": "not_ready"})
+		return
+	}
+	writeJSON(writer, http.StatusOK, map[string]string{"status": "ready"})
 }
 
 func (router *Router) createLobby(writer http.ResponseWriter, request *http.Request) {
