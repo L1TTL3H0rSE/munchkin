@@ -82,7 +82,7 @@ Nuxt/Vue client
 - realtime не передаёт состояние — только новую version и причину resync;
 - card pack — immutable data с canonical digest, а не исполняемый script.
 
-Подробности: `docs/agents/ARCHITECTURE.md` и ADR в
+Подробности game boundary: `docs/agents/ARCHITECTURE.md` и ADR в
 `docs/agents/decisions/`.
 
 ## Подготовка production infrastructure
@@ -96,6 +96,46 @@ Terraform. Прежде чем создавать VM, сеть, registry, bucket
 
 Документ является prerequisite runbook, а не утверждением, что production
 resources уже созданы.
+
+## Production delivery status
+
+Repository-side production delivery contracts уже зафиксированы: immutable
+game/web image digests, one-shot migrations, private PostgreSQL, Traefik-only
+public edge, privacy-safe OpenTelemetry, off-host backup design и
+least-privilege supply-chain checks. Сводная схема и evidence matrix находятся
+в [`docs/architecture/PRODUCTION_INFRASTRUCTURE.md`](docs/architecture/PRODUCTION_INFRASTRUCTURE.md).
+
+Это не означает, что production уже доступен. Ожидаемый hostname —
+`munchkin.l1ttl3h0rse.ru`, но valid HTTPS smoke ещё не подтверждён, поэтому
+README намеренно не публикует рабочую production URL, badge или deployed SHA.
+Публичная ссылка появится только после owner-approved DNS/ACME/deploy gate и
+успешных internal/public smoke checks.
+
+Текущая граница доказательств:
+
+- локальные Terraform/Compose/Traefik/CI/security/backup/telemetry contracts и
+  canonical repository checks реализованы и привязаны к архивным plans;
+- live GitHub settings/WIF exchange, registry publication, attestation, VM
+  bootstrap/deploy, DNS/NS/TLS, Monium import/60-minute soak и first verified
+  backup/isolated restore не выполнялись;
+- production остаётся одной VM без HA, public admin/Card Studio выключены,
+  а guest credentials ограничены game-scoped sessions.
+
+Для owner-safe procedures используйте единственные canonical runbooks:
+
+- [deployment and ACME](docs/operations/PRODUCTION_DEPLOYMENT.md),
+  [rollback](docs/operations/PRODUCTION_ROLLBACK.md) и
+  [secrets](docs/operations/PRODUCTION_SECRETS.md);
+- [readiness/migrations/OTel](docs/operations/READINESS_MIGRATIONS_AND_OTEL.md),
+  [observability](docs/operations/OBSERVABILITY.md) и
+  [backup/restore](docs/operations/POSTGRES_BACKUP_AND_RESTORE.md);
+- [security](docs/operations/PRODUCTION_SECURITY.md) и
+  [supply-chain evidence](docs/operations/SUPPLY_CHAIN.md).
+
+The five-minute, live-only contest path is documented in
+[`docs/demo/CONTEST_DEMO.md`](docs/demo/CONTEST_DEMO.md). It stops at the
+evidence boundary when HTTPS or any separately approved runtime gate is absent;
+there is no prerecorded fallback.
 
 ## Карты, тексты и изображения
 

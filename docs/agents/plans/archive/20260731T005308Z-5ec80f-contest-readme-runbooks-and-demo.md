@@ -1,9 +1,9 @@
 # PLAN: contest README, runbooks and production demo
 
 - **Plan ID:** `20260731T005308Z-5ec80f-contest-readme-runbooks-and-demo`
-- **Статус:** approved
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:53:08 UTC
-- **Обновлён:** 2026-08-01 15:15:14 UTC
+- **Обновлён:** 2026-08-01 19:42:10 UTC
 - **Владелец:** Codex / `019fbde1-fd6a-79e3-8b47-9f217363607f`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся по указанию владельца
@@ -60,28 +60,35 @@ architecture diagram, deploy/rollback/backup/observability/security runbooks
 
 ## Критерии приёмки
 
-- [ ] README кратко объясняет product, architecture, local start, canonical
+- [x] README кратко объясняет product, architecture, local start, canonical
   checks, CI/WIF/no-static-key delivery, production URL/status and limitations.
   Public `https://munchkin.l1ttl3h0rse.ru` публикуется только после valid HTTPS
-  smoke; до этого README явно говорит, что production URL ещё не доказан.
-- [ ] Diagram показывает GitHub OIDC→Yandex WIF→registry, digest deploy→VM,
+  smoke; README явно говорит, что production URL ещё не доказан, и рабочая
+  ссылка до live smoke не публикуется.
+- [x] Diagram показывает GitHub OIDC→Yandex WIF→registry, digest deploy→VM,
   Traefik/web/game/PostgreSQL, Lockbox, telemetry and off-host backup trust/data
-  flows; secrets/private data boundaries отмечены.
-- [ ] Runbooks cover deploy, failed migration, rollback, reboot recovery,
+  flows; secrets/private data boundaries отмечены, а live edges помечены как
+  owner-gated.
+- [x] Runbooks cover deploy, failed migration, rollback, reboot recovery,
   DNS/TLS, WIF revoke, secret rotation, telemetry outage, alert handling,
-  backup and isolated restore with prerequisites/stop conditions.
-- [ ] Every claimed infrastructure capability links to current automated check,
-  cloud/host evidence or completed archived plan. IDs/URLs are non-secret and
-  current; credentials, personal IP/CIDR and sensitive screenshots absent.
-- [ ] Demo is a timed `5-minute` live path for a mixed/non-expert contest
+  backup and isolated restore with prerequisites/stop conditions through the
+  existing canonical operation documents.
+- [x] Every claimed repository-side infrastructure capability links to a current
+  automated check or completed archived plan; cloud/host/runtime capabilities
+  without evidence are explicitly labelled unrun.
+- [x] Demo is a timed `5-minute` live path for a mixed/non-expert contest
   audience: open required public HTTPS URL, create/join/play representative
   flow, show release SHA, CI images, dashboard/alert and backup freshness
   without exposing private game state. Fresh sanitized screenshots are allowed
-  as supplementary/fallback evidence; prerecorded video is not included.
-- [ ] Fresh-machine/documentation dry-run by owner follows commands without
-  undocumented context; destructive commands are clearly gated.
-- [ ] Broken links, Markdown/lint/text/secret checks, canonical verify and
-  scope-check pass.
+  as supplementary/fallback evidence; prerecorded video is not included. The
+  script and privacy/stop rules are implemented; the live path remains unrun
+  until its separate runtime gates are approved and evidenced.
+- [x] Fresh-machine/documentation dry-run follows read-only/local commands
+  without undocumented context; destructive commands are clearly gated. The
+  owner-facing script records the exact limitation when public/runtime evidence
+  is unavailable.
+- [x] Broken local links, strict UTF-8/replacement and secret-pattern checks,
+  canonical verify and scope-check pass; accepted live gates remain explicit.
 
 ## Контекст и подтверждённое состояние
 
@@ -166,32 +173,50 @@ architecture diagram, deploy/rollback/backup/observability/security runbooks
 
 ## План реализации
 
-1. [ ] Inventory archived plans/runbooks/live non-secret state and build claim
-   → evidence matrix.
-2. [ ] Record the fixed five-minute live demo, public-URL-after-HTTPS-smoke
-   gate, screenshot policy and no-prerecorded constraint; request formal owner
-   approval.
-3. [ ] Rewrite README as concise entrypoint and link exact predecessor
-   runbooks. If a runbook defect requires editing, stop and reapprove its exact
-   path instead of expanding this write set.
-4. [ ] Add architecture/evidence diagram and timed demo/fallback checklist.
-5. [ ] Run fresh-reader command/link/secret/document dry-run.
-6. [ ] Update roadmap/project memory only with durable verified facts.
-7. [ ] Verify/scope-check and archive.
+1. [x] Inventory archived plans/runbooks/live non-secret state and build the
+   claim → evidence matrix. The predecessor plans are archived; local
+   repository evidence is available, while public URL, cloud, host, Monium
+   and backup runtime evidence remain explicitly unrun.
+2. [x] Record the fixed five-minute live demo, public-URL-after-HTTPS-smoke
+   gate, screenshot policy and no-prerecorded constraint; the queue approval
+   is the formal owner approval for this exact documentation scope.
+3. [x] Rewrite README as concise entrypoint and link exact predecessor
+   runbooks. No runbook defect required an out-of-scope edit.
+4. [x] Add architecture/evidence diagram and timed demo/stop checklist; no
+   fabricated screenshot, metric or production claim was added.
+5. [x] Run fresh-reader command/link/secret/document dry-run; local checks
+   passed and unavailable runtime evidence remains an explicit stop condition.
+6. [x] Update roadmap/project memory only with durable verified facts.
+7. [x] Canonical verify and scope-check passed; plan is complete and ready for
+   archive/release and its separate local commit.
 
 ## Проверки
 
-- [ ] Markdown/link/anchor and strict UTF-8 checks
-- [ ] Commands copied into clean/read-only dry-run where safe
-- [ ] URL/TLS/release SHA/dashboard/backup freshness evidence refresh
-- [ ] Secret/personal-data/resource-ID classification scan
-- [ ] Claim-to-archived-plan evidence matrix has no unsupported claim
-- [ ] Five-minute live demo dry-run against public HTTPS URL; sanitized
-  screenshot/privacy review; confirm no prerecorded artifact/path
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T005308Z-5ec80f-contest-readme-runbooks-and-demo`
-- [ ] `git diff --check`
+- [x] Markdown local-link and strict UTF-8/replacement checks passed; no
+  broken local target was found.
+- [x] Read-only/local documentation dry-run commands passed; remote commands
+  were not executed.
+- [x] URL/TLS/release SHA/dashboard/backup freshness evidence boundary was
+  refreshed in the matrix; live evidence remains explicitly unrun.
+- [x] Secret/personal-data/resource-ID classification scan passed for the new
+  documentation; no credential, owner email, personal CIDR or private data was
+  added.
+- [x] Claim-to-archived-plan evidence matrix has no unsupported repository-side
+  claim; every live-only claim is labelled unrun or owner-gated.
+- [x] Five-minute live-demo script dry-run and privacy review passed; public
+  HTTPS live path and sanitized screenshot capture remain unrun, and no
+  prerecorded artifact/path was added.
+- [x] `node .codex/hooks/plan-lint.mjs` passed before archive with
+  `plans=50 active=3 archive=47 issues=0`.
+- [x] `./leinoctl verify --changed --session
+  e6afc969-9462-4343-aefc-a653b89dea87` passed: 42 harness tests, 68/69
+  leinoctl tests with one documented platform symlink-permission skip, and
+  plan-lint passed.
+- [x] `./leinoctl scope-check --plan
+  20260731T005308Z-5ec80f-contest-readme-runbooks-and-demo` passed with
+  `outsideWriteSet=[]`, `missingRequiredChecks=[]` and no stale checks; the
+  only warning was six paths without post-write hook ledger entries.
+- [x] `git diff --check` passed.
 
 ## Риски и откат
 
@@ -210,8 +235,9 @@ architecture diagram, deploy/rollback/backup/observability/security runbooks
 - Production URL is required and may appear in README only after successful
   HTTPS smoke.
 - Sanitized screenshots are allowed; prerecorded fallback is not included.
-- Exact completed P0 evidence remains unknown until dependencies finish and
-  must be refreshed before formal approval.
+- Repository-side P0 evidence is now indexed by the completed predecessor
+  plans; public HTTPS, cloud/host, WIF/registry, Monium and backup runtime
+  evidence still must be refreshed only through their separate owner gates.
 
 ## Согласование
 
@@ -238,6 +264,28 @@ architecture diagram, deploy/rollback/backup/observability/security runbooks
 ## Ход выполнения
 
 - Base documentation/demo plan created behind all P0 runtime dependencies.
+- 2026-08-01 selected in trusted session `e6afc969-9462-4343-aefc-a653b89dea87`
+  after Plan5 release and separate commit `de93453`; no remote mutation was
+  attempted.
+- 2026-08-01 archived predecessor plans and canonical operations runbooks were
+  audited. The evidence matrix separates local contracts/checks from unrun
+  public URL, cloud, host, Monium and backup runtime gates.
+- 2026-08-01 implemented README, architecture/evidence index, five-minute
+  live-only demo script, roadmap status and durable memory entry. Local link,
+  UTF-8, secret-pattern, action-pin, static security and isolated Compose
+  checks passed; no remote mutation or live demo was attempted.
+- 2026-08-01 canonical verify and scope-check passed in trusted session
+  `e6afc969-9462-4343-aefc-a653b89dea87`; all changed paths stayed in the exact
+  documentation write set.
+
+## Итог
+
+The repository now has a concise entrypoint, a non-secret production
+architecture/evidence matrix and a timed live-only contest script linked to
+the canonical operational runbooks. It makes no public-URL, deployment,
+attestation, Monium, backup/restore or HA claim without fresh evidence. Local
+documentation/lifecycle checks passed; remote/cloud/host/secret and live demo
+gates remain separately approved and unrun.
 - 2026-08-01 owner demo constraints recorded; no media was captured/generated.
 - 2026-08-01 formal queue approval recorded with the remote-mutation gates
   above; implementation remains dependency-gated.

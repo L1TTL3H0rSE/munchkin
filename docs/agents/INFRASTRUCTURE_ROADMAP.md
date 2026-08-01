@@ -2,7 +2,7 @@
 
 ## Статус документа
 
-- **Снимок текущего состояния:** 2026-07-31.
+- **Снимок текущего состояния:** 2026-08-01.
 - **Целевой deadline:** 2026-08-02 23:59 Europe/Moscow.
 - **Назначение:** архитектурная карта и backlog для отдельных implementation
   plans.
@@ -553,32 +553,45 @@ separate owner-approved gates. See
 
 ### INFRA-012 — documentation и конкурсный demo
 
+**Статус 2026-08-01:** README, production architecture/evidence index and
+the five-minute live-only demo checklist are implemented in
+[`docs/architecture/PRODUCTION_INFRASTRUCTURE.md`](../architecture/PRODUCTION_INFRASTRUCTURE.md)
+and [`docs/demo/CONTEST_DEMO.md`](../demo/CONTEST_DEMO.md). They link the
+canonical deployment, rollback, readiness, observability, backup, security,
+supply-chain and secrets runbooks without duplicating their commands. The
+expected hostname `munchkin.l1ttl3h0rse.ru` is not a proven public URL yet:
+valid HTTPS smoke, production deployment, Monium evidence and backup/restore
+runtime records remain owner-gated and unrun.
+
 **README/runbooks**
 
-- публичная HTTPS ссылка;
-- архитектурная схема и объяснение modular-monolith choice;
-- CI/deploy badge и deployed SHA;
+- expected public hostname only after valid HTTPS smoke;
+- architecture/evidence diagram and modular-monolith boundary;
+- CI/release SHA and digest evidence only when a fresh protected run exists;
 - local start отдельно от production topology;
 - deploy, rollback, backup и restore runbooks;
-- observability screenshots и privacy/cardinality решения;
+- observability evidence and privacy/cardinality decisions;
 - известные ограничения: single VPS, no HA, guest credentials, disabled Studio.
 
 **Пятиминутный demo**
 
-1. Показать commit и зелёный GitHub Actions run.
-2. Показать два Yandex Container Registry image с этим SHA.
-3. Показать successful deploy и public HTTPS.
-4. Создать игру и открыть trace до PostgreSQL span в выбранном telemetry UI.
-5. Показать dashboard с request/command/SSE signals и deploy version.
-6. Показать последний off-host backup и результат restore drill.
-7. Запустить rollback либо controlled container restart и показать recovery.
+1. Открыть approved HTTPS URL после valid smoke и показать hostname/health.
+2. Показать protected CI release SHA, immutable game/web digests и evidence.
+3. Создать и присоединить disposable game, пройти короткий legal action flow.
+4. Показать matching Monium request/trace/dashboard evidence без private state.
+5. Показать sanitized release/backup evidence и recovery boundary.
+
+Подробный five-minute live-only script и stop conditions находятся в
+[`docs/demo/CONTEST_DEMO.md`](../demo/CONTEST_DEMO.md). Prerecorded video не
+используется; sanitized screenshot может только дополнять свежую live evidence.
 
 **Definition of Done**
 
 - Незнакомый проверяющий может открыть проект и понять delivery architecture
   без устного восстановления контекста.
-- Все показанные capabilities реально выполняются; roadmap-only пункты явно
-  обозначены как future.
+- Все показанные repository-side capabilities привязаны к archived plan или
+  automated check; live-only capabilities и roadmap-only пункты явно
+  обозначены как unrun/future до появления их evidence.
 
 ## Рекомендуемая последовательность до deadline
 
