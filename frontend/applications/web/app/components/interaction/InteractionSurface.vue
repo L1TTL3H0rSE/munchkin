@@ -25,6 +25,16 @@ import {
   interactionTitle,
   type InteractionActionView,
 } from "./interactionModel";
+import {
+  formatAbsoluteDeadline,
+  helperCancelAction,
+  helperOfferAction,
+  helperOfferOptions as buildHelperOfferOptions,
+  helperRewardsFor,
+  isCombatantHelperOffer,
+  isInvitedHelperOffer,
+  projectedPlayerName,
+} from "./helperOfferModel";
 
 const props = defineProps<{
   projection: Projection;
@@ -40,9 +50,13 @@ const emit = defineEmits<{
 const dialogRef = ref<HTMLElement | null>(null);
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const selectedActionID = ref<string | null>(null);
+const selectedHelperPlayerID = ref("");
+const selectedRewardValue = ref("");
+const helperFormError = ref("");
 const surfaceOpen = ref(false);
 const lastRevisionKey = ref("");
 const dialogID = "game-interaction-dialog";
+const helperErrorID = "interaction-helper-error";
 
 const interaction = computed(() => props.projection.interaction);
 const ownCards = computed<CardView[]>(() => [
@@ -56,6 +70,28 @@ const ownCards = computed<CardView[]>(() => [
 const selectableActions = computed(() =>
   (interaction.value?.actions ?? []).filter(actionIsSelectable),
 );
+const helperOptions = computed(() => buildHelperOfferOptions(
+  interaction.value?.actions ?? [],
+));
+const helperOfferMode = computed(() => isCombatantHelperOffer(interaction.value));
+const invitedHelperOffer = computed(() => isInvitedHelperOffer(interaction.value));
+const helperCancel = computed(() => helperCancelAction(interaction.value));
+const helperRewardValues = computed(() => helperRewardsFor(
+  helperOptions.value,
+  selectedHelperPlayerID.value,
+));
+const selectedReward = computed(() => Number(selectedRewardValue.value));
+const selectedHelperAction = computed(() => helperOfferAction(
+  interaction.value?.actions ?? [],
+  selectedHelperPlayerID.value,
+  selectedReward.value,
+));
+const invitedCombatantName = computed(() => invitedHelperOffer.value
+  ? projectedPlayerName(props.projection, props.projection.turn.player_id)
+  : "");
+const invitedDeadlineText = computed(() => invitedHelperOffer.value && interaction.value
+  ? formatAbsoluteDeadline(interaction.value.deadline_at)
+  : "");
 const selectedAction = computed(() => selectableActions.value.find((action) =>
   action.action_id === selectedActionID.value,
 ));
@@ -153,6 +189,29 @@ function selectAction(action: InteractionActionView): void {
   selectedActionID.value = action.action_id;
 }
 
+function resetHelperForm(): void {
+  const firstOption = helperOptions.value[0];
+  selectedHelperPlayerID.value = firstOption?.helperPlayerID ?? "";
+  selectedRewardValue.value = firstOption?.rewardTreasures[0]?.toString() ?? "";
+  helperFormError.value = "";
+}
+
+function submitHelperOffer(): void {
+  const action = selectedHelperAction.value;
+  if (!action) {
+    helperFormError.value = "Выберите помощника и награду из текущей проекции.";
+    return;
+  }
+  helperFormError.value = "";
+  emit("submit", action);
+}
+
+function submitHelperCancel(): void {
+  if (helperCancel.value && !props.busy) {
+    emit("submit", helperCancel.value);
+  }
+}
+
 function submitSelected(): void {
   const action = selectedAction.value;
   if (!action || terminal.value || props.busy) {
@@ -174,9 +233,11 @@ watch(
     if (!revisionKey) {
       selectedActionID.value = null;
       surfaceOpen.value = false;
+      resetHelperForm();
       return;
     }
     selectedActionID.value = selectableActions.value[0]?.action_id ?? null;
+    resetHelperForm();
     surfaceOpen.value = true;
     focusDialog();
   },
@@ -191,6 +252,17 @@ watch(
     )) {
       selectedActionID.value = selectableActions.value[0]?.action_id ?? null;
     }
+  },
+);
+
+watch(
+  () => selectedHelperPlayerID.value,
+  (helperPlayerID) => {
+    const rewards = helperRewardsFor(helperOptions.value, helperPlayerID);
+    if (!rewards.includes(Number(selectedRewardValue.value))) {
+      selectedRewardValue.value = rewards[0]?.toString() ?? "";
+    }
+    helperFormError.value = "";
   },
 );
 
@@ -245,7 +317,9 @@ function actionActionKey(action: InteractionActionView): string {
             <p class="eyebrow">СЕРВЕРНОЕ ОКНО</p>
             <h2 id="interaction-dialog-title">{{ interactionTitle(interaction) }}</h2>
             <p class="interaction-dialog__context">
-              {{ interaction.response_required_for_you
+              {{ helperOfferMode
+                ? "Выберите только помощника и награду из текущих дескрипторов."
+                : interaction.response_required_for_you
                 ? "Выберите только действие, которое передала текущая проекция."
                 : "Окно остаётся видимым, даже если сейчас нет действия для этого игрока." }}
             </p>
@@ -274,24 +348,106 @@ function actionActionKey(action: InteractionActionView): string {
           {{ countdownText }}
         </p>
 
+        <section
+          v-if="invitedHelperOffer && interaction.combat_help_offer"
+          class="interaction-helper-summary"
+          aria-label="Предложение помощи"
+        >
+          <p class="eyebrow">ПРЕДЛОЖЕНИЕ ПОМОЩИ</p>
+          <p>Участник боя: <strong>{{ invitedCombatantName }}</strong></p>
+          <p>Награда: <strong>{{ interaction.combat_help_offer.reward_treasures }} сокр.</strong></p>
+          <p>
+            Срок до
+            <time :datetime="interaction.deadline_at">{{ invitedDeadlineText }}</time>
+          </p>
+        </section>
+
         <div v-if="errorMessage" class="interaction-dialog__error" role="alert">
           {{ errorMessage }}
         </div>
 
-        <p v-if="!interaction.actions.length" class="interaction-dialog__opaque" role="status">
+        <form
+          v-if="helperOfferMode"
+          class="interaction-helper-form"
+          novalidate
+          @submit.prevent="submitHelperOffer"
+        >
+          <fieldset :disabled="busy || terminal">
+            <legend>Параметры предложения</legend>
+            <label for="interaction-helper-player">Помощник</label>
+            <select
+              id="interaction-helper-player"
+              v-model="selectedHelperPlayerID"
+              required
+              :aria-describedby="helperFormError ? helperErrorID : undefined"
+              :aria-invalid="helperFormError ? 'true' : undefined"
+            >
+              <option
+                v-for="option in helperOptions"
+                :key="option.helperPlayerID"
+                :value="option.helperPlayerID"
+              >
+                {{ projectedPlayerName(projection, option.helperPlayerID) }}
+              </option>
+            </select>
+
+            <label for="interaction-helper-reward">Награда помощнику, сокровищ</label>
+            <input
+              id="interaction-helper-reward"
+              v-model="selectedRewardValue"
+              type="number"
+              inputmode="numeric"
+              :min="helperRewardValues[0]"
+              :max="helperRewardValues[helperRewardValues.length - 1]"
+              step="1"
+              required
+              :aria-describedby="helperFormError ? helperErrorID : undefined"
+              :aria-invalid="helperFormError ? 'true' : undefined"
+              @input="helperFormError = ''"
+            >
+            <small v-if="helperRewardValues.length">
+              Доступно по текущей проекции: {{ helperRewardValues.join(", ") }}.
+            </small>
+          </fieldset>
+          <p v-if="helperFormError" :id="helperErrorID" role="alert">
+            {{ helperFormError }}
+          </p>
+          <button
+            class="interaction-dialog__submit"
+            type="submit"
+            :disabled="busy || terminal || !selectedHelperAction"
+          >
+            {{ busy ? "Отправляем предложение…" : "Предложить помощь" }}
+          </button>
+        </form>
+
+        <p
+          v-if="!interaction.actions.length"
+          class="interaction-dialog__opaque"
+          role="status"
+        >
           Окно открыто. Сейчас нет действия для этого игрока.
         </p>
 
-        <fieldset v-else class="interaction-actions" :disabled="busy || terminal">
+        <p
+          v-else-if="!selectableActions.length && !helperOfferMode && !helperCancel"
+          class="interaction-dialog__opaque"
+          role="status"
+        >
+          Это действие будет доступно в специализированном окне.
+        </p>
+
+        <fieldset
+          v-else-if="selectableActions.length"
+          class="interaction-actions"
+          :disabled="busy || terminal"
+        >
           <legend>Доступные действия текущего окна</legend>
           <label
-            v-for="action in interaction.actions"
+            v-for="action in selectableActions"
             :key="interactionActionKey(action)"
             class="interaction-action"
-            :class="{
-              'interaction-action--selected': action.action_id === selectedActionID,
-              'interaction-action--unsupported': !actionIsSelectable(action),
-            }"
+            :class="{'interaction-action--selected': action.action_id === selectedActionID}"
             :data-state="action.action_id === selectedActionID ? 'selected' : 'available'"
           >
             <input
@@ -299,30 +455,38 @@ function actionActionKey(action: InteractionActionView): string {
               name="interaction-action"
               :value="action.action_id"
               :checked="action.action_id === selectedActionID"
-              :disabled="!actionIsSelectable(action) || busy || terminal"
+              :disabled="busy || terminal"
               @change="selectAction(action)"
             >
             <span>
               <strong>{{ interactionActionLabel(action) }}</strong>
               <small>{{ interactionActionDescription(action, ownCards) }}</small>
-              <small v-if="!actionIsSelectable(action)">
-                Это действие будет доступно в специализированном окне.
-              </small>
             </span>
           </label>
         </fieldset>
 
         <footer class="interaction-dialog__footer">
           <button
+            v-if="helperCancel"
+            class="interaction-dialog__submit interaction-dialog__submit--secondary"
+            type="button"
+            :disabled="busy || terminal"
+            @click="submitHelperCancel"
+          >
+            {{ busy ? "Отменяем…" : "Отменить предложение" }}
+          </button>
+          <button
+            v-else-if="selectedAction"
             class="interaction-dialog__submit"
             type="button"
-            :disabled="busy || terminal || !selectedAction"
+            :disabled="busy || terminal"
             @click="submitSelected"
           >
-            {{ busy ? "Отправляем…" : selectedAction
-              ? interactionActionLabel(selectedAction)
-              : "Действие недоступно" }}
+            {{ busy ? "Отправляем…" : interactionActionLabel(selectedAction) }}
           </button>
+          <span v-else-if="!helperOfferMode" class="interaction-dialog__submit-placeholder">
+            Действие недоступно
+          </span>
           <small>Окончательное решение принимает сервер.</small>
         </footer>
       </section>
@@ -435,6 +599,73 @@ function actionActionKey(action: InteractionActionView): string {
   line-height: 1.45;
 }
 
+.interaction-helper-summary,
+.interaction-helper-form {
+  display: grid;
+  gap: .65rem;
+  min-width: 0;
+  border: 1px solid var(--line);
+  padding: .85rem;
+}
+
+.interaction-helper-summary p,
+.interaction-helper-form p,
+.interaction-helper-form small {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+.interaction-helper-summary .eyebrow {
+  color: var(--acid);
+}
+
+.interaction-helper-summary time {
+  color: var(--acid);
+  font-variant-numeric: tabular-nums;
+}
+
+.interaction-helper-form fieldset {
+  display: grid;
+  gap: .55rem;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.interaction-helper-form legend {
+  margin-bottom: .15rem;
+  color: var(--muted);
+  font-size: .8rem;
+  text-transform: uppercase;
+}
+
+.interaction-helper-form select,
+.interaction-helper-form input {
+  width: 100%;
+  min-height: 2.75rem;
+  border: 1px solid var(--line);
+  padding: .55rem .65rem;
+  color: inherit;
+  background: var(--color-board);
+  font: inherit;
+}
+
+.interaction-helper-form select:focus-visible,
+.interaction-helper-form input:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: 2px;
+}
+
+.interaction-helper-form [aria-invalid="true"] {
+  border-color: #ef8d74;
+}
+
+.interaction-helper-form > p[role="alert"] {
+  color: #ffd2c6;
+}
+
 .interaction-dialog__opaque {
   margin: 0;
   border: 1px dashed var(--line);
@@ -503,6 +734,16 @@ function actionActionKey(action: InteractionActionView): string {
   min-width: min(100%, 16rem);
 }
 
+.interaction-dialog__submit--secondary {
+  border-color: var(--line);
+  color: var(--muted);
+  background: transparent;
+}
+
+.interaction-dialog__submit-placeholder {
+  color: var(--muted);
+}
+
 .interaction-dialog__footer small {
   margin: 0;
 }
@@ -550,6 +791,16 @@ function actionActionKey(action: InteractionActionView): string {
 
   .interaction-dialog__close {
     align-self: start;
+  }
+
+  .interaction-dialog__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .interaction-dialog__submit,
+  .interaction-dialog__submit-placeholder {
+    width: 100%;
   }
 }
 

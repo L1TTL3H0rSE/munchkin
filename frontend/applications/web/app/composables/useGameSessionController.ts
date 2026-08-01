@@ -61,6 +61,13 @@ export interface GameSessionAPI {
     intent: InteractionIntent,
     options?: GameCommandOptions,
   ) => Promise<CommandResult>;
+  combatHelp: (
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    actionID: string,
+    options?: GameCommandOptions,
+  ) => Promise<CommandResult>;
   stream: (
     gameID: string,
     credential: string,
@@ -635,10 +642,16 @@ export function createGameSessionController(
       candidate.interaction_id === action.interaction_id &&
       candidate.action_id === action.action_id,
     );
-    const intent = action.type === "offer_help" || action.type === "cancel_help"
+    const isCombatHelpAction = descriptor?.type === "offer_help" ||
+      descriptor?.type === "cancel_help";
+    const intent = isCombatHelpAction
       ? undefined
-      : action.type;
-    if (!descriptor || intent === undefined || descriptor.type !== intent) {
+      : descriptor?.type as InteractionIntent | undefined;
+    if (
+      !descriptor ||
+      (!isCombatHelpAction && intent === undefined) ||
+      (!isCombatHelpAction && descriptor.type !== intent)
+    ) {
       interactionErrorState.value = safeGameApiMessage("validation");
       return;
     }
@@ -655,15 +668,23 @@ export function createGameSessionController(
 
     const execute = () => withRequest(
       owner,
-      (signal) => options.api.interaction(
-        currentGameID,
-        credential,
-        current.version,
-        descriptor.interaction_id,
-        descriptor.action_id,
-        intent,
-        {commandID, signal},
-      ),
+      (signal) => isCombatHelpAction
+        ? options.api.combatHelp(
+          currentGameID,
+          credential,
+          current.version,
+          descriptor.action_id,
+          {commandID, signal},
+        )
+        : options.api.interaction(
+          currentGameID,
+          credential,
+          current.version,
+          descriptor.interaction_id,
+          descriptor.action_id,
+          intent as InteractionIntent,
+          {commandID, signal},
+        ),
     );
 
     try {

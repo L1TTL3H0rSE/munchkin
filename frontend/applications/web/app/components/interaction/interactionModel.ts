@@ -9,6 +9,7 @@ export type InteractionActionView = InteractionView["actions"][number];
 const dismissingActionTypes = new Set<InteractionActionView["type"]>([
   "pass",
   "cancel_offer",
+  "cancel_help",
 ]);
 
 const acceptedIntentTypes = new Set<InteractionActionView["type"]>([

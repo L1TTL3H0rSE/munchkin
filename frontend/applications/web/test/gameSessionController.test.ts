@@ -20,6 +20,7 @@ import {
   type GameSessionAPI,
   type GameSessionScheduler,
 } from "../app/composables/useGameSessionController";
+import {createFixtureAdapter} from "./fixtures/fixtureAdapter";
 
 const baseProjection = parseGameProjection(JSON.parse(readFileSync(new URL(
   "../../../../backend/game/internal/transport/httpapi/testdata/"
@@ -33,6 +34,14 @@ const passInteraction = baseProjection.interaction?.actions.find(
 );
 if (!passInteraction) {
   throw new Error("pass interaction action was not parsed");
+}
+const fixtureAdapter = createFixtureAdapter();
+const helperOfferProjection = fixtureAdapter.getProjection("helper-offer");
+const helperOfferAction = helperOfferProjection.interaction?.actions.find(
+  (candidate) => candidate.type === "offer_help",
+);
+if (!helperOfferAction) {
+  throw new Error("helper offer action was not parsed");
 }
 
 interface StreamHarness {
@@ -113,6 +122,9 @@ function createAPI(initialProjection = projectionAt(7)) {
   const interaction = vi.fn<GameSessionAPI["interaction"]>(
     async () => commandResult(initialProjection),
   );
+  const combatHelp = vi.fn<GameSessionAPI["combatHelp"]>(
+    async () => commandResult(initialProjection),
+  );
   const stream = vi.fn<GameSessionAPI["stream"]>(
     (gameID, _credential, onInvalidation, onDisconnect, onConnected) => {
       const stopped = vi.fn();
@@ -126,8 +138,14 @@ function createAPI(initialProjection = projectionAt(7)) {
       return stopped;
     },
   );
-  const api = {getGame, command, interaction, stream} satisfies GameSessionAPI;
-  return {api, getGame, command, interaction, stream, streams};
+  const api = {
+    getGame,
+    command,
+    interaction,
+    combatHelp,
+    stream,
+  } satisfies GameSessionAPI;
+  return {api, getGame, command, interaction, combatHelp, stream, streams};
 }
 
 function createHarness(options: {
@@ -397,6 +415,36 @@ describe("game session controller", () => {
     pending.resolve(commandResult(projectionAt(8)));
     await Promise.all([first, second]);
     expect(harness.controller.interactionBusy.value).toBe(false);
+  });
+
+  it("submits helper offer actions through the specialized opaque endpoint", async () => {
+    const apiHarness = createAPI(helperOfferProjection);
+    const nextProjection = {
+      ...helperOfferProjection,
+      version: helperOfferProjection.version + 1,
+    };
+    apiHarness.combatHelp
+      .mockRejectedValueOnce(new GameApiError(
+        "offline",
+        safeGameApiMessage("offline"),
+      ))
+      .mockResolvedValueOnce(commandResult(nextProjection));
+    const harness = createHarness({api: apiHarness});
+    await harness.controller.start(helperOfferProjection.game_id);
+
+    await harness.controller.submitInteraction(helperOfferAction);
+
+    expect(harness.combatHelp).toHaveBeenCalledTimes(2);
+    expect(harness.combatHelp.mock.calls[0]?.slice(2, 4)).toEqual([
+      helperOfferProjection.version,
+      helperOfferAction.action_id,
+    ]);
+    expect(harness.combatHelp.mock.calls[0]?.[4]?.commandID)
+      .toBe("stable-command-id");
+    expect(harness.combatHelp.mock.calls[1]?.[4]?.commandID)
+      .toBe("stable-command-id");
+    expect(harness.controller.projection.value?.version)
+      .toBe(nextProjection.version);
   });
 
   it("resyncs a stale interaction without silently replaying it", async () => {

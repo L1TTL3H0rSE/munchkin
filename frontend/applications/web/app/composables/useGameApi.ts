@@ -250,6 +250,7 @@ export function useGameApi() {
     credential: string,
     expectedVersion: number,
     actionID: string,
+    options: GameCommandOptions = {},
   ) {
     const request = parseClientRequest(
       () => combatHelpRequestSchema.parse({
@@ -257,6 +258,7 @@ export function useGameApi() {
         action_id: actionID,
       }),
     );
+    const commandID = options.commandID ?? crypto.randomUUID();
     return requestGameplay(
       () => $fetch(
         `${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/commands/combat-help`,
@@ -264,9 +266,10 @@ export function useGameApi() {
           method: "POST",
           headers: {
             ...authorization(credential),
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": commandID,
           },
           body: request,
+          ...(options.signal ? {signal: options.signal} : {}),
         },
       ),
       clientCommandResult,

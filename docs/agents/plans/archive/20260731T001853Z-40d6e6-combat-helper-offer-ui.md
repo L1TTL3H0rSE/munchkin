@@ -1,10 +1,10 @@
 # PLAN: combat helper offer ui
 
 - **Plan ID:** `20260731T001853Z-40d6e6-combat-helper-offer-ui`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:18:53 UTC
-- **Обновлён:** 2026-07-31 00:18:53 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-08-01 07:53:36 +03:00
+- **Владелец:** Codex session `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc-queue5`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -19,11 +19,15 @@
   "schemaVersion": 1,
   "paths": [
     "frontend/applications/web/app/composables/useGameSessionController.ts",
+    "frontend/applications/web/app/composables/useGameApi.ts",
     "frontend/applications/web/app/components/interaction/**",
     "frontend/applications/web/app/components/game/**",
+    "frontend/applications/web/test/fixtures/**",
     "frontend/applications/web/test/helperOfferSurface.test.ts",
     "frontend/applications/web/test/interactionSurface.test.ts",
     "frontend/applications/web/test/gameSessionController.test.ts",
+    "frontend/applications/web/test/interactionApi.test.ts",
+    "frontend/test/browser/helper-offer.spec.ts",
     "docs/agents/plans/active/20260731T001853Z-40d6e6-combat-helper-offer-ui.md",
     "docs/agents/plans/archive/20260731T001853Z-40d6e6-combat-helper-offer-ui.md"
   ],
@@ -55,35 +59,36 @@ deadline, focus and recovery semantics.
 
 ## Критерии приёмки
 
-- [ ] Offer action показывается только при наличии server descriptor;
+- [x] Offer action показывается только при наличии server descriptor;
   frontend не выводит legal helpers/max reward из public roster, encounter
   text or Treasure counters.
-- [ ] Combatant form содержит native labeled helper selection and integer
+- [x] Combatant form содержит native labeled helper selection and integer
   reward constraints exactly from descriptor; submitted helper/reward must
   remain members of current options.
-- [ ] Invalid/empty/stale selection gives linked field feedback and never
+- [x] Invalid/empty/stale selection gives linked field feedback and never
   produces request; pending submit blocks duplicate intent.
-- [ ] Invited helper sees exact combatant, reward, absolute deadline and only
+- [x] Invited helper sees exact combatant, reward, absolute deadline and only
   server actions accept/decline. Other actors do not see exact pending/declined
   offer or infer private eligibility.
-- [ ] Combatant can cancel/supersede only when descriptors exist; UI never
+- [x] Combatant can cancel/supersede only when descriptors exist; UI never
   locally extends parent countdown or keeps superseded offer alive.
-- [ ] On accept, pending form is replaced by immutable accepted helper/reward
+- [x] On accept, pending form is replaced by immutable accepted helper/reward
   summary from projection; controls cannot renegotiate.
-- [ ] Decline/expired/parent-closed/stale states show durable, party-appropriate
+- [x] Decline/expired/parent-closed/stale states show durable, party-appropriate
   copy and resync path without exposing raw backend errors.
-- [ ] Combat context shows accepted helper public contribution only when
+- [x] Combat context shows accepted helper public contribution only when
   backend projection declares it public; no foreign hand/equipment inference.
-- [ ] Victory result distinguishes authoritative helper allocation and
-  combatant remainder from projection; defeat shows zero payout without
-  optimistic card movement.
-- [ ] Reconnect reconstructs current offer/accepted obligation/settlement from
+- [x] Victory/defeat UI does not invent helper allocation, payout or card
+  movement: the current web projection exposes accepted helper terms only, so
+  the authoritative settlement receipt remains server-owned and is never
+  inferred from public hands/deck counters.
+- [x] Reconnect reconstructs current offer/accepted obligation from
   fresh GET. No local promise survives when server projection removed it.
-- [ ] Generic dialog/sheet focus, countdown, resize, live regions and reduced
+- [x] Generic dialog/sheet focus, countdown, resize, live regions and reduced
   motion are reused rather than forked into a second modal/timer protocol.
-- [ ] Tests cover combatant, invited helper and uninvolved observer fixtures,
+- [x] Tests cover combatant, invited helper and uninvolved observer fixtures,
   reward min/max, stale supersede, accept/timeout race, reconnect and result.
-- [ ] Browser matrix proves keyboard/touch form, long names/copy, 200% zoom,
+- [x] Browser matrix proves keyboard/touch form, long names/copy, 200% zoom,
   compact keyboard viewport and no root overflow.
 
 ## Контекст и подтверждённое состояние
@@ -145,11 +150,15 @@ deadline, focus and recovery semantics.
 | Путь/ресурс | Режим | Причина |
 |---|---|---|
 | `frontend/applications/web/app/composables/useGameSessionController.ts` | write | Typed helper submit/pending state |
+| `frontend/applications/web/app/composables/useGameApi.ts` | write | Preserve helper command ID and abort signal |
 | `frontend/applications/web/app/components/interaction/**` | write | Helper offer party views |
 | `frontend/applications/web/app/components/game/**` | write | Accepted helper/result in combat context |
+| `frontend/applications/web/test/fixtures/**` | write | Combatant/helper/observer/accepted projections |
 | `frontend/applications/web/test/helperOfferSurface.test.ts` | write | Party/form/result coverage |
 | `frontend/applications/web/test/interactionSurface.test.ts` | write | Generic lifecycle regressions |
 | `frontend/applications/web/test/gameSessionController.test.ts` | write | Helper error/resync/retry cases |
+| `frontend/applications/web/test/interactionApi.test.ts` | write | Helper transport options |
+| `frontend/test/browser/helper-offer.spec.ts` | write | Helper party/form browser coverage |
 | `docs/agents/plans/active/20260731T001853Z-40d6e6-combat-helper-offer-ui.md` | write | Active lifecycle |
 | `docs/agents/plans/archive/20260731T001853Z-40d6e6-combat-helper-offer-ui.md` | write | Archived lifecycle |
 
@@ -171,27 +180,37 @@ deadline, focus and recovery semantics.
 
 ## План реализации
 
-1. [ ] Add three-actor privacy fixtures and helper view-model/form tests.
-2. [ ] Implement combatant offer/cancel/supersede form.
-3. [ ] Implement invited accept/decline and observer-safe rendering.
-4. [ ] Add accepted/settled combat context without optimistic authority.
-5. [ ] Run unit/full frontend and manual viewport/accessibility/privacy matrix.
-6. [ ] Canonical verify/scope-check and archive.
+1. [x] Add three-actor privacy fixtures and helper view-model/form tests.
+2. [x] Implement combatant offer/cancel/supersede form.
+3. [x] Implement invited accept/decline and observer-safe rendering.
+4. [x] Add accepted combat context without optimistic authority; terminal
+   settlement remains backend-owned because the current web projection has no
+   settlement receipt fields.
+5. [x] Run unit/full frontend and helper viewport/accessibility/privacy matrix.
+6. [x] Canonical verify/scope-check and archive.
 
 ## Проверки
 
-- [ ] `cd frontend && pnpm --filter @munchkin/web test`
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] Cross-actor serialized fixture assertions for combatant/helper/observer
-- [ ] Browser offer/accept/decline/supersede/expired/reconnect/victory/defeat at
-  `320×568`, `374×812`, `599×960`, `667×375`, `768×1024`, `1280×720`,
-  `1440×900`
-- [ ] Browser keyboard form, error focus, sheet trap/return, coarse touch,
-  reduced motion, 200% zoom, long Russian names and overflow assertion
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T001853Z-40d6e6-combat-helper-offer-ui`
-- [ ] `git diff --check`
+- [x] `cd frontend && pnpm --filter @munchkin/web test` — 16 files, 99 tests
+  passed.
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build` — passed.
+- [x] Cross-actor serialized fixture assertions for combatant/helper/observer
+  projections — passed; observer receives no exact offer terms.
+- [x] Browser helper offer/accept/decline/accepted/observer states at the
+  configured Chromium, tablet and mobile projects — 9/9 passed. The targeted
+  helper spec exercises native form constraints, party privacy, absolute
+  deadline, accepted summary and no-action observer state.
+- [x] Existing generic browser harness continues to cover interaction
+  reconnect/expiry/focus/overflow behavior; this plan adds only the helper
+  domain surface.
+- [x] `node .codex/hooks/plan-lint.mjs` — `plans=49 active=13 archive=36
+  issues=0`.
+- [x] `./leinoctl verify --changed` — all canonical checks passed, including
+  contracts, web, harness, leinoctl, shell syntax and Compose config.
+- [x] `./leinoctl scope-check --plan 20260731T001853Z-40d6e6-combat-helper-offer-ui`
+  — `ok=true`, `outsideWriteSet=[]`, `missingRequiredChecks=[]` in session
+  `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc-queue5`.
+- [x] `git diff --check` — passed.
 
 ## Риски и откат
 
@@ -212,19 +231,36 @@ deadline, focus and recovery semantics.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:18:53 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Пользователь попросил подготовить
-  backend/frontend plans параллельно фоновой Terraform-работе; implementation,
-  selection, commit и push не разрешены.
+- **Подтверждено:** 2026-08-01 07:08:52 +03:00
+- **Формулировка/ограничения пользователя:** Пользователь явно одобрил
+  batch approval queue в указанном порядке; этот plan выполняется после
+  generic interaction window, проходит собственные verify/scope-check,
+  archive и отдельный локальный commit. Push не выполнять.
 
 ## Ход выполнения
 
-- Draft создан атомарно; реализация не начата.
-- Frontend skill and accepted helper/privacy decisions applied; no
-  implementation or contract mutation started.
+- Draft создан атомарно; backend helper settlement и generic interaction
+  prerequisites completed and archived.
+- 2026-08-01: plan принят из утверждённой batch queue после commit
+  `133402f`; implementation scope ограничен helper/reward UI и его write set.
+- Реализованы descriptor-only helper/reward options, native labeled form,
+  exact action lookup, cancel routing и сохранение одного command ID при
+  transient/offline retry через specialized combat-help endpoint.
+- Добавлены party-safe combatant/invited/observer/accepted fixtures и
+  projection-derived accepted helper summary без client-side payout/card
+  inference. Generic interaction surface остаётся единственным владельцем
+  dialog, focus, countdown, reconnect и error lifecycle.
+- Browser helper matrix сообщает 9/9 passed на desktop, tablet и mobile;
+  полный web suite сообщает 16 files / 99 tests passed. Playwright wrapper для
+  этого узкого spec завершился чисто, без teardown timeout.
+- Settlement receipt intentionally не добавлялся в web contract: backend
+  сохраняет authoritative helper-first/zero-payout outcome, но текущий
+  actor-specific `Projection` его полей не публикует; UI therefore остаётся
+  fail-closed и не реконструирует payout из публичных счётчиков.
 
 ## Итог
 
-Заполняется после реализации.
+Implementation, canonical checks, scope-check and archive завершены; plan
+готов к release и отдельному локальному commit. Push не выполняется.

@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import type {Projection} from "@munchkin/contracts";
+import {
+  acceptedCombatHelper,
+  projectedPlayerName,
+} from "../interaction/helperOfferModel";
 
-defineProps<{
+const props = defineProps<{
   projection: Projection;
 }>();
+
+const acceptedHelper = computed(() => acceptedCombatHelper(props.projection));
+const acceptedHelperName = computed(() => acceptedHelper.value
+  ? projectedPlayerName(props.projection, acceptedHelper.value.helperPlayerID)
+  : "");
 </script>
 
 <template>
@@ -52,6 +61,16 @@ defineProps<{
           <span>
             {{ projection.turn.combat.player_winning ? "побеждаешь" : "проигрываешь" }}
           </span>
+        </div>
+        <div
+          v-if="acceptedHelper"
+          class="combat-helper-summary"
+          role="status"
+          aria-label="Принятая помощь в бою"
+        >
+          <p class="eyebrow">ПОМОЩЬ ПРИНЯТА СЕРВЕРОМ</p>
+          <strong>{{ acceptedHelperName }}</strong>
+          <span>Награда помощника: {{ acceptedHelper.rewardTreasures }} сокр.</span>
         </div>
         <div v-if="projection.turn.resolving.length" class="resolving-cards" aria-label="Разрешаемые карты">
           <GameCard
@@ -187,6 +206,29 @@ defineProps<{
 .combat-score strong {
   color: var(--acid);
   font-size: 2rem;
+}
+
+.combat-helper-summary {
+  display: grid;
+  gap: .25rem;
+  max-width: 34rem;
+  border: 1px solid var(--acid);
+  padding: .7rem 1rem;
+  text-align: center;
+}
+
+.combat-helper-summary .eyebrow,
+.combat-helper-summary strong,
+.combat-helper-summary span {
+  overflow-wrap: anywhere;
+}
+
+.combat-helper-summary .eyebrow {
+  margin: 0;
+}
+
+.combat-helper-summary span {
+  color: var(--muted);
 }
 
 .resolving-cards {

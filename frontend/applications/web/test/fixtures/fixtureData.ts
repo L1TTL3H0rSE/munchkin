@@ -372,7 +372,40 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     );
   }),
   makeFixture("helper-offer", "Окно: помощь в бою", (projection) => {
+    projection.players = [player(0), player(1)];
     projection.turn.phase = "combat";
+    projection.turn.player_id = "player_hero";
+    projection.turn.combat = {
+      player_strength: 5,
+      monster_strength: 8,
+      player_winning: false,
+      tie_wins: false,
+      combat_closed: false,
+      monsters: [encounter],
+      effects: [],
+    };
+    projection.interaction = interaction(
+      "combat_response",
+      [
+        interactionAction("offer_help", "d", {
+          helper_player_id: "player_1",
+          reward_treasures: 1,
+        }),
+        interactionAction("offer_help", "e", {
+          helper_player_id: "player_1",
+          reward_treasures: 2,
+        }),
+        interactionAction("offer_help", "f", {
+          helper_player_id: "player_2",
+          reward_treasures: 1,
+        }),
+      ],
+    );
+  }),
+  makeFixture("helper-invite", "Окно: приглашение помощника", (projection) => {
+    projection.players = [player(0)];
+    projection.turn.phase = "combat";
+    projection.turn.player_id = "player_1";
     projection.turn.combat = {
       player_strength: 5,
       monster_strength: 8,
@@ -384,14 +417,53 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     };
     projection.interaction = interaction(
       "combat_help_offer",
-      [interactionAction("offer_help", "d")],
+      [
+        interactionAction("accept", "1"),
+        interactionAction("decline", "2"),
+      ],
       {
         combat_help_offer: {
-          helper_player_id: "player_2",
+          helper_player_id: "player_hero",
           reward_treasures: 2,
         },
       },
     );
+  }),
+  makeFixture("helper-observer", "Наблюдатель без условий помощи", (projection) => {
+    projection.players = [player(0), player(1)];
+    projection.turn.phase = "combat";
+    projection.turn.player_id = "player_1";
+    projection.turn.combat = {
+      player_strength: 5,
+      monster_strength: 8,
+      player_winning: false,
+      tie_wins: false,
+      combat_closed: false,
+      monsters: [encounter],
+      effects: [],
+    };
+    projection.interaction = interaction(
+      "combat_response",
+      [],
+      {response_required_for_you: false},
+    );
+  }),
+  makeFixture("helper-accepted", "Бой с принятой помощью", (projection) => {
+    projection.players = [player(0)];
+    projection.turn.phase = "combat";
+    projection.turn.player_id = "player_1";
+    projection.turn.combat = {
+      player_strength: 7,
+      monster_strength: 8,
+      player_winning: false,
+      tie_wins: false,
+      combat_closed: false,
+      monsters: [encounter],
+      effects: [],
+      helper_player_id: "player_hero",
+      helper_reward_treasures: 2,
+    };
+    projection.interaction = undefined;
   }),
   makeFixture("target-response", "Окно: выбор цели", (projection) => {
     projection.interaction = interaction(
