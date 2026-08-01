@@ -8,7 +8,6 @@ import {
   mapCardActions,
 } from "../app/components/actionModel";
 import {
-  GameApiError,
   parseGameProjection,
 } from "../app/composables/useGameApi";
 
@@ -107,7 +106,7 @@ describe("card-first action surface", () => {
     })).toBe("confirmed");
   });
 
-  it("fails closed with a recoverable protocol error instead of dropping actions", () => {
+  it("keeps typed economy descriptors for the specialized surface", () => {
     const fixture = JSON.parse(readFileSync(new URL(
       "../../../../backend/game/internal/transport/httpapi/testdata/"
         + "interaction-projection-v1.json",
@@ -119,14 +118,7 @@ describe("card-first action surface", () => {
       type: "propose_trade",
     }];
 
-    expect(() => parseGameProjection(fixture)).toThrow(GameApiError);
-    try {
-      parseGameProjection(fixture);
-    } catch (error) {
-      expect(error).toMatchObject({
-        kind: "protocol",
-        message: "Получен несовместимый ответ сервера.",
-      });
-    }
+    expect(parseGameProjection(fixture).turn.available_actions[0]?.type)
+      .toBe("propose_trade");
   });
 });

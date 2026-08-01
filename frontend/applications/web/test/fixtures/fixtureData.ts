@@ -1,11 +1,8 @@
 import {
   projectionSchema,
-  type ActionDescriptor,
-  type ActionType,
   type CardView,
   type InteractionView,
   type Projection,
-  type ServerActionDescriptor,
 } from "../../../../packages/contracts/src/index.ts";
 
 export type UiFixtureConnectionState = "connected" | "offline" | "stale";
@@ -20,31 +17,8 @@ export interface UiFixtureDefinition {
 type OtherPlayerView = Projection["players"][number];
 type InteractionAction = InteractionView["actions"][number];
 
-const unsupportedActionTypes: ReadonlySet<ActionType> = new Set([
-  "propose_trade",
-  "propose_gift",
-  "attempt_theft",
-]);
-
-function isSupportedAction(
-  action: ServerActionDescriptor,
-): action is ActionDescriptor {
-  return !unsupportedActionTypes.has(action.type);
-}
-
 export function parseFixtureProjection(value: unknown): Projection {
-  const parsed = projectionSchema.parse(value);
-  const availableActions = parsed.turn.available_actions.filter(isSupportedAction);
-  if (availableActions.length !== parsed.turn.available_actions.length) {
-    throw new Error("Fixture contains an unsupported action descriptor");
-  }
-  return {
-    ...parsed,
-    turn: {
-      ...parsed.turn,
-      available_actions: availableActions,
-    },
-  };
+  return projectionSchema.parse(value);
 }
 
 const longRules = "Выбери момент для следующего шага: проверь открытые зоны, "
@@ -740,6 +714,108 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
           offered: [card("offer-card", "Предложенный предмет", "item", "treasure")],
           requested: [],
         },
+      },
+    );
+  }),
+  makeFixture("economy-actions", "Действия: обмен, подарок и кража", (projection) => {
+    const carriedCards = [
+      card("transfer-card-1", "Передаваемый фонарь", "item", "treasure", {
+        item_slot: "hands",
+        item_size: "small",
+        bonus: 1,
+      }),
+      card("transfer-card-2", "Передаваемый плащ", "item", "treasure", {
+        item_slot: "armor",
+        item_size: "small",
+        bonus: 2,
+      }),
+    ];
+    projection.players = [player(0), player(1), player(2)];
+    projection.you.hand = [structuredClone(heroHand[0]!), structuredClone(heroHand[2]!)];
+    projection.you.carried = carriedCards;
+    projection.you.traits = [card(
+      "theft-trait",
+      "Оригинальная способность кражи",
+      "class",
+      "door",
+      {trait_group: "class"},
+    )];
+    projection.turn.phase = "preparation";
+    projection.turn.available_actions = [
+      {
+        type: "propose_gift",
+        instance_ids: carriedCards.map((item) => item.instance_id),
+        target_player_ids: ["player_1"],
+        minimum: 1,
+        maximum: carriedCards.length,
+      },
+      {
+        type: "propose_trade",
+        instance_ids: carriedCards.map((item) => item.instance_id),
+        requested_instance_ids: ["opaque-recipient-card-1", "opaque-recipient-card-2"],
+        target_player_ids: ["player_2"],
+        minimum: 1,
+        maximum: carriedCards.length,
+      },
+      {
+        type: "attempt_theft",
+        source_instance_id: "theft-trait",
+        instance_ids: projection.you.hand.map((item) => item.instance_id),
+        target_player_ids: ["player_1", "player_2"],
+        minimum: 1,
+        maximum: 1,
+        ability_index: 0,
+      },
+    ];
+  }),
+  makeFixture("economy-observer", "Окно: observer без карт предложения", (projection) => {
+    projection.players = [player(0), player(1), player(2)];
+    projection.interaction = interaction(
+      "economy_offer",
+      [],
+      {
+        response_required_for_you: false,
+      },
+    );
+  }),
+  makeFixture("charity-transfer", "Окно: обязательное распределение", (projection) => {
+    const hand = [
+      card("charity-card-1", "Карта для charity 1", "item", "treasure"),
+      card("charity-card-2", "Карта для charity 2", "item", "treasure"),
+      card("charity-card-3", "Карта для charity 3", "item", "treasure"),
+      card("charity-card-4", "Карта для charity 4", "item", "treasure"),
+    ];
+    projection.players = [player(0), player(1), player(2)];
+    projection.you.hand = hand;
+    projection.turn.phase = "charity";
+    projection.interaction = interaction(
+      "charity_transfer",
+      [],
+      {
+        parent_phase: "charity",
+        charity_transfer: {
+          excess: 2,
+          instance_ids: hand.map((item) => item.instance_id),
+          eligible_recipient_ids: ["player_1", "player_2"],
+        },
+      },
+    );
+  }),
+  makeFixture("theft-response", "Окно: counter кражи", (projection) => {
+    projection.players = [player(0), player(1), player(2)];
+    projection.you.hand = [
+      card("counter-card", "Оригинальная counter-карта", "one_shot", "treasure"),
+      structuredClone(heroHand[0]!),
+    ];
+    projection.turn.phase = "preparation";
+    projection.interaction = interaction(
+      "theft_response",
+      [interactionAction("respond", "7", {
+        source_instance_id: "counter-card",
+        theft_capability: "counter_theft",
+      })],
+      {
+        parent_phase: "preparation",
       },
     );
   }),

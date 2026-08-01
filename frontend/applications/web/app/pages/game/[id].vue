@@ -5,6 +5,7 @@ import type {
 } from "@munchkin/contracts";
 import type {ActionEntry} from "../../components/actionModel";
 import type {InteractionActionView} from "../../components/interaction/interactionModel";
+import type {EconomySubmission} from "../../components/interaction/economyModel";
 
 const route = useRoute();
 const router = useRouter();
@@ -24,7 +25,6 @@ const {
   projection,
   loading,
   actionBusy,
-  interactionBusy,
   errorMessage,
   interactionError,
   connectionState,
@@ -37,6 +37,10 @@ function executeAction(entry: ActionEntry, payload: CommandPayload): void {
 
 function executeInteraction(action: InteractionActionView): void {
   void controller.submitInteraction(action);
+}
+
+function executeEconomy(request: EconomySubmission): void {
+  void controller.submitEconomy(request);
 }
 
 onMounted(() => {
@@ -62,13 +66,15 @@ onMounted(() => {
       :is-busy="isBusy"
       @retry="controller.retry"
       @execute="executeAction"
+      @execute-economy="executeEconomy"
     />
     <InteractionSurface
       :projection="projection"
       :connection-state="connectionState"
-      :busy="interactionBusy"
-      :error-message="interactionError"
+      :busy="isBusy"
+      :error-message="interactionError || errorMessage"
       @submit="executeInteraction"
+      @submit-economy="executeEconomy"
     />
   </div>
   <section v-else class="center-state" :aria-busy="isBusy">

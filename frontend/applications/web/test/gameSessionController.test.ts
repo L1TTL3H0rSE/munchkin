@@ -21,6 +21,10 @@ import {
   type GameSessionScheduler,
 } from "../app/composables/useGameSessionController";
 import {createFixtureAdapter} from "./fixtures/fixtureAdapter";
+import {
+  economyActions,
+  type EconomySubmission,
+} from "../app/components/interaction/economyModel";
 
 const baseProjection = parseGameProjection(JSON.parse(readFileSync(new URL(
   "../../../../backend/game/internal/transport/httpapi/testdata/"
@@ -125,6 +129,15 @@ function createAPI(initialProjection = projectionAt(7)) {
   const combatHelp = vi.fn<GameSessionAPI["combatHelp"]>(
     async () => commandResult(initialProjection),
   );
+  const economyOffer = vi.fn<GameSessionAPI["economyOffer"]>(
+    async () => commandResult(initialProjection),
+  );
+  const resolveCharity = vi.fn<GameSessionAPI["resolveCharity"]>(
+    async () => commandResult(initialProjection),
+  );
+  const attemptTheft = vi.fn<GameSessionAPI["attemptTheft"]>(
+    async () => commandResult(initialProjection),
+  );
   const stream = vi.fn<GameSessionAPI["stream"]>(
     (gameID, _credential, onInvalidation, onDisconnect, onConnected) => {
       const stopped = vi.fn();
@@ -143,9 +156,23 @@ function createAPI(initialProjection = projectionAt(7)) {
     command,
     interaction,
     combatHelp,
+    economyOffer,
+    resolveCharity,
+    attemptTheft,
     stream,
   } satisfies GameSessionAPI;
-  return {api, getGame, command, interaction, combatHelp, stream, streams};
+  return {
+    api,
+    getGame,
+    command,
+    interaction,
+    combatHelp,
+    economyOffer,
+    resolveCharity,
+    attemptTheft,
+    stream,
+    streams,
+  };
 }
 
 function createHarness(options: {
@@ -442,6 +469,51 @@ describe("game session controller", () => {
     expect(harness.combatHelp.mock.calls[0]?.[4]?.commandID)
       .toBe("stable-command-id");
     expect(harness.combatHelp.mock.calls[1]?.[4]?.commandID)
+      .toBe("stable-command-id");
+    expect(harness.controller.projection.value?.version)
+      .toBe(nextProjection.version);
+  });
+
+  it("submits economy clauses with one idempotent retry and no optimistic move", async () => {
+    const economyProjection = fixtureAdapter.getProjection("economy-actions");
+    const giftEntry = economyActions(economyProjection.turn.available_actions)
+      .find(({action}) => action.type === "propose_gift");
+    if (!giftEntry) {
+      throw new Error("economy fixture must expose a gift descriptor");
+    }
+    const nextProjection = {
+      ...economyProjection,
+      version: economyProjection.version + 1,
+    };
+    const apiHarness = createAPI(economyProjection);
+    apiHarness.economyOffer
+      .mockRejectedValueOnce(new GameApiError(
+        "offline",
+        safeGameApiMessage("offline"),
+      ))
+      .mockResolvedValueOnce(commandResult(nextProjection));
+    const harness = createHarness({api: apiHarness});
+    await harness.controller.start(economyProjection.game_id);
+
+    const request: EconomySubmission = {
+      kind: "offer",
+      offerKind: "gift",
+      action: giftEntry.action,
+      recipientPlayerID: "player_1",
+      offeredInstanceIDs: ["transfer-card-1"],
+      requestedInstanceIDs: [],
+    };
+    await harness.controller.submitEconomy(request);
+
+    expect(apiHarness.economyOffer).toHaveBeenCalledTimes(2);
+    expect(apiHarness.economyOffer.mock.calls[0]?.slice(2, 7)).toEqual([
+      economyProjection.version,
+      "gift",
+      "player_1",
+      ["transfer-card-1"],
+      [],
+    ]);
+    expect(apiHarness.economyOffer.mock.calls[0]?.[7]?.commandID)
       .toBe("stable-command-id");
     expect(harness.controller.projection.value?.version)
       .toBe(nextProjection.version);

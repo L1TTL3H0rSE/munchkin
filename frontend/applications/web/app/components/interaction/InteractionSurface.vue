@@ -51,6 +51,11 @@ import {
   targetRunAwayActionDetails,
   targetRunAwayActionLabel,
 } from "./targetRunAwayModel";
+import EconomySurface from "./EconomySurface.vue";
+import {
+  interactionHasCharityForm,
+  type EconomySubmission,
+} from "./economyModel";
 
 const props = defineProps<{
   projection: Projection;
@@ -61,6 +66,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   submit: [action: InteractionActionView];
+  "submit-economy": [request: EconomySubmission];
 }>();
 
 const dialogRef = ref<HTMLElement | null>(null);
@@ -97,6 +103,8 @@ const targetInteraction = computed(() => isTargetInteraction(interaction.value)
 const runAwayInteraction = computed(() => isRunAwayInteraction(interaction.value)
   ? interaction.value
   : undefined);
+const economyOffer = computed(() => interaction.value?.economy_offer);
+const charityForm = computed(() => interactionHasCharityForm(interaction.value));
 const runAway = computed(() => runAwayState(props.projection));
 const helperCancel = computed(() => helperCancelAction(interaction.value));
 const helperRewardValues = computed(() => helperRewardsFor(
@@ -260,6 +268,9 @@ function isTargetRunAwayAction(_action: InteractionActionView): boolean {
 }
 
 function actionLabelFor(action: InteractionActionView, actionIndex: number): string {
+  if (action.theft_capability) {
+    return "Выставить контрмеру";
+  }
   if (isTargetRunAwayAction(action)) {
     return targetRunAwayActionLabel(action, actionIndex, ownCards.value);
   }
@@ -270,6 +281,12 @@ function actionLabelFor(action: InteractionActionView, actionIndex: number): str
 }
 
 function actionDetailsFor(action: InteractionActionView): string[] {
+  if (action.theft_capability) {
+    return [
+      "Собственная контркарта из текущей проекции.",
+      "Итог и скрытые варианты остаются на сервере.",
+    ];
+  }
   if (isTargetRunAwayAction(action) && interaction.value) {
     return targetRunAwayActionDetails(
       action,
@@ -380,6 +397,10 @@ function actionActionKey(action: InteractionActionView): string {
             <p class="interaction-dialog__context">
               {{ helperOfferMode
                 ? "Выберите только помощника и награду из текущих дескрипторов."
+                : charityForm
+                ? "Назначьте ровно server-required excess карт; transfer произойдёт после подтверждения."
+                : economyOffer
+                ? "Детали карт видны только сторонам предложения; observer получает opaque окно."
                 : targetInteraction
                 ? "Цель, private choice и counter доступны только из actor-specific дескрипторов."
                 : runAwayInteraction
@@ -454,6 +475,44 @@ function actionActionKey(action: InteractionActionView): string {
         </section>
 
         <section
+          v-if="interaction.public_kind === 'economy_offer'"
+          class="interaction-domain-summary interaction-domain-summary--offer"
+          aria-label="Предложение обмена или подарка"
+        >
+          <p class="eyebrow">ПРЕДЛОЖЕНИЕ</p>
+          <template v-if="economyOffer">
+            <p>
+              {{ economyOffer.kind === "trade" ? "Обмен" : "Подарок" }} от
+              <strong>{{ projectedPlayerName(projection, economyOffer.offerer_player_id) }}</strong>
+              игроку
+              <strong>{{ projectedPlayerName(projection, economyOffer.recipient_player_id) }}</strong>
+            </p>
+            <div class="interaction-card-columns">
+              <div>
+                <span>Передаётся</span>
+                <ul>
+                  <li v-for="card in economyOffer.offered" :key="card.instance_id">
+                    {{ card.name }}
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <span>{{ economyOffer.kind === "trade" ? "Запрошено" : "Оговорка" }}</span>
+                <ul v-if="economyOffer.requested.length">
+                  <li v-for="card in economyOffer.requested" :key="card.instance_id">
+                    {{ card.name }}
+                  </li>
+                </ul>
+                <p v-else>Подарок без встречной передачи.</p>
+              </div>
+            </div>
+          </template>
+          <p v-else>
+            Детали предложения доступны только участникам; identities карт observer не видит.
+          </p>
+        </section>
+
+        <section
           v-if="invitedHelperOffer && interaction.combat_help_offer"
           class="interaction-helper-summary"
           aria-label="Предложение помощи"
@@ -470,6 +529,14 @@ function actionActionKey(action: InteractionActionView): string {
         <div v-if="errorMessage" class="interaction-dialog__error" role="alert">
           {{ errorMessage }}
         </div>
+
+        <EconomySurface
+          v-if="charityForm && interaction"
+          :projection="projection"
+          :interaction="interaction"
+          :busy="busy"
+          @submit="emit('submit-economy', $event)"
+        />
 
         <form
           v-if="helperOfferMode"
@@ -527,7 +594,7 @@ function actionActionKey(action: InteractionActionView): string {
         </form>
 
         <p
-          v-if="!interaction.actions.length"
+          v-if="!interaction.actions.length && !charityForm"
           class="interaction-dialog__opaque"
           role="status"
         >
@@ -535,7 +602,7 @@ function actionActionKey(action: InteractionActionView): string {
         </p>
 
         <p
-          v-else-if="!selectableActions.length && !helperOfferMode && !helperCancel"
+          v-else-if="!selectableActions.length && !helperOfferMode && !helperCancel && !charityForm"
           class="interaction-dialog__opaque"
           role="status"
         >
@@ -593,7 +660,7 @@ function actionActionKey(action: InteractionActionView): string {
           >
             {{ busy ? "Отправляем…" : actionLabelFor(selectedAction, selectedActionIndex) }}
           </button>
-          <span v-else-if="!helperOfferMode" class="interaction-dialog__submit-placeholder">
+          <span v-else-if="!helperOfferMode && !charityForm" class="interaction-dialog__submit-placeholder">
             Действие недоступно
           </span>
           <small>Окончательное решение принимает сервер.</small>
@@ -663,6 +730,8 @@ function actionActionKey(action: InteractionActionView): string {
   max-height: min(90dvh, 52rem);
   display: grid;
   gap: 1rem;
+  min-width: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid var(--acid);
   padding: 1.25rem;
@@ -676,6 +745,13 @@ function actionActionKey(action: InteractionActionView): string {
   align-items: start;
   justify-content: space-between;
   gap: 1rem;
+  min-width: 0;
+}
+
+.interaction-dialog__header > div,
+.interaction-dialog__footer > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .interaction-dialog__header h2 {
@@ -717,6 +793,36 @@ function actionActionKey(action: InteractionActionView): string {
 
 .interaction-domain-summary .eyebrow {
   color: var(--acid);
+}
+
+.interaction-card-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: .75rem;
+}
+
+.interaction-card-columns > div {
+  min-width: 0;
+  border: 1px solid var(--line);
+  padding: .6rem;
+}
+
+.interaction-card-columns span {
+  color: var(--muted);
+  font-size: .75rem;
+  text-transform: uppercase;
+}
+
+.interaction-card-columns ul {
+  display: grid;
+  gap: .35rem;
+  margin: .45rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.interaction-card-columns p {
+  margin: .45rem 0 0;
+  color: var(--muted);
 }
 
 .interaction-domain-summary time {

@@ -14,9 +14,7 @@ import {
   lobbySummarySchema,
   projectionSchema,
   commandPayloadSchema,
-  type ActionDescriptor,
   type ActionType,
-  type ServerActionDescriptor,
   type CommandResult,
   type CommandPayload,
   type Invalidation,
@@ -65,12 +63,6 @@ export interface GameRequestOptions {
 export interface GameCommandOptions extends GameRequestOptions {
   commandID?: string;
 }
-
-const unsupportedActionTypes = new Set<ActionType>([
-  "propose_trade",
-  "propose_gift",
-  "attempt_theft",
-]);
 
 export function useGameApi() {
   const config = useRuntimeConfig();
@@ -283,6 +275,7 @@ export function useGameApi() {
     recipientPlayerID: string,
     offeredInstanceIDs: string[],
     requestedInstanceIDs: string[] = [],
+    options: GameCommandOptions = {},
   ) {
     const request = parseClientRequest(
       () => economyOfferRequestSchema.parse({
@@ -301,9 +294,10 @@ export function useGameApi() {
           method: "POST",
           headers: {
             ...authorization(credential),
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": options.commandID ?? crypto.randomUUID(),
           },
           body: request,
+          ...(options.signal ? {signal: options.signal} : {}),
         },
       ),
       clientCommandResult,
@@ -315,6 +309,7 @@ export function useGameApi() {
     credential: string,
     expectedVersion: number,
     allocations: CharityAllocation[] = [],
+    options: GameCommandOptions = {},
   ) {
     const request = parseClientRequest(
       () => charityRequestSchema.parse({
@@ -329,9 +324,10 @@ export function useGameApi() {
           method: "POST",
           headers: {
             ...authorization(credential),
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": options.commandID ?? crypto.randomUUID(),
           },
           body: request,
+          ...(options.signal ? {signal: options.signal} : {}),
         },
       ),
       clientCommandResult,
@@ -346,6 +342,7 @@ export function useGameApi() {
     abilityIndex: number,
     costInstanceID: string,
     victimPlayerID: string,
+    options: GameCommandOptions = {},
   ) {
     const request = parseClientRequest(
       () => theftRequestSchema.parse({
@@ -363,9 +360,10 @@ export function useGameApi() {
           method: "POST",
           headers: {
             ...authorization(credential),
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": options.commandID ?? crypto.randomUUID(),
           },
           body: request,
+          ...(options.signal ? {signal: options.signal} : {}),
         },
       ),
       clientCommandResult,
@@ -451,28 +449,7 @@ function clientCommandResult(response: unknown): CommandResult {
 }
 
 function clientProjection(response: unknown): Projection {
-  const parsed = projectionSchema.parse(response);
-  return {
-    ...parsed,
-    turn: {
-      ...parsed.turn,
-      available_actions: parsed.turn.available_actions.map((action) => {
-        if (!isSupportedAction(action)) {
-          throw new GameApiError(
-            "protocol",
-            safeGameApiMessage("protocol"),
-          );
-        }
-        return action;
-      }),
-    },
-  };
-}
-
-function isSupportedAction(
-  action: ServerActionDescriptor,
-): action is ActionDescriptor {
-  return !unsupportedActionTypes.has(action.type);
+  return projectionSchema.parse(response);
 }
 
 export function parseGameProjection(response: unknown): Projection {

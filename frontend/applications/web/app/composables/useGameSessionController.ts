@@ -14,11 +14,14 @@ import type {
   ActionDescriptor,
   CommandPayload,
   CommandResult,
+  CharityAllocation,
   InteractionView,
   InteractionIntent,
   Invalidation,
   Projection,
 } from "@munchkin/contracts";
+
+import type {EconomySubmission} from "../components/interaction/economyModel";
 
 import {
   GameApiError,
@@ -66,6 +69,33 @@ export interface GameSessionAPI {
     credential: string,
     expectedVersion: number,
     actionID: string,
+    options?: GameCommandOptions,
+  ) => Promise<CommandResult>;
+  economyOffer: (
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    kind: "trade" | "gift",
+    recipientPlayerID: string,
+    offeredInstanceIDs: string[],
+    requestedInstanceIDs?: string[],
+    options?: GameCommandOptions,
+  ) => Promise<CommandResult>;
+  resolveCharity: (
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    allocations?: CharityAllocation[],
+    options?: GameCommandOptions,
+  ) => Promise<CommandResult>;
+  attemptTheft: (
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+    sourceInstanceID: string,
+    abilityIndex: number,
+    costInstanceID: string,
+    victimPlayerID: string,
     options?: GameCommandOptions,
   ) => Promise<CommandResult>;
   stream: (
@@ -567,6 +597,142 @@ export function createGameSessionController(
     }
   }
 
+  async function submitEconomy(request: EconomySubmission): Promise<void> {
+    const owner = lifecycle;
+    const current = projectionState.value;
+    const credential = currentCredential;
+    if (
+      !isCurrent(owner) ||
+      !current ||
+      !credential ||
+      pendingCommand ||
+      pendingInteraction
+    ) {
+      return;
+    }
+
+    if (request.kind === "charity" && request.interactionID &&
+      current.interaction?.interaction_id !== request.interactionID) {
+      errorMessageState.value = safeGameApiMessage("stale_version");
+      connectionState.value = "resyncing";
+      await resyncController.request().catch((error: unknown) => {
+        reportDiagnostic(normalizeGameApiError(error));
+      });
+      if (isCurrent(owner) && stopStream) {
+        connectionState.value = "connected";
+      }
+      return;
+    }
+
+    if (request.kind !== "charity") {
+      const liveAction = current.turn.available_actions.find((candidate) =>
+        candidate.type === request.action.type &&
+        candidate.source_instance_id === request.action.source_instance_id &&
+        candidate.ability_index === request.action.ability_index,
+      );
+      if (!liveAction) {
+        errorMessageState.value = safeGameApiMessage("stale_version");
+        connectionState.value = "resyncing";
+        await resyncController.request().catch((error: unknown) => {
+          reportDiagnostic(normalizeGameApiError(error));
+        });
+        if (isCurrent(owner) && stopStream) {
+          connectionState.value = "connected";
+        }
+        return;
+      }
+    }
+
+    const commandID = createCommandID();
+    pendingCommand = {commandID, lifecycle: owner};
+    actionBusyState.value = true;
+    errorMessageState.value = "";
+
+    const execute = () => withRequest(
+      owner,
+      (signal) => {
+        switch (request.kind) {
+          case "offer":
+            return options.api.economyOffer(
+              currentGameID,
+              credential,
+              current.version,
+              request.offerKind,
+              request.recipientPlayerID,
+              request.offeredInstanceIDs,
+              request.requestedInstanceIDs,
+              {commandID, signal},
+            );
+          case "charity":
+            return options.api.resolveCharity(
+              currentGameID,
+              credential,
+              current.version,
+              request.allocations,
+              {commandID, signal},
+            );
+          case "theft":
+            return options.api.attemptTheft(
+              currentGameID,
+              credential,
+              current.version,
+              request.action.source_instance_id ?? "",
+              request.action.ability_index ?? 0,
+              request.costInstanceID,
+              request.victimPlayerID,
+              {commandID, signal},
+            );
+        }
+      },
+    );
+
+    try {
+      let result: CommandResult;
+      try {
+        result = await execute();
+      } catch (error) {
+        const normalized = normalizeGameApiError(error);
+        if (
+          normalized.kind !== "offline" &&
+          normalized.kind !== "transient"
+        ) {
+          throw normalized;
+        }
+        result = await execute();
+      }
+      if (!isCurrent(owner)) {
+        return;
+      }
+      if (
+        result.game_id !== currentGameID ||
+        result.projection.game_id !== currentGameID
+      ) {
+        throw new GameApiError(
+          "protocol",
+          safeGameApiMessage("protocol"),
+        );
+      }
+      const visible = projectionState.value;
+      if (!visible || result.projection.version >= visible.version) {
+        projectionState.value = result.projection;
+      }
+      errorMessageState.value = "";
+    } catch (error) {
+      if (!isCurrent(owner)) {
+        return;
+      }
+      await handleActionFailure(normalizeGameApiError(error), owner);
+    } finally {
+      if (
+        pendingCommand?.commandID === commandID &&
+        pendingCommand.lifecycle === owner
+      ) {
+        pendingCommand = undefined;
+        actionBusyState.value = false;
+      }
+    }
+  }
+
   async function handleActionFailure(
     error: GameApiError,
     owner: number,
@@ -910,6 +1076,7 @@ export function createGameSessionController(
     refresh,
     retry,
     submitAction,
+    submitEconomy,
     submitInteraction,
   };
 }

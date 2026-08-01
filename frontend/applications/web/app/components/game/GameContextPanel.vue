@@ -267,6 +267,9 @@ const runAway = computed(() => runAwayState(props.projection));
   padding: .5rem;
   text-align: center;
   transform: rotate(-2deg);
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .deck strong {
@@ -281,6 +284,14 @@ const runAway = computed(() => runAwayState(props.projection));
   justify-items: center;
   gap: 1rem;
   min-width: 0;
+}
+
+.encounter-area > .eyebrow,
+.phase-display {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .combat-monsters {
@@ -317,6 +328,10 @@ const runAway = computed(() => runAwayState(props.projection));
 .phase-display h3 {
   margin: .5rem;
   font-size: clamp(2rem, 5vw, 4rem);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   text-transform: uppercase;
 }
 
@@ -516,6 +531,12 @@ const runAway = computed(() => runAwayState(props.projection));
 
   .run-away-attempts small {
     grid-column: auto;
+  }
+}
+
+@media (width <= 420px) {
+  .table-center {
+    grid-template-columns: 56px minmax(0, 1fr) 56px;
   }
 }
 </style>

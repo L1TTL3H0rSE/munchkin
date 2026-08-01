@@ -7,6 +7,12 @@ import type {
 import type {GameConnectionState} from "../../composables/useGameSessionController";
 import ActionPanel from "../ActionPanel.vue";
 import GameConnectionStatus from "../GameConnectionStatus.vue";
+import EconomySurface from "../interaction/EconomySurface.vue";
+import {
+  economyActions,
+  isEconomyAction,
+  type EconomySubmission,
+} from "../interaction/economyModel";
 import {
   buildCommandPayload,
   cardActionState,
@@ -31,6 +37,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   retry: [];
   execute: [entry: ActionEntry, payload: CommandPayload];
+  "execute-economy": [request: EconomySubmission];
 }>();
 
 const selectedCardID = ref<string | null>(null);
@@ -64,12 +71,20 @@ const actionEntries = computed<ActionEntry[]>(() =>
   props.projection.turn.available_actions.map((action, index) => ({action, index})),
 );
 
+const economyActionEntries = computed(() => economyActions(
+  props.projection.turn.available_actions,
+));
+
+const genericActionEntries = computed<ActionEntry[]>(() =>
+  actionEntries.value.filter((entry) => !isEconomyAction(entry.action)),
+);
+
 const cardActionMap = computed(() =>
-  mapCardActions(ownCards.value, actionEntries.value),
+  mapCardActions(ownCards.value, genericActionEntries.value),
 );
 
 const globalActionEntries = computed(() =>
-  actionEntries.value.filter((entry) =>
+  genericActionEntries.value.filter((entry) =>
     !cardActionMap.value.cardBoundActionIndexes.has(entry.index),
   ),
 );
@@ -219,6 +234,13 @@ onBeforeUnmount(() => {
       @activate="activateCard"
     />
 
+    <EconomySurface
+      :projection="projection"
+      :actions="economyActionEntries"
+      :busy="actionBusy"
+      @submit="emit('execute-economy', $event)"
+    />
+
     <section class="action-bar" aria-label="Действия текущей проекции">
       <ActionPanel
         :entries="actionPanelEntries"
@@ -230,7 +252,7 @@ onBeforeUnmount(() => {
         @execute="runAction"
       />
       <p
-        v-if="projection.status === 'active' && !projection.turn.available_actions.length"
+        v-if="projection.status === 'active' && !genericActionEntries.length && !economyActionEntries.length"
         class="action-bar__waiting"
         role="status"
       >
