@@ -4,6 +4,11 @@ import {
   acceptedCombatHelper,
   projectedPlayerName,
 } from "../interaction/helperOfferModel";
+import {
+  combatEffectTarget,
+  combatEffects,
+  combatMonsters,
+} from "../interaction/advancedCombatModel";
 
 const props = defineProps<{
   projection: Projection;
@@ -13,6 +18,9 @@ const acceptedHelper = computed(() => acceptedCombatHelper(props.projection));
 const acceptedHelperName = computed(() => acceptedHelper.value
   ? projectedPlayerName(props.projection, acceptedHelper.value.helperPlayerID)
   : "");
+const visibleCombatMonsters = computed(() => combatMonsters(props.projection));
+const primaryCombatMonster = computed(() => visibleCombatMonsters.value[0]);
+const visibleCombatEffects = computed(() => combatEffects(props.projection));
 </script>
 
 <template>
@@ -45,9 +53,28 @@ const acceptedHelperName = computed(() => acceptedHelper.value
 
       <div class="encounter-area">
         <p class="eyebrow">ОБЯЗАТЕЛЬНОЕ РЕШЕНИЕ</p>
+        <div
+          v-if="visibleCombatMonsters.length > 1"
+          class="combat-monsters"
+          aria-label="Монстры текущего боя"
+        >
+          <article
+            v-for="(monster, index) in visibleCombatMonsters"
+            :key="monster.instance_id"
+            class="combat-monster"
+          >
+            <p class="eyebrow">
+              {{ index === 0 ? "МОНСТР ВСТРЕЧИ" : "ДОПОЛНИТЕЛЬНЫЙ МОНСТР" }}
+            </p>
+            <GameCard
+              :card="monster"
+              :content-set-id="projection.content_set_id"
+            />
+          </article>
+        </div>
         <GameCard
-          v-if="projection.turn.encounter"
-          :card="projection.turn.encounter"
+          v-else-if="primaryCombatMonster"
+          :card="primaryCombatMonster"
           :content-set-id="projection.content_set_id"
         />
         <div v-else class="phase-display">
@@ -71,6 +98,27 @@ const acceptedHelperName = computed(() => acceptedHelper.value
           <p class="eyebrow">ПОМОЩЬ ПРИНЯТА СЕРВЕРОМ</p>
           <strong>{{ acceptedHelperName }}</strong>
           <span>Награда помощника: {{ acceptedHelper.rewardTreasures }} сокр.</span>
+        </div>
+        <div
+          v-if="visibleCombatEffects.length"
+          class="combat-effects"
+          aria-label="Эффекты текущего боя"
+        >
+          <article
+            v-for="effect in visibleCombatEffects"
+            :key="effect.effect_id"
+            class="combat-effect"
+            :data-state="effect.active ? 'active' : 'inactive'"
+          >
+            <strong>
+              {{ effect.kind === "enhance_monster"
+                ? "Усиление монстра"
+                : "Эффект боя" }}
+            </strong>
+            <span>{{ combatEffectTarget(projection, effect) }}</span>
+            <span v-if="effect.amount">+{{ effect.amount }} силы</span>
+            <small>{{ effect.active ? "Подтверждено проекцией" : "Снято сервером" }}</small>
+          </article>
         </div>
         <div v-if="projection.turn.resolving.length" class="resolving-cards" aria-label="Разрешаемые карты">
           <GameCard
@@ -178,6 +226,26 @@ const acceptedHelperName = computed(() => acceptedHelper.value
   min-width: 0;
 }
 
+.combat-monsters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: .75rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.combat-monster {
+  display: grid;
+  gap: .4rem;
+  min-width: 0;
+}
+
+.combat-monster > .eyebrow {
+  margin: 0;
+  color: var(--muted);
+  text-align: center;
+}
+
 .encounter-area > .eyebrow {
   margin: 0;
   text-align: center;
@@ -231,6 +299,35 @@ const acceptedHelperName = computed(() => acceptedHelper.value
   color: var(--muted);
 }
 
+.combat-effects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: .5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.combat-effect {
+  display: grid;
+  gap: .2rem;
+  min-width: 0;
+  border: 1px solid var(--line);
+  padding: .65rem .75rem;
+  overflow-wrap: anywhere;
+}
+
+.combat-effect[data-state="inactive"] {
+  opacity: .65;
+}
+
+.combat-effect strong {
+  color: var(--acid);
+}
+
+.combat-effect small {
+  color: var(--muted);
+}
+
 .resolving-cards {
   display: flex;
   gap: .5rem;
@@ -262,6 +359,11 @@ const acceptedHelperName = computed(() => acceptedHelper.value
 
   .deck strong {
     font-size: 1.2rem;
+  }
+
+  .combat-monsters,
+  .combat-effects {
+    grid-template-columns: 1fr;
   }
 }
 </style>

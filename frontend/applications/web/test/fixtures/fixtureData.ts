@@ -116,6 +116,20 @@ const encounter = card(
   },
 );
 
+const additionalMonster = card(
+  "paperwork-hydra-1",
+  "Гидра из справок",
+  "monster",
+  "door",
+  {
+    combat_strength: 9,
+    treasure_count: 2,
+    levels_reward: 1,
+  },
+);
+
+const advancedEffectID = "fx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
 const baseProjection: Projection = {
   game_id: "fixture-base",
   version: 1,
@@ -211,6 +225,40 @@ function interaction(
     actions,
     ...fields,
   };
+}
+
+function configureAdvancedCombat(
+  projection: Projection,
+  actions: InteractionAction[],
+  fields: Partial<InteractionView> = {},
+): void {
+  projection.players = [player(0), player(1), player(2)];
+  projection.turn.phase = "combat";
+  projection.turn.player_id = "player_hero";
+  projection.turn.encounter = encounter;
+  projection.turn.combat = {
+    player_strength: 4,
+    monster_strength: 14,
+    player_winning: false,
+    tie_wins: false,
+    combat_closed: false,
+    monsters: [encounter, additionalMonster],
+    effects: [{
+      effect_id: advancedEffectID,
+      kind: "enhance_monster",
+      target_monster_instance_id: additionalMonster.instance_id,
+      amount: 4,
+      active: true,
+    }],
+  };
+  projection.you.hand = [
+    ...structuredClone(heroHand),
+    card("advanced-add-monster", "Вызов дополнительного монстра", "one_shot", "treasure"),
+    card("advanced-enhancer", "Усиление монстра", "one_shot", "treasure"),
+    card("advanced-helper", "Принудительная помощь", "one_shot", "treasure"),
+  ];
+  projection.turn.available_actions = [];
+  projection.interaction = interaction("combat_response", actions, fields);
 }
 
 function makeFixture(
@@ -464,6 +512,50 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       helper_reward_treasures: 2,
     };
     projection.interaction = undefined;
+  }),
+  makeFixture("advanced-combat", "Бой: дополнительные монстры и эффекты", (projection) => {
+    configureAdvancedCombat(projection, [
+      interactionAction("pass", "a"),
+      interactionAction("respond", "b", {
+        source_instance_id: "advanced-add-monster",
+        combat_capability: "add_monster",
+      }),
+      interactionAction("respond", "c", {
+        source_instance_id: "advanced-enhancer",
+        combat_capability: "enhance_monster",
+        target_monster_instance_id: additionalMonster.instance_id,
+        combat_delta: 4,
+      }),
+      interactionAction("respond", "d", {
+        source_instance_id: "hero-card-3",
+        combat_capability: "counter_combat_effect",
+        target_effect_id: advancedEffectID,
+      }),
+      interactionAction("respond", "e", {
+        source_instance_id: "advanced-helper",
+        combat_capability: "force_combat_helper",
+        helper_player_id: "player_1",
+      }),
+    ]);
+  }),
+  makeFixture("advanced-forced-helper", "Бой: обязательная помощь", (projection) => {
+    configureAdvancedCombat(projection, [
+      interactionAction("respond", "f", {
+        source_instance_id: "advanced-helper",
+        combat_capability: "force_combat_helper",
+        helper_player_id: "player_1",
+      }),
+    ]);
+  }),
+  makeFixture("advanced-observer", "Бой: наблюдатель без вмешательства", (projection) => {
+    configureAdvancedCombat(projection, [], {response_required_for_you: false});
+    projection.you.hand = [card(
+      "observer-card",
+      "Карта наблюдателя",
+      "item",
+      "treasure",
+      {bonus: 1},
+    )];
   }),
   makeFixture("target-response", "Окно: выбор цели", (projection) => {
     projection.interaction = interaction(

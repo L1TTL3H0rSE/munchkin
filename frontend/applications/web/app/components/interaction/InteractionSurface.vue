@@ -35,6 +35,12 @@ import {
   isInvitedHelperOffer,
   projectedPlayerName,
 } from "./helperOfferModel";
+import {
+  advancedCombatActionDetails,
+  advancedCombatActionLabel,
+  advancedCombatActions,
+  type AdvancedCombatAction,
+} from "./advancedCombatModel";
 
 const props = defineProps<{
   projection: Projection;
@@ -221,6 +227,12 @@ function submitSelected(): void {
     return;
   }
   emit("submit", action);
+}
+
+function isAdvancedCombatAction(
+  action: InteractionActionView,
+): action is AdvancedCombatAction {
+  return advancedCombatActions([action]).length === 1;
 }
 
 watch(
@@ -447,7 +459,10 @@ function actionActionKey(action: InteractionActionView): string {
             v-for="action in selectableActions"
             :key="interactionActionKey(action)"
             class="interaction-action"
-            :class="{'interaction-action--selected': action.action_id === selectedActionID}"
+            :class="{
+              'interaction-action--selected': action.action_id === selectedActionID,
+              'interaction-action--advanced': isAdvancedCombatAction(action),
+            }"
             :data-state="action.action_id === selectedActionID ? 'selected' : 'available'"
           >
             <input
@@ -459,8 +474,12 @@ function actionActionKey(action: InteractionActionView): string {
               @change="selectAction(action)"
             >
             <span>
-              <strong>{{ interactionActionLabel(action) }}</strong>
-              <small>{{ interactionActionDescription(action, ownCards) }}</small>
+              <strong>{{ isAdvancedCombatAction(action)
+                ? advancedCombatActionLabel(action)
+                : interactionActionLabel(action) }}</strong>
+              <small>{{ isAdvancedCombatAction(action)
+                ? advancedCombatActionDetails(action, projection, ownCards).join(" · ")
+                : interactionActionDescription(action, ownCards) }}</small>
             </span>
           </label>
         </fieldset>
@@ -703,6 +722,10 @@ function actionActionKey(action: InteractionActionView): string {
 .interaction-action--selected {
   border-color: var(--acid);
   background: #20270d;
+}
+
+.interaction-action--advanced strong {
+  color: var(--acid);
 }
 
 .interaction-action--unsupported {
