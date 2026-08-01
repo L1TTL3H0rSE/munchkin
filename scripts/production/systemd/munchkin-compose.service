@@ -1,0 +1,18 @@
+[Unit]
+Description=Munchkin production Compose recovery
+Requires=docker.service srv-munchkin.mount
+After=docker.service network-online.target srv-munchkin.mount
+Wants=network-online.target
+ConditionPathExists=/srv/munchkin/compose/compose.production.yml
+ConditionPathExists=/srv/munchkin/compose/scripts/deploy.sh
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/munchkin-deploy-allowlist recover
+ExecStop=/usr/local/sbin/munchkin-deploy-allowlist status
+TimeoutStartSec=10min
+TimeoutStopSec=2min
+
+[Install]
+WantedBy=multi-user.target

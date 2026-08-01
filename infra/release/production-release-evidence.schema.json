@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://munchkin.l1ttl3h0rse.ru/schemas/production-release-evidence-v1.json",
+  "title": "Munchkin production release evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operation",
+    "result",
+    "repository",
+    "commit",
+    "migrationContract",
+    "images",
+    "workflow",
+    "startedAt",
+    "completedAt",
+    "migration",
+    "readiness",
+    "smoke",
+    "previousRelease"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "operation": { "enum": ["deploy", "rollback"] },
+    "result": { "enum": ["success", "failed"] },
+    "repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "migrationContract": { "const": "health-migrations-v1" },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["game", "web"],
+      "properties": {
+        "game": { "$ref": "#/$defs/image" },
+        "web": { "$ref": "#/$defs/image" }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "runAttempt", "url"],
+      "properties": {
+        "runId": { "type": "string", "pattern": "^[0-9]+$" },
+        "runAttempt": { "type": "string", "pattern": "^[0-9]+$" },
+        "url": { "type": "string", "format": "uri" }
+      }
+    },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "migration": { "$ref": "#/$defs/stage" },
+    "readiness": { "$ref": "#/$defs/stage" },
+    "smoke": { "$ref": "#/$defs/stage" },
+    "previousRelease": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["commit", "migrationContract", "gameDigest", "webDigest", "completedAt"],
+          "properties": {
+            "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "migrationContract": { "const": "health-migrations-v1" },
+            "gameDigest": { "$ref": "#/$defs/digest" },
+            "webDigest": { "$ref": "#/$defs/digest" },
+            "completedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      ]
+    },
+    "error": { "type": ["string", "null"], "maxLength": 500 }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "digest", "image"],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "pattern": "^[^:@\\s]+(?:/[^:@\\s]+)+:[^@\\s]+$"
+        },
+        "digest": { "$ref": "#/$defs/digest" },
+        "image": {
+          "type": "string",
+          "pattern": "^[^@\\s]+@sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result"],
+      "properties": {
+        "result": { "enum": ["passed", "failed", "not_run"] },
+        "completedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

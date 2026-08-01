@@ -27,3 +27,27 @@ variable "ssh_ingress_cidrs" {
     error_message = "ssh_ingress_cidrs must contain valid IPv4 CIDRs and must not include 0.0.0.0/0."
   }
 }
+
+variable "domain_zone" {
+  type        = string
+  description = "Authoritative public DNS zone without a required trailing dot."
+  nullable    = false
+  default     = "l1ttl3h0rse.ru"
+
+  validation {
+    condition     = can(regex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$", var.domain_zone))
+    error_message = "domain_zone must be a lowercase DNS name without a wildcard."
+  }
+}
+
+variable "production_hostname" {
+  type        = string
+  description = "Exact public hostname routed by Traefik and represented in DNS."
+  nullable    = false
+  default     = "munchkin.l1ttl3h0rse.ru"
+
+  validation {
+    condition     = can(regex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$", var.production_hostname))
+    error_message = "production_hostname must be a lowercase DNS name without a wildcard."
+  }
+}

@@ -1,0 +1,109 @@
+name: deploy-production
+
+on:
+  workflow_dispatch:
+    inputs:
+      game_image:
+        description: Immutable game image reference
+        required: true
+        type: string
+      web_image:
+        description: Immutable web image reference
+        required: true
+        type: string
+      commit:
+        description: Full lowercase commit SHA represented by the images
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production-deploy
+    env:
+      GAME_IMAGE: ${{ inputs.game_image }}
+      WEB_IMAGE: ${{ inputs.web_image }}
+      RELEASE_COMMIT: ${{ inputs.commit }}
+      DEPLOY_HOST: ${{ secrets.PRODUCTION_DEPLOY_HOST }}
+      DEPLOY_USER: munchkin-deploy
+    steps:
+      - name: Validate immutable release inputs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GAME_IMAGE" =~ ^cr\.yandex/crpdnmjudj1usiu90gdn/game@sha256:[0-9a-f]{64}$ ]]
+          [[ "$WEB_IMAGE" =~ ^cr\.yandex/crpdnmjudj1usiu90gdn/web@sha256:[0-9a-f]{64}$ ]]
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ -n "$DEPLOY_HOST" && "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+
+      - name: Prepare protected SSH material
+        shell: bash
+        env:
+          DEPLOY_PRIVATE_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.PRODUCTION_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          [[ -n "$DEPLOY_PRIVATE_KEY" && -n "$DEPLOY_KNOWN_HOSTS" ]]
+          key_path="$(mktemp "$RUNNER_TEMP/munchkin-deploy-key.XXXXXX")"
+          known_hosts_path="$(mktemp "$RUNNER_TEMP/munchkin-known-hosts.XXXXXX")"
+          chmod 0600 "$key_path" "$known_hosts_path"
+          printf '%s\n' "$DEPLOY_PRIVATE_KEY" >"$key_path"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >"$known_hosts_path"
+          ssh-keygen -y -f "$key_path" >/dev/null
+          {
+            printf 'DEPLOY_SSH_KEY_PATH=%s\n' "$key_path"
+            printf 'DEPLOY_KNOWN_HOSTS_PATH=%s\n' "$known_hosts_path"
+          } >>"$GITHUB_ENV"
+
+      - name: Deploy through forced-command SSH boundary
+        id: remote-deploy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +e
+          ssh -i "$DEPLOY_SSH_KEY_PATH" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS_PATH" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            deploy --game-image "$GAME_IMAGE" --web-image "$WEB_IMAGE" \
+            --commit "$RELEASE_COMMIT" --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --workflow-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          deploy_exit=$?
+          set -e
+          ssh -i "$DEPLOY_SSH_KEY_PATH" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS_PATH" \
+            "$DEPLOY_USER@$DEPLOY_HOST" status --evidence \
+            >"$RUNNER_TEMP/production-release-evidence.json" || true
+          exit "$deploy_exit"
+
+      - name: Upload production release evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: production-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/production-release-evidence.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Remove protected SSH material
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ -z "${DEPLOY_SSH_KEY_PATH:-}" || ! -e "$DEPLOY_SSH_KEY_PATH" ]] || rm -f -- "$DEPLOY_SSH_KEY_PATH"
+          [[ -z "${DEPLOY_KNOWN_HOSTS_PATH:-}" || ! -e "$DEPLOY_KNOWN_HOSTS_PATH" ]] || rm -f -- "$DEPLOY_KNOWN_HOSTS_PATH"

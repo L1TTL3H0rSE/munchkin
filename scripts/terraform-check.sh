@@ -715,6 +715,8 @@ done
 production_root="$terraform_root/environments/production"
 production_variables="$production_root/variables.tf"
 production_iam="$production_root/iam.tf"
+production_dns="$production_root/dns.tf"
+production_lockbox="$production_root/lockbox.tf"
 production_network="$production_root/network.tf"
 production_registry="$production_root/registry.tf"
 production_compute="$production_root/compute.tf"
@@ -723,6 +725,8 @@ production_cloud_init="$production_root/cloud-init.yaml.tftpl"
 for required_file in \
   "$production_variables" \
   "$production_iam" \
+  "$production_dns" \
+  "$production_lockbox" \
   "$production_network" \
   "$production_registry" \
   "$production_compute" \
@@ -739,8 +743,8 @@ production_resource_count="$(
     wc -l |
     tr -d '[:space:]'
 )"
-if [[ "$production_resource_count" != "11" ]]; then
-  echo "production graph must contain exactly 11 managed resources; got $production_resource_count" >&2
+if [[ "$production_resource_count" != "15" ]]; then
+  echo "production graph must contain exactly 15 managed resources; got $production_resource_count" >&2
   exit 1
 fi
 
@@ -752,6 +756,10 @@ declare -A expected_production_resource_counts=(
   [yandex_container_registry]=1
   [yandex_container_repository]=2
   [yandex_container_registry_iam_binding]=2
+  [yandex_dns_zone]=1
+  [yandex_dns_recordset]=1
+  [yandex_lockbox_secret]=1
+  [yandex_lockbox_secret_iam_member]=1
   [yandex_compute_disk]=1
   [yandex_compute_instance]=1
 )
@@ -777,6 +785,29 @@ if [[ "$production_data_count" != "3" ]] ||
   ! rg -q '^data "yandex_iam_service_account" "github_images"' "$production_iam" ||
   ! rg -q '^data "yandex_compute_image" "ubuntu"' "$production_compute"; then
   echo "production graph must contain only runtime, GitHub CI and Ubuntu lookups" >&2
+  exit 1
+fi
+
+if ! rg -q '^resource "yandex_dns_zone" "production"' "$production_dns" ||
+  ! rg -q '^[[:space:]]*zone[[:space:]]*=[[:space:]]*"\$\{trimsuffix\(var\.domain_zone, "\."\)\}\."$' "$production_dns" ||
+  ! rg -q '^[[:space:]]*public[[:space:]]*=[[:space:]]*true$' "$production_dns" ||
+  ! rg -q '^[[:space:]]*deletion_protection[[:space:]]*=[[:space:]]*true$' "$production_dns" ||
+  ! rg -q '^resource "yandex_dns_recordset" "production"' "$production_dns" ||
+  ! rg -q '^[[:space:]]*name[[:space:]]*=[[:space:]]*"\$\{trimsuffix\(var\.production_hostname, "\."\)\}\."$' "$production_dns" ||
+  ! rg -q '^[[:space:]]*type[[:space:]]*=[[:space:]]*"A"$' "$production_dns" ||
+  ! rg -q '^[[:space:]]*ttl[[:space:]]*=[[:space:]]*300$' "$production_dns" ||
+  ! rg -q 'yandex_vpc_address\.production\.external_ipv4_address' "$production_dns"; then
+  echo "production DNS graph must manage one public exact-hostname A record" >&2
+  exit 1
+fi
+
+if ! rg -q '^resource "yandex_lockbox_secret" "production"' "$production_lockbox" ||
+  ! rg -q '^[[:space:]]*deletion_protection[[:space:]]*=[[:space:]]*true$' "$production_lockbox" ||
+  ! rg -q '^resource "yandex_lockbox_secret_iam_member" "runtime_viewer"' "$production_lockbox" ||
+  ! rg -q '^[[:space:]]*role[[:space:]]*=[[:space:]]*"viewer"$' "$production_lockbox" ||
+  ! rg -q 'serviceAccount:\$\{data\.yandex_iam_service_account\.runtime\.id\}' "$production_lockbox" ||
+  rg -q 'password_payload_specification|yandex_lockbox_secret_version|text_value|secret_value' "$production_root"; then
+  echo "Lockbox graph must be metadata-only with exact runtime viewer access" >&2
   exit 1
 fi
 

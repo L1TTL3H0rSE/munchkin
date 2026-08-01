@@ -192,9 +192,10 @@ Ubuntu VM и standalone data disk (`10 added`). Remote production state
 существует, `.tflock` освобождён, follow-up plan сообщает `No changes`.
 Owner-side SSH evidence подтвердил host-key pinning, key login,
 `cloud-init=done`, Docker/Compose, отдельный ext4 mount, log limits,
-password/root denial и отсутствие публичных listeners кроме SSH. Automation
-deploy user/root boundary, images, Compose/Traefik, DNS/TLS, reboot recovery,
-backup и telemetry остаются следующими slices.
+password/root denial и отсутствие публичных listeners кроме SSH. Local
+delivery artifacts now define the automation deploy user/root boundary and
+reboot unit; VM bootstrap/deploy, DNS/TLS, backup and telemetry remain live
+mutation/evidence gates.
 
 **Работа**
 
@@ -261,6 +262,11 @@ backup и telemetry остаются следующими slices.
 - Длительный SSE smoke переживает heartbeat и container restart/resync.
 - Пересоздание Traefik не теряет действующий ACME account/certificate state.
 
+**Статус 2026-08-01:** production Compose/Traefik, file-provider routes,
+digest-pinned game/web anchors, one-shot migration service and root-owned host
+boundary are implemented locally. The production VM and public edge have not
+been mutated; only Traefik is assigned public `80/443` in the local topology.
+
 ### INFRA-005 — domain, DNS и TLS
 
 **Рекомендуемый путь**
@@ -284,6 +290,11 @@ automation и поддержка выбранным ACME client проверяю
 - Submission URL человекочитаем, открывается с valid certificate.
 - DNS TTL и A record задокументированы.
 - Renewal/ACME state переживают restart.
+
+**Статус 2026-08-01:** Terraform now contains local-only metadata for the
+Yandex public zone and `munchkin.l1ttl3h0rse.ru` A record to the reserved
+`81.26.187.230`. Timeweb NS delegation, public DNS propagation and ACME
+issuance remain owner-approved mutation gates and were not performed.
 
 ### INFRA-006 — liveness, readiness и migrations
 
@@ -334,6 +345,12 @@ and real PostgreSQL smoke remain gates of the next deployment slice.
 - Предыдущий compatible SHA восстанавливается документированной командой.
 - Privilege path deployment job -> host script/unit описан и проверен; доступ
   к Docker не называется непривилегированным, если он root-equivalent.
+
+**Статус 2026-08-01:** manual main-only workflow, forced-command SSH gateway,
+atomic current/previous release evidence, internal/public smoke hooks and
+compatible rollback guard are implemented locally. GitHub environment,
+protected secrets, VM bootstrap and first production rollout remain unrun
+because they require separate mutation approvals.
 
 ## P0-B: конкурсные differentiators после submission gate
 

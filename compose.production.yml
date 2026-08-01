@@ -1,0 +1,247 @@
+name: munchkin-production
+
+x-images:
+  game: &game-image "${MUNCHKIN_GAME_IMAGE:-cr.yandex/crpdnmjudj1usiu90gdn/game@sha256:519ad993f644f30c380f415049f465a8059e23afaa7a0503aeb286624b35e99f}"
+  web: &web-image "${MUNCHKIN_WEB_IMAGE:-cr.yandex/crpdnmjudj1usiu90gdn/web@sha256:e79531e3dfa1e642b7f8d4f029bde2f5d048382dd0c5aa80c8da271ea03444bb}"
+
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+x-runtime-security: &runtime-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m
+
+services:
+  postgres:
+    image: postgres:17.10-alpine
+    env_file:
+      - path: ${MUNCHKIN_SECRETS_DIR:-/srv/munchkin/secrets}/postgres.env
+        required: false
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-munchkin}
+      POSTGRES_USER: ${POSTGRES_USER:-munchkin}
+    volumes:
+      - type: bind
+        source: ${MUNCHKIN_DATA_DIR:-/srv/munchkin}/postgres
+        target: /var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 60s
+    mem_limit: 768m
+    cpus: 1.0
+    shm_size: 64m
+    security_opt:
+      - no-new-privileges:true
+    logging: *bounded-logging
+
+  migrate:
+    image: *game-image
+    env_file:
+      - path: ${MUNCHKIN_SECRETS_DIR:-/srv/munchkin/secrets}/game.env
+        required: false
+    environment:
+      MIGRATION_PATH: /app/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - data
+    command:
+      - /app/migrate
+    restart: "no"
+    mem_limit: 256m
+    cpus: 0.5
+    <<: *runtime-security
+    logging: *bounded-logging
+
+  game:
+    image: *game-image
+    env_file:
+      - path: ${MUNCHKIN_SECRETS_DIR:-/srv/munchkin/secrets}/game.env
+        required: false
+    environment:
+      SERVER_ADDR: :8080
+      GAME_CONTENT_PATH: /app/content/sets/demo/cards.json
+      MIGRATION_PATH: /app/migrations
+      AUTO_MIGRATE: "false"
+      SERVICE_REVISION: ${MUNCHKIN_RELEASE_COMMIT:-unknown}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://munchkin.l1ttl3h0rse.ru}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - app
+      - data
+      - observability
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - "-"
+        - http://127.0.0.1:8080/health/ready
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 20s
+    mem_limit: 512m
+    cpus: 1.0
+    <<: *runtime-security
+    logging: *bounded-logging
+
+  web:
+    image: *web-image
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+      NODE_ENV: production
+      NUXT_PUBLIC_API_BASE: ${PUBLIC_GAME_URL:-https://munchkin.l1ttl3h0rse.ru}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      SERVICE_REVISION: ${MUNCHKIN_RELEASE_COMMIT:-unknown}
+    depends_on:
+      game:
+        condition: service_healthy
+    networks:
+      - edge
+      - app
+      - observability
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - "-"
+        - http://127.0.0.1:3000/
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 20s
+    mem_limit: 512m
+    cpus: 1.0
+    <<: *runtime-security
+    logging: *bounded-logging
+
+  traefik:
+    image: traefik:v3.5.0
+    env_file:
+      - path: ${MUNCHKIN_SECRETS_DIR:-/srv/munchkin/secrets}/traefik.env
+        required: false
+    environment:
+      TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_EMAIL: ${ACME_EMAIL:-}
+      TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_CASERVER: ${ACME_CA_SERVER:-}
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "80:8080"
+      - "443:8443"
+    volumes:
+      - type: bind
+        source: ${MUNCHKIN_DATA_DIR:-/srv/munchkin}/traefik/acme/acme.json
+        target: /letsencrypt/acme.json
+      - type: bind
+        source: ${MUNCHKIN_DATA_DIR:-/srv/munchkin}/compose/traefik-static.yml
+        target: /etc/traefik/traefik.yml
+        read_only: true
+      - type: bind
+        source: ${MUNCHKIN_DATA_DIR:-/srv/munchkin}/compose/traefik-dynamic.yml
+        target: /etc/traefik/dynamic.yml
+        read_only: true
+    networks:
+      - edge
+      - app
+    depends_on:
+      web:
+        condition: service_healthy
+      game:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - traefik
+        - healthcheck
+        - --ping
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 20s
+    mem_limit: 256m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    logging: *bounded-logging
+
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.153.0
+    profiles:
+      - telemetry
+    command:
+      - --config=/etc/otelcol-contrib/collector.yml
+    volumes:
+      - type: bind
+        source: ${MUNCHKIN_DATA_DIR:-/srv/munchkin}/compose/collector.production.yml
+        target: /etc/otelcol-contrib/collector.yml
+        read_only: true
+    networks:
+      - app
+      - observability
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - "-"
+        - http://127.0.0.1:13133/
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    <<: *runtime-security
+    logging: *bounded-logging
+
+networks:
+  edge:
+    name: munchkin-production-edge
+  app:
+    name: munchkin-production-app
+    internal: true
+  data:
+    name: munchkin-production-data
+    internal: true
+  observability:
+    name: munchkin-production-observability
+    internal: true

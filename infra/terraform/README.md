@@ -164,6 +164,24 @@ Remote state содержит exact десять managed resource addresses и �
 `404` для `.tflock`; полный authenticated production plan завершился exit `0`
 и `No changes`.
 
+### Production delivery extension (local-only, not applied)
+
+The approved production delivery plan adds four non-secret resources to the
+local production graph: one public Yandex Cloud DNS zone, one exact-hostname
+`A` record targeting the already reserved `81.26.187.230`, one deletion-
+protected Lockbox secret container and one exact runtime `viewer` IAM member.
+The repository graph is therefore checked as `15` resources, while the live
+remote state remains the previously applied `10` until a separate sanitized
+Terraform plan and owner approval. The DNS zone/record and registrar NS
+delegation are separate mutation gates.
+
+The Lockbox resource deliberately contains no password generation block,
+secret version, entry or payload value. PostgreSQL password, derived DSN,
+deploy SSH private key and ACME account data are owner-side runtime inputs;
+none is accepted by Terraform or written to state. The deploy workflow uses
+the protected SSH boundary and does not require a new cloud key or a broader
+GitHub/Yandex setting mutation in this local slice.
+
 ### GitHub Actions WIF handoff (repository implementation, not applied)
 
 This plan adds a separate keyless `munchkin-github-images` service account in
@@ -284,8 +302,9 @@ terraform fmt -check -recursive infra/terraform
 - требует ровно по одному bucket-scoped `storage.configurer` и
   `storage.editor` binding с exact единственным member — state service
   account — и запрещает folder-wide варианты этих roles;
-- проверяет exact пять deployer roles, runtime-SA handoff, ровно `11`
-  production resources, три data lookup, exact runtime puller plus CI pusher,
+- проверяет exact пять deployer roles, runtime-SA handoff, ровно `15`
+  local production resources (including DNS and metadata-only Lockbox), три
+  data lookup, exact runtime puller plus CI pusher,
   sensitive SSH boundary,
   IPv4-only ingress, fixed VM/disk profile и cloud-init host baseline;
 - отклоняет tracked state/plan/tfvars/backend artifacts и inline credentials.

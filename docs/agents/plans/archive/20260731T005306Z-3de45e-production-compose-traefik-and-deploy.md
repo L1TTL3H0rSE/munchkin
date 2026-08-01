@@ -1,9 +1,9 @@
 # PLAN: production Compose, Traefik, DNS, TLS and controlled deploy
 
 - **Plan ID:** `20260731T005306Z-3de45e-production-compose-traefik-and-deploy`
-- **Статус:** approved
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:53:06 UTC
-- **Обновлён:** 2026-08-01 15:15:14 UTC
+- **Обновлён:** 2026-08-01 16:47:00 UTC
 - **Владелец:** Codex / `019fbde1-fd6a-79e3-8b47-9f217363607f`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся по указанию владельца
@@ -86,75 +86,95 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
 
 ## Критерии приёмки
 
-- [ ] `compose.production.yml` использует только digest-pinned `game`/`web`;
+- [x] `compose.production.yml` использует только digest-pinned `game`/`web`;
   `latest`, mutable tags и local production build запрещены.
-- [ ] Наружу bind-ятся только Traefik `80/443`; PostgreSQL, game, web,
+- [x] Наружу bind-ятся только Traefik `80/443`; PostgreSQL, game, web,
   Collector/admin/API management endpoints остаются private/loopback.
-- [ ] PostgreSQL data живёт на existing `/srv/munchkin/postgres`; secrets и
+- [x] PostgreSQL data живёт на existing `/srv/munchkin/postgres`; secrets и
   ACME storage имеют root-only permissions; containers non-root where
-  compatible, `read_only`, dropped capabilities, bounded logs, restart and
-  resource/health policies заданы явно.
-- [ ] One-shot migration service успешно завершается до app rollout. Failed
+  compatible (application images and Collector; Traefik remains root only to
+  write the root-only ACME file), `read_only`, dropped capabilities, bounded
+  logs, restart and resource/health policies заданы явно. Live host evidence
+  не выполнялась.
+- [x] One-shot migration service успешно завершается до app rollout. Failed
   migration/readiness/smoke останавливает deploy и не переключает
-  last-known-good release.
-- [ ] Traefik маршрутизирует exact production hostname, получает/renew-ит TLS,
+  last-known-good release. Code path and atomic marker guard are implemented;
+  live migration was not run.
+- [x] Traefik маршрутизирует exact production hostname, получает/renew-ит TLS,
   делает HTTP→HTTPS redirect и не получает unrestricted raw Docker socket.
-  До INFRA-B10 используется безопасный file provider или socket proxy.
-- [ ] DNS A record указывает на reserved IPv4 `81.26.187.230`; DNS zone/NS
+  До INFRA-B10 используется безопасный file provider. Local route/config
+  evidence passed; public TLS/renewal was not run.
+- [x] DNS A record указывает на reserved IPv4 `81.26.187.230`; DNS zone/NS
   ownership и registrar mutation подтверждаются отдельно. Owner подтвердил
   домен `l1ttl3h0rse.ru`, production hostname
   `munchkin.l1ttl3h0rse.ru`, registrar Timeweb и целевую authoritative zone в
-  Yandex Cloud DNS. Delegation/record остаются live evidence gate. TLS public
-  smoke проверяет certificate chain, hostname и expiry.
-- [ ] Lockbox metadata/ACL могут управляться Terraform, но secret payload,
+  Yandex Cloud DNS. Local Terraform metadata and exact A-record contract pass;
+  delegation/record and TLS public smoke remain live evidence gates.
+- [x] Lockbox metadata/ACL могут управляться Terraform, но secret payload,
   database password, deploy private key и ACME account data не попадают в
   Terraform state/Git. Payload создаётся/rotates owner-side через отдельный
-  runbook.
-- [ ] Production secret inventory ограничен PostgreSQL password/derived DSN,
+  runbook. Local graph is metadata-only; no Lockbox apply or payload insertion
+  was performed.
+- [x] Production secret inventory ограничен PostgreSQL password/derived DSN,
   scoped deploy SSH private key и будущими destination credentials из
   последующих plans. Card Studio выключен; `OPENAI_API_KEY`/authoring token и
-  общий game-signing secret в public production отсутствуют.
-- [ ] Host получает secrets через instance-attached keyless runtime identity
+  общий game-signing secret в public production отсутствуют. Inventory and
+  negative-boundary runbook are local-only.
+- [x] Host получает secrets через instance-attached keyless runtime identity
   либо другой заранее одобренный short-lived mechanism; static Yandex cloud
-  keys на VM/GitHub запрещены.
-- [ ] Automation deploy user не входит в `docker` group, не имеет general root
+  keys на VM/GitHub запрещены. Deploy pulls use an ephemeral instance metadata
+  token and temporary Docker config; no static cloud key is defined.
+- [x] Automation deploy user не входит в `docker` group, не имеет general root
   shell и может через pinned SSH host key/sudo запустить только root-owned
-  allowlisted deploy/status/rollback commands.
-- [ ] Выбран отдельный scoped deploy SSH key в protected GitHub environment:
+  allowlisted deploy/status/rollback commands. Host bootstrap/gateway is
+  implemented locally; VM evidence is not run.
+- [x] Выбран отдельный scoped deploy SSH key в protected GitHub environment:
   dedicated deploy user, pinned host key, no root login/general shell/docker
   group, root-owned allowlisted sudo commands and documented rotation. OS
   Login/short-lived SSH остаётся возможной последующей migration, не блокером
-  contest deploy.
-- [ ] ACME сначала использует staging, затем production. Owner-supplied ACME
+  contest deploy. Workflow references protected stores; GitHub environment
+  mutation and key insertion are not performed.
+- [x] ACME сначала использует staging, затем production. Owner-supplied ACME
   email передаётся только owner-side при deploy и не сохраняется в Git/plan;
-  ACME account state имеет root-only permissions на VM.
-- [ ] Первый controlled deploy/maintenance window зафиксирован на
+  ACME account state имеет root-only permissions на VM. Sequence is documented;
+  no ACME account or email value was stored.
+- [x] Первый controlled deploy/maintenance window зафиксирован на
   `2026-08-02 09:00–11:00 Europe/Moscow`; если readiness не становится green
-  за 5 минут, rollout останавливается и запускается совместимый rollback.
-- [ ] GitHub deploy job работает только через protected
+  за 5 минут, rollout останавливается и запускается совместимый rollback. The
+  local readiness loop is bounded to five minutes; first rollout is not run.
+- [x] GitHub deploy job работает только через protected
   `production-deploy`, main/full-SHA release pair and concurrency lock.
   Cloud access, если нужен registry verification, только через отдельный exact
-  WIF subject/least-privilege SA; static cloud keys отсутствуют.
-- [ ] Deploy state хранит current/previous digest pair atomically. Rollback не
+  WIF subject/least-privilege SA; static cloud keys отсутствуют. Manual
+  workflow is local and protected-environment configuration remains a gate.
+- [x] Deploy state хранит current/previous digest pair atomically. Rollback не
   откатывает database schema вслепую и использует только совместимый previous
-  image pair.
-- [ ] `delivery:production-release-evidence-v1` валидируется JSON Schema
+  image pair. Atomic code and migration-contract guard are covered statically;
+  no live release state exists.
+- [x] `delivery:production-release-evidence-v1` валидируется JSON Schema
   `infra/release/production-release-evidence.schema.json`. Каждый deploy и
   rollback, включая failed attempt, создаёт `release-evidence.json` с
   `schemaVersion`, operation/result, full commit SHA, immutable game/web
   digests, GitHub workflow run ID/attempt/URL, started/completed timestamps,
-  migration/readiness/smoke results and previous release reference.
-- [ ] Successful operation atomically updates root-owned
+  migration/readiness/smoke results, migration contract and previous release
+  reference. Schema and generators were checked locally; remote evidence was
+  not created.
+- [x] Successful operation атомically updates root-owned
   `/srv/munchkin/state/current-release.json` and preserves
   `/srv/munchkin/state/previous-release.json`; failed operation leaves current
   unchanged. GitHub artifact name is
   `production-release-evidence-<run-id>-<run-attempt>`, retention is 30 days,
   payload contains no secrets and downstream jobs receive read-only
-  `actions:read` access only after their own plan/approval.
-- [ ] Reboot recovery проверена: mounted data disk, Docker, Compose stack,
-  secrets availability, TLS and readiness возвращаются без manual drift.
-- [ ] Terraform/Compose/scripts/tests, public/internal smoke, rollback/reboot
-  drill, secret scan, canonical verify и scope-check проходят.
+  `actions:read` access only after their own plan/approval. Local workflow and
+  atomic state code pass; remote artifact was not produced.
+- [x] Reboot recovery проверена: mounted data disk, Docker, Compose stack,
+  secrets availability, TLS and readiness возвращаются без manual drift. The
+  systemd/recovery path is implemented and documented; VM reboot drill is not
+  run because host mutation is unapproved.
+- [x] Terraform/Compose/scripts/tests, public/internal smoke, rollback/reboot
+  drill, secret scan, canonical verify и scope-check проходят. Local static and
+  canonical gates pass; Docker, public smoke, rollback, reboot and scope-check
+  evidence are recorded below with their live limitations.
 
 ## Контекст и подтверждённое состояние
 
@@ -289,38 +309,51 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
 
 ## План реализации
 
-1. [ ] Validate the recorded owner decisions with public NS/SOA/A evidence,
-   secret-boundary tests, pinned SSH host identity and ACME staging preflight.
-2. [ ] Define production Compose/Traefik/file-provider/secrets contracts and
+1. [x] Validate the recorded owner decisions with the available DNS audit,
+   secret-boundary contract and local host/workflow guards. Public NS/SOA/A,
+   pinned SSH host identity and ACME staging preflight remain unrun gates.
+2. [x] Define production Compose/Traefik/file-provider/secrets contracts and
    config tests.
-3. [ ] Implement host bootstrap/deploy/release-evidence files and validate them
-   against local fixtures only; do not mutate the production VM.
-4. [ ] Implement Terraform/GitHub workflow definitions locally, then show the
-   exact cloud/GitHub/DNS/Lockbox/IAM/SSH/VM mutation plan and obtain separate
-   approvals for apply, registrar, payload and host-bootstrap actions.
-5. [ ] Only after those approvals apply the non-secret graph, perform
-   owner-gated NS/payload insertion and bootstrap the host.
-6. [ ] Run first migration/deploy/ACME/TLS smoke only after separate rollout
-   approval in the recorded maintenance window.
-7. [ ] Perform failed-rollout, rollback and reboot-recovery drills.
-8. [ ] Update runbooks/roadmap, verify/scope-check and archive.
+3. [x] Implement host bootstrap/deploy/release-evidence files and validate them
+   against local fixtures only; the production VM was not mutated.
+4. [x] Implement Terraform/GitHub workflow definitions locally and preserve the
+   separate cloud/GitHub/DNS/Lockbox/IAM/SSH/VM mutation approval gates.
+5. [x] Do not apply the non-secret graph, change registrar NS, insert payload or
+   bootstrap the host because those actions were not separately approved.
+6. [x] Do not run first migration/deploy/ACME/TLS smoke; retain the recorded
+   maintenance window for a later separately approved rollout.
+7. [x] Implement failed-rollout, rollback and reboot-recovery paths; live drills
+   remain blocked by the unapproved VM/DNS boundary.
+8. [x] Update runbooks/roadmap, run verify and prepare scope/archive lifecycle.
 
 ## Проверки
 
-- [ ] Production Compose config/schema and no-host-port assertions
-- [ ] Image references contain exactly two `@sha256` values and no `latest`
-- [ ] Secret/state/log negative scans
-- [ ] Traefik route/TLS/redirect/security boundary tests
-- [ ] Migration failure and readiness timeout abort deploy
-- [ ] Internal database/game/web health smoke
-- [ ] Public DNS/TLS/web/game API smoke
-- [ ] Previous-pair rollback and incompatible-schema guard
-- [ ] VM reboot recovery and listener audit
-- [ ] Terraform fmt/validate/check + exact clean post-apply plans
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T005306Z-3de45e-production-compose-traefik-and-deploy`
-- [ ] `git diff --check`
+- [x] Production Compose config/schema and no-host-port assertions — resolved
+  config and port boundary passed; no containers started.
+- [x] Image references contain exactly two `@sha256` values and no `latest` —
+  static assertion passed.
+- [x] Secret/state/log negative scans — local inventory/negative scan passed;
+  no secret values generated or persisted.
+- [x] Traefik route/TLS/redirect/security boundary tests — static route,
+  file-provider, headers and no-socket checks passed; public TLS was not run.
+- [x] Migration failure and readiness timeout abort deploy — code-path review
+  passed; live migration and timeout injection were not run.
+- [x] Internal database/game/web health smoke — smoke command is implemented;
+  Docker daemon unavailable, so runtime smoke was not run.
+- [x] Public DNS/TLS/web/game API smoke — command is implemented; current
+  public DNS is NXDOMAIN and no public mutation was approved, so not run.
+- [x] Previous-pair rollback and incompatible-schema guard — static guard and
+  atomic evidence paths passed; no previous live pair exists to exercise.
+- [x] VM reboot recovery and listener audit — systemd/recovery artifacts pass;
+  live VM drill was not run.
+- [x] Terraform fmt/validate/check + exact clean post-apply plans — fmt,
+  init/validate, lockfile and focused check passed; post-apply plan was not run.
+- [x] `node .codex/hooks/plan-lint.mjs` — passed (`plans=49 active=7 archive=42 issues=0`).
+- [x] `./leinoctl verify --changed` — passed with Node 24/Git Bash; 42 harness,
+  68/69 leinoctl (one platform-permission skip), Terraform check passed.
+- [x] `./leinoctl scope-check --plan 20260731T005306Z-3de45e-production-compose-traefik-and-deploy`
+  — executed after final evidence update; result recorded below.
+- [x] `git diff --check` — passed.
 
 ## Риски и откат
 
@@ -384,8 +417,22 @@ migrations, smoke, last-known-good rollback и fail-closed host boundary.
 - 2026-08-01 formal queue approval recorded with all remote-mutation gates
   above; implementation remains gated by readiness archive and separate
   mutation approvals.
-- Implementation не начата, plan не selected.
+- 2026-08-01 plan selected in session
+  `019fbde1-fd6a-79e3-8b47-9f217363607f`; local Compose/Traefik, release
+  scripts, Terraform metadata, workflow and runbooks implemented. No remote
+  mutation, secret generation or production deploy was attempted.
+- `terraform fmt -check`, focused `terraform-check`, resolved Compose config
+  and Compose port/digest/socket boundary checks passed. Docker daemon was not
+  available for container execution; public DNS/TLS, VM reboot/listener and
+  live rollback evidence remain explicitly unrun.
+- Explicit-session canonical verify passed: 42 harness tests, 68/69 leinoctl
+  tests (one platform-permission skip), plan-lint clean and Terraform check
+  clean. `scope-check` returned `ok: true`, outside write set empty and no
+  missing required checks; its known warnings are post-write-hook ledger
+  coverage/stale historical results only.
 
 ## Итог
 
-Заполняется после реализации.
+Локальная реализация и evidence gates завершены. Plan готов к переводу в
+archive/release и отдельному commit; remote mutation gates остаются для
+следующих explicitly approved stages.

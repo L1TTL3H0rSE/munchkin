@@ -1,0 +1,86 @@
+http:
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    production-security-headers:
+      headers:
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: strict-origin-when-cross-origin
+        stsSeconds: 86400
+        stsIncludeSubdomains: true
+        stsPreload: false
+
+    production-compress:
+      compress: {}
+
+  routers:
+    http-redirect:
+      entryPoints:
+        - web
+      rule: HostRegexp(`{host:.+}`)
+      middlewares:
+        - redirect-to-https
+      service: noop@internal
+
+    game-health:
+      entryPoints:
+        - websecure
+      rule: Host(`munchkin.l1ttl3h0rse.ru`) && (Path(`/health/live`) || Path(`/health/ready`) || Path(`/healthz`))
+      priority: 100
+      service: game
+      middlewares:
+        - production-security-headers
+      tls:
+        certResolver: le
+
+    game-api:
+      entryPoints:
+        - websecure
+      rule: Host(`munchkin.l1ttl3h0rse.ru`) && PathPrefix(`/api/v1`)
+      priority: 90
+      service: game
+      middlewares:
+        - production-security-headers
+        - production-compress
+      tls:
+        certResolver: le
+
+    web:
+      entryPoints:
+        - websecure
+      rule: Host(`munchkin.l1ttl3h0rse.ru`)
+      priority: 1
+      service: web
+      middlewares:
+        - production-security-headers
+        - production-compress
+      tls:
+        certResolver: le
+
+  services:
+    game:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://game:8080
+    web:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://web:3000
+
+  serversTransports:
+    production:
+      forwardingTimeouts:
+        dialTimeout: 5s
+        responseHeaderTimeout: 15s
+        idleConnTimeout: 120s
+
+tls:
+  options:
+    production:
+      minVersion: VersionTLS12

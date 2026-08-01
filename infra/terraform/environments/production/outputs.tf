@@ -54,6 +54,21 @@ output "public_ipv4" {
   value       = yandex_vpc_address.production.external_ipv4_address[0].address
 }
 
+output "dns_zone_id" {
+  description = "Yandex Cloud DNS zone ID; registrar delegation remains owner-gated."
+  value       = yandex_dns_zone.production.id
+}
+
+output "production_hostname" {
+  description = "Exact production hostname represented by the managed A record."
+  value       = var.production_hostname
+}
+
+output "runtime_lockbox_secret_id" {
+  description = "Metadata-only Lockbox secret ID; payload remains owner-managed."
+  value       = yandex_lockbox_secret.production.id
+}
+
 output "instance_id" {
   description = "Production Compute instance."
   value       = yandex_compute_instance.production.id
