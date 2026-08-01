@@ -41,6 +41,7 @@ export function actionLabel(action: ActionDescriptor) {
     start: "Начать игру",
     finish_setup: "Закончить подготовку",
     play_card: "Сыграть карту",
+    play_target_effect: "Применить эффект к цели",
     equip_item: "Надеть предмет",
     unequip_item: "Снять предмет",
     discard_card: "Сбросить черту",

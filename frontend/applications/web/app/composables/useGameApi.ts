@@ -67,7 +67,6 @@ export interface GameCommandOptions extends GameRequestOptions {
 }
 
 const unsupportedActionTypes = new Set<ActionType>([
-  "play_target_effect",
   "propose_trade",
   "propose_gift",
   "attempt_theft",

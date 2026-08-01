@@ -673,10 +673,7 @@ export type ActionType = z.infer<typeof actionTypeSchema>;
 export type ServerActionDescriptor = z.infer<typeof actionViewSchema>;
 export type ActionDescriptor =
   Omit<ServerActionDescriptor, "type"> & {
-    type: Exclude<
-      ActionType,
-      "play_target_effect" | "propose_trade" | "propose_gift" | "attempt_theft"
-    >;
+    type: Exclude<ActionType, "propose_trade" | "propose_gift" | "attempt_theft">;
   };
 type ServerProjection = z.infer<typeof projectionSchema>;
 export type Projection = Omit<ServerProjection, "turn"> & {

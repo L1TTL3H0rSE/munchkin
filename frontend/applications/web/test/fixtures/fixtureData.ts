@@ -21,7 +21,6 @@ type OtherPlayerView = Projection["players"][number];
 type InteractionAction = InteractionView["actions"][number];
 
 const unsupportedActionTypes: ReadonlySet<ActionType> = new Set([
-  "play_target_effect",
   "propose_trade",
   "propose_gift",
   "attempt_theft",
@@ -129,6 +128,8 @@ const additionalMonster = card(
 );
 
 const advancedEffectID = "fx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const targetEffectID = "tfx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const runAwayEffectID = "rfx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 const baseProjection: Projection = {
   game_id: "fixture-base",
@@ -558,21 +559,169 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     )];
   }),
   makeFixture("target-response", "Окно: выбор цели", (projection) => {
+    projection.players = [player(0), player(1)];
+    projection.turn.phase = "resolve_effect";
     projection.interaction = interaction(
       "target_response",
-      [interactionAction("respond", "e", {target: "player"})],
-      {target_player_id: "player_2"},
+      [
+        interactionAction("pass", "e"),
+        interactionAction("respond", "f", {
+          source_instance_id: "hero-card-3",
+          combat_capability: "counter_combat_effect",
+          target_effect_id: targetEffectID,
+        }),
+      ],
+      {
+        public_subject: "current_effect",
+        target_player_id: "player_1",
+      },
+    );
+  }),
+  makeFixture("target-initiator", "Действие: выбрать цель эффекта", (projection) => {
+    projection.players = [player(0), player(1)];
+    projection.turn.phase = "combat";
+    projection.turn.encounter = encounter;
+    projection.turn.available_actions = [{
+      ...action("play_target_effect"),
+      source_instance_id: "target-effect-card",
+      target_player_ids: ["player_1"],
+    }];
+    projection.you.hand = [
+      ...structuredClone(heroHand),
+      card(
+        "target-effect-card",
+        "Эффект с выбором цели",
+        "one_shot",
+        "treasure",
+        {rules_text: "Сервер предложит допустимую цель из текущей проекции."},
+      ),
+    ];
+  }),
+  makeFixture("target-private-choice", "Окно: приватный выбор эффекта", (projection) => {
+    projection.turn.phase = "resolve_effect";
+    projection.interaction = interaction(
+      "private_choice",
+      [
+        interactionAction("respond", "1", {choice_ids: ["hero-card-1"]}),
+        interactionAction("respond", "2", {choice_ids: ["hero-card-2"]}),
+      ],
+      {public_subject: "current_effect"},
+    );
+  }),
+  makeFixture("target-observer", "Окно: наблюдатель цели", (projection) => {
+    projection.players = [player(0), player(1)];
+    projection.turn.phase = "resolve_effect";
+    projection.interaction = interaction(
+      "target_response",
+      [],
+      {
+        public_subject: "current_effect",
+        target_player_id: "player_1",
+        response_required_for_you: false,
+      },
     );
   }),
   makeFixture("run-away-response", "Окно: шаг побега", (projection) => {
+    projection.players = [player(0), player(1)];
     projection.turn.phase = "run_away";
     projection.turn.encounter = encounter;
+    projection.turn.player_id = "player_1";
+    projection.turn.run_away = {
+      current_player_id: "player_1",
+      current_monster_instance_id: encounter.instance_id,
+      effects: [{
+        effect_id: runAwayEffectID,
+        kind: "modifier",
+        amount: 2,
+        active: true,
+      }],
+      attempts: [{
+        player_id: "player_hero",
+        monster_instance_id: encounter.instance_id,
+        roll: 2,
+        modifier: 0,
+        total: 2,
+        escaped: false,
+        bad_stuff_applied: true,
+      }],
+      completed: false,
+    };
     projection.interaction = interaction(
       "run_away_response",
-      [interactionAction("respond", "f", {
-        source_instance_id: "hero-card-2",
-        escape_delta: 1,
-      })],
+      [
+        interactionAction("pass", "3"),
+        interactionAction("respond", "4", {
+          source_instance_id: "hero-card-3",
+          escape_delta: 2,
+        }),
+      ],
+      {public_subject: "current_encounter"},
+    );
+  }),
+  makeFixture("run-away-result", "Побег: подтверждённая последовательность", (projection) => {
+    projection.players = [player(0), player(1)];
+    projection.turn.phase = "charity";
+    projection.turn.player_id = "player_1";
+    projection.turn.encounter = encounter;
+    projection.turn.combat = {
+      player_strength: 4,
+      monster_strength: 15,
+      player_winning: false,
+      tie_wins: false,
+      combat_closed: false,
+      monsters: [encounter, additionalMonster],
+      effects: [],
+    };
+    projection.turn.run_away = {
+      current_player_id: "player_1",
+      current_monster_instance_id: additionalMonster.instance_id,
+      effects: [{
+        effect_id: runAwayEffectID,
+        kind: "modifier",
+        amount: 2,
+        active: false,
+      }],
+      attempts: [
+        {
+          player_id: "player_hero",
+          monster_instance_id: encounter.instance_id,
+          roll: 2,
+          modifier: 0,
+          total: 2,
+          escaped: false,
+          bad_stuff_applied: true,
+        },
+        {
+          player_id: "player_1",
+          monster_instance_id: additionalMonster.instance_id,
+          roll: 5,
+          modifier: 2,
+          total: 7,
+          escaped: true,
+        },
+      ],
+      completed: true,
+    };
+  }),
+  makeFixture("run-away-observer", "Окно: наблюдатель побега", (projection) => {
+    projection.players = [player(0), player(1)];
+    projection.turn.phase = "run_away";
+    projection.turn.player_id = "player_1";
+    projection.turn.encounter = encounter;
+    projection.turn.run_away = {
+      current_player_id: "player_1",
+      current_monster_instance_id: encounter.instance_id,
+      effects: [],
+      attempts: [],
+      completed: false,
+    };
+    projection.interaction = interaction(
+      "run_away_response",
+      [],
+      {
+        public_subject: "current_encounter",
+        response_required_for_you: false,
+      },
     );
   }),
   makeFixture("economy-offer", "Окно: обмен", (projection) => {

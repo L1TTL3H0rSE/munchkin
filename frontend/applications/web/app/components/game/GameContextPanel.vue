@@ -9,6 +9,16 @@ import {
   combatEffects,
   combatMonsters,
 } from "../interaction/advancedCombatModel";
+import {
+  runAwayAttemptMonsterName,
+  runAwayAttemptPlayerName,
+  runAwayAttemptResult,
+  runAwayAttemptRoll,
+  runAwayCurrentPlayerName,
+  runAwayEffectLabel,
+  runAwayMonsterName,
+  runAwayState,
+} from "../interaction/targetRunAwayModel";
 
 const props = defineProps<{
   projection: Projection;
@@ -21,6 +31,7 @@ const acceptedHelperName = computed(() => acceptedHelper.value
 const visibleCombatMonsters = computed(() => combatMonsters(props.projection));
 const primaryCombatMonster = computed(() => visibleCombatMonsters.value[0]);
 const visibleCombatEffects = computed(() => combatEffects(props.projection));
+const runAway = computed(() => runAwayState(props.projection));
 </script>
 
 <template>
@@ -120,6 +131,52 @@ const visibleCombatEffects = computed(() => combatEffects(props.projection));
             <small>{{ effect.active ? "Подтверждено проекцией" : "Снято сервером" }}</small>
           </article>
         </div>
+        <section
+          v-if="runAway"
+          class="run-away-summary"
+          aria-label="Состояние побега"
+        >
+          <div class="run-away-summary__header">
+            <div>
+              <p class="eyebrow">ПОБЕГ</p>
+              <strong>{{ runAway.completed ? "Шаги завершены сервером" : "Текущий шаг" }}</strong>
+            </div>
+            <div class="run-away-summary__participants">
+              <span>Участник: {{ runAwayCurrentPlayerName(projection) }}</span>
+              <span>
+                Монстр:
+                {{ runAwayMonsterName(projection, runAway.current_monster_instance_id) }}
+              </span>
+            </div>
+          </div>
+          <ol v-if="runAway.attempts.length" class="run-away-attempts">
+            <li
+              v-for="(attempt, index) in runAway.attempts"
+              :key="`${attempt.player_id}:${attempt.monster_instance_id}:${index}`"
+            >
+              <strong>Шаг {{ index + 1 }}</strong>
+              <span>
+                {{ runAwayAttemptPlayerName(projection, attempt) }} ·
+                {{ runAwayAttemptMonsterName(projection, attempt) }}
+              </span>
+              <span>{{ runAwayAttemptRoll(attempt) }}</span>
+              <small>{{ runAwayAttemptResult(attempt) }}</small>
+            </li>
+          </ol>
+          <p v-else class="run-away-summary__empty" role="status">
+            Ожидаем текущий server-owned attempt.
+          </p>
+          <div v-if="runAway.effects.length" class="run-away-effects">
+            <span
+              v-for="effect in runAway.effects"
+              :key="effect.effect_id"
+              :data-state="effect.active ? 'active' : 'inactive'"
+            >
+              {{ runAwayEffectLabel(effect) }} ·
+              {{ effect.active ? "Подтверждено" : "Снято сервером" }}
+            </span>
+          </div>
+        </section>
         <div v-if="projection.turn.resolving.length" class="resolving-cards" aria-label="Разрешаемые карты">
           <GameCard
             v-for="card in projection.turn.resolving"
@@ -328,6 +385,84 @@ const visibleCombatEffects = computed(() => combatEffects(props.projection));
   color: var(--muted);
 }
 
+.run-away-summary {
+  display: grid;
+  gap: .75rem;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--acid);
+  padding: .8rem;
+  overflow-wrap: anywhere;
+}
+
+.run-away-summary__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.run-away-summary__header p {
+  margin: 0 0 .25rem;
+}
+
+.run-away-summary__participants {
+  display: grid;
+  gap: .25rem;
+  color: var(--muted);
+  text-align: end;
+}
+
+.run-away-attempts {
+  display: grid;
+  gap: .5rem;
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.run-away-attempts li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: .35rem .75rem;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: .5rem;
+}
+
+.run-away-attempts li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.run-away-attempts small {
+  grid-column: 2 / -1;
+  color: var(--muted);
+}
+
+.run-away-summary__empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.run-away-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  min-width: 0;
+}
+
+.run-away-effects span {
+  border: 1px solid var(--line);
+  padding: .4rem .55rem;
+  color: var(--muted);
+}
+
+.run-away-effects span[data-state="active"] {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+
 .resolving-cards {
   display: flex;
   gap: .5rem;
@@ -362,8 +497,25 @@ const visibleCombatEffects = computed(() => combatEffects(props.projection));
   }
 
   .combat-monsters,
-  .combat-effects {
+  .combat-effects,
+  .run-away-attempts {
     grid-template-columns: 1fr;
+  }
+
+  .run-away-summary__header {
+    flex-direction: column;
+  }
+
+  .run-away-summary__participants {
+    text-align: start;
+  }
+
+  .run-away-attempts li {
+    grid-template-columns: 1fr;
+  }
+
+  .run-away-attempts small {
+    grid-column: auto;
   }
 }
 </style>

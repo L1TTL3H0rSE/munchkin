@@ -41,6 +41,16 @@ import {
   advancedCombatActions,
   type AdvancedCombatAction,
 } from "./advancedCombatModel";
+import {
+  isRunAwayInteraction,
+  isTargetInteraction,
+  runAwayCurrentPlayerName,
+  runAwayMonsterName,
+  runAwayState,
+  targetPlayerName,
+  targetRunAwayActionDetails,
+  targetRunAwayActionLabel,
+} from "./targetRunAwayModel";
 
 const props = defineProps<{
   projection: Projection;
@@ -81,6 +91,13 @@ const helperOptions = computed(() => buildHelperOfferOptions(
 ));
 const helperOfferMode = computed(() => isCombatantHelperOffer(interaction.value));
 const invitedHelperOffer = computed(() => isInvitedHelperOffer(interaction.value));
+const targetInteraction = computed(() => isTargetInteraction(interaction.value)
+  ? interaction.value
+  : undefined);
+const runAwayInteraction = computed(() => isRunAwayInteraction(interaction.value)
+  ? interaction.value
+  : undefined);
+const runAway = computed(() => runAwayState(props.projection));
 const helperCancel = computed(() => helperCancelAction(interaction.value));
 const helperRewardValues = computed(() => helperRewardsFor(
   helperOptions.value,
@@ -99,6 +116,9 @@ const invitedDeadlineText = computed(() => invitedHelperOffer.value && interacti
   ? formatAbsoluteDeadline(interaction.value.deadline_at)
   : "");
 const selectedAction = computed(() => selectableActions.value.find((action) =>
+  action.action_id === selectedActionID.value,
+));
+const selectedActionIndex = computed(() => selectableActions.value.findIndex((action) =>
   action.action_id === selectedActionID.value,
 ));
 const dismissible = computed(() => interaction.value
@@ -235,6 +255,35 @@ function isAdvancedCombatAction(
   return advancedCombatActions([action]).length === 1;
 }
 
+function isTargetRunAwayAction(_action: InteractionActionView): boolean {
+  return Boolean(targetInteraction.value || runAwayInteraction.value);
+}
+
+function actionLabelFor(action: InteractionActionView, actionIndex: number): string {
+  if (isTargetRunAwayAction(action)) {
+    return targetRunAwayActionLabel(action, actionIndex, ownCards.value);
+  }
+  if (isAdvancedCombatAction(action)) {
+    return advancedCombatActionLabel(action);
+  }
+  return interactionActionLabel(action);
+}
+
+function actionDetailsFor(action: InteractionActionView): string[] {
+  if (isTargetRunAwayAction(action) && interaction.value) {
+    return targetRunAwayActionDetails(
+      action,
+      props.projection,
+      ownCards.value,
+      interaction.value,
+    );
+  }
+  if (isAdvancedCombatAction(action)) {
+    return advancedCombatActionDetails(action, props.projection, ownCards.value);
+  }
+  return [interactionActionDescription(action, ownCards.value)];
+}
+
 watch(
   () => interactionRevisionKey(interaction.value),
   (revisionKey) => {
@@ -331,6 +380,10 @@ function actionActionKey(action: InteractionActionView): string {
             <p class="interaction-dialog__context">
               {{ helperOfferMode
                 ? "Выберите только помощника и награду из текущих дескрипторов."
+                : targetInteraction
+                ? "Цель, private choice и counter доступны только из actor-specific дескрипторов."
+                : runAwayInteraction
+                ? "Шаг побега и его исход меняются только новой проекцией сервера."
                 : interaction.response_required_for_you
                 ? "Выберите только действие, которое передала текущая проекция."
                 : "Окно остаётся видимым, даже если сейчас нет действия для этого игрока." }}
@@ -359,6 +412,46 @@ function actionActionKey(action: InteractionActionView): string {
         <p class="interaction-countdown" role="timer" aria-live="off">
           {{ countdownText }}
         </p>
+
+        <section
+          v-if="targetInteraction"
+          class="interaction-domain-summary"
+          aria-label="Цель эффекта"
+        >
+          <p class="eyebrow">ЦЕЛЕВОЙ ЭФФЕКТ</p>
+          <p v-if="targetInteraction.target_player_id">
+            Цель:
+            <strong>{{ targetPlayerName(projection, targetInteraction.target_player_id) }}</strong>
+          </p>
+          <p v-if="targetInteraction.public_kind === 'private_choice'">
+            Варианты выбора доступны только текущему игроку.
+          </p>
+          <p v-else>
+            Окно ответа остаётся opaque; наличие counter у других игроков не раскрывается.
+          </p>
+        </section>
+
+        <section
+          v-if="runAwayInteraction && runAway"
+          class="interaction-domain-summary"
+          aria-label="Текущий шаг побега"
+        >
+          <p class="eyebrow">ТЕКУЩИЙ ШАГ ПОБЕГА</p>
+          <p>
+            Участник:
+            <strong>{{ runAwayCurrentPlayerName(projection) }}</strong>
+          </p>
+          <p>
+            Монстр:
+            <strong>{{ runAwayMonsterName(projection, runAway.current_monster_instance_id) }}</strong>
+          </p>
+          <p>
+            Срок —
+            <time :datetime="interaction.deadline_at">
+              {{ formatAbsoluteDeadline(interaction.deadline_at) }}
+            </time>; часы advisory.
+          </p>
+        </section>
 
         <section
           v-if="invitedHelperOffer && interaction.combat_help_offer"
@@ -456,12 +549,13 @@ function actionActionKey(action: InteractionActionView): string {
         >
           <legend>Доступные действия текущего окна</legend>
           <label
-            v-for="action in selectableActions"
+            v-for="(action, actionIndex) in selectableActions"
             :key="interactionActionKey(action)"
             class="interaction-action"
             :class="{
               'interaction-action--selected': action.action_id === selectedActionID,
               'interaction-action--advanced': isAdvancedCombatAction(action),
+              'interaction-action--domain': isTargetRunAwayAction(action),
             }"
             :data-state="action.action_id === selectedActionID ? 'selected' : 'available'"
           >
@@ -474,12 +568,8 @@ function actionActionKey(action: InteractionActionView): string {
               @change="selectAction(action)"
             >
             <span>
-              <strong>{{ isAdvancedCombatAction(action)
-                ? advancedCombatActionLabel(action)
-                : interactionActionLabel(action) }}</strong>
-              <small>{{ isAdvancedCombatAction(action)
-                ? advancedCombatActionDetails(action, projection, ownCards).join(" · ")
-                : interactionActionDescription(action, ownCards) }}</small>
+              <strong>{{ actionLabelFor(action, actionIndex) }}</strong>
+              <small>{{ actionDetailsFor(action).join(" · ") }}</small>
             </span>
           </label>
         </fieldset>
@@ -501,7 +591,7 @@ function actionActionKey(action: InteractionActionView): string {
             :disabled="busy || terminal"
             @click="submitSelected"
           >
-            {{ busy ? "Отправляем…" : interactionActionLabel(selectedAction) }}
+            {{ busy ? "Отправляем…" : actionLabelFor(selectedAction, selectedActionIndex) }}
           </button>
           <span v-else-if="!helperOfferMode" class="interaction-dialog__submit-placeholder">
             Действие недоступно
@@ -607,6 +697,29 @@ function actionActionKey(action: InteractionActionView): string {
 
 .interaction-countdown {
   margin: 0;
+  color: var(--acid);
+  font-variant-numeric: tabular-nums;
+}
+
+.interaction-domain-summary {
+  display: grid;
+  gap: .35rem;
+  min-width: 0;
+  border: 1px solid var(--line);
+  padding: .8rem;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+.interaction-domain-summary p {
+  margin: 0;
+}
+
+.interaction-domain-summary .eyebrow {
+  color: var(--acid);
+}
+
+.interaction-domain-summary time {
   color: var(--acid);
   font-variant-numeric: tabular-nums;
 }
@@ -725,6 +838,14 @@ function actionActionKey(action: InteractionActionView): string {
 }
 
 .interaction-action--advanced strong {
+  color: var(--acid);
+}
+
+.interaction-action--domain {
+  border-color: #65751f;
+}
+
+.interaction-action--domain strong {
   color: var(--acid);
 }
 
