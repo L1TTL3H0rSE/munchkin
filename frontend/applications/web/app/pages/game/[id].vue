@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import type {CommandPayload} from "@munchkin/contracts";
+import {onMounted, ref} from "vue";
+import type {
+  CommandPayload,
+} from "@munchkin/contracts";
 import type {ActionEntry} from "../../components/actionModel";
+import type {InteractionActionView} from "../../components/interaction/interactionModel";
 
 const route = useRoute();
 const router = useRouter();
 const api = useGameApi();
 const session = useGameSession();
 const gameID = computed(() => String(route.params.id));
+const hydrated = ref(false);
 const controller = useGameSessionController({
   gameID,
   api,
@@ -19,7 +24,9 @@ const {
   projection,
   loading,
   actionBusy,
+  interactionBusy,
   errorMessage,
+  interactionError,
   connectionState,
   isBusy,
 } = controller;
@@ -27,10 +34,18 @@ const {
 function executeAction(entry: ActionEntry, payload: CommandPayload): void {
   void controller.submitAction(entry.action, payload);
 }
+
+function executeInteraction(action: InteractionActionView): void {
+  void controller.submitInteraction(action);
+}
+
+onMounted(() => {
+  hydrated.value = true;
+});
 </script>
 
 <template>
-  <section v-if="loading" class="center-state" aria-busy="true">
+  <section v-if="!hydrated || loading" class="center-state" aria-busy="true">
     <p role="status">Загружаем состояние игры…</p>
     <GameConnectionStatus
       :state="connectionState"
@@ -38,16 +53,24 @@ function executeAction(entry: ActionEntry, payload: CommandPayload): void {
       @retry="controller.retry"
     />
   </section>
-  <GameTable
-    v-else-if="projection"
-    :projection="projection"
-    :connection-state="connectionState"
-    :error-message="errorMessage"
-    :action-busy="actionBusy"
-    :is-busy="isBusy"
-    @retry="controller.retry"
-    @execute="executeAction"
-  />
+  <div v-else-if="projection" class="game-route">
+    <GameTable
+      :projection="projection"
+      :connection-state="connectionState"
+      :error-message="errorMessage"
+      :action-busy="actionBusy"
+      :is-busy="isBusy"
+      @retry="controller.retry"
+      @execute="executeAction"
+    />
+    <InteractionSurface
+      :projection="projection"
+      :connection-state="connectionState"
+      :busy="interactionBusy"
+      :error-message="interactionError"
+      @submit="executeInteraction"
+    />
+  </div>
   <section v-else class="center-state" :aria-busy="isBusy">
     <GameConnectionStatus
       :state="connectionState"
@@ -74,5 +97,11 @@ function executeAction(entry: ActionEntry, payload: CommandPayload): void {
 
 .center-state > * {
   max-width: min(100%, 42rem);
+}
+
+.game-route {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
 }
 </style>

@@ -188,6 +188,7 @@ export function useGameApi() {
     interactionID: string,
     actionID: string,
     intent: InteractionIntent,
+    options: GameCommandOptions = {},
   ) {
     const request = parseClientRequest(
       () => interactionCommandRequestSchema.parse({
@@ -200,6 +201,7 @@ export function useGameApi() {
     const path = intent === "pass"
       ? "pass-interaction"
       : "respond-interaction";
+    const commandID = options.commandID ?? crypto.randomUUID();
     return requestGameplay(
       () => $fetch(
         `${baseURL}/api/v1/games/${encodeURIComponent(gameID)}/commands/${path}`,
@@ -207,9 +209,10 @@ export function useGameApi() {
           method: "POST",
           headers: {
             ...authorization(credential),
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": commandID,
           },
           body: request,
+          ...(options.signal ? {signal: options.signal} : {}),
         },
       ),
       clientCommandResult,

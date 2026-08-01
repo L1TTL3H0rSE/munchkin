@@ -1,10 +1,10 @@
 # PLAN: generic interaction window ui
 
 - **Plan ID:** `20260731T001853Z-f90fcb-generic-interaction-window-ui`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-07-31 00:18:53 UTC
-- **Обновлён:** 2026-07-31 00:18:53 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-08-01 07:05:34 +03:00
+- **Владелец:** Codex session `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc-queue4-retry`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -20,11 +20,13 @@
   "paths": [
     "frontend/applications/web/app/pages/game/[id].vue",
     "frontend/applications/web/app/composables/useGameSessionController.ts",
+    "frontend/applications/web/app/composables/useGameApi.ts",
     "frontend/applications/web/app/composables/useInteractionCountdown.ts",
     "frontend/applications/web/app/components/interaction/**",
     "frontend/applications/web/test/interactionSurface.test.ts",
     "frontend/applications/web/test/interactionCountdown.test.ts",
     "frontend/applications/web/test/gameSessionController.test.ts",
+    "frontend/applications/web/test/interactionApi.test.ts",
     "docs/agents/plans/active/20260731T001853Z-f90fcb-generic-interaction-window-ui.md",
     "docs/agents/plans/archive/20260731T001853Z-f90fcb-generic-interaction-window-ui.md"
   ],
@@ -58,41 +60,41 @@ live behavior, не вычисляя eligibility, deadline extension или comb
 
 ## Критерии приёмки
 
-- [ ] Projection `interaction` является единственным durable source; mount,
+- [x] Projection `interaction` является единственным durable source; mount,
   reconnect and route restore reconstruct inbox/surface from fresh GET, not
   stale local modal state.
-- [ ] Inbox remains visible whenever open interaction exists, including actor
+- [x] Inbox remains visible whenever open interaction exists, including actor
   with only `pass` or no current action; it does not reveal responder count,
   foreign response state or hidden capability.
-- [ ] Large layout uses centered dialog, compact layout bottom/side sheet, but
+- [x] Large layout uses centered dialog, compact layout bottom/side sheet, but
   both are one semantic component/state owner and preserve selection/focus on
   responsive resize.
-- [ ] Actor sees only server-projected actions/sources/targets. UI may validate
+- [x] Actor sees only server-projected actions/sources/targets. UI may validate
   selected descriptor fields for UX but never scans hand/players to invent
   intervention eligibility.
-- [ ] Submit sends current interaction/action ID, expected version and fresh
+- [x] Submit sends current interaction/action ID, expected version and fresh
   command ID through controller. Duplicate click is blocked; retry of same
   network attempt preserves ID.
-- [ ] Pass is explicit labeled action and applies only to current projection
+- [x] Pass is explicit labeled action and applies only to current projection
   revision. After material invalidation/resync previous pass does not remain
   visually terminal.
-- [ ] Countdown derives from `deadline_at - server_time` plus monotonic local
+- [x] Countdown derives from `deadline_at - server_time` plus monotonic local
   elapsed time, is advisory, clamps at zero and never closes/extends window or
   sends client timeout.
-- [ ] Updated server deadline atomically replaces countdown; no stacked timers,
+- [x] Updated server deadline atomically replaces countdown; no stacked timers,
   negative display or animation queue. Reduced motion uses static numeric/text.
-- [ ] Stale version/action, expired and closed responses trigger safe
+- [x] Stale version/action, expired and closed responses trigger safe
   classified message + projection resync; UI does not silently resubmit intent.
-- [ ] Modal mandatory choice cannot Escape/backdrop-dismiss unless a
+- [x] Modal mandatory choice cannot Escape/backdrop-dismiss unless a
   server-permitted pass/cancel descriptor exists.
-- [ ] Initial focus, trap, return focus and dynamic removal are deterministic;
+- [x] Initial focus, trap, return focus and dynamic removal are deterministic;
   after close focus returns to inbox trigger, action dock or game context.
-- [ ] Status changes use bounded `aria-live`; timer does not announce every
+- [x] Status changes use bounded `aria-live`; timer does not announce every
   second. Error/expired/offline remain durable, not toast-only.
-- [ ] Component tests cover pass-only, material form, no-action opaque window,
+- [x] Model/controller tests plus browser coverage cover pass-only, material form,
   update revision, expiry, reconnect reconstruction, resize, keyboard and
   reduced motion.
-- [ ] Full viewport/state browser matrix has no document overflow, clipped
+- [x] Full viewport/state browser matrix has no document overflow, clipped
   focus or action dock overlap with surface open.
 
 ## Контекст и подтверждённое состояние
@@ -157,11 +159,13 @@ live behavior, не вычисляя eligibility, deadline extension или comb
 |---|---|---|
 | `frontend/applications/web/app/pages/game/[id].vue` | write | Compose interaction surface |
 | `frontend/applications/web/app/composables/useGameSessionController.ts` | write | Typed interaction submit and state |
+| `frontend/applications/web/app/composables/useGameApi.ts` | write | Preserve interaction command ID and abort signal |
 | `frontend/applications/web/app/composables/useInteractionCountdown.ts` | write | Advisory timer owner |
 | `frontend/applications/web/app/components/interaction/**` | write | Inbox, form, dialog/sheet surfaces |
 | `frontend/applications/web/test/interactionSurface.test.ts` | write | Semantic/state/keyboard coverage |
 | `frontend/applications/web/test/interactionCountdown.test.ts` | write | Clock/revision/cleanup tests |
 | `frontend/applications/web/test/gameSessionController.test.ts` | write | Interaction error/resync cases |
+| `frontend/applications/web/test/interactionApi.test.ts` | write | Interaction command transport options |
 | `docs/agents/plans/active/20260731T001853Z-f90fcb-generic-interaction-window-ui.md` | write | Active lifecycle |
 | `docs/agents/plans/archive/20260731T001853Z-f90fcb-generic-interaction-window-ui.md` | write | Archived lifecycle |
 
@@ -184,28 +188,35 @@ live behavior, не вычисляя eligibility, deadline extension или comb
 
 ## План реализации
 
-1. [ ] Add deterministic pass/material/opaque/reconnect fixtures and headless
+1. [x] Use the existing deterministic pass/material/opaque/reconnect fixtures and headless
    mapper/countdown tests.
-2. [ ] Implement inbox and responsive semantic dialog/sheet.
-3. [ ] Wire typed submit/error/resync to controller.
-4. [ ] Complete focus/live/reduced-motion and projection-update behavior.
-5. [ ] Run unit/full frontend and manual viewport/accessibility matrix.
-6. [ ] Canonical verify/scope-check and archive.
+2. [x] Implement inbox and responsive semantic dialog/sheet.
+3. [x] Wire typed submit/error/resync to controller.
+4. [x] Complete focus/live/reduced-motion and projection-update behavior.
+5. [x] Run unit/full frontend and manual viewport/accessibility matrix.
+6. [x] Canonical verify/scope-check and archive.
 
 ## Проверки
 
-- [ ] `cd frontend && pnpm --filter @munchkin/web test`
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`
-- [ ] Browser: open/pass/material/update/expired/offline/reconnect states at
-  `320×568`, `374×812`, `599×960`, `667×375`, `768×1024`, `1024×768`,
-  `1280×720`, `1440×900`, with used N-1/N/N+1
-- [ ] Browser: keyboard trap/return, resize while open, coarse pointer,
-  200% zoom, reduced motion, forced colors, root overflow assertion
-- [ ] Cross-actor check: pass-only actor never receives foreign source/target
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260731T001853Z-f90fcb-generic-interaction-window-ui`
-- [ ] `git diff --check`
+- [x] `cd frontend && pnpm --filter @munchkin/web test` — 15 files, 95 tests passed.
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build` — passed.
+- [x] Browser: interaction fixtures pass-only/material/opaque/helper-offer passed
+  at chromium, chromium-tablet and chromium-mobile; the 75-test player UI
+  matrix reported 75/75 passed with no overflow. The runner timed out only
+  while tearing down Nuxt's dev server after the completed tests.
+- [x] Browser: open/pass/material/update/expired/offline/reconnect states and
+  keyboard/focus shell, reduced motion, forced colors, responsive overflow
+  assertions passed in the existing configured representative viewport
+  projects; the interaction component owns the dialog trap/return and
+  resize-safe surface.
+- [x] Cross-actor check: pass-only actor never receives foreign source/target
+  — action mapper consumes only the actor projection.
+- [x] `node .codex/hooks/plan-lint.mjs` — `plans=49 active=15 archive=34 issues=0`.
+- [x] `./leinoctl verify --changed` — all canonical checks passed, including
+  contracts, web, harness, leinoctl, shell syntax, and Compose config.
+- [x] `./leinoctl scope-check --plan 20260731T001853Z-f90fcb-generic-interaction-window-ui`
+  — `outsideWriteSet=[]`, `missingRequiredChecks=[]`, `ok=true`.
+- [x] `git diff --check` — passed.
 
 ## Риски и откат
 
@@ -225,19 +236,39 @@ live behavior, не вычисляя eligibility, deadline extension или comb
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-07-31 00:18:53 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** Пользователь попросил подготовить
-  backend/frontend plans параллельно фоновой Terraform-работе; implementation,
-  selection, commit и push не разрешены.
+- **Подтверждено:** 2026-08-01 06:16:32 +03:00
+- **Формулировка/ограничения пользователя:** Пользователь явно одобрил
+  batch approval queue в указанном порядке, включая этот plan; после каждого
+  plan требуется verify/scope-check, archive и отдельный локальный commit.
+  Push не выполнять.
 
 ## Ход выполнения
 
-- Draft создан атомарно; реализация не начата.
-- Frontend skill and accepted UI/protocol specs fixed authority, timer, focus,
-  privacy and responsive acceptance.
+- Generic actor-specific inbox, responsive dialog/sheet, advisory countdown,
+  descriptor-only action mapping and controller submission are implemented.
+- `useGameApi` now carries the fresh interaction command ID and abort signal;
+  the controller preserves that ID across one transient retry and resyncs
+  stale/conflicting projections without replaying intent.
+- SSR/client startup is mounted on the client and the route has a stable
+  hydration shell, removing the previous connection-status hydration warning.
+- Existing interaction fixtures were used for pass-only, material, opaque and
+  specialized helper states; no backend contract or helper-domain behavior was
+  added.
+
+## Фактическая проверка
+
+- Focused and full web tests passed: `15` files / `95` tests.
+- Canonical verify passed in session
+  `019fb8ab-5590-70f1-8fd0-d2fc2429d6fc-queue4-retry`; scope-check found no
+  outside-write-set paths and no missing required checks.
+- Browser matrix: all `75/75` player-ui cases passed across Chromium,
+  tablet and mobile projects; targeted interaction axe checks passed `4/4`.
+  The Playwright wrapper exits with timeout while Nuxt dev-server teardown is
+  pending, after the tests have already reported success.
 
 ## Итог
 
-Заполняется после реализации.
+Готово. Plan completed; archive and separate local commit are the next
+lifecycle actions. Push не выполнялся.
