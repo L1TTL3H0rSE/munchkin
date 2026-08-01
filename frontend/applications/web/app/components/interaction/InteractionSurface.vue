@@ -52,10 +52,14 @@ import {
   targetRunAwayActionLabel,
 } from "./targetRunAwayModel";
 import EconomySurface from "./EconomySurface.vue";
+import DeathLootSurface from "./DeathLootSurface.vue";
 import {
   interactionHasCharityForm,
   type EconomySubmission,
 } from "./economyModel";
+import {
+  isDeathLootInteraction,
+} from "./deathLootModel";
 
 const props = defineProps<{
   projection: Projection;
@@ -77,6 +81,8 @@ const selectedRewardValue = ref("");
 const helperFormError = ref("");
 const surfaceOpen = ref(false);
 const lastRevisionKey = ref("");
+const deathLootClosureNotice = ref("");
+const deathLootClosureNoticeRef = ref<HTMLElement | null>(null);
 const dialogID = "game-interaction-dialog";
 const helperErrorID = "interaction-helper-error";
 
@@ -101,6 +107,9 @@ const targetInteraction = computed(() => isTargetInteraction(interaction.value)
   ? interaction.value
   : undefined);
 const runAwayInteraction = computed(() => isRunAwayInteraction(interaction.value)
+  ? interaction.value
+  : undefined);
+const deathLootInteraction = computed(() => isDeathLootInteraction(interaction.value)
   ? interaction.value
   : undefined);
 const economyOffer = computed(() => interaction.value?.economy_offer);
@@ -344,6 +353,27 @@ watch(
   },
 );
 
+watch(
+  [() => props.projection.version, () => interaction.value],
+  ([version, nextInteraction], [previousVersion, previousInteraction]) => {
+    if (nextInteraction) {
+      deathLootClosureNotice.value = "";
+      return;
+    }
+    if (
+      previousVersion === undefined ||
+      version <= previousVersion ||
+      !isDeathLootInteraction(previousInteraction)
+    ) {
+      return;
+    }
+    deathLootClosureNotice.value =
+      "Окно приоритета добычи закрыто сервером. Подтверждённый итог доступен в свежей projection; клиент не достраивает выбор.";
+    void nextTick(() => deathLootClosureNoticeRef.value?.focus());
+  },
+  {flush: "post"},
+);
+
 function actionActionKey(action: InteractionActionView): string {
   return interactionActionKey(action);
 }
@@ -351,12 +381,13 @@ function actionActionKey(action: InteractionActionView): string {
 
 <template>
   <section
-    v-if="interaction"
+    v-if="interaction || deathLootClosureNotice"
     class="interaction-surface"
     data-testid="interaction-surface"
     :data-state="terminal ? 'terminal' : busy ? 'pending' : 'open'"
   >
-    <aside class="interaction-inbox" data-testid="interaction-inbox">
+    <template v-if="interaction">
+      <aside class="interaction-inbox" data-testid="interaction-inbox">
       <div>
         <p class="eyebrow">ВХОДЯЩЕЕ ВЗАИМОДЕЙСТВИЕ</p>
         <strong>{{ interactionTitle(interaction) }}</strong>
@@ -405,6 +436,8 @@ function actionActionKey(action: InteractionActionView): string {
                 ? "Цель, private choice и counter доступны только из actor-specific дескрипторов."
                 : runAwayInteraction
                 ? "Шаг побега и его исход меняются только новой проекцией сервера."
+                : deathLootInteraction
+                ? "Публичные counts видны всем; названия карт и pick actions — только текущему priority actor."
                 : interaction.response_required_for_you
                 ? "Выберите только действие, которое передала текущая проекция."
                 : "Окно остаётся видимым, даже если сейчас нет действия для этого игрока." }}
@@ -538,6 +571,14 @@ function actionActionKey(action: InteractionActionView): string {
           @submit="emit('submit-economy', $event)"
         />
 
+        <DeathLootSurface
+          v-if="deathLootInteraction"
+          :projection="projection"
+          :interaction="deathLootInteraction"
+          :busy="busy"
+          @submit="emit('submit', $event)"
+        />
+
         <form
           v-if="helperOfferMode"
           class="interaction-helper-form"
@@ -594,7 +635,7 @@ function actionActionKey(action: InteractionActionView): string {
         </form>
 
         <p
-          v-if="!interaction.actions.length && !charityForm"
+          v-if="!deathLootInteraction && !interaction.actions.length && !charityForm"
           class="interaction-dialog__opaque"
           role="status"
         >
@@ -602,7 +643,7 @@ function actionActionKey(action: InteractionActionView): string {
         </p>
 
         <p
-          v-else-if="!selectableActions.length && !helperOfferMode && !helperCancel && !charityForm"
+          v-else-if="!deathLootInteraction && !selectableActions.length && !helperOfferMode && !helperCancel && !charityForm"
           class="interaction-dialog__opaque"
           role="status"
         >
@@ -610,7 +651,7 @@ function actionActionKey(action: InteractionActionView): string {
         </p>
 
         <fieldset
-          v-else-if="selectableActions.length"
+          v-else-if="!deathLootInteraction && selectableActions.length"
           class="interaction-actions"
           :disabled="busy || terminal"
         >
@@ -641,7 +682,7 @@ function actionActionKey(action: InteractionActionView): string {
           </label>
         </fieldset>
 
-        <footer class="interaction-dialog__footer">
+        <footer v-if="!deathLootInteraction" class="interaction-dialog__footer">
           <button
             v-if="helperCancel"
             class="interaction-dialog__submit interaction-dialog__submit--secondary"
@@ -666,7 +707,20 @@ function actionActionKey(action: InteractionActionView): string {
           <small>Окончательное решение принимает сервер.</small>
         </footer>
       </section>
-    </div>
+      </div>
+    </template>
+
+    <p
+      v-if="deathLootClosureNotice"
+      ref="deathLootClosureNoticeRef"
+      class="interaction-dialog__closure-notice"
+      data-testid="death-loot-closure-notice"
+      role="status"
+      aria-live="polite"
+      tabindex="-1"
+    >
+      {{ deathLootClosureNotice }}
+    </p>
   </section>
 </template>
 
@@ -835,6 +889,19 @@ function actionActionKey(action: InteractionActionView): string {
   padding: .75rem;
   color: #ffd2c6;
   line-height: 1.45;
+}
+
+.interaction-dialog__closure-notice {
+  margin: 0;
+  border: 1px solid var(--acid);
+  padding: 1rem;
+  color: var(--acid);
+  line-height: 1.45;
+}
+
+.interaction-dialog__closure-notice:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: 3px;
 }
 
 .interaction-helper-summary,
@@ -1058,7 +1125,8 @@ function actionActionKey(action: InteractionActionView): string {
   .interaction-inbox,
   .interaction-dialog,
   .interaction-action,
-  .interaction-dialog__error {
+  .interaction-dialog__error,
+  .interaction-dialog__closure-notice {
     border-color: CanvasText;
     forced-color-adjust: none;
   }

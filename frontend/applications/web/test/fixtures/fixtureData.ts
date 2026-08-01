@@ -253,6 +253,17 @@ function makeFixture(
   };
 }
 
+function configureDeathLootRoster(projection: Projection): void {
+  projection.you.dead = false;
+  projection.players = [0, 1, 2, 3, 4].map(player);
+  const deadPlayer = projection.players.find((candidate) =>
+    candidate.player_id === "player_2",
+  );
+  if (deadPlayer) {
+    deadPlayer.dead = true;
+  }
+}
+
 export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
   makeFixture("single-setup", "Один игрок: подготовка", (projection) => {
     projection.you.setup_done = false;
@@ -820,21 +831,80 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     );
   }),
   makeFixture("death-loot", "Окно: приоритет добычи", (projection) => {
-    projection.you.dead = true;
+    configureDeathLootRoster(projection);
     projection.interaction = interaction(
       "death_loot_priority",
       [
         interactionAction("respond", "3", {choice_ids: ["loot-option-1"]}),
+        interactionAction("respond", "5", {choice_ids: ["loot-option-2"]}),
         interactionAction("pass", "4"),
       ],
       {
+        response_required_for_you: true,
         death_loot: {
           dead_player_id: "player_2",
           initial_count: 3,
           remaining_count: 2,
           picked_count: 1,
           discarded_count: 0,
-          options: [card("loot-option-1", "Добыча из комнаты", "item", "treasure")],
+          options: [
+            card("loot-option-1", "Добыча из комнаты", "item", "treasure"),
+            card("loot-option-2", "Старый фонарь", "item", "treasure"),
+          ],
+        },
+      },
+    );
+  }),
+  makeFixture("death-loot-observer", "Наблюдатель: добыча opaque", (projection) => {
+    configureDeathLootRoster(projection);
+    projection.interaction = interaction(
+      "death_loot_priority",
+      [],
+      {
+        response_required_for_you: false,
+        death_loot: {
+          dead_player_id: "player_2",
+          initial_count: 3,
+          remaining_count: 2,
+          picked_count: 1,
+          discarded_count: 0,
+          options: [],
+        },
+      },
+    );
+  }),
+  makeFixture("death-loot-all-pass", "Пул добычи: все пропустили", (projection) => {
+    configureDeathLootRoster(projection);
+    projection.interaction = interaction(
+      "death_loot_priority",
+      [],
+      {
+        response_required_for_you: false,
+        death_loot: {
+          dead_player_id: "player_2",
+          initial_count: 3,
+          remaining_count: 0,
+          picked_count: 0,
+          discarded_count: 3,
+          options: [],
+        },
+      },
+    );
+  }),
+  makeFixture("death-loot-single", "Один игрок: пустой пул добычи", (projection) => {
+    projection.you.dead = true;
+    projection.interaction = interaction(
+      "death_loot_priority",
+      [],
+      {
+        response_required_for_you: false,
+        death_loot: {
+          dead_player_id: "player_hero",
+          initial_count: 0,
+          remaining_count: 0,
+          picked_count: 0,
+          discarded_count: 0,
+          options: [],
         },
       },
     );
