@@ -1,0 +1,1882 @@
+{
+  "schema_version": 1,
+  "set_id": "async-javascript",
+  "version": 1,
+  "author": "L1TTL3H0rSE",
+  "license": "All-Rights-Reserved",
+  "source": "original-async-javascript-card-game-2026",
+  "content_digest": "sha256:995c78b19ad803e5d3808653673d104690d705c28506c113cb75c5299c071197",
+  "cards": [
+    {
+      "id": "utya-race",
+      "name": "Утя",
+      "deck": "door",
+      "kind": "race",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "utya",
+          "event-loop"
+        ],
+        "modifiers": [
+          {
+            "target": "escape",
+            "amount": 1,
+            "condition": {
+              "kind": "always"
+            }
+          },
+          {
+            "target": "player_combat",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "queue"
+            }
+          }
+        ]
+      },
+      "rules_text": "Постоянно +1 к побегу; +1 в бою против монстров с меткой queue."
+    },
+    {
+      "id": "zavrik-race",
+      "name": "Заврик",
+      "deck": "door",
+      "kind": "race",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "zavrik",
+          "worker"
+        ],
+        "big_allowance": 1,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "worker"
+            }
+          }
+        ]
+      },
+      "rules_text": "Можно нести на один большой предмет больше; +2 против Worker-монстров."
+    },
+    {
+      "id": "master-manul-race",
+      "name": "Мастер Манул",
+      "deck": "door",
+      "kind": "race",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "manul",
+          "promise",
+          "debug"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "error"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 3,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+2 против ошибок. Сбрось карту: +3 в текущем бою."
+    },
+    {
+      "id": "master-panda-race",
+      "name": "Мастер Панда",
+      "deck": "door",
+      "kind": "race",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "race",
+        "tags": [
+          "panda",
+          "async-await",
+          "promise"
+        ],
+        "tie_wins": true,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "async-await"
+            }
+          },
+          {
+            "target": "escape",
+            "amount": 1,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "rules_text": "Ничья в бою считается победой. Постоянно +1 к побегу и +2 против async/await-монстров."
+    },
+    {
+      "id": "event-loop-dispatcher",
+      "name": "Диспетчер Event Loop",
+      "deck": "door",
+      "kind": "class",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "event-loop",
+          "queue"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "queue"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 2,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+2 против очередей. Сбрось карту: +2 в текущем бою."
+    },
+    {
+      "id": "promise-alchemist",
+      "name": "Алхимик Promise",
+      "deck": "door",
+      "kind": "class",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "promise",
+          "thenable"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "promise"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 3,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+2 против Promise-монстров. Сбрось карту: +3 в текущем бою."
+    },
+    {
+      "id": "worker-engineer",
+      "name": "Инженер Web Worker",
+      "deck": "door",
+      "kind": "class",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "worker",
+          "buffer"
+        ],
+        "big_allowance": 1,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "worker"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 4,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+2 против Worker-монстров и можно нести большой предмет. Сбрось карту: +4 в бою."
+    },
+    {
+      "id": "channel-diplomat",
+      "name": "Переговорщик MessageChannel",
+      "deck": "door",
+      "kind": "class",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "channel",
+          "origin"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "channel"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 2,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+2 против каналов. Сбрось карту: +2 в текущем бою."
+    },
+    {
+      "id": "render-optimizer",
+      "name": "Оптимизатор рендера",
+      "deck": "door",
+      "kind": "class",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "render",
+          "idle"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "render"
+            }
+          },
+          {
+            "target": "escape",
+            "amount": 1,
+            "condition": {
+              "kind": "always"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 2,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+2 против монстров рендера и постоянно +1 к побегу. Сбрось карту: +2 в бою."
+    },
+    {
+      "id": "rejection-debugger",
+      "name": "Отладчик Rejection",
+      "deck": "door",
+      "kind": "class",
+      "copies": 2,
+      "interaction_scope": "self",
+      "trait": {
+        "group": "class",
+        "tags": [
+          "debug",
+          "error"
+        ],
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "error"
+            }
+          }
+        ]
+      },
+      "abilities": [
+        {
+          "kind": "discard_for_combat",
+          "amount": 4,
+          "discard_count": 1
+        }
+      ],
+      "rules_text": "+2 против ошибок и rejection. Сбрось карту: +4 в текущем бою."
+    },
+    {
+      "id": "microtask-gremlin",
+      "name": "Гремлин микрозадач",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 3,
+        "treasures": 1,
+        "levels": 1,
+        "tags": [
+          "queue",
+          "microtask"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "event-loop"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось карту с руки."
+    },
+    {
+      "id": "raf-ninja",
+      "name": "Ниндзя requestAnimationFrame",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 4,
+        "treasures": 1,
+        "levels": 1,
+        "tags": [
+          "render",
+          "raf",
+          "queue"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "render"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "Без метки render монстр получает +2 к боевой силе. При неудаче потеряй уровень."
+    },
+    {
+      "id": "idle-callback-sloth",
+      "name": "Ленивец requestIdleCallback",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 2,
+        "treasures": 1,
+        "levels": 1,
+        "tags": [
+          "idle",
+          "ric"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось карту с руки."
+    },
+    {
+      "id": "same-origin-guardian",
+      "name": "Страж Same-Origin Policy",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 5,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "origin",
+          "sop"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "channel"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "trait",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Без канала монстр получает +2 к боевой силе. При неудаче сбрось черту."
+    },
+    {
+      "id": "post-message-pirate",
+      "name": "Пират postMessage",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 6,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "channel",
+          "post-message"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "channel"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, потеряй уровень."
+    },
+    {
+      "id": "structured-clone-chimera",
+      "name": "Химера Structured Clone",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 4,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "clone",
+          "structured-clone"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось один экипированный предмет."
+    },
+    {
+      "id": "transferable-buffer-beast",
+      "name": "Зверь Transferable ArrayBuffer",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 7,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "buffer",
+          "transferable"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "worker"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Без Worker-метки монстр получает +2. При неудаче сбрось экипировку."
+    },
+    {
+      "id": "shared-array-hydra",
+      "name": "Гидра SharedArrayBuffer",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 8,
+        "treasures": 3,
+        "levels": 2,
+        "tags": [
+          "shared",
+          "atomics",
+          "buffer"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "worker"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "Без Worker-метки монстр получает +2. При неудаче потеряй уровень."
+    },
+    {
+      "id": "message-channel-duo",
+      "name": "Дуэт MessageChannel",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 6,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "channel",
+          "queue"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "channel"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Без канала монстр получает +2. При неудаче сбрось карту с руки."
+    },
+    {
+      "id": "broadcast-channel-choir",
+      "name": "Хор BroadcastChannel",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 5,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "channel",
+          "broadcast"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 2
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось две карты с руки."
+    },
+    {
+      "id": "worker-golem",
+      "name": "Голем Web Worker",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 7,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "worker",
+          "compute"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "worker"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "Без Worker-метки монстр получает +2. При неудаче потеряй уровень."
+    },
+    {
+      "id": "callback-hell",
+      "name": "Ад колбэков",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 6,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "callback",
+          "promise",
+          "error"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "promise"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          },
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Без Promise-мушки монстр получает +2. При неудаче потеряй уровень и сбрось карту."
+    },
+    {
+      "id": "pending-forever",
+      "name": "Вечный Pending",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 5,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "promise",
+          "pending"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "async-await"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "Без async/await монстр получает +2. При неудаче потеряй уровень."
+    },
+    {
+      "id": "unhandled-rejection",
+      "name": "Непойманный Rejection",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 7,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "promise",
+          "error"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "debug"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          },
+          {
+            "kind": "discard",
+            "selector": "trait",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Без отладки монстр получает +2. При неудаче потеряй уровень и сбрось черту."
+    },
+    {
+      "id": "thenable-mimic",
+      "name": "Мимик Thenable",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 5,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "promise",
+          "thenable"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось один экипированный предмет."
+    },
+    {
+      "id": "finally-bomb",
+      "name": "Бомба Finally",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 7,
+        "treasures": 3,
+        "levels": 1,
+        "tags": [
+          "promise",
+          "finally",
+          "error"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "promise"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Без Promise-мушки монстр получает +2. При неудаче сбрось экипировку."
+    },
+    {
+      "id": "promise-all-hydra",
+      "name": "Гидра Promise.all",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 8,
+        "treasures": 3,
+        "levels": 2,
+        "tags": [
+          "promise",
+          "all"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "promise"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 2
+          }
+        ]
+      },
+      "rules_text": "Без Promise-мушки монстр получает +2. При неудаче потеряй два уровня."
+    },
+    {
+      "id": "promise-race-hare",
+      "name": "Заяц Promise.race",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 6,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "promise",
+          "race"
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Если не сбежишь, сбрось карту с руки."
+    },
+    {
+      "id": "aggregate-error",
+      "name": "AggregateError",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 8,
+        "treasures": 3,
+        "levels": 2,
+        "tags": [
+          "error",
+          "promise"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "debug"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "hand",
+            "count": 2
+          }
+        ]
+      },
+      "rules_text": "Без отладки монстр получает +2. При неудаче сбрось две карты с руки."
+    },
+    {
+      "id": "sequential-await-troll",
+      "name": "Тролль последовательного await",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 7,
+        "treasures": 2,
+        "levels": 1,
+        "tags": [
+          "async-await",
+          "sequential"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "async-await"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "discard",
+            "selector": "equipment",
+            "count": 1
+          }
+        ]
+      },
+      "rules_text": "Без async/await монстр получает +2. При неудаче сбрось экипировку."
+    },
+    {
+      "id": "async-function-giant",
+      "name": "Гигант async function",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 9,
+        "treasures": 3,
+        "levels": 2,
+        "tags": [
+          "async-await",
+          "promise"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "async-await"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "lose_level",
+            "amount": 1
+          }
+        ]
+      },
+      "rules_text": "Без async/await монстр получает +2. При неудаче потеряй уровень."
+    },
+    {
+      "id": "top-level-await-boss",
+      "name": "Босс Top-Level Await",
+      "deck": "door",
+      "kind": "monster",
+      "copies": 1,
+      "interaction_scope": "none",
+      "monster": {
+        "strength": 10,
+        "treasures": 4,
+        "levels": 2,
+        "tags": [
+          "async-await",
+          "boss"
+        ],
+        "modifiers": [
+          {
+            "target": "monster_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "character_lacks_tag",
+              "tag": "async-await"
+            }
+          }
+        ],
+        "bad_stuff": [
+          {
+            "kind": "death"
+          }
+        ]
+      },
+      "rules_text": "Без async/await монстр получает +2. При неудачном побеге наступает смерть."
+    },
+    {
+      "id": "unhandled-rejection-curse",
+      "name": "Проклятие: Unhandled Rejection",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "lose_level",
+          "amount": 1
+        },
+        {
+          "kind": "discard",
+          "selector": "hand",
+          "count": 1
+        }
+      ],
+      "rules_text": "Потеряй уровень и сбрось карту с руки."
+    },
+    {
+      "id": "callback-hell-curse",
+      "name": "Проклятие: Callback Hell",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_hand_limit",
+          "amount": -1,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно уменьши лимит руки на одну карту."
+    },
+    {
+      "id": "wrong-origin",
+      "name": "Проклятие: Чужой origin",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -2,
+          "target": "player",
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −2 к твоей боевой силе."
+    },
+    {
+      "id": "detached-buffer-curse",
+      "name": "Проклятие: Отсоединённый буфер",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "equipment",
+          "count": 1
+        }
+      ],
+      "rules_text": "Сбрось один экипированный предмет."
+    },
+    {
+      "id": "microtask-flood",
+      "name": "Проклятие: Потоп микрозадач",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_hand_limit",
+          "amount": -1,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно уменьши лимит руки на одну карту."
+    },
+    {
+      "id": "race-condition",
+      "name": "Проклятие: Race Condition",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -2,
+          "target": "player",
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −2 к твоей боевой силе."
+    },
+    {
+      "id": "sequential-await-curse",
+      "name": "Проклятие: Последовательный await",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": -2,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −2 к броску на побег."
+    },
+    {
+      "id": "type-error-undefined",
+      "name": "Проклятие: TypeError undefined",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "hand",
+          "count": 2
+        }
+      ],
+      "rules_text": "Сбрось до двух карт с руки."
+    },
+    {
+      "id": "promise-pending-curse",
+      "name": "Проклятие: Promise Pending",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": -2,
+          "persistent": true
+        }
+      ],
+      "rules_text": "Постоянно −2 к броску на побег."
+    },
+    {
+      "id": "finally-bomb-curse",
+      "name": "Проклятие: Бомба Finally",
+      "deck": "door",
+      "kind": "curse",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "discard",
+          "selector": "equipment",
+          "count": 1
+        }
+      ],
+      "rules_text": "Сбрось один экипированный предмет."
+    },
+    {
+      "id": "async-clocks",
+      "name": "Часы асинхронности",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 700,
+        "bonus": 2,
+        "escape_bonus": 1,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "promise"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 к боевой силе, +1 к побегу; ещё +1 против Promise-монстров."
+    },
+    {
+      "id": "catch-net",
+      "name": "Сеть catch",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "headgear",
+        "size": "small",
+        "value": 500,
+        "bonus": 1,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "error"
+            }
+          }
+        ]
+      },
+      "rules_text": "+1 к боевой силе; ещё +2 против ошибок."
+    },
+    {
+      "id": "then-chain",
+      "name": "Цепочка then",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 800,
+        "bonus": 3,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "promise"
+            }
+          }
+        ]
+      },
+      "rules_text": "+3 к боевой силе и ещё +1 против Promise-монстров."
+    },
+    {
+      "id": "finally-cloak",
+      "name": "Плащ finally",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "armor",
+        "size": "small",
+        "value": 900,
+        "bonus": 3,
+        "escape_bonus": 1
+      },
+      "rules_text": "+3 к боевой силе и +1 к побегу."
+    },
+    {
+      "id": "structured-clone-crystal",
+      "name": "Кристалл Structured Clone",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 600,
+        "bonus": 2,
+        "hand_limit_bonus": 1
+      },
+      "rules_text": "+2 к боевой силе и +1 к лимиту руки."
+    },
+    {
+      "id": "transferable-array-buffer",
+      "name": "Transferable ArrayBuffer",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 2,
+        "size": "big",
+        "value": 1000,
+        "bonus": 5,
+        "restrictions": {
+          "required_tags": [
+            "worker"
+          ]
+        }
+      },
+      "rules_text": "+5 к боевой силе. Доступен персонажу с меткой worker."
+    },
+    {
+      "id": "shared-array-buffer",
+      "name": "SharedArrayBuffer",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "big",
+        "value": 900,
+        "bonus": 4,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "buffer"
+            }
+          }
+        ]
+      },
+      "rules_text": "+4 к боевой силе и ещё +2 против буферов."
+    },
+    {
+      "id": "message-channel",
+      "name": "MessageChannel",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 700,
+        "bonus": 3,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "channel"
+            }
+          }
+        ]
+      },
+      "rules_text": "+3 к боевой силе и ещё +2 против каналов."
+    },
+    {
+      "id": "broadcast-channel",
+      "name": "BroadcastChannel",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 600,
+        "bonus": 2,
+        "hand_limit_bonus": 1
+      },
+      "rules_text": "+2 к боевой силе и +1 к лимиту руки."
+    },
+    {
+      "id": "worker-hammer",
+      "name": "Молот Web Worker",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 2,
+        "size": "big",
+        "value": 1200,
+        "bonus": 6,
+        "restrictions": {
+          "required_tags": [
+            "worker"
+          ]
+        }
+      },
+      "rules_text": "+6 к боевой силе. Доступен персонажу с меткой worker."
+    },
+    {
+      "id": "async-await-hourglass",
+      "name": "Песочные часы async/await",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "headgear",
+        "size": "small",
+        "value": 900,
+        "bonus": 3,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "async-await"
+            }
+          }
+        ]
+      },
+      "rules_text": "+3 к боевой силе и ещё +2 против async/await-монстров."
+    },
+    {
+      "id": "promise-race-stopwatch",
+      "name": "Секундомер Promise.race",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "footgear",
+        "size": "small",
+        "value": 800,
+        "bonus": 2,
+        "escape_bonus": 2,
+        "modifiers": [
+          {
+            "target": "escape",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "promise"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 к боевой силе, +2 к побегу и ещё +1 к побегу против Promise-монстров."
+    },
+    {
+      "id": "promise-all-multitool",
+      "name": "Мультитул Promise.all",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "big",
+        "value": 1000,
+        "bonus": 4,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 2,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "promise"
+            }
+          }
+        ]
+      },
+      "rules_text": "+4 к боевой силе и ещё +2 против Promise-монстров."
+    },
+    {
+      "id": "promise-any-charm",
+      "name": "Амулет Promise.any",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "none",
+        "size": "small",
+        "value": 700,
+        "bonus": 1,
+        "modifiers": [
+          {
+            "target": "treasure_reward",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "promise"
+            }
+          }
+        ]
+      },
+      "rules_text": "+1 к боевой силе и +1 сокровище за победу над Promise-монстром."
+    },
+    {
+      "id": "all-settled-salvage",
+      "name": "Осколок Promise.allSettled",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "armor",
+        "size": "small",
+        "value": 800,
+        "bonus": 2,
+        "hand_limit_bonus": 1,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "error"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 к боевой силе, +1 к лимиту руки и ещё +1 против ошибок."
+    },
+    {
+      "id": "with-resolvers-control",
+      "name": "Пульт Promise.withResolvers",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 2,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "small",
+        "value": 700,
+        "bonus": 2,
+        "modifiers": [
+          {
+            "target": "player_combat",
+            "amount": 1,
+            "condition": {
+              "kind": "monster_has_tag",
+              "tag": "async-await"
+            }
+          }
+        ]
+      },
+      "rules_text": "+2 к боевой силе и ещё +1 против async/await-монстров."
+    },
+    {
+      "id": "coroutine-staff",
+      "name": "Посох корутины",
+      "deck": "treasure",
+      "kind": "item",
+      "copies": 1,
+      "interaction_scope": "self",
+      "item": {
+        "slot": "hands",
+        "hands": 1,
+        "size": "big",
+        "value": 1100,
+        "bonus": 4,
+        "escape_bonus": 1
+      },
+      "rules_text": "+4 к боевой силе и +1 к побегу."
+    },
+    {
+      "id": "promise-resolve-cookie",
+      "name": "Печенье Promise.resolve",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "draw",
+          "deck": "treasure",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Немедленно возьми одну карту сокровищ."
+    },
+    {
+      "id": "promise-reject-explosion",
+      "name": "Взрыв Promise.reject",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": -3,
+          "target": "monster"
+        }
+      ],
+      "rules_text": "−3 к боевой силе монстра в текущем бою."
+    },
+    {
+      "id": "catch-net-deploy",
+      "name": "Развёртывание catch-сети",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 3,
+          "target": "player"
+        }
+      ],
+      "rules_text": "+3 к твоей боевой силе в текущем бою."
+    },
+    {
+      "id": "finally-cleanup",
+      "name": "Уборка в finally",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": 3
+        }
+      ],
+      "rules_text": "+3 к твоему побегу в текущей попытке."
+    },
+    {
+      "id": "structured-clone-copy",
+      "name": "Копия Structured Clone",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "draw",
+          "deck": "treasure",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Сделай копию: возьми одну карту сокровищ."
+    },
+    {
+      "id": "transfer-buffer-burst",
+      "name": "Рывок Transfer Buffer",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 4,
+          "target": "player"
+        }
+      ],
+      "rules_text": "+4 к твоей боевой силе в текущем бою."
+    },
+    {
+      "id": "post-message-call",
+      "name": "Вызов postMessage",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 3,
+          "target": "player"
+        }
+      ],
+      "rules_text": "+3 к твоей боевой силе в текущем бою."
+    },
+    {
+      "id": "broadcast-channel-ping",
+      "name": "Пинг BroadcastChannel",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 2,
+          "target": "player"
+        },
+        {
+          "kind": "modify_treasure_reward",
+          "amount": 1
+        }
+      ],
+      "rules_text": "+2 к бою и +1 сокровище за победу в текущем бою."
+    },
+    {
+      "id": "promise-all-parallel",
+      "name": "Параллельный Promise.all",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 5,
+          "target": "player"
+        }
+      ],
+      "rules_text": "+5 к твоей боевой силе в текущем бою."
+    },
+    {
+      "id": "promise-any-first-success",
+      "name": "Первый успех Promise.any",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "draw",
+          "deck": "treasure",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Первый успех приносит одну карту сокровищ."
+    },
+    {
+      "id": "promise-race-sprint",
+      "name": "Спринт Promise.race",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": 3
+        }
+      ],
+      "rules_text": "+3 к побегу в текущей попытке."
+    },
+    {
+      "id": "all-settled-recovery",
+      "name": "Восстановление allSettled",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_treasure_reward",
+          "amount": 1
+        }
+      ],
+      "rules_text": "+1 сокровище за победу в текущем бою."
+    },
+    {
+      "id": "async-await-pause",
+      "name": "Пауза async/await",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_escape",
+          "amount": 2
+        }
+      ],
+      "rules_text": "+2 к побегу в текущей попытке."
+    },
+    {
+      "id": "promisify-adapter",
+      "name": "Адаптер promisify",
+      "deck": "treasure",
+      "kind": "one_shot",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "modify_combat",
+          "amount": 2,
+          "target": "player"
+        },
+        {
+          "kind": "draw",
+          "deck": "treasure",
+          "amount": 1
+        }
+      ],
+      "rules_text": "+2 к бою и возьми одну карту сокровищ."
+    },
+    {
+      "id": "fulfilled-cookie",
+      "name": "Печенье Fulfilled",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи один уровень."
+    },
+    {
+      "id": "async-mastery-badge",
+      "name": "Знак мастерства async/await",
+      "deck": "treasure",
+      "kind": "level_up",
+      "copies": 2,
+      "interaction_scope": "self",
+      "effects": [
+        {
+          "kind": "gain_level",
+          "amount": 1
+        }
+      ],
+      "rules_text": "Получи один уровень."
+    }
+  ]
+}
