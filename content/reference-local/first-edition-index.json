@@ -1,0 +1,3569 @@
+{
+  "schema_version": 1,
+  "reference_id": "official-current-first-edition-core-list-2024",
+  "source": {
+    "title": "Munchkin core set official product page",
+    "url": "https://munchkin.game/products/games/munchkin/",
+    "retrieved_at": "2026-07-29",
+    "scope_note": "Current official First Edition core/reprint list; not asserted to be the exact 2001 first printing."
+  },
+  "copyright_boundary": "Human-only adaptation index. Contains public card names and original neutral summaries only; no original rules text, translations, scans, art, logos, fonts or trade dress.",
+  "entries": [
+    {
+      "ordinal": 1,
+      "deck": "door",
+      "public_name": "3,872 Orcs",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[1]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with a character-trait conditional; exact values need source review.",
+      "mechanic_tags": [
+        "monster",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Минотавр МФЦ",
+      "moscow_concept": "монстр. Нить Ариадны принимается только в оригинале и с копией. Механика: +3 против героя без метки «бюрократ». Если не сбежишь, сбрось 1 карту черты."
+    },
+    {
+      "ordinal": 2,
+      "deck": "door",
+      "public_name": "Amazon",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[2]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with a character-tag-dependent outcome; exact values need source review.",
+      "mechanic_tags": [
+        "monster",
+        "character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Забор, ведущий кругами",
+      "moscow_concept": "монстр. Обход занимает восемь минут и возвращает к началу. Механика: +2 против пешехода. Если не сбежишь, сбрось 2 предмета экипировки."
+    },
+    {
+      "ordinal": 3,
+      "deck": "door",
+      "public_name": "Ancient",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[3]",
+      "kind_guess": "monster_enhancer",
+      "mechanical_synopsis": "Raises the current Monster's combat strength and reward.",
+      "mechanic_tags": [
+        "combat",
+        "monster-modifier",
+        "reward-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat",
+        "modify_treasure_reward"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие соседского ремонта",
+      "moscow_concept": "проклятие. Сверление прекратится сразу после конца времён. Механика: Постоянно −1 к твоей боевой силе."
+    },
+    {
+      "ordinal": 4,
+      "deck": "door",
+      "public_name": "Baby",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[4]",
+      "kind_guess": "monster_enhancer",
+      "mechanical_synopsis": "Reduces the current Monster's combat strength and reward.",
+      "mechanic_tags": [
+        "combat",
+        "monster-modifier",
+        "reward-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat",
+        "modify_treasure_reward"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие закрытого перехода",
+      "moscow_concept": "проклятие. Обход обозначен стрелкой, которая указывает на другую стрелку. Механика: Постоянно −2 к побегу."
+    },
+    {
+      "ordinal": 5,
+      "deck": "door",
+      "public_name": "Bigfoot",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[5]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with conditional strength and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Рой доставщиков",
+      "moscow_concept": "монстр. Каждый ищет нужный подъезд, но нашли они тебя. Механика: +2 против курьера. Если не сбежишь, сбрось 2 карты с руки."
+    },
+    {
+      "ordinal": 6,
+      "deck": "door",
+      "public_name": "Bullrog",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[6]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "High-strength Monster with pursuit and severe typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "pursuit",
+        "death"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "death"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Сороконожка с проездным",
+      "moscow_concept": "монстр. Все сорок две ноги стоят на переходе правильно. Механика: Турист автоматически проигрывает бой, но может попытаться убежать. При неудачном побеге умри."
+    },
+    {
+      "ordinal": 7,
+      "deck": "door",
+      "public_name": "Cheat!",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[7]",
+      "kind_guess": "cheat",
+      "mechanical_synopsis": "Attaches to one owned Item and bypasses its normal use restrictions.",
+      "mechanic_tags": [
+        "item-attachment",
+        "restriction-bypass"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "cheat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Общая квартира",
+      "moscow_concept": "усиление черты. На кухне встречаются культуры, графики и чужая гречка. Механика: Можно иметь ещё 1 Расу."
+    },
+    {
+      "ordinal": 8,
+      "deck": "door",
+      "public_name": "Cleric",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[8]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait granting registered abilities and conditional modifiers.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "ability"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "discard_for_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Велокурьер",
+      "moscow_concept": "класс. Домофон не отвечает, зато ноги отвечают за всё. Механика: Постоянно +2 к побегу. Сбрось 1 карту с руки: +3 в текущем бою."
+    },
+    {
+      "ordinal": 9,
+      "deck": "door",
+      "public_name": "Cleric",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[9]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait granting registered abilities and conditional modifiers.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "ability"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "discard_for_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Смотритель двора",
+      "moscow_concept": "класс. Знает каждый ключ, кота и несанкционированный самокат. Механика: Можно нести на 1 крупный предмет больше. +2 против монстров с меткой «двор»."
+    },
+    {
+      "ordinal": 10,
+      "deck": "door",
+      "public_name": "Cleric",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[10]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait granting registered abilities and conditional modifiers.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "ability"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "discard_for_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Диспетчер района",
+      "moscow_concept": "класс. Ваше обращение принято, пронумеровано и направлено судьбе. Механика: Ты считаешься офисным работником. Постоянно +2 к лимиту руки. Сбрось 1 карту с руки: +2 в текущем бою."
+    },
+    {
+      "ordinal": 11,
+      "deck": "door",
+      "public_name": "Crabs",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[11]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Self Curse that removes or penalizes equipment; exact selector needs review.",
+      "mechanic_tags": [
+        "curse",
+        "equipment-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "equipment-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие балконного голубя",
+      "moscow_concept": "проклятие. Он ничего не украл. Он просто всё переоформил на себя. Механика: Выбери и сбрось 2 свои карты."
+    },
+    {
+      "ordinal": 12,
+      "deck": "door",
+      "public_name": "Curse! Change Class",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[12]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Replaces or removes the current Class-like trait.",
+      "mechanic_tags": [
+        "curse",
+        "class-change"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "trait-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие разряженного телефона",
+      "moscow_concept": "проклятие. Билет внутри, зарядка дома, контролёр рядом. Механика: Сбрось 2 карты с руки."
+    },
+    {
+      "ordinal": 13,
+      "deck": "door",
+      "public_name": "Curse! Change Race",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[13]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Replaces or removes the current Race-like trait.",
+      "mechanic_tags": [
+        "curse",
+        "race-change"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "trait-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие вчерашнего срока",
+      "moscow_concept": "проклятие. Уведомление пришло вовремя — на следующий день. Механика: Потеряй 1 уровень и сбрось 1 карту с руки."
+    },
+    {
+      "ordinal": 14,
+      "deck": "door",
+      "public_name": "Curse! Change Sex",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[14]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Changes a registered character tag and may apply a temporary penalty.",
+      "mechanic_tags": [
+        "curse",
+        "character-tag",
+        "temporary-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "change_character_tag",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие выцветшей вывески",
+      "moscow_concept": "проклятие. Название ещё читается, если помнить его заранее. Механика: Постоянно −2 к твоей боевой силе."
+    },
+    {
+      "ordinal": 15,
+      "deck": "door",
+      "public_name": "Curse! Chicken on Your Head",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[15]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Persistent self Curse with an ongoing modifier until a typed removal condition.",
+      "mechanic_tags": [
+        "curse",
+        "persistent",
+        "modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "persistent_effect",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие вывернутого зонта",
+      "moscow_concept": "проклятие. Теперь он ловит не дождь, а взгляды. Механика: Постоянно −1 к побегу."
+    },
+    {
+      "ordinal": 16,
+      "deck": "door",
+      "public_name": "Curse! Duck of Doom",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[16]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Immediate self Curse that loses a Level.",
+      "mechanic_tags": [
+        "curse",
+        "level-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "lose_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие пропущенной остановки",
+      "moscow_concept": "проклятие. До конечной осталось всего сорок семь минут. Механика: Потеряй 1 уровень."
+    },
+    {
+      "ordinal": 17,
+      "deck": "door",
+      "public_name": "Curse! Income Tax",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[17]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Requires discarding owned value and historically can affect multiple players.",
+      "mechanic_tags": [
+        "curse",
+        "item-value",
+        "multi-actor"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "multi_actor_selector"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Проклятие обязательного обновления",
+      "moscow_concept": "проклятие. До завершения осталось две минуты и новое соглашение. Механика: Наложи на выбранного соперника: тот заменяет метку «цифровой» на метку «офлайн»."
+    },
+    {
+      "ordinal": 18,
+      "deck": "door",
+      "public_name": "Curse! Lose a Big Item",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[18]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Discards one eligible Big Item from the affected character.",
+      "mechanic_tags": [
+        "curse",
+        "item-loss",
+        "big-item"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "equipment-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие формы в трёх экземплярах",
+      "moscow_concept": "проклятие. Третий экземпляр подтверждает существование первых двух. Механика: Сбрось 3 карты с руки."
+    },
+    {
+      "ordinal": 19,
+      "deck": "door",
+      "public_name": "Curse! Lose a Level",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[19]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Immediate self Curse that loses a Level without going below the floor.",
+      "mechanic_tags": [
+        "curse",
+        "level-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "lose_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие офисного обеда",
+      "moscow_concept": "проклятие. Контейнер открылся раньше, чем ты дошёл до кухни. Механика: Сбрось 1 карту с руки и потеряй 1 уровень."
+    },
+    {
+      "ordinal": 20,
+      "deck": "door",
+      "public_name": "Curse! Lose a Level",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[20]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Immediate self Curse that loses a Level without going below the floor.",
+      "mechanic_tags": [
+        "curse",
+        "level-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "lose_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие трёх пересадок",
+      "moscow_concept": "проклятие. Короткий маршрут — это когда переход только один раз ведёт на улицу. Механика: Потеряй 2 уровня."
+    },
+    {
+      "ordinal": 21,
+      "deck": "door",
+      "public_name": "Curse! Lose a Small Item",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[21]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Discards one eligible Small Item from the affected character.",
+      "mechanic_tags": [
+        "curse",
+        "item-loss",
+        "small-item"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "equipment-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие просроченного пропуска",
+      "moscow_concept": "проклятие. Турникет помнит дату лучше тебя. Механика: Выбери и сбрось 1 свою карту."
+    },
+    {
+      "ordinal": 22,
+      "deck": "door",
+      "public_name": "Curse! Lose a Small Item",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[22]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Discards one eligible Small Item from the affected character.",
+      "mechanic_tags": [
+        "curse",
+        "item-loss",
+        "small-item"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "equipment-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие лишней квитанции",
+      "moscow_concept": "проклятие. Услуга не оказана, зато бумага состоялась. Механика: Выбери и сбрось 1 свою карту."
+    },
+    {
+      "ordinal": 23,
+      "deck": "door",
+      "public_name": "Curse! Lose the Armor You Are Wearing",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[23]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Discards the equipped Armor-slot Item if present.",
+      "mechanic_tags": [
+        "curse",
+        "item-loss",
+        "armor"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "equipment-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие замёрзшего замка",
+      "moscow_concept": "проклятие. Ключ подходит идеально, кроме физической реальности. Механика: Сбрось 1 предмет экипировки."
+    },
+    {
+      "ordinal": 24,
+      "deck": "door",
+      "public_name": "Curse! Lose the Footgear You Are Wearing",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[24]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Discards the equipped Footgear-slot Item if present.",
+      "mechanic_tags": [
+        "curse",
+        "item-loss",
+        "footgear"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "equipment-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие внезапной проверки",
+      "moscow_concept": "проклятие. Документы в порядке, поэтому проверят карманы. Механика: Сбрось 2 предмета экипировки."
+    },
+    {
+      "ordinal": 25,
+      "deck": "door",
+      "public_name": "Curse! Lose the Headgear You Are Wearing",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[25]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Discards the equipped Headgear-slot Item if present.",
+      "mechanic_tags": [
+        "curse",
+        "item-loss",
+        "headgear"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "equipment-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие мокрых носков",
+      "moscow_concept": "проклятие. Лужа была маленькая, но очень целеустремлённая. Механика: Сбрось 1 предмет экипировки."
+    },
+    {
+      "ordinal": 26,
+      "deck": "door",
+      "public_name": "Curse! Lose Two Cards",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[26]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Requires choosing and discarding two eligible owned cards.",
+      "mechanic_tags": [
+        "curse",
+        "card-loss",
+        "choice"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "pending_decision"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие счастливого талона",
+      "moscow_concept": "проклятие. Номер красивый. Последствия подозрительно выгодные. Механика: Пока Проклятие остаётся у тебя, ничья в бою считается твоей победой."
+    },
+    {
+      "ordinal": 27,
+      "deck": "door",
+      "public_name": "Curse! Lose Your Class",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[27]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Discards the current Class-like trait and related attachment as required.",
+      "mechanic_tags": [
+        "curse",
+        "class-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "trait-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие ночной смены",
+      "moscow_concept": "проклятие. Утро начинается после третьего кофе, а не по часам. Механика: Получи метку «ночная сова»."
+    },
+    {
+      "ordinal": 28,
+      "deck": "door",
+      "public_name": "Curse! Lose Your Race",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[28]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Discards the current Race-like trait and related attachment as required.",
+      "mechanic_tags": [
+        "curse",
+        "race-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "trait-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие белого пятна связи",
+      "moscow_concept": "проклятие. Пять полосок исчезли сразу после важного сообщения. Механика: Постоянно −2 к лимиту руки."
+    },
+    {
+      "ordinal": 29,
+      "deck": "door",
+      "public_name": "Curse! Malign Mirror",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[29]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Persistent or turn-scoped combat penalty tied to equipment use.",
+      "mechanic_tags": [
+        "curse",
+        "combat-modifier",
+        "equipment"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat",
+        "persistent_effect"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие зимних ботинок",
+      "moscow_concept": "проклятие. Тепло, надёжно и совершенно неподвижно. Механика: Постоянно −1 к побегу и −1 к твоей боевой силе."
+    },
+    {
+      "ordinal": 30,
+      "deck": "door",
+      "public_name": "Divine Intervention",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[30]",
+      "kind_guess": "special",
+      "mechanical_synopsis": "Class-linked level effect that can alter several players simultaneously.",
+      "mechanic_tags": [
+        "class",
+        "level-gain",
+        "multi-actor"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "multi_actor_effect"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Проклятие коллективного перфоратора",
+      "moscow_concept": "проклятие. Сверлит один сосед, просыпается весь подъезд. Механика: Наложи на выбранного соперника: у того постоянно −1 к лимиту руки."
+    },
+    {
+      "ordinal": 31,
+      "deck": "door",
+      "public_name": "Drooling Slime",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[31]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with a character-tag conditional and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Портал без свободных слотов",
+      "moscow_concept": "монстр. Запись откроется вчера в 03:17. Механика: +4 против героя без метки «цифровой». Если не сбежишь, сбрось 2 свои карты."
+    },
+    {
+      "ordinal": 32,
+      "deck": "door",
+      "public_name": "Dwarf",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[32]",
+      "kind_guess": "race",
+      "mechanical_synopsis": "Race-like trait with registered carrying or hand-limit modifiers.",
+      "mechanic_tags": [
+        "trait",
+        "race",
+        "capacity-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "modify_hand_limit",
+        "big_allowance"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Опытный квартиросъёмщик",
+      "moscow_concept": "раса. Умеет упаковать жизнь в две сумки и один залог. Механика: Постоянно +1 к лимиту руки."
+    },
+    {
+      "ordinal": 33,
+      "deck": "door",
+      "public_name": "Dwarf",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[33]",
+      "kind_guess": "race",
+      "mechanical_synopsis": "Race-like trait with registered carrying or hand-limit modifiers.",
+      "mechanic_tags": [
+        "trait",
+        "race",
+        "capacity-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "modify_hand_limit",
+        "big_allowance"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Ежедневный пассажир",
+      "moscow_concept": "раса. Может уснуть между двумя станциями и проснуться вовремя. Механика: Постоянно +1 к побегу."
+    },
+    {
+      "ordinal": 34,
+      "deck": "door",
+      "public_name": "Dwarf",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[34]",
+      "kind_guess": "race",
+      "mechanical_synopsis": "Race-like trait with registered carrying or hand-limit modifiers.",
+      "mechanic_tags": [
+        "trait",
+        "race",
+        "capacity-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "modify_hand_limit",
+        "big_allowance"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Коренной москвич",
+      "moscow_concept": "раса. Помнит, что раньше было на месте того, что было раньше. Механика: Можно нести на 1 крупный предмет больше."
+    },
+    {
+      "ordinal": 35,
+      "deck": "door",
+      "public_name": "Elf",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[35]",
+      "kind_guess": "race",
+      "mechanical_synopsis": "Race-like trait with combat and Run Away-related modifiers.",
+      "mechanic_tags": [
+        "trait",
+        "race",
+        "combat",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "modify_combat",
+        "modify_escape"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Патриот своего района",
+      "moscow_concept": "раса. До центра далеко, зато всё нужное уже здесь. Механика: +2 против монстров с меткой «достопримечательность»."
+    },
+    {
+      "ordinal": 36,
+      "deck": "door",
+      "public_name": "Elf",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[36]",
+      "kind_guess": "race",
+      "mechanical_synopsis": "Race-like trait with combat and Run Away-related modifiers.",
+      "mechanic_tags": [
+        "trait",
+        "race",
+        "combat",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "modify_combat",
+        "modify_escape"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Новый москвич",
+      "moscow_concept": "раса. Ещё верит, что одну справку можно получить за один визит. Механика: +2 против монстров с меткой «бумаги»."
+    },
+    {
+      "ordinal": 37,
+      "deck": "door",
+      "public_name": "Elf",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[37]",
+      "kind_guess": "race",
+      "mechanical_synopsis": "Race-like trait with combat and Run Away-related modifiers.",
+      "mechanic_tags": [
+        "trait",
+        "race",
+        "combat",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "modify_combat",
+        "modify_escape"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Несгибаемый пешеход",
+      "moscow_concept": "раса. Десять тысяч шагов — это только дорога до нужного выхода. Механика: +2 против монстров с меткой «транспорт»."
+    },
+    {
+      "ordinal": 38,
+      "deck": "door",
+      "public_name": "Enraged",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[38]",
+      "kind_guess": "monster_enhancer",
+      "mechanical_synopsis": "Raises the current Monster's strength and reward for this combat.",
+      "mechanic_tags": [
+        "combat",
+        "monster-modifier",
+        "reward-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat",
+        "modify_treasure_reward"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие регистрационного круга",
+      "moscow_concept": "проклятие. Для подтверждения адреса нужно подтвердить адрес. Механика: Замени метку «местный» на метку «новичок»."
+    },
+    {
+      "ordinal": 39,
+      "deck": "door",
+      "public_name": "Face Sucker",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[39]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with equipment-related typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "equipment-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "discard",
+        "equipment-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Шлагбаум общего собрания",
+      "moscow_concept": "монстр. За установку проголосовали двадцать квартир из четырёхсот. Механика: Если не сбежишь, сбрось 1 карту с руки и 1 предмет экипировки."
+    },
+    {
+      "ordinal": 40,
+      "deck": "door",
+      "public_name": "Floating Nose",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[40]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with a special avoidance condition requiring a dedicated review.",
+      "mechanic_tags": [
+        "monster",
+        "avoidance",
+        "special-cost"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Кавалерия снегоуборщиков",
+      "moscow_concept": "монстр. Днём их никто не видел, зато ночью слышали все. Механика: Ночная сова убегает автоматически. Иначе при неудачном побеге сбрось 1 предмет экипировки."
+    },
+    {
+      "ordinal": 41,
+      "deck": "door",
+      "public_name": "Flying Frogs",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[41]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with an escape-related modifier and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "escape-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "modify_escape",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Домовой чат",
+      "moscow_concept": "монстр. За ночь накопилось триста сообщений и ни одного решения. Механика: Если не сбежишь, выбери и сбрось 1 свою карту."
+    },
+    {
+      "ordinal": 42,
+      "deck": "door",
+      "public_name": "Gazebo",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[42]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter whose original exception concerns receiving help.",
+      "mechanic_tags": [
+        "monster",
+        "help-restriction"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "help_window"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Последний поезд без пересадки",
+      "moscow_concept": "монстр. Двери закрываются. Следующая возможность — утром. Механика: Добавь этого монстра в бой выбранного соперника. Если соперник проиграет бой, он отдельно пытается убежать от этого монстра; при неудачном побеге умирает."
+    },
+    {
+      "ordinal": 43,
+      "deck": "door",
+      "public_name": "Gelatinous Octahedron",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[43]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with pursuit/escape and equipment-loss consequences.",
+      "mechanic_tags": [
+        "monster",
+        "pursuit",
+        "equipment-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "modify_escape",
+        "discard"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Система пропусков",
+      "moscow_concept": "монстр. Ваше лицо распознано как недостаточно корпоративное. Механика: Новичок автоматически проигрывает бой, но может попытаться убежать. При неудачном побеге сбрось 1 свою карту."
+    },
+    {
+      "ordinal": 44,
+      "deck": "door",
+      "public_name": "Ghoulfiends",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[44]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with restrictions on combat bonuses; exact exception needs review.",
+      "mechanic_tags": [
+        "monster",
+        "combat-restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Башенный кран-мыслитель",
+      "moscow_concept": "монстр. Поднимает бетон и тяжёлые вопросы о сроках сдачи. Механика: Если не сбежишь, сбрось 2 предмета экипировки."
+    },
+    {
+      "ordinal": 45,
+      "deck": "door",
+      "public_name": "Half-Breed",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[45]",
+      "kind_guess": "trait_attachment",
+      "mechanical_synopsis": "Attachment that permits one additional Race-like trait.",
+      "mechanic_tags": [
+        "trait-attachment",
+        "race-capacity"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait_attachment"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Районная идентичность",
+      "moscow_concept": "усиление черты. Сначала район выбирает тебя, потом ты споришь за него в сети. Механика: Можно иметь ещё 1 Расу."
+    },
+    {
+      "ordinal": 46,
+      "deck": "door",
+      "public_name": "Half-Breed",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[46]",
+      "kind_guess": "trait_attachment",
+      "mechanical_synopsis": "Attachment that permits one additional Race-like trait.",
+      "mechanic_tags": [
+        "trait-attachment",
+        "race-capacity"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait_attachment"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Двойная регистрация",
+      "moscow_concept": "усиление черты. По документам ты живёшь сразу в двух очередях. Механика: Можно иметь ещё 1 Расу."
+    },
+    {
+      "ordinal": 47,
+      "deck": "door",
+      "public_name": "Halfling",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[47]",
+      "kind_guess": "race",
+      "mechanical_synopsis": "Race-like trait with Item sale/value and Run Away-related behavior.",
+      "mechanic_tags": [
+        "trait",
+        "race",
+        "sale",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "sale",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Городская ночная сова",
+      "moscow_concept": "раса. Знает, где после полуночи есть свет, суп и зарядка. Механика: Ничья в бою считается твоей победой."
+    },
+    {
+      "ordinal": 48,
+      "deck": "door",
+      "public_name": "Halfling",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[48]",
+      "kind_guess": "race",
+      "mechanical_synopsis": "Race-like trait with Item sale/value and Run Away-related behavior.",
+      "mechanic_tags": [
+        "trait",
+        "race",
+        "sale",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "sale",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Гость из-за кольца",
+      "moscow_concept": "раса. Последняя электричка воспитала точность лучше школы. Механика: Ты считаешься туристом. Постоянно +2 к побегу."
+    },
+    {
+      "ordinal": 49,
+      "deck": "door",
+      "public_name": "Halfling",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[49]",
+      "kind_guess": "race",
+      "mechanical_synopsis": "Race-like trait with Item sale/value and Run Away-related behavior.",
+      "mechanic_tags": [
+        "trait",
+        "race",
+        "sale",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "sale",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Системный администратор",
+      "moscow_concept": "класс. Город прислал ему журнал ошибок объёмом с многоэтажку. Механика: +3 против монстров с меткой «цифровой». Сбрось 2 карты с руки: +5 в текущем бою."
+    },
+    {
+      "ordinal": 50,
+      "deck": "door",
+      "public_name": "Harpies",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[50]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with a Class-tag conditional and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Начальник района на обходе",
+      "moscow_concept": "монстр. Все проблемы уже взяты под личное фотографирование. Механика: +3 против новичка. Если не сбежишь, потеряй 2 уровня и сбрось 1 карту черты."
+    },
+    {
+      "ordinal": 51,
+      "deck": "door",
+      "public_name": "Help Me Out Here!",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[51]",
+      "kind_guess": "special",
+      "mechanical_synopsis": "Takes or uses another player's Item to change an active combat.",
+      "mechanic_tags": [
+        "combat",
+        "steal",
+        "other-player-item"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "other_player_selector"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Проклятие выездной комиссии",
+      "moscow_concept": "проклятие. Комиссия уже у двери и очень рада, что ты не готов. Механика: Выбранный соперник сбрасывает 1 предмет экипировки и 1 карту черты."
+    },
+    {
+      "ordinal": 52,
+      "deck": "door",
+      "public_name": "Hippogriff",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[52]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with pursuit and typed Bad Stuff; exact conditions need review.",
+      "mechanic_tags": [
+        "monster",
+        "pursuit"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Призрак ночного автобуса",
+      "moscow_concept": "монстр. Он приходит строго после того, как ты вызвал такси. Механика: Ночная сова убегает автоматически. Иначе при неудачном побеге умри."
+    },
+    {
+      "ordinal": 53,
+      "deck": "door",
+      "public_name": "Humongous",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[53]",
+      "kind_guess": "monster_enhancer",
+      "mechanical_synopsis": "Raises the current Monster's strength and reward for this combat.",
+      "mechanic_tags": [
+        "combat",
+        "monster-modifier",
+        "reward-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat",
+        "modify_treasure_reward"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие переименованной улицы",
+      "moscow_concept": "проклятие. Старое название знает таксист, новое — только карта. Механика: Получи метку «растерянный»."
+    },
+    {
+      "ordinal": 54,
+      "deck": "door",
+      "public_name": "Illusion",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[54]",
+      "kind_guess": "special",
+      "mechanical_synopsis": "Replaces the current Monster with another Monster from hand.",
+      "mechanic_tags": [
+        "combat",
+        "monster-replacement"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "deferred",
+        "encounter_replacement"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Подработка после работы",
+      "moscow_concept": "усиление черты. Свободный вечер найден и немедленно монетизирован. Механика: Можно иметь ещё 1 Класс."
+    },
+    {
+      "ordinal": 55,
+      "deck": "door",
+      "public_name": "Insurance Salesman",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[55]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with Item/value-related defeat consequences.",
+      "mechanic_tags": [
+        "monster",
+        "item-value",
+        "bad-stuff"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "discard",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Курьер в застрявшем лифте",
+      "moscow_concept": "монстр. Заказ прибыл, а этаж — пока нет. Механика: Курьер убегает автоматически. Иначе при неудачном побеге сбрось 1 карту с руки."
+    },
+    {
+      "ordinal": 56,
+      "deck": "door",
+      "public_name": "Intelligent",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[56]",
+      "kind_guess": "monster_enhancer",
+      "mechanical_synopsis": "Raises the current Monster's strength and reward for this combat.",
+      "mechanic_tags": [
+        "combat",
+        "monster-modifier",
+        "reward-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat",
+        "modify_treasure_reward"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие крошечной кухни",
+      "moscow_concept": "проклятие. Чтобы открыть холодильник, выйди в коридор. Механика: Постоянно −1 к лимиту руки."
+    },
+    {
+      "ordinal": 57,
+      "deck": "door",
+      "public_name": "King Tut",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[57]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Undead Monster encounter with pursuit conditions and severe Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "undead",
+        "pursuit",
+        "level-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "lose_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Вечный ремонт",
+      "moscow_concept": "монстр. Дата окончания работ скрыта под новым слоем плитки. Механика: +2 против пассажира. Если не сбежишь, потеряй 1 уровень."
+    },
+    {
+      "ordinal": 58,
+      "deck": "door",
+      "public_name": "Lame Goblin",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[58]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Low-strength Monster with an advantageous Run Away modifier.",
+      "mechanic_tags": [
+        "monster",
+        "escape-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "modify_escape",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Кофе за ползарплаты",
+      "moscow_concept": "монстр. Сироп входит в стоимость. Стакан — нет. Механика: Если не сбежишь, сбрось 2 свои карты."
+    },
+    {
+      "ordinal": 59,
+      "deck": "door",
+      "public_name": "Large Angry Chicken",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[59]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with a character-tag conditional and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Горизонтальный московский дождь",
+      "moscow_concept": "монстр. Зонт открылся. Погода восприняла это как вызов. Механика: +3 против велосипедиста. Если не сбежишь, сбрось 2 предмета экипировки."
+    },
+    {
+      "ordinal": 60,
+      "deck": "door",
+      "public_name": "Lawyers",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[60]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with Class-tag automatic or conditional outcomes.",
+      "mechanic_tags": [
+        "monster",
+        "class-conditional",
+        "automatic-outcome"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "auto_defeat_character_tags",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Гидра из справок",
+      "moscow_concept": "монстр. На место каждой заполненной формы вырастают две новые. Механика: Если не сбежишь, сбрось 2 карты с руки."
+    },
+    {
+      "ordinal": 61,
+      "deck": "door",
+      "public_name": "Leperchaun",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[61]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with Race-tag conditional strength and Item-related Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "race-conditional",
+        "item-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "discard"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Зазывала у метро",
+      "moscow_concept": "монстр. Только сегодня, только сейчас и каждое утро с 2009 года. Механика: +3 против туриста. Если не сбежишь, сбрось 2 карты с руки."
+    },
+    {
+      "ordinal": 62,
+      "deck": "door",
+      "public_name": "Mate",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[62]",
+      "kind_guess": "monster_adder",
+      "mechanical_synopsis": "Adds a second copy-like Monster to the encounter and combines rewards.",
+      "mechanic_tags": [
+        "combat",
+        "additional-monster",
+        "multi-monster"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "multiple_monsters"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Временная прописка у знакомых",
+      "moscow_concept": "усиление черты. Хозяин квартиры почти помнит, как тебя зовут. Механика: Прикрепи к выбранному сопернику: тот может иметь ещё 1 Расу."
+    },
+    {
+      "ordinal": 63,
+      "deck": "door",
+      "public_name": "Maul Rat",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[63]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Low-strength Monster with a character-tag conditional and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Квитанция с характером",
+      "moscow_concept": "монстр. Перерасчёт возможен, но только в следующей жизни. Механика: +2 против героя без метки «офисный работник». Если не сбежишь, потеряй 1 уровень."
+    },
+    {
+      "ordinal": 64,
+      "deck": "door",
+      "public_name": "Mr. Bones",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[64]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Undead Monster with a level-loss consequence and possible persistence exception.",
+      "mechanic_tags": [
+        "monster",
+        "undead",
+        "level-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "lose_level",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Парковочный инспектор",
+      "moscow_concept": "монстр. Фотография уже загружена, возражение ещё нет. Механика: Если не сбежишь, сбрось 1 предмет экипировки и потеряй 1 уровень."
+    },
+    {
+      "ordinal": 65,
+      "deck": "door",
+      "public_name": "Net Troll",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[65]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with level- or Item-related defeat consequences.",
+      "mechanic_tags": [
+        "monster",
+        "bad-stuff"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Объявление на платформе",
+      "moscow_concept": "монстр. Смысл был где-то между эхом и закрывающимися дверями. Механика: Если не сбежишь, потеряй метку «местный» и получи метку «растерянный»."
+    },
+    {
+      "ordinal": 66,
+      "deck": "door",
+      "public_name": "Out to Lunch",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[66]",
+      "kind_guess": "combat_special",
+      "mechanical_synopsis": "Ends or bypasses the current encounter and changes its reward flow.",
+      "mechanic_tags": [
+        "combat",
+        "encounter-removal",
+        "reward"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "deferred",
+        "encounter_cancellation"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Две работы",
+      "moscow_concept": "усиление черты. Одна работа кормит, вторая объясняет, почему некогда есть. Механика: Можно иметь ещё 1 Класс."
+    },
+    {
+      "ordinal": 67,
+      "deck": "door",
+      "public_name": "Pit Bull",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[67]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Low-strength Monster with pursuit/escape behavior and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "pursuit",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "modify_escape",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Лужа у подъезда",
+      "moscow_concept": "монстр. Глубину измеряют по исчезнувшим бахилам. Механика: Если не сбежишь, сбрось 1 предмет экипировки."
+    },
+    {
+      "ordinal": 68,
+      "deck": "door",
+      "public_name": "Platycore",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[68]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with character-tag conditional strength and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Навигатор, который знает лучше",
+      "moscow_concept": "монстр. Маршрут перестроен через реку. Мост появится в обновлении. Механика: +2 против цифрового или растерянного героя; оба условия складываются. Если не сбежишь, замени метку «цифровой» на «офлайн»."
+    },
+    {
+      "ordinal": 69,
+      "deck": "door",
+      "public_name": "Plutonium Dragon",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[69]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "High-strength Monster with pursuit and lethal or severe Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "pursuit",
+        "death"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "death"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Перфоратор в семь утра",
+      "moscow_concept": "монстр. Сверло знает расписание тишины и принципиально с ним не знакомо. Механика: Если не сбежишь, умри."
+    },
+    {
+      "ordinal": 70,
+      "deck": "door",
+      "public_name": "Potted Plant",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[70]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Very low-strength Monster with simple typed rewards and Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "simple-encounter"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Эскалатор в час пик",
+      "moscow_concept": "монстр. Стой справа, проходи слева, паникуй по центру. Механика: +2 против неместного. Если не сбежишь, получи метку «растерянный»."
+    },
+    {
+      "ordinal": 71,
+      "deck": "door",
+      "public_name": "Pukachu",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[71]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with an optional reward or defeat exception needing review.",
+      "mechanic_tags": [
+        "monster",
+        "special-reward"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Узел троллейбусных проводов",
+      "moscow_concept": "монстр. Схему развязки помнит только голубь на опоре. Механика: Электрик убегает автоматически. Иначе при неудачном побеге потеряй 2 уровня."
+    },
+    {
+      "ordinal": 72,
+      "deck": "door",
+      "public_name": "Shrieking Geek",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[72]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with a Class-tag conditional and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "class-conditional"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Тень музейного смотрителя",
+      "moscow_concept": "монстр. Не трогать экспонаты. Особенно того, который трогает тебя. Механика: −2 к силе монстра против гида. Если не сбежишь, сбрось 1 карту черты."
+    },
+    {
+      "ordinal": 73,
+      "deck": "door",
+      "public_name": "Snails on Speed",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[73]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with an adverse Run Away modifier and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "escape-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "modify_escape",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Окно номер сорок семь",
+      "moscow_concept": "монстр. Ваш вопрос решается в окне сорок восемь. Механика: Не преследует героев ниже 3-го уровня. При неудачном побеге потеряй 1 уровень и сбрось 1 карту с руки."
+    },
+    {
+      "ordinal": 74,
+      "deck": "door",
+      "public_name": "Squidzilla",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[74]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "High-strength Monster with level-based pursuit and severe typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "pursuit",
+        "death"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "death"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Дворовый эвакуатор",
+      "moscow_concept": "монстр. Он увозит даже то, что ещё не успело припарковаться. Механика: Если не сбежишь, потеряй 1 уровень."
+    },
+    {
+      "ordinal": 75,
+      "deck": "door",
+      "public_name": "Stoned Golem",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[75]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with an automatic escape/avoidance condition.",
+      "mechanic_tags": [
+        "monster",
+        "automatic-escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "auto_escape_character_tags",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Дворовый урбанист",
+      "moscow_concept": "класс. У него есть схема удобного двора и ни одного согласования. Механика: +2 против монстров с меткой «стройка»."
+    },
+    {
+      "ordinal": 76,
+      "deck": "door",
+      "public_name": "Super Munchkin",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[76]",
+      "kind_guess": "trait_attachment",
+      "mechanical_synopsis": "Attachment that permits one additional Class-like trait.",
+      "mechanic_tags": [
+        "trait-attachment",
+        "class-capacity"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait_attachment"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Профессиональная переподготовка",
+      "moscow_concept": "усиление черты. Диплом обещали за шесть недель и три жизненных этапа. Механика: Можно иметь ещё 1 Класс."
+    },
+    {
+      "ordinal": 77,
+      "deck": "door",
+      "public_name": "Super Munchkin",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[77]",
+      "kind_guess": "trait_attachment",
+      "mechanical_synopsis": "Attachment that permits one additional Class-like trait.",
+      "mechanic_tags": [
+        "trait-attachment",
+        "class-capacity"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait_attachment"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Второй диплом",
+      "moscow_concept": "усиление черты. Первый диплом лежит рядом и делает вид, что не ревнует. Механика: Можно иметь ещё 1 Класс."
+    },
+    {
+      "ordinal": 78,
+      "deck": "door",
+      "public_name": "Thief",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[78]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait whose signature actions target another player's resources.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "steal",
+        "backstab"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "trait",
+        "deferred",
+        "other_player_selector"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Уличный фотограф",
+      "moscow_concept": "класс. Лучший кадр всегда происходит в чужом бою. Механика: В бою выбранного соперника можешь сбрасывать по 1 карте: за каждую соперник получает +3 в этом бою. Когда ты сам побеждаешь монстра с меткой «достопримечательность», получи на 1 Сокровище больше."
+    },
+    {
+      "ordinal": 79,
+      "deck": "door",
+      "public_name": "Thief",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[79]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait whose signature actions target another player's resources.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "steal",
+        "backstab"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "trait",
+        "deferred",
+        "other_player_selector"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Вечный студент",
+      "moscow_concept": "раса. Льгота закончилась, семестр — никогда. Механика: В бою выбранного соперника можешь сбрасывать по 1 карте: за каждую соперник получает +2 в этом бою. Твой лимит руки постоянно увеличен на 2."
+    },
+    {
+      "ordinal": 80,
+      "deck": "door",
+      "public_name": "Thief",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[80]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait whose signature actions target another player's resources.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "steal",
+        "backstab"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "trait",
+        "deferred",
+        "other_player_selector"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Сквозняк между башнями",
+      "moscow_concept": "монстр. На уровне земли штиль, на уровне амбиций — ураган. Механика: Добавь этого монстра в бой выбранного соперника. Если соперник проиграет бой, он отдельно пытается убежать от этого монстра; при неудачном побеге сбрасывает 1 предмет экипировки."
+    },
+    {
+      "ordinal": 81,
+      "deck": "door",
+      "public_name": "Tongue Demon",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[81]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with an adverse Run Away modifier and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "escape-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "modify_escape",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Сонный турникет",
+      "moscow_concept": "монстр. Зелёный огонёк ему сегодня не снился. Механика: Если не сбежишь, сбрось 1 карту с руки."
+    },
+    {
+      "ordinal": 82,
+      "deck": "door",
+      "public_name": "Truly Obnoxious Curse!",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[82]",
+      "kind_guess": "curse",
+      "mechanical_synopsis": "Severe self Curse that discards an eligible Item; exact selector needs review.",
+      "mechanic_tags": [
+        "curse",
+        "item-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "discard",
+        "equipment-selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Проклятие динамической цены",
+      "moscow_concept": "проклятие. Спрос вырос ровно в момент, когда ты нажал кнопку. Механика: Пока Проклятие остаётся у тебя, награда за победу уменьшается на 1 Сокровище, но не ниже 0."
+    },
+    {
+      "ordinal": 83,
+      "deck": "door",
+      "public_name": "Undead Horse",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[83]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Undead Monster with a combat or pursuit exception and typed Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "undead",
+        "pursuit"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Очередь с локтями",
+      "moscow_concept": "монстр. Последний здесь тот, кто спросил, кто последний. Механика: +2 против новичка. Если не сбежишь, потеряй 1 уровень."
+    },
+    {
+      "ordinal": 84,
+      "deck": "door",
+      "public_name": "Unspeakably Awful Indescribable Horror",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[84]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "High-strength Monster with a Class-tag exception and severe Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "class-conditional",
+        "death"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "conditional_modifier",
+        "death"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Февральская слякоть",
+      "moscow_concept": "монстр. Она одинаково уверенно лежит и на земле, и в воздухе. Механика: +3 против велосипедиста. Если не сбежишь, сбрось 1 предмет экипировки."
+    },
+    {
+      "ordinal": 85,
+      "deck": "door",
+      "public_name": "Wandering Monster",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[85]",
+      "kind_guess": "monster_adder",
+      "mechanical_synopsis": "Adds a Monster from hand to an active combat.",
+      "mechanic_tags": [
+        "combat",
+        "additional-monster",
+        "multi-monster"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "multiple_monsters"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Проклятие неправильного подъезда",
+      "moscow_concept": "проклятие. Номер квартиры верный. Дом решил иначе. Механика: Наложи на выбранного соперника: у того постоянно −3 к боевой силе."
+    },
+    {
+      "ordinal": 86,
+      "deck": "door",
+      "public_name": "Wandering Monster",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[86]",
+      "kind_guess": "monster_adder",
+      "mechanical_synopsis": "Adds a Monster from hand to an active combat.",
+      "mechanic_tags": [
+        "combat",
+        "additional-monster",
+        "multi-monster"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "multiple_monsters"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Проклятие опроса в домовом чате",
+      "moscow_concept": "проклятие. Варианты ответа: «за», «против» и «кто добавил меня сюда». Механика: Выбранный соперник выбирает и сбрасывает 1 свою карту."
+    },
+    {
+      "ordinal": 87,
+      "deck": "door",
+      "public_name": "Wandering Monster",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[87]",
+      "kind_guess": "monster_adder",
+      "mechanical_synopsis": "Adds a Monster from hand to an active combat.",
+      "mechanic_tags": [
+        "combat",
+        "additional-monster",
+        "multi-monster"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "multiple_monsters"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Проклятие магнитной бури",
+      "moscow_concept": "проклятие. Компас смотрит на кассу, терминал — в пустоту. Механика: Наложи на выбранного соперника. Пока Проклятие остаётся у него, награда за победу уменьшается на 2 Сокровища, но не ниже 0."
+    },
+    {
+      "ordinal": 88,
+      "deck": "door",
+      "public_name": "Wannabe Vampire",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[88]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Monster encounter with a Class-tag automatic outcome.",
+      "mechanic_tags": [
+        "monster",
+        "class-conditional",
+        "automatic-outcome"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "auto_defeat_character_tags",
+        "typed_bad_stuff"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Умный шлагбаум",
+      "moscow_concept": "монстр. Он узнал номер машины, но не признал владельца. Механика: Водитель автоматически проигрывает бой, но может попытаться убежать. При неудачном побеге потеряй 2 уровня."
+    },
+    {
+      "ordinal": 89,
+      "deck": "door",
+      "public_name": "Warrior",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[89]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait with discard-cost combat ability and a tie-win rule.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "combat-ability",
+        "tie-win"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "discard_for_combat",
+        "tie_wins"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Аварийный электрик",
+      "moscow_concept": "класс. Видит фазу там, где остальные видят только темноту. Механика: +3 против монстров с меткой «цифровой»."
+    },
+    {
+      "ordinal": 90,
+      "deck": "door",
+      "public_name": "Warrior",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[90]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait with discard-cost combat ability and a tie-win rule.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "combat-ability",
+        "tie-win"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "discard_for_combat",
+        "tie_wins"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Машинист метро",
+      "moscow_concept": "класс. Он знает, где поезд разворачивается, но не расскажет. Механика: Постоянно +1 к побегу. Сбрось 1 карту с руки: +2 в текущем бою."
+    },
+    {
+      "ordinal": 91,
+      "deck": "door",
+      "public_name": "Warrior",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[91]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait with discard-cost combat ability and a tie-win rule.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "combat-ability",
+        "tie-win"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "discard_for_combat",
+        "tie_wins"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Специалист МФЦ",
+      "moscow_concept": "класс. Любой лабиринт становится коридором, если знать номер окна. Механика: Ничья считается твоей победой. За монстра с меткой «бумаги» получи на 1 Сокровище больше."
+    },
+    {
+      "ordinal": 92,
+      "deck": "door",
+      "public_name": "Wight Brothers",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[92]",
+      "kind_guess": "monster",
+      "mechanical_synopsis": "Undead Monster with level-based pursuit and level-loss Bad Stuff.",
+      "mechanic_tags": [
+        "monster",
+        "undead",
+        "pursuit",
+        "level-loss"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "monster",
+        "lose_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Пробка на Третьем кольце",
+      "moscow_concept": "монстр. Навигатор обещает, что осталось всего вечность и семь минут. Механика: Велосипедист убегает автоматически. Иначе при неудачном побеге потеряй 2 уровня."
+    },
+    {
+      "ordinal": 93,
+      "deck": "door",
+      "public_name": "Wizard",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[93]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait with discard-cost combat/escape abilities; some outcomes need dedicated handlers.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "combat-ability",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "discard_for_combat",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Музейный гид",
+      "moscow_concept": "класс. Экскурсия длится сорок минут или до первой закрытой двери. Механика: За монстра с меткой «достопримечательность» получи на 1 Сокровище больше."
+    },
+    {
+      "ordinal": 94,
+      "deck": "door",
+      "public_name": "Wizard",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[94]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait with discard-cost combat/escape abilities; some outcomes need dedicated handlers.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "combat-ability",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "discard_for_combat",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Ночной бариста",
+      "moscow_concept": "класс. Различает шесть видов усталости по заказу на кофе. Механика: +2 против монстров с меткой «толпа». Сбрось 1 карту с руки: ещё +2 в текущем бою."
+    },
+    {
+      "ordinal": 95,
+      "deck": "door",
+      "public_name": "Wizard",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Doors[95]",
+      "kind_guess": "class",
+      "mechanical_synopsis": "Class trait with discard-cost combat/escape abilities; some outcomes need dedicated handlers.",
+      "mechanic_tags": [
+        "trait",
+        "class",
+        "combat-ability",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "trait",
+        "discard_for_combat",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Фельдшер подстанции",
+      "moscow_concept": "класс. Доезжает быстрее слухов и говорит короче сирены. Механика: +2 против монстров с меткой «погода» и постоянно +1 к лимиту руки."
+    },
+    {
+      "ordinal": 96,
+      "deck": "treasure",
+      "public_name": "1,000 Gold Pieces (GUAL)",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[1]",
+      "kind_guess": "level_up",
+      "mechanical_synopsis": "One-shot self effect that gains a non-winning Level.",
+      "mechanic_tags": [
+        "level-up",
+        "one-shot"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "gain_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Успел на последний поезд",
+      "moscow_concept": "повышение уровня. Двери закрылись за спиной и признали твою победу. Механика: Получи 1 уровень. Этой картой нельзя получить победный уровень."
+    },
+    {
+      "ordinal": 97,
+      "deck": "treasure",
+      "public_name": "Bad-Ass Bandana",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[2]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Wearable Item with a combat bonus and character-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "headgear",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Ключ от каршеринга без царапин",
+      "moscow_concept": "предмет. Все повреждения уже были. Даже будущие. Механика: +2 к боевой силе и +1 к побегу, только водителю."
+    },
+    {
+      "ordinal": 98,
+      "deck": "treasure",
+      "public_name": "Boil an Anthill (GUAL)",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[3]",
+      "kind_guess": "level_up",
+      "mechanical_synopsis": "One-shot self effect that gains a non-winning Level.",
+      "mechanic_tags": [
+        "level-up",
+        "one-shot"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "gain_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Закрыл вкладку с ипотечным калькулятором",
+      "moscow_concept": "повышение уровня. Цифры исчезли, плечи распрямились. Механика: Получи 1 уровень. Этой картой нельзя получить победный уровень."
+    },
+    {
+      "ordinal": 99,
+      "deck": "treasure",
+      "public_name": "Boots of Butt-Kicking",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[4]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Footgear Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "footgear",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Каска с наклейкой «Скоро»",
+      "moscow_concept": "предмет. Наклейка пережила три проекта и два переименования. Механика: +4 к боевой силе и ещё +2 против монстров с меткой «стройка». Крупный головной убор."
+    },
+    {
+      "ordinal": 100,
+      "deck": "treasure",
+      "public_name": "Boots of Running Really Fast",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[5]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Footgear Item providing a persistent Run Away bonus.",
+      "mechanic_tags": [
+        "item",
+        "footgear",
+        "escape-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_escape"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Броня из балконных рам",
+      "moscow_concept": "предмет. Тепло держит плохо, удар — с неожиданным достоинством. Механика: +4 к боевой силе. Крупный предмет, занимает слот брони."
+    },
+    {
+      "ordinal": 101,
+      "deck": "treasure",
+      "public_name": "Bow with Ribbons",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[6]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item with a combat bonus and character-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Карта подъездов и арок",
+      "moscow_concept": "предмет. Составлена от руки человеком, который однажды вышел. Механика: +3 к боевой силе и ещё +2 против монстров с меткой «двор». Занимает 1 руку."
+    },
+    {
+      "ordinal": 102,
+      "deck": "treasure",
+      "public_name": "Bribe GM With Food (GUAL)",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[7]",
+      "kind_guess": "level_up",
+      "mechanical_synopsis": "One-shot self effect that gains a non-winning Level.",
+      "mechanic_tags": [
+        "level-up",
+        "one-shot"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "gain_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Нашёл проход между дворами",
+      "moscow_concept": "повышение уровня. Маршрут короче, легенда длиннее. Механика: Получи 1 уровень. Этой картой нельзя получить победный уровень."
+    },
+    {
+      "ordinal": 103,
+      "deck": "treasure",
+      "public_name": "Broad Sword",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[8]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Связка ключей консьержа",
+      "moscow_concept": "предмет. Один ключ точно подходит. Осталось узнать дверь. Механика: +3 к боевой силе и ещё +2 против монстров с меткой «двор». Занимает 1 руку."
+    },
+    {
+      "ordinal": 104,
+      "deck": "treasure",
+      "public_name": "Buckler of Swashing",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[9]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item with combat bonus and a character-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Папка с прозрачными файлами",
+      "moscow_concept": "предмет. Каждый лист виден, ни один не находится. Механика: +2 к боевой силе и ещё +2, если ты бюрократ. Занимает 1 руку."
+    },
+    {
+      "ordinal": 105,
+      "deck": "treasure",
+      "public_name": "Chainsaw of Bloody Dismemberment",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[10]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Large Hands Item providing a high persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "big-item",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "big_allowance",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Фонарь ночного двора",
+      "moscow_concept": "предмет. Освещает всё, кроме номера нужного дома. Механика: +2 к боевой силе и ещё +2, если ты ночная сова. Занимает 1 руку."
+    },
+    {
+      "ordinal": 106,
+      "deck": "treasure",
+      "public_name": "Cheese Grater of Peace",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[11]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item with a combat bonus and character-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Ящик аварийного электрика",
+      "moscow_concept": "предмет. Там есть инструмент для каждой проблемы и чайный пакетик. Механика: +5 к боевой силе, только электрику. Крупный предмет, занимает 2 руки. Сбрось 1 карту: +2 в текущем бою."
+    },
+    {
+      "ordinal": 107,
+      "deck": "treasure",
+      "public_name": "Cloak of Obscurity",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[12]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Wearable Item granting a combat or escape modifier with a tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "combat-bonus",
+        "escape",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "conditional_modifier"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Курьерский рюкзак-куб",
+      "moscow_concept": "предмет. Пицца внутри остывает медленнее владельца. Механика: +3 к боевой силе и +2 к лимиту руки, только курьеру. Крупный предмет, занимает слот брони."
+    },
+    {
+      "ordinal": 108,
+      "deck": "treasure",
+      "public_name": "Convenient Addition Error (GUAL)",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[13]",
+      "kind_guess": "level_up",
+      "mechanical_synopsis": "One-shot self effect that gains a non-winning Level.",
+      "mechanic_tags": [
+        "level-up",
+        "one-shot"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "gain_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Научился жить по московскому времени",
+      "moscow_concept": "повышение уровня. Опоздание на семь минут теперь считается пунктуальностью. Механика: Получи 1 уровень. Этой картой нельзя получить победный уровень."
+    },
+    {
+      "ordinal": 109,
+      "deck": "treasure",
+      "public_name": "Cotion of Ponfusion",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[14]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Combat one-shot that applies a temporary player or Monster modifier.",
+      "mechanic_tags": [
+        "one-shot",
+        "combat-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Обход через знакомый двор",
+      "moscow_concept": "разовая карта. Калитка открылась именно потому, что ты не надеялся. Механика: Монстр получает −3 в текущем бою."
+    },
+    {
+      "ordinal": 110,
+      "deck": "treasure",
+      "public_name": "Dagger of Treachery",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[15]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item with combat bonus and Class-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Лом для согласованной перепланировки",
+      "moscow_concept": "предмет. Несущая стена пока не возражала письменно. Механика: +5 к боевой силе, нельзя бюрократу. Крупный предмет, занимает 2 руки. Сбрось 1 карту: +2 в текущем бою."
+    },
+    {
+      "ordinal": 111,
+      "deck": "treasure",
+      "public_name": "Doppleganger",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[16]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Combat one-shot that derives a modifier from the current character strength.",
+      "mechanic_tags": [
+        "one-shot",
+        "combat",
+        "derived-value"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "review_required",
+        "dynamic_combat_modifier"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Двойной эспрессо перед пересадкой",
+      "moscow_concept": "разовая карта. Сердце уже приехало, тело догоняет. Механика: Получи +3 в текущем бою."
+    },
+    {
+      "ordinal": 112,
+      "deck": "treasure",
+      "public_name": "Electric Radioactive Acid Potion",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[17]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Combat one-shot applying a temporary player or Monster strength modifier.",
+      "mechanic_tags": [
+        "one-shot",
+        "combat-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Вспышка бесплатного вайфая",
+      "moscow_concept": "разовая карта. Соглашение прочитано не было, зато маршрут загрузился. Механика: Получи +3 в текущем бою, затем возьми 1 закрытую Дверь."
+    },
+    {
+      "ordinal": 113,
+      "deck": "treasure",
+      "public_name": "Eleven-Foot Pole",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[18]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Антенна с московской крыши",
+      "moscow_concept": "предмет. Ловит три канала, грозу и чужие планы на выходные. Механика: +5 к боевой силе и ещё +3 против монстров с меткой «цифровой». Крупный предмет, занимает 2 руки."
+    },
+    {
+      "ordinal": 114,
+      "deck": "treasure",
+      "public_name": "Flaming Armor",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[19]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Armor Item with combat bonus and possible Monster-tag conditional.",
+      "mechanic_tags": [
+        "item",
+        "armor",
+        "combat-bonus",
+        "conditional"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "conditional_modifier"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Значок любимого района",
+      "moscow_concept": "предмет. На обороте написано, почему остальные районы хуже. Механика: +1 к боевой силе и ещё +3, если ты местный."
+    },
+    {
+      "ordinal": 115,
+      "deck": "treasure",
+      "public_name": "Flaming Poison Potion",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[20]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Combat one-shot applying a temporary player or Monster strength modifier.",
+      "mechanic_tags": [
+        "one-shot",
+        "combat-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Горячий пирожок у метро",
+      "moscow_concept": "разовая карта. Начинка не определена, решимость восстановлена. Механика: Получи +2 в текущем бою."
+    },
+    {
+      "ordinal": 116,
+      "deck": "treasure",
+      "public_name": "Flask of Glue",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[21]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Run Away one-shot that changes an escape result or modifier.",
+      "mechanic_tags": [
+        "one-shot",
+        "escape",
+        "die-result"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_escape",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Объявление командным голосом",
+      "moscow_concept": "разовая карта. Слова неразборчивы, но интонация убедила всех. Механика: Получи +2 в текущем бою и +1 к текущей попытке побега."
+    },
+    {
+      "ordinal": 117,
+      "deck": "treasure",
+      "public_name": "Freezing Explosive Potion",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[22]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Combat one-shot applying a temporary player or Monster strength modifier.",
+      "mechanic_tags": [
+        "one-shot",
+        "combat-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Билет на дневной сеанс",
+      "moscow_concept": "разовая карта. В зале пусто, скидка полна, монстр растерян. Механика: Монстр получает −2 в текущем бою; после победы получи на 1 Сокровище больше."
+    },
+    {
+      "ordinal": 118,
+      "deck": "treasure",
+      "public_name": "Friendship Potion",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[23]",
+      "kind_guess": "combat_special",
+      "mechanical_synopsis": "Removes Monsters from a combat without normal kill rewards.",
+      "mechanic_tags": [
+        "one-shot",
+        "encounter-removal",
+        "combat"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "encounter_cancellation"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Флешмоб внезапной поддержки",
+      "moscow_concept": "разовая карта. Никто не репетировал, поэтому получилось искренне. Механика: Сыграй в бой выбранного соперника: тот получает +5 в этом бою."
+    },
+    {
+      "ordinal": 119,
+      "deck": "treasure",
+      "public_name": "Gentleman's Club",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[24]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item with combat bonus and character-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Лопата первой необходимости",
+      "moscow_concept": "предмет. Снег убран ровно до следующего взгляда в окно. Механика: +5 к боевой силе и ещё +2 против монстров с меткой «погода». Крупный предмет, занимает 2 руки."
+    },
+    {
+      "ordinal": 120,
+      "deck": "treasure",
+      "public_name": "Hammer of Kneecapping",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[25]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item with combat bonus and Race-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Складной велосипед",
+      "moscow_concept": "предмет. В сложенном виде занимает всего половину вагона. Механика: +4 к боевой силе и +2 к побегу, только велосипедисту. Крупный предмет."
+    },
+    {
+      "ordinal": 121,
+      "deck": "treasure",
+      "public_name": "Helm of Courage",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[26]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Headgear Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "headgear",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Музейный аудиогид",
+      "moscow_concept": "предмет. Дорожка номер восемь объясняет, почему выход закрыт. Механика: +2 к боевой силе и ещё +2 против монстров с меткой «достопримечательность». Головной убор."
+    },
+    {
+      "ordinal": 122,
+      "deck": "treasure",
+      "public_name": "Hireling",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[27]",
+      "kind_guess": "persistent_special",
+      "mechanical_synopsis": "Persistent companion-like card with carrying/combat and sacrifice behavior.",
+      "mechanic_tags": [
+        "persistent",
+        "companion",
+        "capacity",
+        "sacrifice"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "review_required",
+        "new_persistent_zone"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Знакомый охранник на смене",
+      "moscow_concept": "особое усиление предмета. Он тебя точно видел. Возможно, завтра вспомнит, где. Механика: Прикрепи к своему предмету: для него не действуют ограничения по меткам героя, размеру и занятым слотам экипировки."
+    },
+    {
+      "ordinal": 123,
+      "deck": "treasure",
+      "public_name": "Hoard!",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[28]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Immediate self effect that draws multiple Treasure cards.",
+      "mechanic_tags": [
+        "one-shot",
+        "draw",
+        "treasure"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "draw"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Кошелёк под сиденьем",
+      "moscow_concept": "разовая карта. Внутри только карта кофейни и хорошая карма. Механика: Возьми 1 закрытое Сокровище."
+    },
+    {
+      "ordinal": 124,
+      "deck": "treasure",
+      "public_name": "Horny Helmet",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[29]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Headgear Item with conditional combat bonus based on character tags.",
+      "mechanic_tags": [
+        "item",
+        "headgear",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "conditional_modifier"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Наушники против ремонта",
+      "moscow_concept": "предмет. Перфоратор не исчез, но теперь у него есть басовая партия. Механика: +3 к боевой силе и ещё +2 против монстров с меткой «толпа». Головной убор."
+    },
+    {
+      "ordinal": 125,
+      "deck": "treasure",
+      "public_name": "Huge Rock",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[30]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Large Hands Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "big-item",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "big_allowance",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Безразмерная сумка",
+      "moscow_concept": "предмет. Внутри есть отделение для ещё одной сумки. Механика: +3 к боевой силе и +1 к лимиту руки. Крупный предмет, занимает 1 руку."
+    },
+    {
+      "ordinal": 126,
+      "deck": "treasure",
+      "public_name": "Instant Wall",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[31]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Run Away one-shot that grants an automatic or strongly modified escape.",
+      "mechanic_tags": [
+        "one-shot",
+        "escape",
+        "automatic-escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "review_required",
+        "automatic_escape"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Точное погодное предупреждение",
+      "moscow_concept": "разовая карта. Дождь начался по расписанию, ты ушёл раньше. Механика: Получи +3 к текущей попытке побега."
+    },
+    {
+      "ordinal": 127,
+      "deck": "treasure",
+      "public_name": "Invisibility Potion",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[32]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Run Away one-shot that grants an escape modifier.",
+      "mechanic_tags": [
+        "one-shot",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_escape"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Такси по ночному тарифу",
+      "moscow_concept": "разовая карта. Цена страшная, зато монстр видел ещё страшнее. Механика: Получи +2 к текущей попытке побега."
+    },
+    {
+      "ordinal": 128,
+      "deck": "treasure",
+      "public_name": "Invoke Obscure Rules (GUAL)",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[33]",
+      "kind_guess": "level_up",
+      "mechanical_synopsis": "One-shot self effect that gains a non-winning Level.",
+      "mechanic_tags": [
+        "level-up",
+        "one-shot"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "gain_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Освоил кольцевую без подсказок",
+      "moscow_concept": "повышение уровня. Теперь ты выходишь на нужную сторону хотя бы через раз. Механика: Получи 1 уровень. Этой картой нельзя получить победный уровень."
+    },
+    {
+      "ordinal": 129,
+      "deck": "treasure",
+      "public_name": "Kill the Hireling (GUAL)",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[34]",
+      "kind_guess": "level_up",
+      "mechanical_synopsis": "One-shot self effect that gains a non-winning Level.",
+      "mechanic_tags": [
+        "level-up",
+        "one-shot"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "gain_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Согласовал часы ремонта",
+      "moscow_concept": "повышение уровня. Тишина длится с 13:00 до 13:07 и строго соблюдается. Механика: Получи 1 уровень. Этой картой нельзя получить победный уровень."
+    },
+    {
+      "ordinal": 130,
+      "deck": "treasure",
+      "public_name": "Kneepads of Allure",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[35]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Item that compels another player to help in combat.",
+      "mechanic_tags": [
+        "item",
+        "forced-help",
+        "combat",
+        "other-player"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "help_window"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Пауэрбанк на всех",
+      "moscow_concept": "предмет. Одного заряда хватает ровно на две чужие срочности. Механика: Передай выбранному сопернику. Пока предмет у него, его боевая сила увеличена на 2, а лимит руки — на 1."
+    },
+    {
+      "ordinal": 131,
+      "deck": "treasure",
+      "public_name": "Leather Armor",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[36]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Armor Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "armor",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Офисный шнурок с пропуском",
+      "moscow_concept": "предмет. Имя стёрлось, уверенность осталась. Механика: +1 к боевой силе и ещё +2 против монстров с меткой «служебный»."
+    },
+    {
+      "ordinal": 132,
+      "deck": "treasure",
+      "public_name": "Limburger and Anchovy Sandwich",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[37]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Item with combat bonus and a Race-tag use restriction.",
+      "mechanic_tags": [
+        "item",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Броня из кассовых чеков",
+      "moscow_concept": "предмет. Гарантия выцвела, защита осталась. Механика: +1 к боевой силе и ещё +3 против монстров с меткой «бумаги». Занимает слот брони."
+    },
+    {
+      "ordinal": 133,
+      "deck": "treasure",
+      "public_name": "Loaded Die",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[38]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Changes a realized die result within a valid roll window.",
+      "mechanic_tags": [
+        "one-shot",
+        "die-result",
+        "escape"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "rng_reaction_window"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Анонимная жалоба с приложениями",
+      "moscow_concept": "разовая карта. Подписи нет, зато фотографий семнадцать. Механика: Выбранный соперник выбирает и сбрасывает 1 свою карту."
+    },
+    {
+      "ordinal": 134,
+      "deck": "treasure",
+      "public_name": "Mace of Sharpness",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[39]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Неубиваемый термос",
+      "moscow_concept": "предмет. Чай давно остыл, а термос всё ещё готов к бою. Механика: +2 к боевой силе. Занимает 1 руку."
+    },
+    {
+      "ordinal": 135,
+      "deck": "treasure",
+      "public_name": "Magic Lamp",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[40]",
+      "kind_guess": "combat_special",
+      "mechanical_synopsis": "Removes one Monster from combat and adjusts reward without a normal kill.",
+      "mechanic_tags": [
+        "one-shot",
+        "encounter-removal",
+        "reward"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "deferred",
+        "encounter_cancellation"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Исключение с гербовой печатью",
+      "moscow_concept": "особое усиление предмета. Правило остаётся правилом, просто сегодня не твоим. Механика: Прикрепи к своему предмету: для него не действуют ограничения по меткам героя, размеру и занятым слотам экипировки."
+    },
+    {
+      "ordinal": 136,
+      "deck": "treasure",
+      "public_name": "Magic Missile",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[41]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Combat one-shot applying a temporary player or Monster strength modifier.",
+      "mechanic_tags": [
+        "one-shot",
+        "combat-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Субботник с неожиданным размахом",
+      "moscow_concept": "разовая карта. Вместе вынесли мусор, лавочку и аргументы монстра. Механика: Монстр получает −4 в текущем бою."
+    },
+    {
+      "ordinal": 137,
+      "deck": "treasure",
+      "public_name": "Mithril Armor",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[42]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Large Armor Item with high combat bonus and character-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "armor",
+        "big-item",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "big_allowance",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Светоотражающий жилет",
+      "moscow_concept": "предмет. Видно издалека, особенно когда уже поздно. Механика: +2 к боевой силе, только велосипедисту. Занимает слот брони."
+    },
+    {
+      "ordinal": 138,
+      "deck": "treasure",
+      "public_name": "Mutilate the Bodies (GUAL)",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[43]",
+      "kind_guess": "level_up",
+      "mechanical_synopsis": "One-shot self effect that gains a non-winning Level.",
+      "mechanic_tags": [
+        "level-up",
+        "one-shot"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "gain_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Получил постоянный пропуск",
+      "moscow_concept": "повышение уровня. Фотография ужасна, срок действия прекрасен. Механика: Получи 1 уровень. Этой картой нельзя получить победный уровень."
+    },
+    {
+      "ordinal": 139,
+      "deck": "treasure",
+      "public_name": "Nasty-Tasting Sports Drink",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[44]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Small Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "small-item",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Надёжный пауэрбанк",
+      "moscow_concept": "предмет. Показывает четыре деления даже после конца света. Механика: +2 к боевой силе и ещё +2 против монстров с меткой «цифровой»."
+    },
+    {
+      "ordinal": 140,
+      "deck": "treasure",
+      "public_name": "Pantyhose of Giant Strength",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[45]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Wearable Item with combat bonus and a character-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Дворовый дождевик",
+      "moscow_concept": "предмет. Цвет выбран так, чтобы грязь считалась узором. Механика: +2 к боевой силе. Занимает слот брони."
+    },
+    {
+      "ordinal": 141,
+      "deck": "treasure",
+      "public_name": "Pointy Hat of Power",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[46]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Headgear Item with high combat bonus and Class-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "headgear",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Эргономичное кресло из коворкинга",
+      "moscow_concept": "предмет. Регулируется всё, кроме стоимости часа. Механика: +3 к боевой силе и +2 к лимиту руки. Крупный предмет."
+    },
+    {
+      "ordinal": 142,
+      "deck": "treasure",
+      "public_name": "Pollymorph Potion",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[47]",
+      "kind_guess": "combat_special",
+      "mechanical_synopsis": "Removes one Monster from combat and grants or changes Treasure reward.",
+      "mechanic_tags": [
+        "one-shot",
+        "encounter-removal",
+        "reward"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "deferred",
+        "encounter_cancellation"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Универсальный пропуск",
+      "moscow_concept": "особое усиление предмета. Открывает всё, но не снимает вопросов о своём происхождении. Механика: Прикрепи к своему предмету: для него не действуют ограничения по меткам героя, размеру и занятым слотам экипировки."
+    },
+    {
+      "ordinal": 143,
+      "deck": "treasure",
+      "public_name": "Potion of General Studliness (GUAL)",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[48]",
+      "kind_guess": "level_up",
+      "mechanical_synopsis": "One-shot self effect that gains a non-winning Level.",
+      "mechanic_tags": [
+        "level-up",
+        "one-shot"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "gain_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Запомнил все выходы со станции",
+      "moscow_concept": "повышение уровня. Номера больше не пугают. Иногда. Механика: Получи 1 уровень. Этой картой нельзя получить победный уровень."
+    },
+    {
+      "ordinal": 144,
+      "deck": "treasure",
+      "public_name": "Potion of Halitosis",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[49]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Combat one-shot with a Monster-tag-specific automatic or strength effect.",
+      "mechanic_tags": [
+        "one-shot",
+        "monster-tag",
+        "automatic-outcome"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "conditional_modifier",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Внезапно открывшееся окно",
+      "moscow_concept": "разовая карта. Оно закроется через минуту. Беги культурно. Механика: После победы в текущем бою получи на 1 Сокровище больше."
+    },
+    {
+      "ordinal": 145,
+      "deck": "treasure",
+      "public_name": "Potion of Idiotic Bravery",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[50]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Combat one-shot applying a temporary player or Monster strength modifier.",
+      "mechanic_tags": [
+        "one-shot",
+        "combat-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Удачная пересадка",
+      "moscow_concept": "разовая карта. Обе платформы рядом. Так тоже бывает, не пугайся. Механика: Возьми 1 закрытую Дверь и 1 закрытое Сокровище."
+    },
+    {
+      "ordinal": 146,
+      "deck": "treasure",
+      "public_name": "Pretty Balloons",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[51]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Small Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "small-item",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Зарядка из дежурного ларька",
+      "moscow_concept": "предмет. Греется так, будто заряжает весь квартал. Механика: +1 к боевой силе и +1 к побегу. Сбрось 1 карту: +2 в текущем бою."
+    },
+    {
+      "ordinal": 147,
+      "deck": "treasure",
+      "public_name": "Rapier of Unfairness",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[52]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item with a conditional combat bonus based on character tags.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "conditional_modifier"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Термосумка с гречкой",
+      "moscow_concept": "предмет. Обед переживёт дорогу, совещание и ещё одну дорогу. Механика: +1 к боевой силе и +1 к лимиту руки. Занимает 1 руку."
+    },
+    {
+      "ordinal": 148,
+      "deck": "treasure",
+      "public_name": "Rat on a Stick",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[53]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Small Item with combat value and an optional discard-for-escape behavior.",
+      "mechanic_tags": [
+        "item",
+        "small-item",
+        "combat-bonus",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Складной самокат",
+      "moscow_concept": "предмет. Складывается за секунду и раскладывает прохожих за две. Механика: +3 к боевой силе и +1 к побегу. Крупный предмет."
+    },
+    {
+      "ordinal": 149,
+      "deck": "treasure",
+      "public_name": "Really Impressive Title",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[54]",
+      "kind_guess": "persistent_special",
+      "mechanical_synopsis": "Persistent non-slot card providing a combat bonus.",
+      "mechanic_tags": [
+        "persistent",
+        "combat-bonus",
+        "title"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "review_required",
+        "new_persistent_zone"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Разрешение от руки",
+      "moscow_concept": "особое усиление предмета. Подпись похожа на настоящую, особенно издалека. Механика: Прикрепи к своему предмету: для него не действуют ограничения по меткам героя, размеру и занятым слотам экипировки."
+    },
+    {
+      "ordinal": 150,
+      "deck": "treasure",
+      "public_name": "Sandals of Protection",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[55]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Footgear Item that changes how face-up Door Curses affect the owner.",
+      "mechanic_tags": [
+        "item",
+        "footgear",
+        "curse-protection"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "review_required",
+        "curse_reaction"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Шапка с подогревом",
+      "moscow_concept": "предмет. Заряда хватает до первого серьёзного мороза. Механика: +1 к боевой силе и +1 к побегу. Головной убор."
+    },
+    {
+      "ordinal": 151,
+      "deck": "treasure",
+      "public_name": "Shield of Ubiquity",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[56]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Многоразовая сумка из супермаркета",
+      "moscow_concept": "предмет. Выдерживает продукты, переезд и последствия скидок. Механика: +1 к боевой силе; позволяет нести ещё 1 крупный предмет. Занимает 1 руку."
+    },
+    {
+      "ordinal": 152,
+      "deck": "treasure",
+      "public_name": "Short Wide Armor",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[57]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Armor Item with combat bonus and a Race-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "armor",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Счастливый жетон турникета",
+      "moscow_concept": "предмет. Никто не знает, от какого он метро, но работает уверенно. Механика: +1 к боевой силе и +1 к побегу."
+    },
+    {
+      "ordinal": 153,
+      "deck": "treasure",
+      "public_name": "Singing & Dancing Sword",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[58]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Non-hand or special-slot Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Кроссовки для переходов",
+      "moscow_concept": "предмет. С ними двести метров по указателю превращаются в сто девяносто. Механика: +2 к боевой силе и +1 к побегу. Обувь."
+    },
+    {
+      "ordinal": 154,
+      "deck": "treasure",
+      "public_name": "Sleep Potion",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[59]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Combat one-shot applying a temporary Monster strength penalty.",
+      "mechanic_tags": [
+        "one-shot",
+        "monster-modifier"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Городская субсидия за стойкость",
+      "moscow_concept": "разовая карта. Заявка одобрена раньше, чем ты забыл пароль. Механика: Получи 1 уровень. Этой картой нельзя получить победный уровень."
+    },
+    {
+      "ordinal": 155,
+      "deck": "treasure",
+      "public_name": "Slimy Armor",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[60]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Armor Item providing a combat and/or Run Away modifier.",
+      "mechanic_tags": [
+        "item",
+        "armor",
+        "combat-bonus",
+        "escape"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat",
+        "modify_escape"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Складной стул для очереди",
+      "moscow_concept": "предмет. Терпение не бесконечно, зато сиденье почти. Механика: +1 к боевой силе и +1 к лимиту руки."
+    },
+    {
+      "ordinal": 156,
+      "deck": "treasure",
+      "public_name": "Sneaky Bastard Sword",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[61]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item with combat bonus and Class-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Кружка для долгой дороги",
+      "moscow_concept": "предмет. Крышка держится крепче утренней решимости. Механика: +1 к боевой силе. Занимает 1 руку."
+    },
+    {
+      "ordinal": 157,
+      "deck": "treasure",
+      "public_name": "Spiky Knees",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[62]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Small Item providing a persistent combat bonus.",
+      "mechanic_tags": [
+        "item",
+        "small-item",
+        "combat-bonus"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Красный шерстяной шарф",
+      "moscow_concept": "предмет. Обматывает владельца быстрее, чем тот принимает решение. Механика: +1 к боевой силе. Головной убор."
+    },
+    {
+      "ordinal": 158,
+      "deck": "treasure",
+      "public_name": "Staff of Napalm",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[63]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Large Hands Item with high combat bonus and Class-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "big-item",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "big_allowance",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Почти непродуваемый зонт",
+      "moscow_concept": "предмет. Слово «почти» напечатано внутри купола. Механика: +2 к боевой силе и +1 к побегу. Занимает 1 руку."
+    },
+    {
+      "ordinal": 159,
+      "deck": "treasure",
+      "public_name": "Steal a Level",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[64]",
+      "kind_guess": "special",
+      "mechanical_synopsis": "Transfers a Level from another player to the actor.",
+      "mechanic_tags": [
+        "level-transfer",
+        "other-player"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "other_player_selector"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Одолженная печать",
+      "moscow_concept": "особое усиление предмета. Вернуть нужно до того, как кто-нибудь заметит идеальный оттиск. Механика: Прикрепи к предмету выбранного соперника: для него не действуют ограничения по меткам героя, размеру и занятым слотам экипировки."
+    },
+    {
+      "ordinal": 160,
+      "deck": "treasure",
+      "public_name": "Stepladder",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[65]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Large Item with combat bonus and a Race-tag conditional.",
+      "mechanic_tags": [
+        "item",
+        "big-item",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "big_allowance",
+        "conditional_modifier"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Резиновые ботинки межсезонья",
+      "moscow_concept": "предмет. Не скользят, если не проверять. Механика: +2 к боевой силе и +2 к побегу. Обувь."
+    },
+    {
+      "ordinal": 161,
+      "deck": "treasure",
+      "public_name": "Swiss Army Polearm",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[66]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Hands Item with combat bonus and Race-tag restriction.",
+      "mechanic_tags": [
+        "item",
+        "hands",
+        "combat-bonus",
+        "restriction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "restriction",
+        "modify_combat"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Запасной проездной",
+      "moscow_concept": "предмет. Баланс неизвестен, зато надежда безлимитна. Механика: +1 к боевой силе и +1 к побегу."
+    },
+    {
+      "ordinal": 162,
+      "deck": "treasure",
+      "public_name": "Transferral Potion",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[67]",
+      "kind_guess": "combat_special",
+      "mechanical_synopsis": "Moves an active Monster encounter between players.",
+      "mechanic_tags": [
+        "combat",
+        "encounter-transfer",
+        "other-player"
+      ],
+      "interaction_scope": "other_players",
+      "registry_coverage": [
+        "deferred",
+        "other_player_selector",
+        "encounter_transfer"
+      ],
+      "adaptation_status": "ready-original-future-multiplayer",
+      "moscow_working_title": "Пробка из ниоткуда",
+      "moscow_concept": "разовая карта. Дорога свободна ровно до момента, когда кому-то это важно. Механика: Сыграй в бой выбранного соперника: сторона монстров получает +4 до конца боя."
+    },
+    {
+      "ordinal": 163,
+      "deck": "treasure",
+      "public_name": "Tuba of Charm",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[68]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Large Item with Run Away and post-escape reward behavior.",
+      "mechanic_tags": [
+        "item",
+        "big-item",
+        "escape",
+        "reward"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "modify_escape",
+        "review_required"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Часы со станции пересадки",
+      "moscow_concept": "предмет. Показывают московское время и личное опоздание. Механика: +2 к боевой силе и +1 к лимиту руки. Головной убор."
+    },
+    {
+      "ordinal": 164,
+      "deck": "treasure",
+      "public_name": "Wand of Dowsing",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[69]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Selects and recovers one eligible card from discard.",
+      "mechanic_tags": [
+        "one-shot",
+        "discard-recovery",
+        "choice"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "review_required",
+        "discard_selector"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Печать нужного оттенка",
+      "moscow_concept": "разовая карта. Круглая, синяя и совершенно не задаёт вопросов. Механика: После победы в текущем бою получи на 2 Сокровища больше."
+    },
+    {
+      "ordinal": 165,
+      "deck": "treasure",
+      "public_name": "Whine at the GM (GUAL)",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[70]",
+      "kind_guess": "level_up",
+      "mechanical_synopsis": "One-shot self effect that gains a non-winning Level.",
+      "mechanic_tags": [
+        "level-up",
+        "one-shot"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "gain_level"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Пережил визит в МФЦ",
+      "moscow_concept": "повышение уровня. Все документы приняты, герой временно не верит в чудеса. Механика: Получи 1 уровень. Этой картой нельзя получить победный уровень."
+    },
+    {
+      "ordinal": 166,
+      "deck": "treasure",
+      "public_name": "Wishing Ring",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[71]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Cancels or removes one eligible Curse effect.",
+      "mechanic_tags": [
+        "one-shot",
+        "curse-cancel",
+        "reaction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "review_required",
+        "curse_reaction"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Открытая боковая дверь",
+      "moscow_concept": "разовая карта. Табличка «служебный вход» сегодня смотрит в другую сторону. Механика: Возьми 1 закрытую Дверь."
+    },
+    {
+      "ordinal": 167,
+      "deck": "treasure",
+      "public_name": "Wishing Ring",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[72]",
+      "kind_guess": "one_shot",
+      "mechanical_synopsis": "Cancels or removes one eligible Curse effect.",
+      "mechanic_tags": [
+        "one-shot",
+        "curse-cancel",
+        "reaction"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "review_required",
+        "curse_reaction"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Короткая тропа через двор",
+      "moscow_concept": "разовая карта. На карте её нет, на подошвах — есть. Механика: Получи +2 к текущей попытке побега."
+    },
+    {
+      "ordinal": 168,
+      "deck": "treasure",
+      "public_name": "Yuppie Water",
+      "source_locator": "https://munchkin.game/products/games/munchkin/ :: Treasures[73]",
+      "kind_guess": "item",
+      "mechanical_synopsis": "Small Item with combat bonus and a Class-tag conditional.",
+      "mechanic_tags": [
+        "item",
+        "small-item",
+        "conditional-character-tag"
+      ],
+      "interaction_scope": "self",
+      "registry_coverage": [
+        "item",
+        "conditional_modifier"
+      ],
+      "adaptation_status": "ready-original-active",
+      "moscow_working_title": "Тележка на несокрушимых колёсиках",
+      "moscow_concept": "предмет. Гремит так, будто объявляет собственную станцию. Механика: +2 к боевой силе. Крупный предмет; позволяет нести ещё 1 крупный предмет."
+    }
+  ]
+}
