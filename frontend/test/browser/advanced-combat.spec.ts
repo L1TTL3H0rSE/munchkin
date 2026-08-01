@@ -29,8 +29,8 @@ test("forced helper remains mandatory and does not invent a reward", async ({pag
   await openFixture(page, "advanced-forced-helper");
 
   const dialog = page.locator(".interaction-dialog");
-  await expect(dialog.getByText("Принудительная помощь", {exact: true}))
-    .toBeVisible();
+  await expect(dialog.locator("#interaction-dialog-title"))
+    .toHaveText("Ответ в бою");
   await expect(dialog.locator(".interaction-action").filter({
     hasText: "Борис",
   })).toBeVisible();

@@ -9,6 +9,11 @@ const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
 const apiPort = Number(process.env.PLAYWRIGHT_API_PORT ?? 18080);
 const isRealE2E = process.env.MUNCHKIN_REAL_E2E === "1";
 const baseURL = process.env.WEB_BASE_URL ?? `http://127.0.0.1:${port}`;
+const gameContentPath = process.env.GAME_CONTENT_PATH ?? (
+  isRealE2E
+    ? "../../content/sets/moscow/v4/cards.json"
+    : "../../content/sets/demo/cards.json"
+);
 
 export default defineConfig({
   testDir: "./test/browser",
@@ -70,7 +75,7 @@ export default defineConfig({
         timeout: 120_000,
         env: {
           SERVER_ADDR: `127.0.0.1:${apiPort}`,
-          GAME_CONTENT_PATH: "../../content/sets/demo/cards.json",
+          GAME_CONTENT_PATH: gameContentPath,
           AUTO_MIGRATE: "false",
           CORS_ALLOWED_ORIGINS: baseURL,
         },

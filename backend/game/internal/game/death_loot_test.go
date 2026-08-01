@@ -365,3 +365,46 @@ func TestDeathLootHandlesOneToSixSeatsAndEmptyPool(t *testing.T) {
 		t.Fatalf("empty death loot=%#v", state.DeathLoot)
 	}
 }
+
+func TestEndTurnClearsCompletedDeathLootState(t *testing.T) {
+	state, pack, _ := deathLootState(t, 2)
+	openedAt := time.Date(2026, 7, 31, 7, 10, 0, 0, time.UTC)
+	state = openDeathLootWindowForTest(
+		t,
+		state,
+		pack,
+		"interaction-death-loot-a-end-turn",
+		openedAt,
+	)
+	window := state.InteractionWindow
+	if window == nil {
+		t.Fatal("death loot interaction is missing")
+	}
+	events, err := Handle(state, Command{
+		Type:                CommandPassDeathLoot,
+		ActorID:             "player-a",
+		InteractionID:       window.ID,
+		InteractionAt:       openedAt.Add(time.Second),
+		InteractionRevision: window.DeadlineRevision,
+	}, pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, _ = applyForTest(t, state, events)
+	if state.DeathLoot == nil || !state.DeathLoot.Completed {
+		t.Fatalf("death loot did not complete: %#v", state.DeathLoot)
+	}
+	state.Turn.PlayerID = "player-a"
+	setTurnPhase(&state, PhaseEndTurn)
+	endTurnEvents, err := Handle(state, Command{
+		Type:    CommandEndTurn,
+		ActorID: "player-a",
+	}, pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, _ := applyForTest(t, state, endTurnEvents)
+	if next.DeathLoot != nil {
+		t.Fatalf("completed death loot survived end turn: %#v", next.DeathLoot)
+	}
+}
