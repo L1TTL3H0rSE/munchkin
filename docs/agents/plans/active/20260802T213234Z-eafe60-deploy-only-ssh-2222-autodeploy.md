@@ -353,13 +353,17 @@ owner CIDR.
   `enpk0vbt420gq27a18ia` (`INGRESS TCP 2222`, `0.0.0.0/0`). Rule count changed
   `4 -> 5`; no existing rule ID was removed. TCP `2222` became reachable and
   `/health/live` remained healthy.
-- **Continuation checkpoint:** local `configure-deploy-ssh.sh` contains one
-  final runtime-dir idempotency fix (`/run/sshd` recreation after
-  `ssh.socket` restart) that passed local syntax/static checks but has not yet
-  been uploaded to the VM. The currently installed desired listener/policy is
-  healthy and live audit is green; next session must SHA-verify/install this
-  final script, rerun it idempotently, rerun live audit, then continue with
-  canonical verify, CI publication approvals and automatic GitHub deploy.
+- 2026-08-03: SHA-verified final `configure-deploy-ssh.sh`, including
+  `/run/sshd` recreation after `ssh.socket` restart, was installed on the VM.
+  Its idempotent rerun passed, full live security audit passed, a fresh owner
+  TCP-22 connection passed, and temporary uploads were removed. Host/SG work
+  is complete; the remaining positive deploy-user proof comes from the
+  GitHub-hosted automatic deploy after environment approvals.
+- **Continuation checkpoint:** commit `4711557` is already on `origin/main`.
+  Continue with post-commit canonical verify/scope-check, inspect the CI run,
+  approve `production-images` and `production-deploy`, verify exact release
+  evidence/HTTPS, then complete/archive/release the plan and push the final
+  lifecycle commit.
 
 ## Итог
 
