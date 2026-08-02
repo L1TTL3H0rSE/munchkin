@@ -60,15 +60,17 @@ jobs:
             --output-dir security-evidence \
             --release-commit "$GITHUB_SHA"
       - name: Upload scanner evidence
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: security-evidence-${{ github.sha }}
           path: security-evidence
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
   codeql:
     name: CodeQL Go and JavaScript/TypeScript
+    if: github.repository_visibility == 'public'
     runs-on: ubuntu-24.04
     permissions:
       actions: read

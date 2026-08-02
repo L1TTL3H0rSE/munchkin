@@ -103,6 +103,7 @@ for image_ref in "$game_image" "$web_image"; do
 done
 
 mkdir -p -- "$output_dir"
+output_dir="$(cd -- "$output_dir" && pwd -P)"
 download_dir="$(mktemp -d "${TMPDIR:-/tmp}/munchkin-security-tools.XXXXXX")"
 cleanup() {
   rm -rf -- "$download_dir"

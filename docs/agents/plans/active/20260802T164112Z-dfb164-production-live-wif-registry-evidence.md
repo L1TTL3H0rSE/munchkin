@@ -3,7 +3,7 @@
 - **Plan ID:** `20260802T164112Z-dfb164-production-live-wif-registry-evidence`
 - **Статус:** in_progress
 - **Создан:** 2026-08-02 16:41:12 UTC
-- **Обновлён:** 2026-08-02 18:19:00 UTC
+- **Обновлён:** 2026-08-02 18:58:58 UTC
 - **Владелец:** Codex
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся
@@ -23,6 +23,7 @@
     ".leino/profile.json",
     ".github/workflows/security.yml",
     ".github/workflows/ci.yml",
+    "scripts/ci/security-scan.sh",
     "backend/game/Dockerfile",
     "backend/game/go.mod",
     "backend/game/go.sum",
@@ -66,14 +67,15 @@
 ## Цель
 
 Зафиксировать live readiness цепочки GitHub push → pinned CI → Yandex Workload
-Identity Federation → private Container Registry для commit `0a3e9ef`.
+Identity Federation → private Container Registry для latest approved `main`
+remediation commit.
 Если read-only preflight обнаружит drift в Terraform foundation/WIF, применить
 только exact sanitized change set этого плана; секреты не печатаются и не
 сохраняются.
 
 ## Критерии приёмки
 
-- [ ] GitHub Actions run для `0a3e9ef` найден; required checks и Linux security
+- [ ] GitHub Actions run для latest approved remediation commit найден; required checks и Linux security
       wrapper имеют terminal success.
 - [ ] Protected environment `production-images` имеет требуемые reviewers,
       variables и secret boundary; значения секретов не раскрываются.
@@ -150,6 +152,14 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
   every path touched by every fast-forward commit, keep the HEAD fingerprint in
   verification evidence, and fail closed for rewinds/divergent history or any
   committed path outside the approved write set.
+- GitHub security run `30761504520` for commit `4383193` proved two independent
+  CI configuration defects. The repository scanner used a relative
+  `--output-dir`, then changed directory before redirecting govulncheck JSON,
+  so the shell failed before govulncheck ran. Both CodeQL matrix jobs completed
+  analysis but failed to upload because this personal private repository does
+  not have GitHub Code Security enabled; their declared `security-events: write`
+  permission was present. No scanner artifact was retained because the upload
+  step was skipped after the scanner failure.
 
 ## Scope
 
@@ -165,9 +175,9 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
 
 - VM bootstrap/deploy/rollback, Docker runtime or application secrets.
 - DNS/NS delegation, ACME/TLS, Lockbox payloads, telemetry, backup/restore.
-- GitHub workflow/settings mutation outside the narrowly scoped failure-only
-  SARIF diagnostic upload and exact dependency/toolchain remediation described
-  in this plan.
+- GitHub workflow/settings mutation outside the narrowly scoped diagnostic
+  upload, private-repository CodeQL eligibility gate and exact
+  dependency/toolchain/scanner-path remediation described in this plan.
 - Registry deletion, tag cleanup, force push, or broad Terraform apply.
 
 ## Архитектурный подход
@@ -194,7 +204,8 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
 |---|---|---|
 | `.leino/profile.json` | write | Raise repository Go minimum to patched `1.25.12` |
 | `.github/workflows/ci.yml` | write | Upload diagnostics and use patched Go toolchain |
-| `.github/workflows/security.yml` | write | Use patched Go toolchain |
+| `.github/workflows/security.yml` | write | Use patched Go toolchain, retain scanner diagnostics and skip unavailable CodeQL upload for a private unlicensed repository |
+| `scripts/ci/security-scan.sh` | write | Canonicalize a caller-provided relative evidence directory before changing working directory |
 | `backend/game/Dockerfile` | write | Pin patched Go build image and digest |
 | `backend/game/go.mod` | write | Remediate OSV Go module findings |
 | `backend/game/go.sum` | write | Generated checksums for the remediated Go graph |
@@ -251,6 +262,10 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
    - Preserve and validate fast-forward commit paths in the selected session so
      the CI-triggering commit is checked by write set and canonical evidence;
      do not whitelist `.git/HEAD` or reset the original baseline.
+   - Canonicalize the scanner evidence directory before the backend subshell,
+     retain partial diagnostics with an always-running artifact step, and run
+     CodeQL only when repository visibility makes GitHub code scanning
+     available. Keep Gitleaks, Trivy, OSV and govulncheck fail-closed.
 7. [ ] Verify immutable `game`/`web` digests and release evidence without
       exposing tokens or secret payloads.
 8. [ ] Run canonical verify/scope-check, archive and guarded release before
@@ -262,6 +277,9 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
 - [ ] GitHub Actions required checks and publish evidence — terminal success.
 - [ ] OSV remediation evidence shows no vulnerable versions; Trivy SARIF is
       empty; focused Go/frontend checks pass.
+- [ ] Relative scanner output survives the backend working-directory change;
+      the private repository skips unavailable CodeQL without weakening the
+      pinned scanner job, and failed scanner evidence is retained.
 - [ ] Declared executable resolver is used by actual `leinoctl verify`
       execution; missing resolver fails closed; runner regression tests pass.
 - [ ] Forward root commits enumerate every touched path, remain tied to the
@@ -296,6 +314,11 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
   later maintenance.
 - 2026-08-02: owner explicitly approved this plan change after the canonical
   scope-check exposed the mid-plan CI commit lifecycle gap.
+- 2026-08-02: owner explicitly approved the exact "free CI fix": add
+  `scripts/ci/security-scan.sh` to the write set, fix relative evidence output,
+  always retain scanner diagnostics, and gate CodeQL on supported public
+  repository visibility without changing repository visibility or purchasing
+  GitHub Code Security.
 
 ## Согласование
 
@@ -335,6 +358,17 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
   because it downloads Linux ELF tools. Ubuntu WSL exists but lacks `go` and
   `jq`; no host packages were installed. The pushed Linux GitHub Actions run
   remains the authoritative full repository/image security gate.
+- GitHub connector inspection of run `30761504520` found scanner job
+  `91532800665` failing at `security-evidence/govulncheck.json` after the
+  backend `cd`, CodeQL jobs `91532800703` and `91532800710` failing only at the
+  disabled private-repository code-scanning upload, and no retained artifacts.
+  Full-SHA action policy job `91532800693` passed.
+- The approved free CI fix canonicalizes caller-provided scanner output before
+  the backend subshell, uploads partial scanner evidence with `if: always()`,
+  and gates CodeQL on public repository visibility. Focused Git Bash syntax and
+  scanner-contract checks, action-pin policy, plan-lint and `git diff --check`
+  all passed locally. The authoritative full pinned scan remains the next Linux
+  GitHub Actions run.
 
 ## Итог
 
