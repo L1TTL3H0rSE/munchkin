@@ -25,6 +25,11 @@ LABEL org.opencontainers.image.source="${OCI_SOURCE}" \
       org.opencontainers.image.created="${OCI_CREATED}" \
       org.opencontainers.image.licenses="${OCI_LICENSES}"
 
+# The runtime starts the built Nuxt output directly with node. Keeping npm/npx
+# here adds an unused package-manager tree and its vulnerability surface.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx
+
 COPY --from=build --chown=node:node /app/applications/web/.output ./.output
 
 ENV HOST=0.0.0.0 \

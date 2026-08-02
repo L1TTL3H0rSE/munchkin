@@ -3,7 +3,7 @@
 - **Plan ID:** `20260802T164112Z-dfb164-production-live-wif-registry-evidence`
 - **Статус:** in_progress
 - **Создан:** 2026-08-02 16:41:12 UTC
-- **Обновлён:** 2026-08-02 19:05:56 UTC
+- **Обновлён:** 2026-08-02 19:21:56 UTC
 - **Владелец:** Codex
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся
@@ -33,6 +33,7 @@
     "docs/agents/STACK.md",
     "frontend/pnpm-workspace.yaml",
     "frontend/pnpm-lock.yaml",
+    "frontend/Dockerfile",
     "tools/leinoctl/src/cli.mjs",
     "tools/leinoctl/src/git.mjs",
     "tools/leinoctl/src/runner.mjs",
@@ -215,6 +216,7 @@ remediation commit.
 | `docs/agents/STACK.md` | write | Keep declared Go toolchain documentation aligned |
 | `frontend/pnpm-workspace.yaml` | write | Remediate Playwright OSV finding |
 | `frontend/pnpm-lock.yaml` | write | Generated lockfile for the remediated Playwright graph |
+| `frontend/Dockerfile` | write | Remove unused npm/npx from the production runtime image after Trivy identified vulnerabilities in the base image's bundled npm tree |
 | `tools/leinoctl/src/cli.mjs` | write | Apply profile executable resolution to actual checks/generators/Compose commands |
 | `tools/leinoctl/src/git.mjs` | write | Enumerate fast-forward committed paths without resetting the selected-plan baseline |
 | `tools/leinoctl/src/runner.mjs` | write | Launch the resolved executable while preserving canonical argv evidence |
@@ -266,6 +268,9 @@ remediation commit.
      retain partial diagnostics with an always-running artifact step, and run
      CodeQL only when repository visibility makes GitHub code scanning
      available. Keep Gitleaks, Trivy, OSV and govulncheck fail-closed.
+   - Remove npm/npx from only the final web runtime stage. The build stage keeps
+     Corepack/pnpm, while production continues to start the Nuxt output with
+     the `node` binary and no package-manager runtime dependency.
 7. [ ] Verify immutable `game`/`web` digests and release evidence without
       exposing tokens or secret payloads.
 8. [ ] Run canonical verify/scope-check, archive and guarded release before
@@ -280,6 +285,8 @@ remediation commit.
 - [ ] Relative scanner output survives the backend working-directory change;
       the private repository skips unavailable CodeQL without weakening the
       pinned scanner job, and failed scanner evidence is retained.
+- [x] The final web image contains no npm/npx runtime tree, still starts via
+      `node .output/server/index.mjs`, and its Trivy HIGH/CRITICAL scan is empty.
 - [ ] Declared executable resolver is used by actual `leinoctl verify`
       execution; missing resolver fails closed; runner regression tests pass.
 - [ ] Forward root commits enumerate every touched path, remain tied to the
@@ -319,6 +326,10 @@ remediation commit.
   always retain scanner diagnostics, and gate CodeQL on supported public
   repository visibility without changing repository visibility or purchasing
   GitHub Code Security.
+- 2026-08-02 19:17 UTC: after artifact `8837987746` identified five
+  HIGH/CRITICAL findings exclusively under the base image's bundled npm tree,
+  owner explicitly approved expanding the same plan to `frontend/Dockerfile`
+  and removing npm/npx from only the production runtime stage.
 
 ## Согласование
 
@@ -385,6 +396,22 @@ remediation commit.
   with digest `sha256:62b6ea9d0c04da5808e61f8d97e989fd0814719fbc47eef00734df884f096d5d`.
   The POSIX fixture now prints its quoted first argument; the focused resolver
   test, a direct Git Bash spaced-argument probe, plan-lint and diff checks pass.
+- CI run `30762635736` for commit `569853a` passed every prerequisite job,
+  WIF claim validation and Yandex Registry login, then stopped before push at
+  the fail-closed Trivy scan of the web image. Failure artifact `8837987746`
+  (`sha256:3d731b742cc460aba8287be467d3919ccc571ec70f0e23b77033712928324c9e`)
+  proves the game image is clean and the web image findings are only bundled
+  npm runtime packages: `brace-expansion` `5.0.6` (CVE-2026-13149 and
+  CVE-2026-14257), `tar` `7.5.15` (CVE-2026-59873 and CVE-2026-59874), and
+  `undici` `6.26.0` (CVE-2026-12151). No application dependency or image was
+  published by the failed step.
+- The approved runtime hardening keeps Corepack/pnpm in the build stage and
+  removes `/usr/local/lib/node_modules/npm`, `npm` and `npx` only from the
+  final web stage. Focused local image build produced
+  `sha256:06cf974295f18a3f59285b0b366a5249303f1e808be1f576d9c386eb1ea23a76`;
+  the container retained its Nuxt entrypoint and started with Node `v24.18.1`.
+  Trivy `0.70.0` then reported zero HIGH/CRITICAL findings for Alpine and every
+  detected Node package. The pushed Linux workflow remains authoritative.
 
 ## Итог
 
