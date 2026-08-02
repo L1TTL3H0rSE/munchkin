@@ -160,7 +160,7 @@ chmod 0755 "$osv_binary"
 "$trivy_bin" fs --scanners vuln,misconfig,secret --severity CRITICAL,HIGH \
   --format sarif --output "$output_dir/trivy-fs.sarif" --exit-code 1 --no-progress "$repo_root"
 "$trivy_bin" config --severity CRITICAL,HIGH --format sarif \
-  --output "$output_dir/trivy-config.sarif" --exit-code 1 --no-progress "$repo_root"
+  --output "$output_dir/trivy-config.sarif" --exit-code 1 "$repo_root"
 "$osv_binary" scan source -r "$repo_root" --format json \
   --output "$output_dir/osv-scanner.json"
 
