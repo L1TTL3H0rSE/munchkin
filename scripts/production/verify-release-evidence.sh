@@ -68,14 +68,22 @@ command -v jq >/dev/null 2>&1 || die "jq is required"
 [[ "$github_repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "GitHub repository is invalid"
 [[ -f "$release_manifest" && -f "$security_evidence" ]] || die "release evidence files are missing"
 
+game_digest="sha256:${game_image##*@sha256:}"
+web_digest="sha256:${web_image##*@sha256:}"
+game_release_ref="${game_image%@sha256:*}:$release_commit"
+web_release_ref="${web_image%@sha256:*}:$release_commit"
+
 jq -e \
   --arg commit "$release_commit" \
-  --arg game "$game_image" \
-  --arg web "$web_image" \
+  --arg gameRef "$game_release_ref" \
+  --arg gameDigest "$game_digest" \
+  --arg webRef "$web_release_ref" \
+  --arg webDigest "$web_digest" \
   '.schemaVersion == 1 and .commit == $commit and
-   .images.game.image == $game and .images.web.image == $web and
-   (.images.game.digest | startswith("sha256:")) and
-   (.images.web.digest | startswith("sha256:"))' \
+   .images.game.ref == $gameRef and .images.game.digest == $gameDigest and
+   .images.game.image == ($gameRef + "@" + $gameDigest) and
+   .images.web.ref == $webRef and .images.web.digest == $webDigest and
+   .images.web.image == ($webRef + "@" + $webDigest)' \
   "$release_manifest" >/dev/null || die "release manifest does not match requested SHA and image pair"
 
 jq -e \

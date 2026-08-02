@@ -21,6 +21,7 @@
   "schemaVersion": 1,
   "paths": [
     ".github/workflows/deploy-production.yml",
+    "scripts/production/verify-release-evidence.sh",
     "docs/agents/plans/active/20260802T200453Z-135717-first-production-deploy-https-smoke.md",
     "docs/agents/plans/archive/20260802T200453Z-135717-first-production-deploy-https-smoke.md"
   ],
@@ -98,13 +99,18 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 - Exact one-line Linux runner portability fix in
   `.github/workflows/deploy-production.yml`: invoke the existing verifier via
   `bash`; no verification policy or arguments change.
+- Exact manifest serialization fix in
+  `scripts/production/verify-release-evidence.sh`; security evidence and all
+  four attestations remain mandatory and unchanged.
 - Lifecycle evidence in this plan, archive, local commit and push to `main`.
 
 ### Не входит
 
-- Any repository source/config/workflow change except the exact one-line
-  Git Bash portability fix that invokes the existing release verifier through
-  `bash` after run `30764956972` failed with exit 126 before SSH.
+- Any repository source/config/workflow change except the two exact pre-SSH
+  release-gate fixes confirmed by runs `30764956972` and `30765108163`: invoke
+  the verifier through `bash`, then compare the manifest's exact
+  `repo:commit`, digest and combined `repo:commit@digest` fields with the
+  requested immutable `repo@digest` input.
 - Terraform apply, Yandex resource mutation, DNS/NS edit, firewall change,
   Registry delete/retag/push, GitHub settings/environment/secret mutation.
 - Reading, printing or rotating SSH/application/ACME/Lockbox secret values.
@@ -126,7 +132,7 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 | GitHub Actions | explicit Bash invocation plus dispatch/read | unchanged verification contract and exact inputs |
 | Existing VM runtime | controlled rollout through gateway | `production-release-evidence-v1` |
 | Public edge | read-only HTTPS validation | hostname/TLS/health availability |
-| Repository | lifecycle plan plus one workflow launcher line | no script/policy change |
+| Repository | lifecycle, workflow launcher and manifest contract fix | no attestation-policy weakening |
 
 ## Координация с другими планами
 
@@ -135,6 +141,7 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 | Путь/ресурс | Режим | Причина |
 |---|---|---|
 | `.github/workflows/deploy-production.yml` | write | Invoke existing verifier through Bash on Linux runner |
+| `scripts/production/verify-release-evidence.sh` | write | Verify exact manifest ref/digest serialization |
 | `docs/agents/plans/active/20260802T200453Z-135717-first-production-deploy-https-smoke.md` | write | Active lifecycle плана |
 | `docs/agents/plans/archive/20260802T200453Z-135717-first-production-deploy-https-smoke.md` | write | Archived lifecycle плана |
 
@@ -161,9 +168,10 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 1. [x] Select this exact plan and confirm clean `main`/release inputs.
 2. [x] Dispatch `deploy-production` with the exact two digests, full SHA and
       release run ID; do not change workflow/environment/secrets.
-3. [ ] Fix the confirmed pre-SSH workflow portability failure by invoking the
-      existing release verifier with `bash`; run focused policy checks,
-      commit/push and dispatch the same exact release inputs again.
+3. [ ] Fix the confirmed pre-SSH workflow portability and manifest
+      serialization failures; run focused fail-closed fixture/policy checks,
+      canonical verify/scope-check, commit/push and dispatch the same exact
+      release inputs again.
 4. [ ] Wait for terminal workflow result and inspect every step plus uploaded
       production evidence without exposing protected values.
 5. [ ] Independently verify DNS, TLS, page load and public health; perform a
@@ -227,6 +235,17 @@ public HTTPS и зафиксировать machine-readable release evidence б�
   owner's standing approval for plan/fix changes, write scope expands only to
   `.github/workflows/deploy-production.yml` for a one-line explicit Bash
   invocation; no script behavior, VM, secrets or environment settings change.
+- Focused Git Bash verifier entrypoint, full-SHA action policy, plan-lint,
+  canonical repository-workflow verify (`42/42` harness and `80/0/1`
+  leinoctl) and scope-check all passed. Fix commit `670cbc1` was pushed; exact
+  retry run `30765108163` dispatched with unchanged release inputs.
+- Retry `30765108163`, job `91542289246`, passed explicit Bash launch and then
+  failed closed before SSH because the release manifest stores
+  `repo:commit@digest` while the approved workflow input is immutable
+  `repo@digest`. Direct artifact inspection confirmed the same commit and
+  digests in manifest/security evidence; the scoped verifier fix requires the
+  exact manifest ref, digest and recomposed image instead of weakening string
+  matching.
 
 ## Итог
 
