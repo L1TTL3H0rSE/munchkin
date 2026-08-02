@@ -3,12 +3,12 @@
 - **Plan ID:** `20260801T225905Z-64608a-frontend-redesign-verification-cleanup`
 - **Статус:** approved
 - **Создан:** 2026-08-01 22:59:05 UTC
-- **Обновлён:** 2026-08-01 23:00:21 UTC
+- **Обновлён:** 2026-08-02 12:20:00 UTC
 - **Владелец:** Codex
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** exclusive
-- **Зависит от:** plans `20260801T225856Z-b69a1a-frontend-scss-architecture-foundation`, `20260801T225858Z-49b2b8-figma-lobby-shell-rebuild`, `20260801T225859Z-5831ff-figma-game-primitives-view-models`, `20260801T225900Z-2e903a-figma-mobile-game-states`, `20260801T225902Z-564b56-figma-desktop-game-states`, `20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces`, `20260801T225904Z-83bfe1-figma-system-terminal-states`.
+- **Зависит от:** plans `20260801T225856Z-b69a1a-frontend-scss-architecture-foundation`, `20260801T225858Z-49b2b8-figma-lobby-shell-rebuild`, `20260801T225859Z-5831ff-figma-game-primitives-view-models`, `20260801T225900Z-2e903a-figma-mobile-game-states`, `20260801T225902Z-564b56-figma-desktop-game-states`, `20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces`, `20260801T225904Z-83bfe1-figma-system-terminal-states`, `20260802T115450Z-eef974-frontend-browser-runner-determinism`.
 - **Блокирует:** нет.
 - **Связанные ADR/handoff:** `docs/agents/FRONTEND_ENGINEERING_SPEC.md`, `docs/agents/GAME_UI_UX_SPEC.md`, Figma file `bmxy6z3Z0bBLHLYryYJYrP`.
 
@@ -47,7 +47,8 @@
     "20260801T225900Z-2e903a-figma-mobile-game-states",
     "20260801T225902Z-564b56-figma-desktop-game-states",
     "20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces",
-    "20260801T225904Z-83bfe1-figma-system-terminal-states"
+    "20260801T225904Z-83bfe1-figma-system-terminal-states",
+    "20260802T115450Z-eef974-frontend-browser-runner-determinism"
   ],
   "sharedResources": [
     "frontend:browser-a11y-harness-v1",
@@ -255,6 +256,7 @@
 - **Статус:** approved
 - **Запрошено:** 2026-08-01 23:00:21 UTC
 - **Подтверждено:** 2026-08-02, user batch approval: exact queue in listed order; push запрещён
+- **Дополнительно подтверждено:** 2026-08-02, user разрешил сначала выполнить workflow queue `20260802T115448Z` → `20260802T115450Z` → `20260802T115451Z`; этот final-gate остаётся после неё.
 - **Формулировка/ограничения пользователя:** User requested the complete
   frontend/layout plan at once. This final slice proves the whole approved
   player-facing rebuild and does not redesign the dev-only Card Studio. Batch

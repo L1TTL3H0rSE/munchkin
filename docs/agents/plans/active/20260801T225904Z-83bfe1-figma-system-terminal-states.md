@@ -3,12 +3,12 @@
 - **Plan ID:** `20260801T225904Z-83bfe1-figma-system-terminal-states`
 - **Статус:** approved
 - **Создан:** 2026-08-01 22:59:04 UTC
-- **Обновлён:** 2026-08-01 23:00:21 UTC
+- **Обновлён:** 2026-08-02 12:20:00 UTC
 - **Владелец:** Codex
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
-- **Зависит от:** plans `20260801T225856Z-b69a1a-frontend-scss-architecture-foundation`, `20260801T225858Z-49b2b8-figma-lobby-shell-rebuild`, `20260801T225859Z-5831ff-figma-game-primitives-view-models`, `20260801T225900Z-2e903a-figma-mobile-game-states`, `20260801T225902Z-564b56-figma-desktop-game-states`, `20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces`.
+- **Зависит от:** plans `20260801T225856Z-b69a1a-frontend-scss-architecture-foundation`, `20260801T225858Z-49b2b8-figma-lobby-shell-rebuild`, `20260801T225859Z-5831ff-figma-game-primitives-view-models`, `20260801T225900Z-2e903a-figma-mobile-game-states`, `20260801T225902Z-564b56-figma-desktop-game-states`, `20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces`, `20260802T115450Z-eef974-frontend-browser-runner-determinism`.
 - **Блокирует:** `20260801T225905Z-64608a-frontend-redesign-verification-cleanup`.
 - **Связанные ADR/handoff:** Figma lifecycle/system frames, game-session recovery controller v1.
 
@@ -51,7 +51,8 @@
     "20260801T225859Z-5831ff-figma-game-primitives-view-models",
     "20260801T225900Z-2e903a-figma-mobile-game-states",
     "20260801T225902Z-564b56-figma-desktop-game-states",
-    "20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces"
+    "20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces",
+    "20260802T115450Z-eef974-frontend-browser-runner-determinism"
   ],
   "sharedResources": [
     "frontend:system-state-ui-v2",
@@ -242,6 +243,7 @@ Figma death/recovery/victory surfaces без инженерных labels.
 - **Статус:** approved
 - **Запрошено:** 2026-08-01 23:00:21 UTC
 - **Подтверждено:** 2026-08-02, user batch approval: exact queue in listed order; push запрещён
+- **Дополнительно подтверждено:** 2026-08-02, user разрешил сначала выполнить workflow queue `20260802T115448Z` → `20260802T115450Z` → `20260802T115451Z`; этот UI plan остаётся downstream.
 - **Формулировка/ограничения пользователя:** Connection loss should normally be
   an icon over the screen; technical retry/waiting labels were rejected; all
   remaining lifecycle screens should be drawn/implemented consistently. Batch
