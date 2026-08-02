@@ -25,6 +25,7 @@
     "@nuxt/eslint": "catalog:",
     "@types/node": "catalog:",
     "eslint": "catalog:",
+    "sass-embedded": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "vue-tsc": "catalog:"

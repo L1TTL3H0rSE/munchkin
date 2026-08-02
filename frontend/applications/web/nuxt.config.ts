@@ -4,7 +4,7 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-07-29",
   devtools: {enabled: true},
   modules: ["@pinia/nuxt", "@nuxt/eslint"],
-  css: ["~/assets/main.css"],
+  css: ["~/assets/scss/main.scss"],
   runtimeConfig: {
     cardStudio: {
       enabled: process.env.CARD_STUDIO_ENABLED === "true",

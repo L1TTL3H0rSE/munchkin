@@ -48,8 +48,10 @@ schema и Zod contract отдельным implementation plan.
    руку, eligible actors или скрытый исход.
 7. **Карты работают без иллюстраций.** Название, тип, правила, числовые
    параметры и доступность действия читаемы при missing/disabled image.
-8. **320 CSS px — настоящий нижний предел.** Горизонтальный scroll всего
-   документа, clipped critical content и controls за safe viewport запрещены.
+8. **Поддерживаемый mobile target — 360×640.** Карта и critical actions
+   сохраняют читаемый размер, а bottom safe area добавляется к shell. `320px`,
+   short-height и phone landscape остаются safety-only fallback: legal action,
+   focus и privacy не ломаются, но pixel parity не обещается.
 
 ## Подтверждённая runtime-граница
 
@@ -89,9 +91,10 @@ create/join/start, owner setup, waiting peer и version invalidation → resync.
 | Semantics snapshot | `320 × 568` | Native link/buttons доступны; dialog и `aria-live`/`role=status`/`role=alert` отсутствуют; custom `:focus-visible` rule не найден |
 | Realtime | два actor-а | Join дал version `v2`, start дал `v3`; оба клиента получили invalidation и перезагрузили projection |
 
-Причина 320 px дефекта подтверждена source-аудитом: `body { min-width:
-320px }` конфликтует с шириной, занятой vertical scrollbar. Исправление
-принадлежит будущему implementation plan; этот docs-only plan CSS не меняет.
+Этот audit — historical baseline до SCSS foundation plan. После foundation
+global shell использует `min-width: 0`, dynamic viewport units, safe-area
+padding и Munchkin-owned breakpoint tokens; canonical visual proof для target
+viewports принадлежит ordered implementation queue.
 
 Живьём не проверялись и не выдаются за проверенные:
 
@@ -106,6 +109,19 @@ create/join/start, owner setup, waiting peer и version invalidation → resync.
 Source-аудит подтверждает наличие CURRENT phase/error/reconnect branches, но
 не доказывает их визуальную и accessibility корректность. Эти состояния
 остаются обязательными future fixtures.
+
+### Accepted Figma contract v2
+
+- Approved visual source is the Munchkin-owned Figma file and its selected
+  Flow B lobby, hybrid primitive, mobile `360×640` and desktop `1440×900`
+  frames; Digiversity is read-only engineering reference only.
+- Full visual support targets are portrait mobile `360×640` and desktop
+  `1440×900`. `390×844`, `427×926`, tablet and laptop rows are responsive
+  evidence; `320×568`, short-height and phone landscape are safety-only.
+- The visual language is paper-like canvas/surfaces with muted green and rust
+  accents. Dark/acid legacy copy is not a player-facing visual direction.
+- Browser, axe and visual checks are repository-pinned implementation gates;
+  source inspection or a static build alone never substitutes for them.
 
 ## Screen and state inventory
 
@@ -277,7 +293,7 @@ Boundary token — закрытая верхняя граница, а не го�
 
 | Capacity | Default composition | Typical transition |
 |---|---|---|
-| `320–374` | Single column; compact header; bottom action dock; hand rail + full-hand sheet | Base |
+| `320–374` | `360×640` full-support single column; compact header; bottom action dock; hand rail + full-hand sheet. `320` is safety-only. | Base |
 | `>374–599` | Single column; larger card preview; paired secondary actions where they fit | Content, not token count |
 | `>599–767` | Stacked table with optional two-column own-board details | `above(tablet_small)` |
 | `>767–1023` | Two-region table: context/encounter + player area; action dock remains persistent | `above(tablet)` |
@@ -408,7 +424,7 @@ mandatory choices never hide their only legal action in an inactive slide.
 
 ## Responsive compositions
 
-### Compact mobile (`320–599`)
+### Compact mobile (`360–599` full-support target)
 
 - Turn/context header is sticky at top only if it does not consume more than
   roughly one quarter of short landscape height.
@@ -422,6 +438,8 @@ mandatory choices never hide their only legal action in an inactive slide.
   descriptor; otherwise all projected actions stay in one visible labeled
   list/sheet and the client does not rank them.
 - FUTURE interaction sheet appears above the action dock and owns focus.
+- At `320` or short height, the fallback may scroll internally/document-wide;
+  it must keep the legal action, focus destination and privacy boundary usable.
 
 ### Tablet (`600–1023`)
 
@@ -720,18 +738,17 @@ names; decorative icons are hidden from accessibility APIs.
 
 ## Visual direction
 
-### Chosen concept: tactical street table
+### Chosen concept: quiet paper table
 
-Развивается гибрид текущего тёмного acid/road motif и тактильной настольной
-композиции:
+Figma v2 задаёт спокойную paper-like настольную композицию с muted green и
+rust accents:
 
-- тёмная нейтральная поверхность задаёт «стол» и отделяет UI chrome;
-- бумажные светлые card surfaces дают длинному тексту спокойный фон;
-- acid-lime обозначает доступность/active focus, hazard orange — срочность и
-  turn context;
-- грубые directional marks и компактный monospace metadata поддерживают
-  street-sign характер;
-- иерархия, сетка и доступность важнее декоративной «грязи».
+- светлый canvas и карточные поверхности дают длинному русскому тексту
+  устойчивый фон;
+- muted green обозначает primary/action/confirmed roles, rust — urgency и
+  destructive context;
+- техническая информация остаётся вторичной и не занимает primary UI;
+- иерархия, сетка и accessibility важнее декоративной «грязи».
 
 Нельзя копировать названия, изображения, логотипы, шрифты или trade dress
 коммерческого Munchkin. Card art остаётся versioned presentation content.
@@ -743,23 +760,22 @@ names; decorative icons are hidden from accessibility APIs.
 
 | Role | Starting value | Use |
 |---|---|---|
-| `canvas` | `#11120F` | Browser/page background |
-| `board` | `#1B1D18` | Main table |
-| `surface` | `#262921` | Panels and compact opponent cards |
-| `paper` | `#F3E8CF` | Card text surface |
-| `ink` | `#191A17` | Text on paper |
-| `text` | `#F5F3EA` | Primary text on dark |
-| `text-muted` | `#B8B9AE` | Secondary metadata |
-| `acid` | `#C8FF3D` | Available/focus/active accent |
-| `hazard` | `#FF8A24` | Turn urgency and countdown threshold |
-| `success` | `#38B978` | Confirmed positive result with icon/text |
-| `danger` | `#E85D64` | Error/destructive state with icon/text |
-| `info` | `#64B5F6` | Connection/resync information |
-| `scrim` | `rgb(0 0 0 / 68%)` | Modal separation |
+| `canvas` | `#F1EEE5` | Browser/page background |
+| `board` | `#30483B` | Main table / contrast surface |
+| `surface` | `#FBFAF4` | Panels and compact opponent cards |
+| `paper` | `#FFFAF0` | Card text surface |
+| `ink` | `#26372E` | Primary text |
+| `text-muted` | `#68776D` | Secondary metadata |
+| `accent` | `#315E45` | Available/focus/active accent |
+| `rust` | `#A4563E` | Turn urgency and destructive context |
+| `success` | `#2D7653` | Confirmed positive result with icon/text |
+| `danger` | `#A33F3F` | Error/destructive state with icon/text |
+| `info` | `#356C86` | Connection/resync information |
+| `scrim` | `rgb(28 42 34 / 68%)` | Modal separation |
 
 Rules:
 
-- `acid`, `hazard`, `success` and `danger` are never the only status signal.
+- `accent`, `rust`, `success` and `danger` are never the only status signal.
 - Long body copy uses `paper/ink` or `canvas/text`, not saturated accent.
 - Disabled content retains readable text and shape; opacity alone is
   insufficient.
@@ -956,14 +972,15 @@ additional cross-cutting gates, not substitutes for either tier.
 
 ### Automation boundary
 
-CURRENT repository has unit tests but no Playwright/Cypress/axe/visual
-regression dependency. This spec does not install one. A future plan must
-select and pin browser/axe/snapshot tooling, add deterministic fixtures and
-define CI platform policy before claiming automated browser coverage.
+The repository now pins Playwright, axe-core and Chromium visual snapshots in
+the frontend workspace. `pnpm test:browser`, `pnpm test:a11y` and
+`pnpm test:visual` are implementation gates for the ordered UI plans. Their
+fixture browser boundary remains distinct from real browser→Nuxt→Go evidence;
+neither a snapshot nor a static build proves server authority or privacy.
 
-Until then, implementation completion requires recorded manual browser
-evidence for the exact viewport/state matrix plus existing lint/typecheck/test/
-build gates from `FRONTEND_ENGINEERING_SPEC.md`.
+Visual baselines are reviewed artifacts, not blanket `--update-snapshots`
+acceptance. Manual Figma comparison remains required at `360×640` and
+`1440×900`, with safety-only checks for unsupported viewports.
 
 ### Review lenses
 
@@ -1023,7 +1040,7 @@ modal/timer protocol.
 
 | Question | Decision | Why |
 |---|---|---|
-| Visual direction | Hybrid tactical street table | Preserves recognizable current acid/road character while improving long-form card readability and tabletop hierarchy |
+| Visual direction | Quiet paper table | Paper-like surfaces, muted green/rust accents and a calmer hierarchy replace the legacy acid/dark player direction |
 | Compact hand | Bounded rail + full-hand sheet; small-count grid allowed | Keeps cards readable, gives keyboard/non-rail alternative, avoids inaccessible decorative fan |
 | Sound/haptics | Out of scope, optional future layer | No essential feedback may depend on device sensory features |
 | Visual fixtures | Deterministic actor projections listed above | Reproducible dense/error/future states without private data or manual RNG |

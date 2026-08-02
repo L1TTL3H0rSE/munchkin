@@ -1,0 +1,117 @@
+@use "../api" as api;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#__nuxt {
+  min-width: 0;
+  min-height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  @include api.touch-target;
+
+  border: 1px solid var(--color-accent-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-accent-strong);
+  color: var(--color-surface);
+  cursor: pointer;
+  font-weight: 750;
+  letter-spacing: .02em;
+  padding: .75rem 1rem;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  padding: .75rem;
+}
+
+input {
+  margin-top: .45rem;
+}
+
+select,
+textarea {
+  margin-top: .45rem;
+}
+
+textarea {
+  line-height: 1.4;
+  resize: vertical;
+}
+
+label {
+  color: var(--muted);
+  font-size: .82rem;
+  letter-spacing: .04em;
+}
+
+code {
+  overflow-wrap: anywhere;
+  color: var(--color-accent-strong);
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  @include api.focus-ring;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus:not(:focus-visible) {
+  outline: none;
+}
+
+@include api.reduced-motion {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms;
+    animation-iteration-count: 1;
+    scroll-behavior: auto;
+    transition-delay: 0ms;
+    transition-duration: .01ms;
+  }
+}
+
+@include api.forced-colors {
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px double Highlight;
+    box-shadow: none;
+  }
+}

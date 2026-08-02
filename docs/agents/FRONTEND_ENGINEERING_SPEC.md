@@ -448,15 +448,19 @@ local state. Смешивать оба режима неявно нельзя.
 Рекомендуемая логическая структура:
 
 ```text
-assets/
-  tokens.css       # global semantic tokens
-  base.css         # reset, typography, document defaults
+assets/scss/
+  api/              # Munchkin-owned tokens, breakpoints and mixins
+  base/             # reset, typography, document defaults, app shell
+  pages/            # explicitly isolated compatibility layers
+  main.scss         # one global entry with stable import order
 component.vue      # component-owned scoped styles
-feature/*.css      # только shared feature primitives с несколькими owners
+feature/*.scss     # только shared feature primitives с несколькими owners
 ```
 
-Физическое разделение выполняется отдельным implementation plan. Новые styles
-не должны дальше раздувать один global `main.css`.
+`main.scss` импортирует только `api → base → app shell → compatibility pages`.
+SCSS API использует `@use`/`@forward`; скрытый global Sass namespace и
+`additionalData` запрещены. Новые styles не должны снова собираться в один
+растущий global stylesheet.
 
 Global разрешён для:
 
@@ -465,6 +469,9 @@ Global разрешён для:
 - document typography/background;
 - действительно shared layout primitive;
 - third-party override с локальной причиной.
+
+Foundation exception: dev-only Card Studio compatibility styles живут в
+`assets/scss/pages/_studio.scss`; это preservation layer, а не player UI kit.
 
 Component/page selectors scoped по умолчанию. Deep/global selector требует
 комментария о внешнем owner. Element selectors вне reset/base запрещены, если
@@ -590,7 +597,8 @@ range начинается с `N + 1px`. Например, `mobile` заканч
 
 | Class | Viewports |
 |---|---|
-| narrow mobile | 320×568, 360×800, 374×812 |
+| full-support mobile | 360×640, 390×844, 427×926 |
+| safety-only mobile | 320×568, short-height and phone landscape |
 | boundary entry | 375×667, 428×926 |
 | large mobile | 390×844, 427×926 |
 | tablet | 599×960, 768×1024, 1024×768 |
@@ -673,14 +681,15 @@ Copy-ready checklist для любого frontend change:
 - [ ] Props/emits/models/keys typed; assertions узкие и проверяемые; any нет.
 - [ ] Markup semantic; keyboard/focus/ARIA и non-color status проверены.
 - [ ] Styles принадлежат component/feature; tokens semantic; overflow bounded.
-- [ ] Relevant N-1/N/N+1 viewports и 320px проверены без document overflow.
+- [ ] Relevant N-1/N/N+1 viewports and canonical `360×640`/`1440×900` are
+  checked; unsupported `320px` fallback preserves action, focus and privacy.
 - [ ] Reduced motion, long Russian copy и 200% zoom имеют usable equivalent.
 - [ ] Unit/contract/integration/browser evidence соответствует риску.
 - [ ] pnpm lint, pnpm check, pnpm build и leinoctl verify прошли.
 - [ ] Diff review не содержит unrelated formatting/generated/manual edits.
 ```
 
-## Audit snapshot — 2026-07-30
+## Audit snapshot — 2026-08-02
 
 Этот раздел нужно перепроверять перед refactor. Он не доказывает текущее
 состояние после будущих commits.
@@ -701,6 +710,11 @@ Copy-ready checklist для любого frontend change:
 - Card Studio имеет typed client/server/provider boundary и deterministic fake.
 - Forms/buttons, card alt/fallback и основные landmarks используют semantic
   HTML.
+- One `main.scss` entry now owns the semantic token/reset/app-shell layers;
+  Card Studio has an explicitly isolated compatibility layer.
+- `sass-embedded` is a direct web devDependency resolved by the single
+  `frontend/pnpm-lock.yaml`; pinned Chromium/axe/visual harnesses are present
+  in the frontend workspace.
 
 ### Gap matrix
 
@@ -709,14 +723,14 @@ Copy-ready checklist для любого frontend change:
 | P0 | Gameplay `apiErrorSchema` не превращён в typed UX errors; pages показывают `Error.message` | error adapter + recovery taxonomy |
 | P0 | Non-stream requests/polling не получают route-owned cancellation | AbortSignal/generation owner |
 | P0 | Reconnect использует fixed 1s retry без bounded backoff/terminal classification | retry policy + offline state |
-| P0 | Нет focus-visible/reduced-motion/safe-area/dvh contract | global accessibility/responsive foundation |
-| P0 | Один raw `720px` query и нет boundary source/viewport regression | Munchkin breakpoint contract + browser matrix |
+| P0 | Foundation had no focus-visible/reduced-motion/safe-area/dvh contract | resolved by SCSS base layer and focused browser smoke |
+| P0 | One raw `720px` query had no boundary source/viewport regression | resolved by Munchkin-owned SCSS breakpoint API and focused browser smoke |
 | P0 | App-level `<main>` содержит второй `<main>` Card Studio | один page landmark, Studio как `section` |
 | P0 | Loading/error/success/offline transitions не объявлены через live status/`aria-busy` | bounded status/alert/live-region contract |
 | P0 | Studio `listbox` не реализует roving focus/arrow-key pattern | native button list либо complete APG pattern |
 | P1 | `game/[id].vue` около 333 строк смешивает fetch/SSE/commands/render | game-session composable + feature surfaces |
 | P1 | `CardStudioPanel.vue` около 489 строк смешивает form/polling/preview/render | split по independently testable responsibilities |
-| P1 | `main.css` около 638 строк смешивает reset, gameplay, cards и Studio | tokens/base + component-owned styles |
+| P1 | Legacy `main.css` смешивал reset, gameplay, cards и Studio | resolved by SCSS tokens/base/app-shell plus isolated Studio compatibility |
 | P1 | Hand/actions/public cards используют rails без полного keyboard/focus/affordance evidence | bounded rail contract или grid/stack |
 | P1 | Studio history selection передаётся только CSS class | `aria-current`/`aria-selected` по реальной semantic |
 | P1 | Global disabled style всегда показывает wait cursor, смешивая invalid и busy | отдельные disabled и pending contracts |

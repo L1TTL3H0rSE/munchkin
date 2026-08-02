@@ -1,0 +1,43 @@
+@use "./tokens" as tokens;
+
+@mixin at-most($name) {
+  @media (width <= #{tokens.breakpoint($name)}) {
+    @content;
+  }
+}
+
+@mixin from($name) {
+  @media (width >= #{tokens.breakpoint($name) + 1px}) {
+    @content;
+  }
+}
+
+@mixin focus-ring($color: var(--color-focus)) {
+  outline: 3px solid $color;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 1px var(--paper);
+}
+
+@mixin touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+@mixin safe-area-padding($top: 0px, $right: 0px, $bottom: 0px, $left: 0px) {
+  padding-top: calc(#{$top} + env(safe-area-inset-top, 0px));
+  padding-right: calc(#{$right} + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(#{$bottom} + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(#{$left} + env(safe-area-inset-left, 0px));
+}
+
+@mixin reduced-motion {
+  @media (prefers-reduced-motion: reduce) {
+    @content;
+  }
+}
+
+@mixin forced-colors {
+  @media (forced-colors: active) {
+    @content;
+  }
+}
