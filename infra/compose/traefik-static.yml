@@ -47,6 +47,3 @@ accessLog:
   fields:
     headers:
       defaultMode: drop
-
-metrics:
-  prometheus: {}

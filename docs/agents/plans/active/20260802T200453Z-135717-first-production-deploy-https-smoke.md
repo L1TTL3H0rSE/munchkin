@@ -21,6 +21,7 @@
   "schemaVersion": 1,
   "paths": [
     "compose.production.yml",
+    "infra/compose/traefik-static.yml",
     ".github/workflows/deploy-production.yml",
     "scripts/production/verify-release-evidence.sh",
     "docs/agents/plans/active/20260802T200453Z-135717-first-production-deploy-https-smoke.md",
@@ -122,6 +123,9 @@ public HTTPS и зафиксировать machine-readable release evidence б�
   override the game image entrypoint with `/app/migrate` for the one-shot
   `migrate` service, install that reviewed Compose file on the existing host,
   and remove only the orphaned healthy game-as-migrate container.
+- Exact Traefik bind-collision repair confirmed by the second live rollout:
+  remove the unused Prometheus block that creates a default `traefik` listener
+  on `:8080`, conflicting with the declared HTTP `web` entrypoint.
 - Lifecycle evidence in this plan, archive, local commit and push to `main`.
 
 ### Не входит
@@ -172,6 +176,7 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 |---|---|---|
 | `.github/workflows/deploy-production.yml` | write | Invoke verifier through Bash and install pinned Cosign v3.0.6 |
 | `compose.production.yml` | write | Make the migration service execute `/app/migrate` instead of `/app/game /app/migrate` |
+| `infra/compose/traefik-static.yml` | write | Remove unused Prometheus default listener that collides on port 8080 |
 | `scripts/production/verify-release-evidence.sh` | write | Verify exact manifest serialization and local bundle identity/digest |
 | `docs/agents/plans/active/20260802T200453Z-135717-first-production-deploy-https-smoke.md` | write | Active lifecycle плана |
 | `docs/agents/plans/archive/20260802T200453Z-135717-first-production-deploy-https-smoke.md` | write | Archived lifecycle плана |
@@ -306,6 +311,11 @@ public HTTPS и зафиксировать machine-readable release evidence б�
   `ENTRYPOINT [\"/app/game\"]`, so Compose `command: /app/migrate` appended an
   argument instead of selecting the one-shot binary. The SSH rollout was
   stopped; PostgreSQL data was not deleted or reset.
+- With the migration override installed, migration completed and PostgreSQL,
+  game and web became healthy. Traefik alone restarted with a sanitized error:
+  its implicit Prometheus `traefik` entrypoint and explicit `web` entrypoint
+  both attempted `:8080`. Repository search confirmed no Traefik metrics
+  scraper; application telemetry remains on the existing OTLP path.
 
 ## Итог
 
