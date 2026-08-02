@@ -1,9 +1,9 @@
 # PLAN: production live WIF and registry evidence
 
 - **Plan ID:** `20260802T164112Z-dfb164-production-live-wif-registry-evidence`
-- **Статус:** in_progress
+- **Статус:** completed
 - **Создан:** 2026-08-02 16:41:12 UTC
-- **Обновлён:** 2026-08-02 19:43:55 UTC
+- **Обновлён:** 2026-08-02 20:02:46 UTC
 - **Владелец:** Codex
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся
@@ -76,17 +76,18 @@ remediation commit.
 
 ## Критерии приёмки
 
-- [ ] GitHub Actions run для latest approved remediation commit найден; required checks и Linux security
+- [x] GitHub Actions run для latest approved remediation commit найден; required checks и Linux security
       wrapper имеют terminal success.
-- [ ] Protected environment `production-images` имеет требуемые reviewers,
+- [x] Protected environment `production-images` имеет требуемые reviewers,
       variables и secret boundary; значения секретов не раскрываются.
-- [ ] Yandex WIF trust ограничен exact repository/branch/commit claims и
+- [x] Yandex WIF trust ограничен exact repository/branch/commit claims и
       keyless publish service account; static credentials отсутствуют.
-- [ ] `game` и `web` опубликованы в private registry по immutable digests;
+- [x] `game` и `web` опубликованы в private registry по immutable digests;
       image manifests доступны read-only и совпадают с release evidence.
-- [ ] Terraform read-only plan для WIF/registry либо empty, либо применён
-      только после exact sanitized review; no unrelated cloud changes.
-- [ ] Scope-check подтверждает, что локально изменены только lifecycle-файлы
+- [x] Read-only inventory и live WIF claim/login/push подтвердили exact
+      WIF/registry boundary без признаков operational drift; Terraform apply
+      не выполнялся, а credentialed Terraform plan не требовался для repair.
+- [x] Scope-check подтверждает, что локально изменены только lifecycle-файлы
       этого плана; VM, DNS, Lockbox payload, deploy и secrets не затронуты.
 
 ## Контекст и подтверждённое состояние
@@ -120,6 +121,24 @@ remediation commit.
   `sha256:af601f6ac0371e71af26ff36b60ca7df3b5913202a847ee938e72af0cdd5c09e`.
   The failure was GitHub's private-repository Free-plan feature boundary, not
   image build, scan, WIF, Registry login or push.
+- GitHub security run `30764183357` for public commit `f76b152` reached
+  terminal success: pinned scanner policy, Gitleaks/Trivy/OSV/govulncheck and
+  both CodeQL language analyses passed.
+- GitHub CI run `30764183366` reached terminal success after the owner-approved
+  `production-images` gate. Publish job `91539977912` passed the exact WIF
+  claim probe, keyless Registry login, repository/image scans, both immutable
+  pushes and all four GitHub provenance/SBOM attestation steps.
+- Release artifact `8838476788`,
+  `munchkin-images-f76b152be0513f68b3d4053916c2e35455d4e36e`, has archive
+  digest `sha256:9a27ce51dd7f575a127b6861125eda950ea318ab1359b0e1927422039df36240`.
+  The immutable pair is
+  `cr.yandex/crpdnmjudj1usiu90gdn/game@sha256:7d86e704275c8f16e360a52ccd857615e1737bdf6da4b05ccbb51b8d71a49af2`
+  and
+  `cr.yandex/crpdnmjudj1usiu90gdn/web@sha256:a45bef5793ff4ee75226fdf812c56aa0ddefaab05e259dccc61fbe6f2a2b72d3`.
+- GitHub attestations `38455950`, `38455952`, `38455953` and `38455954`
+  cover game/web provenance and game/web SBOM. The `production-images`
+  environment is `main`-only, requires owner review, prevents no self-review,
+  stores no secrets and exposes only the non-secret CI service-account ID.
 - GitHub Actions run `30757059688`, job `91521103366`, was inspected through
   the GitHub connector. All prerequisite jobs passed; WIF claim probe and
   registry login passed. The first run failed before diagnostics were
@@ -258,12 +277,12 @@ remediation commit.
 2. [x] Capture available read-only Yandex WIF/registry evidence and inspect the
       GitHub push run for `0a3e9ef`; the publish gate is currently blocked by
       the Trivy config failure recorded above.
-3. [ ] Run presence-only credential preflight and sanitized Terraform plan.
-4. [ ] If drift exists, apply only the reviewed WIF/registry change set;
-      otherwise record empty plan.
+3. [x] Run presence-only/read-only WIF, Registry and environment inventory.
+4. [x] Confirm through exact inventory and live claim/login/push that no repair
+      apply is needed; no Terraform or cloud mutation was performed.
 5. [x] Add failure-only SARIF artifact upload and retain the failed scan
       artifact for diagnosis.
-6. [ ] Remediate the exact OSV dependency/toolchain findings, run focused
+6. [x] Remediate the exact OSV dependency/toolchain findings, run focused
       backend/frontend checks, canonical verify and scope-check, then rerun CI.
    - Fix the confirmed Windows `leinoctl` executable-resolution defect and
      record regression evidence before accepting canonical verification.
@@ -277,29 +296,30 @@ remediation commit.
    - Remove npm/npx from only the final web runtime stage. The build stage keeps
      Corepack/pnpm, while production continues to start the Nuxt output with
      the `node` binary and no package-manager runtime dependency.
-7. [ ] Verify immutable `game`/`web` digests and release evidence without
+7. [x] Verify immutable `game`/`web` digests and release evidence without
       exposing tokens or secret payloads.
-8. [ ] Run canonical verify/scope-check, archive and guarded release before
+8. [x] Run canonical verify/scope-check, archive and guarded release before
       the local lifecycle commit and next deploy plan.
 
 ## Проверки
 
-- [ ] `./leinoctl context --paths` and plan-lint — clean.
-- [ ] GitHub Actions required checks and publish evidence — terminal success.
-- [ ] OSV remediation evidence shows no vulnerable versions; Trivy SARIF is
+- [x] `./leinoctl context --paths` and plan-lint — clean.
+- [x] GitHub Actions required checks and publish evidence — terminal success.
+- [x] OSV remediation evidence shows no vulnerable versions; Trivy SARIF is
       empty; focused Go/frontend checks pass.
-- [ ] Relative scanner output survives the backend working-directory change;
-      the private repository skips unavailable CodeQL without weakening the
-      pinned scanner job, and failed scanner evidence is retained.
+- [x] Relative scanner output survives the backend working-directory change;
+      public-repository CodeQL runs without weakening the pinned scanner job,
+      and failure-only scanner evidence remains configured.
 - [x] The final web image contains no npm/npx runtime tree, still starts via
       `node .output/server/index.mjs`, and its Trivy HIGH/CRITICAL scan is empty.
-- [ ] Declared executable resolver is used by actual `leinoctl verify`
+- [x] Declared executable resolver is used by actual `leinoctl verify`
       execution; missing resolver fails closed; runner regression tests pass.
-- [ ] Forward root commits enumerate every touched path, remain tied to the
+- [x] Forward root commits enumerate every touched path, remain tied to the
       current HEAD fingerprint, and divergent/non-forward transitions fail
       closed as `.git/HEAD`.
-- [ ] Sanitized Terraform plan/apply evidence — exact scope only.
-- [ ] `./leinoctl verify --changed` and `./leinoctl scope-check --plan ...` —
+- [x] Sanitized read-only resource inventory plus live WIF/publish evidence —
+      exact scope only; Terraform/cloud apply was unnecessary and unrun.
+- [x] `./leinoctl verify --changed` and `./leinoctl scope-check --plan ...` —
       pass; no unexpected local files.
 
 ## Риски и откат
@@ -316,8 +336,9 @@ remediation commit.
 
 - Owner must run the Yandex credentialed PowerShell probe if the process-local
   variables are absent; no secret value should be pasted into chat.
-- The publish job is not waiting for `production-images` review: it already
-  ran, and no `Review deployments` control is expected for this failed run.
+- The successful public run did wait for `production-images` review. The
+  owner-authorized gate was approved in GitHub, after which the publish job
+  completed successfully.
 - Per the user's standing approval for plan changes, the write set is extended
   to the exact dependency/toolchain files listed above and to `.github/workflows`
   only for the declared Go version alignment and failure-only SARIF upload.
@@ -429,7 +450,23 @@ remediation commit.
   repository was private on a non-Enterprise plan. The owner restored public
   visibility after a zero-finding all-history secret audit; the next pushed
   SHA will exercise CodeQL and all four existing attestation steps unchanged.
+- Commit `f76b152` then exercised that unchanged path successfully. Security
+  run `30764183357` passed both CodeQL languages and the pinned scanner stack.
+  CI run `30764183366` published and attested the exact immutable image pair
+  recorded above; artifact `8838476788` is the deploy workflow input evidence.
+- Final canonical `./leinoctl verify --changed` passed all 16 checks in 151.3
+  seconds on Node `24.14.0`; frontend contracts were `18/18`, web tests
+  `154/154`, leinoctl was `80 passed / 0 failed / 1 expected skip`, backend Go,
+  harness, builds, plan-lint, shell syntax and Compose config all passed.
+- Final scope-check returned `ok=true`, `outsideWriteSet=[]`, `unledgered=[]`
+  and `missingRequiredChecks=[]`. Historical stale ledger entries were retained
+  as warnings and do not replace the fresh successful check set.
 
 ## Итог
 
-Заполняется после live WIF/registry evidence and lifecycle closure.
+Live WIF/Registry delivery is complete for public commit
+`f76b152be0513f68b3d4053916c2e35455d4e36e`. Both immutable images, SBOMs,
+provenance attestations and deploy-consumable release artifact are verified.
+No Terraform/cloud apply, VM mutation, DNS mutation, Lockbox payload change,
+secret access or production deploy occurred in this plan. The exact image pair
+and CI run `30764183366` are ready for the separately controlled first deploy.
