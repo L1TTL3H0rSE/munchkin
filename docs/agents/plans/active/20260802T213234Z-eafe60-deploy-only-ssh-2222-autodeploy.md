@@ -364,6 +364,12 @@ owner CIDR.
   approve `production-images` and `production-deploy`, verify exact release
   evidence/HTTPS, then complete/archive/release the plan and push the final
   lifecycle commit.
+- 2026-08-03: host-convergence checkpoint `5d3268b` was pushed to `main`.
+  Post-commit canonical verify passed all four required checks, including
+  Terraform provider/lock validation; scope-check passed for the full
+  fast-forward `aa0cda5..5d3268b` with no outside-write-set or unledgered
+  paths. Older sandbox-network failure/stale records remain informational and
+  are superseded by the fresh successful fingerprint.
 
 ## Итог
 
