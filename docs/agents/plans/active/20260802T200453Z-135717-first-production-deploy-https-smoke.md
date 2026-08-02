@@ -3,7 +3,7 @@
 - **Plan ID:** `20260802T200453Z-135717-first-production-deploy-https-smoke`
 - **Статус:** in_progress
 - **Создан:** 2026-08-02 20:04:53 UTC
-- **Обновлён:** 2026-08-02 20:30:09 UTC
+- **Обновлён:** 2026-08-02 20:48:34 UTC
 - **Владелец:** Codex
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся
@@ -20,6 +20,7 @@
 {
   "schemaVersion": 1,
   "paths": [
+    "compose.production.yml",
     ".github/workflows/deploy-production.yml",
     "scripts/production/verify-release-evidence.sh",
     "docs/agents/plans/active/20260802T200453Z-135717-first-production-deploy-https-smoke.md",
@@ -39,6 +40,10 @@
     "cloud:yandex-container-registry:crpdnmjudj1usiu90gdn",
     "dns:munchkin.l1ttl3h0rse.ru",
     "host:/srv/munchkin",
+    "host:/srv/munchkin/secrets/postgres.env",
+    "host:/srv/munchkin/secrets/game.env",
+    "host:/srv/munchkin/secrets/traefik.env",
+    "host:/srv/munchkin/traefik/acme/acme.json",
     "delivery:production-deploy-lock"
   ]
 }
@@ -105,6 +110,18 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 - Exact registry-free attestation fix confirmed by run `30765399436`: install
   pinned Cosign v3.0.6 and verify each local Sigstore bundle against the exact
   image digest plus GitHub workflow identity/ref/SHA before SSH.
+- Emergency transport fallback after run `30765986050` proved GitHub-hosted
+  runner port 22 is filtered: from the already allowlisted owner workstation,
+  invoke only `/usr/local/sbin/munchkin-deploy-allowlist deploy` through
+  non-interactive `munchkin-admin` sudo with the same exact release arguments.
+- Approved owner-side secret insertion: generate a random 256-bit PostgreSQL
+  password inside the VM process without output, atomically write the password
+  and derived DSN to root-owned mode-0600 files, and write the owner-provided
+  ACME email plus the production Let's Encrypt directory to `traefik.env`.
+- Exact migration entrypoint repair confirmed by the first live rollout:
+  override the game image entrypoint with `/app/migrate` for the one-shot
+  `migrate` service, install that reviewed Compose file on the existing host,
+  and remove only the orphaned healthy game-as-migrate container.
 - Lifecycle evidence in this plan, archive, local commit and push to `main`.
 
 ### Не входит
@@ -118,7 +135,11 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 - Terraform apply, Yandex resource mutation, DNS/NS edit, firewall change,
   Registry delete/retag/push, GitHub settings/environment/secret mutation.
 - Reading, printing or rotating SSH/application/ACME/Lockbox secret values.
-- Ad-hoc admin SSH or direct Docker/Compose commands outside the workflow.
+- Lockbox payload mutation or exporting the generated database password from
+  the VM; this rollout inserts only the approved root-owned runtime files.
+- Interactive admin SSH, direct Docker/Compose commands, arbitrary root shell
+  commands or any remote operation except the exact root-owned deploy
+  allowlist invocation from the already permitted owner source address.
 - Rollback or destructive cleanup; a failed rollout stops for diagnosis.
 
 ## Архитектурный подход
@@ -127,6 +148,9 @@ public HTTPS и зафиксировать machine-readable release evidence б�
   including registry-free cryptographic Sigstore bundle verification with
   pinned Cosign, protected SSH material second, then one forced-command host
   operation.
+- If the GitHub runner cannot reach port 22, preserve the same root-owned
+  allowlist and immutable arguments while changing only the network origin to
+  the already allowlisted owner workstation; do not widen the firewall.
 - Trust only immutable digest refs and the exact public commit/run pair.
 - Treat workflow `success` plus host evidence and independent public HTTPS
   checks as completion; no UI inference substitutes for recorded evidence.
@@ -147,6 +171,7 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 | Путь/ресурс | Режим | Причина |
 |---|---|---|
 | `.github/workflows/deploy-production.yml` | write | Invoke verifier through Bash and install pinned Cosign v3.0.6 |
+| `compose.production.yml` | write | Make the migration service execute `/app/migrate` instead of `/app/game /app/migrate` |
 | `scripts/production/verify-release-evidence.sh` | write | Verify exact manifest serialization and local bundle identity/digest |
 | `docs/agents/plans/active/20260802T200453Z-135717-first-production-deploy-https-smoke.md` | write | Active lifecycle плана |
 | `docs/agents/plans/archive/20260802T200453Z-135717-first-production-deploy-https-smoke.md` | write | Archived lifecycle плана |
@@ -266,6 +291,21 @@ public HTTPS и зафиксировать machine-readable release evidence б�
   workflow identity/name, main ref, push trigger and release SHA.
 - All four real release bundles passed that Cosign policy locally without
   Registry credentials; a tampered game digest was rejected.
+- Deploy run `30765986050`, job `91544686951`, passed every release gate and
+  then timed out twice connecting to VM port 22. No remote deploy command ran;
+  cleanup/evidence upload succeeded. Read-only local SSH reached the existing
+  root allowlist and returned `no current release evidence is available`,
+  confirming both the filtered GitHub transport and the owner fallback path.
+- Owner confirmed there was no previously agreed database password and
+  explicitly approved process-local random secret insertion with
+  `ACME_EMAIL=shelovek002@gmail.com` and production Let's Encrypt. Presence-only
+  checks found all four required keys missing; no values were read or logged.
+- The first post-secret rollout started PostgreSQL successfully, then remained
+  inside migration. A read-only container listing proved the `migrate` service
+  was healthy and running `/app/game /app/migrate`; the image Dockerfile has
+  `ENTRYPOINT [\"/app/game\"]`, so Compose `command: /app/migrate` appended an
+  argument instead of selecting the one-shot binary. The SSH rollout was
+  stopped; PostgreSQL data was not deleted or reset.
 
 ## Итог
 
