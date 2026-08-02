@@ -28,6 +28,7 @@ import {
   createVersionedResync,
   normalizeGameApiError,
   safeGameApiMessage,
+  type GameApiErrorKind,
   type GameCommandOptions,
   type GameRequestOptions,
 } from "./useGameApi";
@@ -159,6 +160,7 @@ export function createGameSessionController(
   const actionBusyState = ref(false);
   const interactionBusyState = ref(false);
   const errorMessageState = ref("");
+  const errorKindState = ref<GameApiErrorKind | null>(null);
   const interactionErrorState = ref("");
   const connectionState = ref<GameConnectionState>("connecting");
 
@@ -186,6 +188,16 @@ export function createGameSessionController(
 
   function isCurrent(owner: number): boolean {
     return !isStopped && lifecycle === owner;
+  }
+
+  function clearConnectionError(): void {
+    errorMessageState.value = "";
+    errorKindState.value = null;
+  }
+
+  function setConnectionError(error: GameApiError): void {
+    errorMessageState.value = error.message;
+    errorKindState.value = error.kind;
   }
 
   function createSessionResync(owner: number) {
@@ -246,7 +258,7 @@ export function createGameSessionController(
     loadingState.value = true;
     actionBusyState.value = false;
     interactionBusyState.value = false;
-    errorMessageState.value = "";
+    clearConnectionError();
     interactionErrorState.value = "";
     connectionState.value = "connecting";
     reconnectAttempts = 0;
@@ -370,7 +382,7 @@ export function createGameSessionController(
         return;
       case "offline":
       case "transient":
-        errorMessageState.value = error.message;
+        setConnectionError(error);
         scheduleRecovery(owner);
         return;
       case "not_found":
@@ -407,7 +419,7 @@ export function createGameSessionController(
     if (!isCurrent(owner)) {
       return;
     }
-    errorMessageState.value = error.message;
+    setConnectionError(error);
     connectionState.value = "failed";
   }
 
@@ -421,6 +433,7 @@ export function createGameSessionController(
       connectionState.value = "failed";
       errorMessageState.value =
         "Автоматическое восстановление остановлено. Повторите вручную.";
+      errorKindState.value = "transient";
       return;
     }
 
@@ -449,7 +462,7 @@ export function createGameSessionController(
       if (!isCurrent(owner)) {
         return;
       }
-      errorMessageState.value = "";
+      clearConnectionError();
       connect(owner);
     } catch (error) {
       if (!isCurrent(owner)) {
@@ -463,7 +476,7 @@ export function createGameSessionController(
         normalized.kind === "offline" ||
         normalized.kind === "transient"
       ) {
-        errorMessageState.value = normalized.message;
+        setConnectionError(normalized);
         scheduleRecovery(owner);
       } else {
         finishTerminalFailure(normalized, owner);
@@ -480,7 +493,7 @@ export function createGameSessionController(
     try {
       await resyncController.request();
       if (isCurrent(owner)) {
-        errorMessageState.value = "";
+        clearConnectionError();
         if (stopStream) {
           connectionState.value = "connected";
         } else {
@@ -499,7 +512,7 @@ export function createGameSessionController(
         normalized.kind === "offline" ||
         normalized.kind === "transient"
       ) {
-        errorMessageState.value = normalized.message;
+        setConnectionError(normalized);
         scheduleRecovery(owner);
       } else {
         finishTerminalFailure(normalized, owner);
@@ -514,7 +527,7 @@ export function createGameSessionController(
     }
     clearReconnectTimer();
     reconnectAttempts = 0;
-    errorMessageState.value = "";
+    clearConnectionError();
     void recoverConnection(owner);
   }
 
@@ -537,7 +550,7 @@ export function createGameSessionController(
     const commandID = createCommandID();
     pendingCommand = {commandID, lifecycle: owner};
     actionBusyState.value = true;
-    errorMessageState.value = "";
+    clearConnectionError();
 
     const execute = () => withRequest(
       owner,
@@ -613,7 +626,10 @@ export function createGameSessionController(
 
     if (request.kind === "charity" && request.interactionID &&
       current.interaction?.interaction_id !== request.interactionID) {
-      errorMessageState.value = safeGameApiMessage("stale_version");
+      setConnectionError(new GameApiError(
+        "stale_version",
+        safeGameApiMessage("stale_version"),
+      ));
       connectionState.value = "resyncing";
       await resyncController.request().catch((error: unknown) => {
         reportDiagnostic(normalizeGameApiError(error));
@@ -631,7 +647,10 @@ export function createGameSessionController(
         candidate.ability_index === request.action.ability_index,
       );
       if (!liveAction) {
-        errorMessageState.value = safeGameApiMessage("stale_version");
+        setConnectionError(new GameApiError(
+          "stale_version",
+          safeGameApiMessage("stale_version"),
+        ));
         connectionState.value = "resyncing";
         await resyncController.request().catch((error: unknown) => {
           reportDiagnostic(normalizeGameApiError(error));
@@ -646,7 +665,7 @@ export function createGameSessionController(
     const commandID = createCommandID();
     pendingCommand = {commandID, lifecycle: owner};
     actionBusyState.value = true;
-    errorMessageState.value = "";
+    clearConnectionError();
 
     const execute = () => withRequest(
       owner,
@@ -716,7 +735,7 @@ export function createGameSessionController(
       if (!visible || result.projection.version >= visible.version) {
         projectionState.value = result.projection;
       }
-      errorMessageState.value = "";
+      clearConnectionError();
     } catch (error) {
       if (!isCurrent(owner)) {
         return;
@@ -738,6 +757,7 @@ export function createGameSessionController(
     owner: number,
   ): Promise<void> {
     reportDiagnostic(error);
+    setConnectionError(error);
     switch (error.kind) {
       case "aborted":
         return;
@@ -771,19 +791,17 @@ export function createGameSessionController(
         return;
       case "offline":
       case "transient":
-        errorMessageState.value = error.message;
         scheduleRecovery(owner);
         return;
       case "protocol":
         stopActiveStream();
         connectionState.value = "failed";
-        errorMessageState.value = error.message;
         return;
       case "validation":
       case "conflict":
       case "not_found":
       case "unexpected":
-        errorMessageState.value = error.message;
+        return;
     }
   }
 
@@ -959,6 +977,7 @@ export function createGameSessionController(
     }
     loadingState.value = false;
     reportDiagnostic(error);
+    setConnectionError(error);
     if (error.kind === "auth") {
       finishTerminalAuth(owner);
     } else if (
@@ -986,6 +1005,7 @@ export function createGameSessionController(
     pendingInteraction = undefined;
     connectionState.value = "failed";
     errorMessageState.value = safeGameApiMessage("auth");
+    errorKindState.value = "auth";
     interactionErrorState.value = "";
     try {
       options.credentials.clearCurrentGame(gameID);
@@ -1009,7 +1029,7 @@ export function createGameSessionController(
     clearReconnectTimer();
     loadingState.value = false;
     connectionState.value = "failed";
-    errorMessageState.value = error.message;
+    setConnectionError(error);
   }
 
   function reportDiagnostic(error: GameApiError): void {
@@ -1062,6 +1082,7 @@ export function createGameSessionController(
     actionBusy: readonly(actionBusyState),
     interactionBusy: readonly(interactionBusyState),
     errorMessage: readonly(errorMessageState),
+    errorKind: readonly(errorKindState),
     interactionError: readonly(interactionErrorState),
     connectionState: readonly(connectionState),
     isBusy: computed(() =>

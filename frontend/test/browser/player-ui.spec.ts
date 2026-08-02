@@ -34,6 +34,33 @@ test("media preferences preserve motion and focus policy", async ({page}) => {
   await assertMediaPreferences(page);
 });
 
+test("finished projection uses a terminal surface and closes stale actions", async ({page}) => {
+  const fixture = await openFixtureAtViewport(page, "single-finished", 1440, 900);
+  const presenter = await activePresenter(page);
+  const surface = presenter.locator(".system-state-surface[data-state='victory']");
+
+  await expect(surface).toBeVisible();
+  await expect(surface).toContainText("Победа подтверждена");
+  await expect(surface).toContainText(fixture.projection.you.name);
+  await expect(surface.locator("a[href='/']")).toContainText("Вернуться в лобби");
+  await expect(page.locator(".action-dock")).toHaveCount(0);
+  await expect(page.locator(".interaction-surface")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText("Состояние игры недоступно");
+  await expect(page.locator("body")).not.toContainText("Waiting Status Hint");
+});
+
+test("observer waiting state stays contextual and keeps the confirmed table visible", async ({page}) => {
+  await openFixtureAtViewport(page, "stale-projection", 1440, 900);
+
+  const presenter = await activePresenter(page, "desktop");
+  const waiting = presenter.locator(".desktop-game-table__waiting");
+  await expect(waiting).toBeVisible();
+  await expect(waiting).toContainText("Ожидаем подтверждённый ход другого игрока.");
+  await expect(presenter.locator(".desktop-encounter-stage")).toBeVisible();
+  await expect(presenter.locator(".action-dock")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText("Последнее состояние осталось на экране");
+});
+
 test("card action rail exposes labeled close and removes contextual state", async ({page}) => {
   const fixture = await openFixture(page, "card-action-rail");
   const presenter = await activePresenter(page);
@@ -48,6 +75,11 @@ test("card action rail exposes labeled close and removes contextual state", asyn
   const activate = presenter.locator(".game-card__activate").first();
   await activate.click();
   await expect(presenter.locator(".action-dock__close")).toBeVisible();
+  const openSheet = page.locator(".sheet-dialog[open]");
+  if (await openSheet.count()) {
+    await openSheet.locator(".sheet-dialog__close").click();
+    await expect(openSheet).toHaveCount(0);
+  }
   await presenter.locator(".action-dock__close").click();
   await expect(presenter.locator(".action-dock__close")).toHaveCount(0);
   await expect(presenter.locator(".action-dock")).toHaveCount(0);

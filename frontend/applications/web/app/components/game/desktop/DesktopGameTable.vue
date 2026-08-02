@@ -5,6 +5,7 @@ import type {
   Projection,
 } from "@munchkin/contracts";
 import type {GameConnectionState} from "../../../composables/useGameSessionController";
+import type {GameApiErrorKind} from "../../../composables/useGameApi";
 import type {
   ActionEntry,
   CardActionBinding,
@@ -22,10 +23,12 @@ import DesktopGameHeader from "./DesktopGameHeader.vue";
 import {desktopStateFamily} from "./desktopGameModel";
 import OpponentRoster from "../OpponentRoster.vue";
 import OwnBoard from "../OwnBoard.vue";
+import SystemStateSurface from "../status/SystemStateSurface.vue";
 
 const props = defineProps<{
   projection: Projection;
   connectionState: GameConnectionState;
+  errorKind: GameApiErrorKind | null;
   errorMessage: string;
   actionBusy: boolean;
   isBusy: boolean;
@@ -66,72 +69,73 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
     :aria-busy="isBusy"
     aria-label="Игровой стол для desktop и tablet"
   >
-    <DesktopGameHeader :projection="projection" />
+    <SystemStateSurface
+      v-if="projection.status === 'finished'"
+      kind="victory"
+      :projection="projection"
+    />
+    <template v-else>
+      <DesktopGameHeader :projection="projection" />
 
-    <div v-if="connectionState !== 'connected'" class="desktop-game-table__connection">
-      <GameConnectionStatus
-        :state="connectionState"
-        :error-message="errorMessage"
-        @retry="emit('retry')"
-      />
-    </div>
-
-    <OpponentRoster :projection="projection" />
-
-    <div class="desktop-game-table__main">
-      <DesktopEncounterStage :projection="projection" />
-
-      <aside class="desktop-game-table__side" aria-label="Сводка игрока и контекстные действия">
-        <OwnBoard
-          :projection="projection"
-          :bindings-for-card="bindingsForCard"
-          :state-for-card="stateForCard"
-          :confirmed-card-ids="confirmedCardIds"
-          @activate="emit('activate', $event)"
+      <div v-if="connectionState !== 'connected'" class="desktop-game-table__connection">
+        <GameConnectionStatus
+          :state="connectionState"
+          :error-kind="errorKind"
+          :error-message="errorMessage"
+          :has-projection="true"
+          @retry="emit('retry')"
         />
+      </div>
 
-        <section
-          v-if="economyEntries.length || showActionDock"
-          class="desktop-game-table__actions"
-          aria-label="Контекстные действия текущей проекции"
-        >
-          <EconomySurface
-            v-if="economyEntries.length"
+      <OpponentRoster :projection="projection" />
+
+      <div class="desktop-game-table__main">
+        <DesktopEncounterStage :projection="projection" />
+
+        <aside class="desktop-game-table__side" aria-label="Сводка игрока и контекстные действия">
+          <OwnBoard
             :projection="projection"
-            :actions="economyEntries"
-            :busy="actionBusy"
-            @submit="emit('execute-economy', $event)"
+            :bindings-for-card="bindingsForCard"
+            :state-for-card="stateForCard"
+            :confirmed-card-ids="confirmedCardIds"
+            @activate="emit('activate', $event)"
           />
 
-          <ActionPanel
-            v-if="showActionDock"
-            :entries="actionPanelEntries"
-            :cards="visibleCards"
-            :player-names="playerNames"
-            :busy="actionBusy"
-            :context-card-name="contextCardName"
-            @close="emit('close')"
-            @execute="runAction"
-          />
-        </section>
+          <section
+            v-if="economyEntries.length || showActionDock"
+            class="desktop-game-table__actions"
+            aria-label="Контекстные действия текущей проекции"
+          >
+            <EconomySurface
+              v-if="economyEntries.length"
+              :projection="projection"
+              :actions="economyEntries"
+              :busy="actionBusy"
+              @submit="emit('execute-economy', $event)"
+            />
 
-        <p
-          v-if="projection.status === 'active' && !economyEntries.length && !showActionDock"
-          class="desktop-game-table__waiting"
-          role="status"
-        >
-          Ход подтверждён за {{ projection.turn.player_id === projection.you.player_id
-            ? "сервером"
-            : "другим игроком" }}. Сохраняем последнюю проекцию.
-        </p>
-        <strong v-if="projection.status === 'finished'" class="desktop-game-table__result">
-          Победитель: {{ projection.winner_player_id === projection.you.player_id
-            ? projection.you.name
-            : projection.players.find((player) => player.player_id === projection.winner_player_id)?.name
-              ?? "игра завершена" }}
-        </strong>
-      </aside>
-    </div>
+            <ActionPanel
+              v-if="showActionDock"
+              :entries="actionPanelEntries"
+              :cards="visibleCards"
+              :player-names="playerNames"
+              :busy="actionBusy"
+              :context-card-name="contextCardName"
+              @close="emit('close')"
+              @execute="runAction"
+            />
+          </section>
+
+          <p
+            v-if="projection.status === 'active' && !economyEntries.length && !showActionDock"
+            class="desktop-game-table__waiting"
+            role="status"
+          >
+            Ожидаем подтверждённый ход другого игрока.
+          </p>
+        </aside>
+      </div>
+    </template>
   </section>
 </template>
 
