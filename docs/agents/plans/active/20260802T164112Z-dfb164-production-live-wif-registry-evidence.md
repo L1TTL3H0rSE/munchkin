@@ -3,7 +3,7 @@
 - **Plan ID:** `20260802T164112Z-dfb164-production-live-wif-registry-evidence`
 - **Статус:** in_progress
 - **Создан:** 2026-08-02 16:41:12 UTC
-- **Обновлён:** 2026-08-02 19:21:56 UTC
+- **Обновлён:** 2026-08-02 19:43:55 UTC
 - **Владелец:** Codex
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся
@@ -92,9 +92,10 @@ remediation commit.
 ## Контекст и подтверждённое состояние
 
 - Security remediation commit `0a3e9ef` pushed to `origin/main`.
-- GitHub connector can read repository metadata and the owner-provided private
-  Actions run URL. The public Actions API and unauthenticated browser cannot
-  inspect this private repository.
+- GitHub connector confirms repository visibility is `public` after the owner
+  restored the project's previously intended public mode on 2026-08-02. A
+  Gitleaks `8.30.1` `git --log-opts=--all --redact=100` audit scanned all 88
+  commits and found zero leaks before the visibility change.
 - Current process has no `YC_TOKEN`/AWS/TF_VAR credentials; owner-managed
   credentialed PowerShell is required for Terraform/Yandex read-only evidence.
 - Foundation/WIF source and prior implementation are archived in
@@ -112,8 +113,13 @@ remediation commit.
 - Registry bindings are exact: CI service account has
   `container-registry.images.pusher`; runtime service account has
   `container-registry.images.puller`. Repositories `game` and `web` exist.
-- Current registry images are tagged only with old commit `6b461eb...`; no
-  digest for `0a3e9ef` has been observed yet.
+- CI run `30763382278` published the clean `f730acf` image pair before its
+  post-publish GitHub attestation step failed: game digest
+  `sha256:9384db2bae3179da39dc72c0feaa8964f5780e210b89162cc4936b2f5eee3fc8`
+  and web digest
+  `sha256:af601f6ac0371e71af26ff36b60ca7df3b5913202a847ee938e72af0cdd5c09e`.
+  The failure was GitHub's private-repository Free-plan feature boundary, not
+  image build, scan, WIF, Registry login or push.
 - GitHub Actions run `30757059688`, job `91521103366`, was inspected through
   the GitHub connector. All prerequisite jobs passed; WIF claim probe and
   registry login passed. The first run failed before diagnostics were
@@ -330,6 +336,11 @@ remediation commit.
   HIGH/CRITICAL findings exclusively under the base image's bundled npm tree,
   owner explicitly approved expanding the same plan to `frontend/Dockerfile`
   and removing npm/npx from only the production runtime stage.
+- 2026-08-02 19:43 UTC: after the full 88-commit history audit returned zero
+  leaks, the owner changed `L1TTL3H0rSE/munchkin` from private to public so the
+  existing fail-closed CodeQL and GitHub Artifact Attestation jobs can use the
+  repository's free public-project entitlement. No workflow weakening or paid
+  service is introduced.
 
 ## Согласование
 
@@ -412,6 +423,12 @@ remediation commit.
   the container retained its Nuxt entrypoint and started with Node `v24.18.1`.
   Trivy `0.70.0` then reported zero HIGH/CRITICAL findings for Alpine and every
   detected Node package. The pushed Linux workflow remains authoritative.
+- Commit `f730acf` passed the public-image build, full repository/image scanner,
+  WIF claim probe, Registry login and both immutable pushes in CI run
+  `30763382278`. GitHub then rejected `Attest game provenance` only because the
+  repository was private on a non-Enterprise plan. The owner restored public
+  visibility after a zero-finding all-history secret audit; the next pushed
+  SHA will exercise CodeQL and all four existing attestation steps unchanged.
 
 ## Итог
 
