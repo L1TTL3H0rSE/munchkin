@@ -1,7 +1,7 @@
 # PLAN: deploy-only SSH 2222 autodeploy
 
 - **Plan ID:** `20260802T213234Z-eafe60-deploy-only-ssh-2222-autodeploy`
-- **Статус:** in_progress
+- **Статус:** completed
 - **Создан:** 2026-08-02 21:32:34 UTC
 - **Обновлён:** 2026-08-02 21:43:20 UTC
 - **Владелец:** Codex
@@ -69,27 +69,27 @@ owner CIDR.
 
 ## Критерии приёмки
 
-- [ ] Yandex security group и UFW сохраняют TCP `22` только для
+- [x] Yandex security group и UFW сохраняют TCP `22` только для
       `ssh_ingress_cidrs`, а TCP `2222` публикуют в IPv4 Internet только как
       deploy transport; `80/443` и остальные port invariants не меняются.
-- [ ] OpenSSH на `2222` допускает только `munchkin-deploy` с public-key auth и
+- [x] OpenSSH на `2222` допускает только `munchkin-deploy` с public-key auth и
       forced command; admin/root/password/interactive shell/PTY/agent, TCP,
       X11 and tunnel forwarding fail closed. Existing owner SSH on `22`
       продолжает работать.
-- [ ] Host configuration is idempotent and validates `sshd -t` before reload;
+- [x] Host configuration is idempotent and validates `sshd -t` before reload;
       failure leaves the existing port-22 owner path available.
-- [ ] `deploy-production` remains manual-dispatch capable, additionally
+- [x] `deploy-production` remains manual-dispatch capable, additionally
       supports a reusable call, connects on port `2222` and reuses the already
       pinned host key through `HostKeyAlias`; no SSH secret value is read or
       replaced.
-- [ ] Successful `publish` on `main` passes its exact digest pair, full SHA and
+- [x] Successful `publish` on `main` passes its exact digest pair, full SHA and
       current CI run ID to the reusable deploy workflow. Current
       `production-images`/`production-deploy` environment approvals remain
       unchanged and still gate access to protected values.
-- [ ] GitHub-hosted live run passes release/SBOM/attestation verification,
+- [x] GitHub-hosted live run passes release/SBOM/attestation verification,
       SSH deploy, host evidence upload and public HTTPS smoke for the exact
       immutable pair.
-- [ ] No application source, DNS, Lockbox payload, PostgreSQL data/credential,
+- [x] No application source, DNS, Lockbox payload, PostgreSQL data/credential,
       Registry retention/content outside the normal immutable publish, or
       GitHub environment protection setting changes; canonical scope clean.
 
@@ -243,13 +243,14 @@ owner CIDR.
       Terraform plan remains preferred when backend credentials are restored;
       otherwise the exact additive `yc update-rules --add-rule` fallback must
       be named explicitly in the approval.
-6. [ ] Restore the existing-host UFW baseline, install/reload the validated
+6. [x] Restore the existing-host UFW baseline, install/reload the validated
       host config, prove a second owner TCP-22 connection, then add only SG TCP
       `2222` and prove deploy-only negative/positive paths.
-7. [ ] Complete the waiting/new image publication approval, allow the automatic
+7. [x] Complete the waiting/new image publication approval, allow the automatic
       deploy handoff, inspect terminal workflow/evidence and verify public TLS.
-8. [ ] Record results, final verify/scope-check, archive/release, commit and
-      push to `main` under the owner's existing publication instruction.
+8. [x] Record terminal results and archive the completed plan for final
+      canonical verify, scope-check and guarded release. Commit/push follow the
+      release under the owner's existing publication instruction.
 
 ## Проверки
 
@@ -262,9 +263,9 @@ owner CIDR.
 - [x] Sanitized saved `terraform plan`, or separately approved additive `yc`
       fallback: exact one SG ingress addition, no replace/destroy/delete or
       unrelated cloud change.
-- [ ] Live `sshd -t`, UFW/listener audit, owner SSH 22 continuity and GitHub
+- [x] Live `sshd -t`, UFW/listener audit, owner SSH 22 continuity and GitHub
       hosted-runner deploy on 2222.
-- [ ] Host release evidence and external DNS/TLS `/` + `/health/live` smoke.
+- [x] Host release evidence and external DNS/TLS `/` + `/health/live` smoke.
 - [x] `./leinoctl verify --changed`
 - [x] `./leinoctl scope-check --plan 20260802T213234Z-eafe60-deploy-only-ssh-2222-autodeploy`
 - [x] `git diff --check`
@@ -360,17 +361,35 @@ owner CIDR.
   is complete; the remaining positive deploy-user proof comes from the
   GitHub-hosted automatic deploy after environment approvals.
 - **Continuation checkpoint:** commit `4711557` is already on `origin/main`.
-  Continue with post-commit canonical verify/scope-check, inspect the CI run,
-  approve `production-images` and `production-deploy`, verify exact release
-  evidence/HTTPS, then complete/archive/release the plan and push the final
-  lifecycle commit.
+  Its post-commit verification and production-host convergence evidence were
+  subsequently recorded in commits `5d3268b` and `2808aa7`.
 - 2026-08-03: host-convergence checkpoint `5d3268b` was pushed to `main`.
   Post-commit canonical verify passed all four required checks, including
   Terraform provider/lock validation; scope-check passed for the full
   fast-forward `aa0cda5..5d3268b` with no outside-write-set or unledgered
   paths. Older sandbox-network failure/stale records remain informational and
   are superseded by the fresh successful fingerprint.
+- 2026-08-03: owner approved the `production-images` gate for Munchkin CI run
+  `30770318611`; security run `30770318460`, publish job `91556350089` and the
+  automatic reusable deploy job `91556671595` all completed successfully. No
+  second reviewer click was required for `production-deploy`, and no GitHub
+  environment setting was changed.
+- 2026-08-03: production release evidence reports `success` for commit
+  `2808aa7baa100cb51e4a6a614e875b76548ae264`, run `30770318611`, attempt `1`,
+  completed at `2026-08-02T22:37:30Z`. Migration, readiness and smoke all
+  passed for immutable images
+  `game@sha256:e687d866f47ee037475bebb99ae8cc84cc9d42e2dd14f6fec1c3372efde6a3c0`
+  and `web@sha256:77494ce6912d097d54033035acbe02c735135e8eb536e6765a22f5a6611f4b14`.
+- 2026-08-03: public HTTPS `/` returned `200` and `/health/live` returned
+  `{"status":"ok"}` after the deploy. GitHub retained artifacts
+  `production-release-evidence-30770318611-1` (ID `8840356100`) and
+  `munchkin-images-2808aa7baa100cb51e4a6a614e875b76548ae264`
+  (ID `8840346827`).
 
 ## Итог
 
-Заполняется после реализации.
+Deploy-only SSH transport on public TCP `2222` is active with owner SSH kept
+restricted on TCP `22`. The exact immutable image pair published by CI was
+automatically deployed to production, all release gates and public HTTPS
+smoke passed, and no excluded cloud, secret, data or GitHub-setting mutation
+was made.
