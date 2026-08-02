@@ -107,7 +107,8 @@ if [[ -n "$source_root" ]]; then
     scripts/production/deploy.sh \
     scripts/production/rollback.sh \
     scripts/production/status.sh \
-    scripts/production/smoke.sh; do
+    scripts/production/smoke.sh \
+    scripts/production/configure-deploy-ssh.sh; do
     [[ -f "$source_root/$source_file" ]] || {
       echo "source artifact is missing: $source_file" >&2
       exit 66
@@ -120,6 +121,9 @@ if [[ -n "$source_root" ]]; then
   for script_name in deploy rollback status smoke; do
     install -m 0750 -o root -g root "$source_root/scripts/production/$script_name.sh" "$script_dir/$script_name.sh"
   done
+  install -m 0750 -o root -g root \
+    "$source_root/scripts/production/configure-deploy-ssh.sh" \
+    "$script_dir/configure-deploy-ssh.sh"
 fi
 
 [[ -f "$compose_dir/compose.production.yml" ]] || {
@@ -188,6 +192,10 @@ if [[ -n "$source_root" && -f "$source_root/scripts/production/systemd/munchkin-
     /etc/systemd/system/munchkin-compose.service
   systemctl daemon-reload
   systemctl enable munchkin-compose.service
+fi
+
+if [[ -x "$script_dir/configure-deploy-ssh.sh" ]]; then
+  "$script_dir/configure-deploy-ssh.sh"
 fi
 
 echo "production host boundary prepared"

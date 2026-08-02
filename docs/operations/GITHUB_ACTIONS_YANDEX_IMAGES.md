@@ -10,7 +10,11 @@ The workflow in `.github/workflows/ci.yml` runs the repository verification DAG
 for pull requests and `main` pushes. Only its `publish` job can request a
 GitHub OIDC token. It requires all verification jobs, `refs/heads/main`, and
 either a `push` event or an explicitly confirmed `workflow_dispatch` input.
-The job uses the protected GitHub environment `production-images`.
+The job uses the protected GitHub environment `production-images`. After a
+successful publication it passes the exact digest-pinned pair, full commit SHA
+and the current run ID to the reusable `deploy-production` workflow. That
+workflow remains protected by `production-deploy`; neither environment's
+manual approval or branch protection is changed by repository code.
 
 The expected immutable GitHub OIDC claims are:
 
@@ -43,6 +47,12 @@ manifest contains digest-pinned `image@sha256:...` references and no token.
 There is no `latest` tag, tag overwrite, cleanup, scanner or registry cache
 policy in this slice.
 
+`deploy-production.yml` remains available through `workflow_dispatch` for a
+reviewed recovery or replay. The normal `main` path calls it automatically
+only after `publish` succeeds. The deploy job still waits for the existing
+GitHub environment approval and independently re-verifies the same-run
+manifest, SBOM and keyless attestations before opening SSH transport.
+
 ## Owner setup gates
 
 1. Configure the GitHub environment `production-images` as protected and
@@ -72,6 +82,9 @@ policy in this slice.
 7. Enable the first trusted `main` publication only after the protected
    environment and both live Terraform graphs are verified. Preserve the
    uploaded digest-pair artifact as the handoff to the deploy plan.
+8. Keep the `production-deploy` environment approval enabled. The reusable
+   call reaches the host only on deploy-only TCP `2222`; owner/admin TCP `22`
+   remains outside the GitHub-hosted runner path.
 
 ## Local checks
 
@@ -135,5 +148,7 @@ GitHub variables, artifacts, summaries, caches or repository files.
 - zero CI service-account keys/authorized keys and no state access;
 - successful masked WIF exchange and registry login;
 - two full-SHA image references, two remote digests and the pair manifest;
+- automatic same-run handoff waits at the protected deploy environment and
+  uses those exact references rather than tags;
 - OCI source/revision/created/licenses labels on both images;
 - no `latest`, tag overwrite, image deletion or cleanup mutation.

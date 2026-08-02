@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: munchkin-ci-${{ github.ref }}
@@ -180,6 +181,9 @@ jobs:
       id-token: write
       attestations: write
       artifact-metadata: write
+    outputs:
+      game_image: ${{ steps.publish-images.outputs.game_image }}
+      web_image: ${{ steps.publish-images.outputs.web_image }}
     concurrency:
       group: munchkin-image-publication
       cancel-in-progress: false
@@ -281,6 +285,8 @@ jobs:
           {
             printf 'game_digest=%s\n' "$game_digest"
             printf 'web_digest=%s\n' "$web_digest"
+            printf 'game_image=%s\n' "${REGISTRY}/game@${game_digest}"
+            printf 'web_image=%s\n' "${REGISTRY}/web@${web_digest}"
           } >>"$GITHUB_OUTPUT"
           mkdir -p release
           jq -n \
@@ -361,3 +367,20 @@ jobs:
           path: release
           if-no-files-found: error
           retention-days: 14
+
+  deploy-production:
+    name: Deploy production
+    needs: publish
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      needs.publish.result == 'success'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/deploy-production.yml
+    with:
+      game_image: ${{ needs.publish.outputs.game_image }}
+      web_image: ${{ needs.publish.outputs.web_image }}
+      commit: ${{ github.sha }}
+      release_run_id: ${{ github.run_id }}
+    secrets: inherit

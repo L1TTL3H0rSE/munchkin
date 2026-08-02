@@ -9,8 +9,11 @@ VM bootstrap, DNS/NS changes, or a production deploy.
 
 - The public edge is Traefik on TCP `80/443`. PostgreSQL, game, web, OTLP,
   Collector and management ports are private.
-- SSH is TCP `22` only from the owner-supplied IPv4 CIDR set. IPv6 ingress is
-  not part of the baseline.
+- Owner/admin SSH is TCP `22` only from the owner-supplied IPv4 CIDR set.
+  Public IPv4 TCP `2222` is a separate deploy transport restricted by OpenSSH
+  to `munchkin-deploy`, public-key authentication and the root-owned forced
+  command. Root/admin/password/PTY/user-RC/agent/TCP/X11/tunnel forwarding are
+  denied there. IPv6 ingress is not part of the baseline.
 - `munchkin-runtime` pulls images and reads the metadata-only Lockbox
   definition. It does not receive Terraform state, CI publishing, backup
   administration or signing keys.
@@ -52,7 +55,9 @@ Live mode checks only sanitized metadata: listeners, SSH policy, Docker
 socket mode, deploy-user group membership, root-only secret modes,
 unattended-upgrades, UFW and Docker seccomp. It never prints a secret value.
 Expected listeners are `22` (CIDR-limited), `80` and `443`; any other
-non-loopback listener is a stop condition.
+non-loopback listener except deploy-only `2222` is a stop condition. Live
+audit also checks the effective `Match LocalPort 2222` policy, denial of the
+deploy user on owner TCP `22`, and the UFW rate-limit rule.
 
 ## Remote mutation gate
 
@@ -67,6 +72,8 @@ Before every remote action, produce a sanitized exact plan with:
 The following remain owner-gated and are not implied by a local check:
 
 - GitHub protected `main`, required checks and `production-images` environment;
+- the `production-deploy` manual environment approval remains enabled; the
+  automatic post-publish call does not alter repository settings;
 - Yandex WIF/IAM/network/registry/Lockbox/Terraform mutation;
 - secret payload insertion, PostgreSQL password or deploy-key delivery;
 - VM bootstrap, host hardening installation and first production deploy;

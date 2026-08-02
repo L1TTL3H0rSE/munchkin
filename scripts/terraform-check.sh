@@ -943,14 +943,17 @@ if [[ -z "$runtime_registry_binding" ]] ||
   exit 1
 fi
 
-if [[ "$(rg -c '^[[:space:]]*ingress[[:space:]]*\{' "$production_network")" != "3" ]] ||
+if [[ "$(rg -c '^[[:space:]]*ingress[[:space:]]*\{' "$production_network")" != "4" ]] ||
   [[ "$(rg -c '^[[:space:]]*egress[[:space:]]*\{' "$production_network")" != "1" ]] ||
-  [[ "$(rg -c '^[[:space:]]*port[[:space:]]*=[[:space:]]*(22|80|443)$' "$production_network")" != "3" ]] ||
-  [[ "$(rg -c '"0\.0\.0\.0/0"' "$production_network")" != "3" ]] ||
+  [[ "$(rg -c '^[[:space:]]*port[[:space:]]*=[[:space:]]*(22|80|443|2222)$' "$production_network")" != "4" ]] ||
+  [[ "$(rg -c '"0\.0\.0\.0/0"' "$production_network")" != "4" ]] ||
   ! rg -q '^[[:space:]]*v4_cidr_blocks[[:space:]]*=[[:space:]]*var\.ssh_ingress_cidrs$' \
     "$production_network" ||
+  [[ "$(rg -c '^[[:space:]]*port[[:space:]]*=[[:space:]]*2222$' "$production_network")" != "1" ]] ||
+  ! rg -q -U 'description[[:space:]]*=[[:space:]]*"Deploy-only SSH"[\s\S]*?port[[:space:]]*=[[:space:]]*2222[\s\S]*?v4_cidr_blocks[[:space:]]*=[[:space:]]*\["0\.0\.0\.0/0"\]' \
+    "$production_network" ||
   rg -q 'v6_cidr_blocks|ipv6' "$production_network"; then
-  echo "production security group must expose only owner SSH and public HTTP/HTTPS over IPv4" >&2
+  echo "production security group must expose owner SSH, deploy-only SSH and public HTTP/HTTPS over IPv4" >&2
   exit 1
 fi
 

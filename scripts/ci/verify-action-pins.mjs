@@ -68,6 +68,10 @@ if (!ci) {
   requireText(ci, "environment: production-images");
   requireText(ci, "id-token: write");
   requireText(ci, "attestations: write");
+  requireText(ci, "uses: ./.github/workflows/deploy-production.yml");
+  requireText(ci, "needs: publish");
+  requireText(ci, "secrets: inherit");
+  requireText(ci, "release_run_id: ${{ github.run_id }}");
 }
 
 if (!deploy) {
@@ -77,6 +81,11 @@ if (!deploy) {
   requireText(deploy, "environment:\n      name: production-deploy");
   requireText(deploy, "verify-release-evidence.sh");
   requireText(deploy, "release_run_id:");
+  requireText(deploy, "workflow_call:");
+  requireText(deploy, "workflow_dispatch:");
+  requireText(deploy, 'DEPLOY_PORT: "2222"');
+  requireText(deploy, '-p "$DEPLOY_PORT"');
+  requireText(deploy, '-o HostKeyAlias="$DEPLOY_HOST"');
 }
 
 if (!security) {
