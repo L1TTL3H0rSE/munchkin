@@ -5,6 +5,7 @@ import type {
   Projection,
 } from "@munchkin/contracts";
 import type {GameConnectionState} from "../../composables/useGameSessionController";
+import type {GameApiErrorKind} from "../../composables/useGameApi";
 import {useCardSelection} from "../../composables/useCardSelection";
 import {useGamePresentation} from "../../composables/useGamePresentation";
 import {
@@ -30,6 +31,7 @@ import {
 const props = defineProps<{
   projection: Projection;
   connectionState: GameConnectionState;
+  errorKind: GameApiErrorKind | null;
   errorMessage: string;
   actionBusy: boolean;
   isBusy: boolean;
@@ -204,6 +206,7 @@ onBeforeUnmount(() => {
       <DesktopGameTable
         :projection="projection"
         :connection-state="connectionState"
+        :error-kind="errorKind"
         :error-message="errorMessage"
         :action-busy="actionBusy"
         :is-busy="isBusy"
@@ -226,6 +229,7 @@ onBeforeUnmount(() => {
     <MobileGameTable
       :projection="projection"
       :connection-state="connectionState"
+      :error-kind="errorKind"
       :error-message="errorMessage"
       :action-busy="actionBusy"
       :is-busy="isBusy"

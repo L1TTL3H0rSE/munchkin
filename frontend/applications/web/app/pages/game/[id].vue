@@ -6,6 +6,10 @@ import type {
 import type {ActionEntry} from "../../components/actionModel";
 import type {InteractionActionView} from "../../components/interaction/interactionModel";
 import type {EconomySubmission} from "../../components/interaction/economyModel";
+import {
+  buildRouteSystemState,
+} from "../../components/game/status/systemStateModel";
+import SystemStateSurface from "../../components/game/status/SystemStateSurface.vue";
 import {useGameSessionController} from "../../composables/useGameSessionController";
 
 const route = useRoute();
@@ -27,10 +31,24 @@ const {
   loading,
   actionBusy,
   errorMessage,
+  errorKind,
   interactionError,
   connectionState,
   isBusy,
 } = controller;
+
+const routeState = computed(() => buildRouteSystemState({
+  hydrated: hydrated.value,
+  loading: loading.value,
+  projection: projection.value,
+  errorKind: errorKind.value,
+}));
+
+const showDeathState = computed(() => Boolean(
+  routeState.value.kind === "game" &&
+  routeState.value.projection.you.dead &&
+  !routeState.value.projection.interaction?.response_required_for_you,
+));
 
 function executeAction(entry: ActionEntry, payload: CommandPayload): void {
   void controller.submitAction(entry.action, payload);
@@ -50,18 +68,28 @@ onMounted(() => {
 </script>
 
 <template>
-  <section v-if="!hydrated || loading" class="center-state" aria-busy="true">
-    <p role="status">Загружаем состояние игры…</p>
-    <GameConnectionStatus
-      :state="connectionState"
-      :error-message="errorMessage"
+  <section v-if="routeState.kind === 'loading'" class="center-state" aria-busy="true">
+    <SystemStateSurface kind="loading" />
+  </section>
+  <section
+    v-else-if="routeState.kind !== 'game' && routeState.kind !== 'victory'"
+    class="center-state"
+  >
+    <SystemStateSurface
+      :kind="routeState.kind"
       @retry="controller.retry"
     />
   </section>
-  <div v-else-if="projection" class="game-route">
+  <div v-else class="game-route">
+    <SystemStateSurface
+      v-if="showDeathState"
+      kind="death"
+      :projection="routeState.projection"
+    />
     <GameTable
-      :projection="projection"
+      :projection="routeState.projection"
       :connection-state="connectionState"
+      :error-kind="errorKind"
       :error-message="errorMessage"
       :action-busy="actionBusy"
       :is-busy="isBusy"
@@ -70,7 +98,8 @@ onMounted(() => {
       @execute-economy="executeEconomy"
     />
     <InteractionSurface
-      :projection="projection"
+      v-if="routeState.kind === 'game'"
+      :projection="routeState.projection"
       :connection-state="connectionState"
       :busy="isBusy"
       :error-message="interactionError || errorMessage"
@@ -78,15 +107,6 @@ onMounted(() => {
       @submit-economy="executeEconomy"
     />
   </div>
-  <section v-else class="center-state" :aria-busy="isBusy">
-    <GameConnectionStatus
-      :state="connectionState"
-      :error-message="errorMessage"
-      @retry="controller.retry"
-    />
-    <p v-if="!errorMessage">Состояние игры недоступно.</p>
-    <NuxtLink to="/">Вернуться в лобби</NuxtLink>
-  </section>
 </template>
 
 <style lang="scss">

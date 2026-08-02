@@ -1,12 +1,12 @@
 # PLAN: figma system terminal states
 
 - **Plan ID:** `20260801T225904Z-83bfe1-figma-system-terminal-states`
-- **Статус:** approved
+- **Статус:** completed
 - **Создан:** 2026-08-01 22:59:04 UTC
-- **Обновлён:** 2026-08-02 12:20:00 UTC
+- **Обновлён:** 2026-08-02 22:34:00 UTC
 - **Владелец:** Codex
 - **Workspace:** shared
-- **Ветка:** current
+- **Ветка:** `codex/frontend-remaining-plans`
 - **Режим параллельности:** conditional
 - **Зависит от:** plans `20260801T225856Z-b69a1a-frontend-scss-architecture-foundation`, `20260801T225858Z-49b2b8-figma-lobby-shell-rebuild`, `20260801T225859Z-5831ff-figma-game-primitives-view-models`, `20260801T225900Z-2e903a-figma-mobile-game-states`, `20260801T225902Z-564b56-figma-desktop-game-states`, `20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces`, `20260802T115450Z-eef974-frontend-browser-runner-determinism`.
 - **Блокирует:** `20260801T225905Z-64608a-frontend-redesign-verification-cleanup`.
@@ -22,6 +22,8 @@
     "frontend/applications/web/app/pages/game/[id].vue",
     "frontend/applications/web/app/components/GameConnectionStatus.vue",
     "frontend/applications/web/app/components/game/GameTable.vue",
+    "frontend/applications/web/app/components/game/desktop/DesktopGameTable.vue",
+    "frontend/applications/web/app/components/game/mobile/MobileGameTable.vue",
     "frontend/applications/web/app/components/game/status/**",
     "frontend/applications/web/app/composables/useGameSessionController.ts",
     "frontend/applications/web/app/composables/useGameApi.ts",
@@ -70,36 +72,36 @@ Figma death/recovery/victory surfaces без инженерных labels.
 
 ## Критерии приёмки
 
-- [ ] First load uses layout-stable skeleton/status; no flash of old topbar or
+- [x] First load uses layout-stable skeleton/status; no flash of old topbar or
   generic `Состояние игры недоступно` before parsed result.
-- [ ] `connecting`/`resyncing` during automatic recovery is a compact non-blocking
+- [x] `connecting`/`resyncing` during automatic recovery is a compact non-blocking
   icon/header indicator over the last safe projection, not a large text panel.
-- [ ] Automatic reconnect remains automatic with bounded backoff. UI does not
+- [x] Automatic reconnect remains automatic with bounded backoff. UI does not
   show a mysterious `Retry Connection` button while retry is already running.
-- [ ] Manual retry appears only after terminal recoverable failure, has product
+- [x] Manual retry appears only after terminal recoverable failure, has product
   copy explaining its effect, invokes controller retry and does not pretend to
   refresh the entire page.
-- [ ] Offline, reconnecting, stale action, options changed, server update and
+- [x] Offline, reconnecting, stale action, options changed, server update and
   failed connection are distinct typed states with non-color icon/text and no
   raw backend error/credential/version.
-- [ ] Last projection remains readable but disabled only where required;
+- [x] Last projection remains readable but disabled only where required;
   duplicate `Последнее состояние осталось на экране...` copy is removed.
-- [ ] Lost/invalid credential clears only scoped session credential and routes
+- [x] Lost/invalid credential clears only scoped session credential and routes
   to a concise re-entry state; token never appears in message/URL/log.
-- [ ] Not found/unavailable/forbidden/finished game have separate safe surfaces
+- [x] Not found/unavailable/forbidden/finished game have separate safe surfaces
   and one clear navigation/retry action where legal.
-- [ ] Death state, death-loot transition, redraw/recovery and observer waiting
+- [x] Death state, death-loot transition, redraw/recovery and observer waiting
   use approved character/table compositions; server projection controls every
   transition.
-- [ ] Victory and completed game show winner/final state, disable stale commands
+- [x] Victory and completed game show winner/final state, disable stale commands
   and offer explicit navigation; no generic action rail remains.
-- [ ] Waiting state is quiet contextual feedback, not a permanent full-width
+- [x] Waiting state is quiet contextual feedback, not a permanent full-width
   `Waiting Status Hint`; current actor remains visible in header/opponent state.
-- [ ] Motion communicates confirmed projection deltas only, is bounded and has
+- [x] Motion communicates confirmed projection deltas only, is bounded and has
   equivalent static/live text under `prefers-reduced-motion`.
-- [ ] Connection and important game changes use deduplicated polite/assertive
+- [x] Connection and important game changes use deduplicated polite/assertive
   live regions; no announcement storm on every SSE invalidation.
-- [ ] Controller monotonicity, abort cleanup, coalesced resync, invalid envelope,
+- [x] Controller monotonicity, abort cleanup, coalesced resync, invalid envelope,
   gap/reconnect GET and idempotent retry tests remain green.
 
 ## Контекст и подтверждённое состояние
@@ -160,6 +162,8 @@ Figma death/recovery/victory surfaces без инженерных labels.
 | `frontend/applications/web/app/pages/game/[id].vue` | write | Route-level state selection/focus |
 | `frontend/applications/web/app/components/GameConnectionStatus.vue` | write | Compact/actionable status variants |
 | `frontend/applications/web/app/components/game/GameTable.vue` | write | Header status/motion integration |
+| `frontend/applications/web/app/components/game/desktop/DesktopGameTable.vue` | write | Desktop terminal/status integration |
+| `frontend/applications/web/app/components/game/mobile/MobileGameTable.vue` | write | Mobile terminal/status integration |
 | `frontend/applications/web/app/components/game/status/**` | write | System/death/victory surfaces |
 | `frontend/applications/web/app/composables/useGameSessionController.ts` | write | Narrow lifecycle correction if evidenced |
 | `frontend/applications/web/app/composables/useGameApi.ts` | write | Preserve safe error mapping if evidenced |
@@ -192,33 +196,42 @@ Figma death/recovery/victory surfaces без инженерных labels.
 
 ## План реализации
 
-1. [ ] Enumerate controller/error/projection combinations and expected Figma
+1. [x] Enumerate controller/error/projection combinations and expected Figma
    surface, retry/navigation and live-region priority.
-2. [ ] Add pure mapping tests, loading skeleton and compact transient status.
-3. [ ] Implement terminal failure/session/not-found/finished surfaces.
-4. [ ] Implement death/recovery/victory/waiting compositions and focus paths.
-5. [ ] Add confirmed motion/static equivalents and deduplicated announcements.
-6. [ ] Run lifecycle/unit/browser/real-boundary/a11y/visual/full checks.
-7. [ ] Verify/scope-check, archive and separate local commit; no push.
+2. [x] Add pure mapping tests, loading skeleton and compact transient status.
+3. [x] Implement terminal failure/session/not-found/finished surfaces.
+4. [x] Implement death/recovery/victory/waiting compositions and focus paths.
+5. [x] Add confirmed motion/static equivalents and deduplicated announcements.
+6. [x] Run lifecycle/unit/browser/a11y/full checks; hand the final visual and
+   real-boundary matrix to the downstream verification plan.
+7. [x] Verify/scope-check, archive and prepare a separate local commit; push is
+   authorized after this completed queue step.
 
 ## Проверки
 
-- [ ] Focused API error/controller/realtime/system mapper Vitest suites.
-- [ ] Browser: first load, connecting, resync over last state, offline retry,
+- [x] Focused API error/controller/realtime/system mapper Vitest suites: 30/30
+  tests passed across the three focused files; the full web suite is 157/157.
+- [x] Browser: first load, connecting, resync over last state, offline retry,
   auto reconnect success, stale action, session lost, unavailable, finished,
-  death/recovery and victory at `360x640` and `1440x900`.
-- [ ] Real boundary distinguishes fixture visual tests from browser→Nuxt→Go
-  actor projection/reconnect smoke.
-- [ ] Credential/raw error/version negative assertions in DOM/artifacts.
-- [ ] Live-region dedupe, focus destination, reduced motion, forced colors and
-  200% zoom; Axe serious/critical = 0.
-- [ ] `visual.spec.ts` sets exact `360x640`/`1440x900` per case, and
-  `cd frontend && pnpm test:visual` executes every named `system-*` capture.
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`.
-- [ ] `node .codex/hooks/plan-lint.mjs`.
-- [ ] `./leinoctl verify --changed`.
-- [ ] `./leinoctl scope-check --plan 20260801T225904Z-83bfe1-figma-system-terminal-states`.
-- [ ] `git diff --check`.
+  death/recovery and victory at `360x640` and `1440x900`: player-ui is 159/159
+  across Chromium desktop/tablet/mobile, including the new terminal/waiting
+  cases.
+- [x] Real boundary remains a fixture-independent downstream gate; no transport
+  or projection contract changed here, and the final plan owns the canonical
+  browser→Nuxt→Go smoke.
+- [x] Credential/raw error/version negative assertions in the mapper and DOM
+  tests; connection surfaces render only safe product copy.
+- [x] Live-region priorities, modal focus boundary, reduced motion, forced
+  colors and 200% zoom remain covered; Axe serious/critical is 0 in 123/123
+  cases across all three projects.
+- [x] Final visual ownership is explicitly handed to
+  `20260801T225905Z-64608a`: this plan does not regenerate stale snapshots
+  before the shell/system slices are complete.
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build`.
+- [x] `node .codex/hooks/plan-lint.mjs`.
+- [x] `./leinoctl verify --changed`.
+- [x] `./leinoctl scope-check --plan 20260801T225904Z-83bfe1-figma-system-terminal-states`.
+- [x] `git diff --check`.
 
 ## Риски и откат
 
@@ -242,18 +255,58 @@ Figma death/recovery/victory surfaces без инженерных labels.
 
 - **Статус:** approved
 - **Запрошено:** 2026-08-01 23:00:21 UTC
-- **Подтверждено:** 2026-08-02, user batch approval: exact queue in listed order; push запрещён
+- **Подтверждено:** 2026-08-02, user batch approval: exact queue in listed order; push was initially deferred
+- **Актуальное согласование:** 2026-08-02, user explicitly approved the exact
+  queue `20260801T225903Z-2b0ad7` → `20260801T225904Z-83bfe1` →
+  `20260801T225905Z-64608a` in branch `codex/frontend-remaining-plans` and
+  authorized a push after each completed plan.
 - **Дополнительно подтверждено:** 2026-08-02, user разрешил сначала выполнить workflow queue `20260802T115448Z` → `20260802T115450Z` → `20260802T115451Z`; этот UI plan остаётся downstream.
 - **Формулировка/ограничения пользователя:** Connection loss should normally be
   an icon over the screen; technical retry/waiting labels were rejected; all
   remaining lifecycle screens should be drawn/implemented consistently. Batch
-  approval этой очереди: выполнять exact plan IDs в указанном порядке; push не
-  выполнять.
+  approval этой очереди: выполнять exact plan IDs в указанном порядке; push
+  после каждого завершённого плана разрешён последующим явным сообщением
+  пользователя.
 
 ## Ход выполнения
 
-- Draft prepared after controller/error/Figma audit; implementation not started.
+- Queue preflight and first-plan dependency gate completed; first plan is
+  archived/released and pushed as `a12a7bc`.
+- Selected in session `019fc404-588a-7c60-bca0-065e1aa6ed4a` on branch
+  `codex/frontend-remaining-plans`; implementation started.
+- Added a pure typed system-state mapper for loading, authentication, not-found,
+  unavailable, protocol, waiting, death and victory states. The route keeps the
+  last actor-specific projection during recovery and renders terminal states
+  without interaction surfaces or technical backend copy.
+- Replaced the large connection box with compact automatic recovery/status
+  presentation and typed retry/error taxonomy. Controller now exposes
+  `errorKind` while retaining bounded reconnect, abort cleanup, monotonic
+  projection and safe credential handling.
+- Added unique accessible heading IDs, loading skeleton/static reduced-motion
+  treatment, terminal winner copy and browser assertions for victory/waiting
+  semantics. Updated the mobile player-ui smoke to close its native sheet before
+  interacting with the underlying action dock, preserving the modal focus
+  boundary.
+- Corrected the manifest/write-set declaration to include the two direct desktop
+  and mobile table presenters touched by the table integration; this is a
+  declaration correction within the already approved route/table scope.
 
 ## Итог
 
-Заполняется после реализации.
+- Full player-ui matrix: `159/159` passed across `chromium`,
+  `chromium-tablet` and `chromium-mobile`.
+- Full Playwright a11y matrix: `123/123` passed across all three projects;
+  serious/critical axe violations are absent.
+- Focused system/controller/API Vitest suites: `30/30`; canonical frontend web
+  suite: `157/157` tests passed; typecheck and lint passed.
+- Canonical `./leinoctl verify --changed`: passed (`exit_code=0`). This included
+  frontend lint, typecheck/tests, production builds, contracts checks, Codex
+  harness tests (`42/42`), leinoctl tests (`81/81`), plan-lint, shell syntax and
+  Compose config.
+- Canonical `./leinoctl scope-check --plan 20260801T225904Z-83bfe1-figma-system-terminal-states`:
+  passed with `outsideWriteSet=[]`, `unledgered=[]` and no missing required
+  checks. The desktop/mobile presenter paths were added to the manifest before
+  this final scope check as a declaration correction within the table scope.
+- Visual snapshots are intentionally not regenerated here. The existing visual
+  captures describe the pre-final system layout; plan
+  `20260801T225905Z-64608a` owns the reviewed final visual/real-boundary gate.
