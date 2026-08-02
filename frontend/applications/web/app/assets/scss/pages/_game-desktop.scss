@@ -1,0 +1,155 @@
+@use "../api" as api;
+
+@media (width > #{api.breakpoint(tablet-small)}) {
+  .desktop-game-table {
+    --color-text-muted: #526158;
+    --muted: var(--color-text-muted);
+  }
+
+  .game-route > .game-table {
+    width: min(1440px, calc(100% - 2rem));
+    min-width: 0;
+    margin: 0 auto;
+    padding: var(--space-4) 0 var(--space-6);
+  }
+
+  .game-table__desktop {
+    display: block;
+    min-width: 0;
+  }
+
+  .desktop-game-table .game-connection-status {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-paper);
+  }
+
+  .desktop-game-table .action-dock {
+    min-width: 0;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    padding: var(--space-2);
+    background: var(--color-paper);
+  }
+
+  .desktop-game-table .action-dock__header {
+    padding: var(--space-1) var(--space-1) 0;
+  }
+
+  .desktop-game-table .action-dock__hint,
+  .desktop-game-table .action-dock__empty {
+    color: var(--color-text-muted);
+  }
+
+  .desktop-game-table .action-choice {
+    border-color: var(--color-line);
+    border-radius: var(--radius-control);
+    color: var(--color-paper);
+    background: var(--color-board);
+  }
+
+  .desktop-game-table .action-choice > strong {
+    color: #e4f0d3;
+  }
+
+  .desktop-game-table .selection-option,
+  .desktop-game-table .action-choice__source {
+    color: #f5f7ee;
+  }
+
+  .desktop-game-table .target-select select {
+    border-color: rgb(255 255 255 / 55%);
+    color: var(--color-text);
+    background: var(--color-paper);
+  }
+
+  .desktop-game-table .action-choice__submit {
+    border-color: var(--color-accent-strong);
+    border-radius: var(--radius-control);
+    color: var(--color-paper);
+    background: var(--color-accent-strong);
+  }
+}
+
+@media (width >= 1024px) and (height >= 800px) {
+  .game-route > .game-table {
+    height: calc(100dvh - 64px);
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .desktop-game-table {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .desktop-game-table__main,
+  .desktop-encounter-stage,
+  .desktop-game-table__side {
+    min-height: 0;
+  }
+
+  .desktop-game-table__main {
+    overflow: hidden;
+  }
+
+  .desktop-encounter-stage,
+  .desktop-game-table__side {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+}
+
+@media (width >= 1440px) {
+  .game-route > .game-table {
+    padding-top: var(--space-3);
+  }
+}
+
+@media (width <= 1279px) and (width > #{api.breakpoint(tablet-small)}) {
+  .game-route > .game-table {
+    width: min(100% - 1rem, 1440px);
+    padding-top: var(--space-3);
+  }
+
+  .desktop-game-table {
+    gap: var(--space-2);
+  }
+
+  .desktop-game-table__main {
+    gap: var(--space-3);
+  }
+}
+
+@media (width <= 767px) and (width > #{api.breakpoint(tablet-small)}) {
+  .game-route > .game-table {
+    padding-top: var(--space-2);
+  }
+
+  .desktop-game-table__main {
+    overflow: visible;
+  }
+
+  .desktop-encounter-stage,
+  .desktop-game-table__side {
+    overflow: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-game-table,
+  .desktop-game-table * {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .desktop-game-table .action-dock,
+  .desktop-game-table .action-choice {
+    border-color: CanvasText;
+  }
+}

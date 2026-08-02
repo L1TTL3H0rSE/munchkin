@@ -38,18 +38,76 @@ test("card action rail exposes labeled close and removes contextual state", asyn
   const handTab = page.locator(".mobile-game-table .hand-tab");
   if (await handTab.isVisible()) {
     await handTab.click();
-    await expect(page.locator(".sheet-dialog")).toBeVisible();
+    await expect(page.locator(".sheet-dialog[open]")).toBeVisible();
+  } else {
+    await page.locator(".desktop-game-table .own-board__open").click();
+    await expect(page.locator(".sheet-dialog[open]")).toBeVisible();
   }
   const presenter = (await page.locator(".mobile-game-table:visible").count())
     ? page.locator(".mobile-game-table")
-    : page.locator(".game-table__desktop");
+    : page.locator(".desktop-game-table");
   const activate = presenter.locator(".game-card__activate").first();
   await activate.click();
   await expect(presenter.locator(".action-dock__close")).toBeVisible();
   await presenter.locator(".action-dock__close").click();
   await expect(presenter.locator(".action-dock__close")).toHaveCount(0);
-  await expect(presenter.locator(".action-dock")).toHaveAttribute("aria-labelledby", "action-dock-title");
+  await expect(presenter.locator(".action-dock")).toHaveCount(0);
   expect(fixture.projection.turn.available_actions[0]?.type).toBe("play_card");
+});
+
+test("1440x900 uses one bounded desktop presenter without legacy telemetry", async ({page}) => {
+  await openFixtureAtViewport(page, "single-combat", 1440, 900);
+  const presenter = page.locator(".desktop-game-table");
+
+  await expect(presenter).toBeVisible();
+  await expect(page.locator(".mobile-game-table")).toBeHidden();
+  await expect(presenter.locator(".meta-badges")).toHaveCount(0);
+  await expect(presenter.locator(".action-bar")).toHaveCount(0);
+  await expect(presenter.locator(".own-board__card-count")).toHaveCount(0);
+  await expect(presenter.locator(".desktop-encounter-stage .game-card")).toBeVisible();
+  await expect(presenter.locator(".desktop-combat-summary")).toBeVisible();
+  await assertNoRootOverflow(page);
+  await assertNoDocumentVerticalOverflow(page);
+});
+
+test("desktop density stays bounded at laptop and ultra-wide targets", async ({page}) => {
+  await openFixtureAtViewport(page, "full-roster-long-copy", 1280, 720);
+  await expect(page.locator(".desktop-game-table")).toBeVisible();
+  await assertNoRootOverflow(page);
+
+  await page.setViewportSize({width: 1920, height: 1080});
+  await assertNoRootOverflow(page);
+  const tableBox = await page.locator(".game-table").boundingBox();
+  expect(tableBox?.width ?? 0).toBeLessThanOrEqual(1440);
+  await assertNoDocumentVerticalOverflow(page);
+});
+
+test.describe("desktop input and zoom safety", () => {
+  test.use({hasTouch: true});
+
+  test("coarse pointer keeps the desktop rail keyboard-accessible at 200 percent zoom", async ({page}) => {
+    await openFixtureAtViewport(page, "mobile-combat-multiple", 1440, 900);
+
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBeTruthy();
+
+    const presenter = page.locator(".desktop-game-table:visible");
+    const rail = presenter.locator(".card-rail__viewport").first();
+    await expect(rail).toHaveAttribute("tabindex", "0");
+    await rail.focus();
+    await expect(rail).toBeFocused();
+    await page.keyboard.press("End");
+
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = "200%";
+    });
+    await assertNoRootOverflow(page);
+
+    const action = presenter.locator(".action-dock button:not([disabled])").first();
+    await expect(action).toHaveCount(1);
+    await action.scrollIntoViewIfNeeded();
+    await expect(action).toBeVisible();
+    expect((await action.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  });
 });
 
 test("360x640 uses one mobile presenter without document scrolling", async ({page}) => {
@@ -92,7 +150,7 @@ test("mobile breakpoints and safety viewports keep the action reachable", async 
   for (const viewport of viewports) {
     await page.setViewportSize({width: viewport.width, height: viewport.height});
     const mobilePresenter = page.locator(".mobile-game-table");
-    const desktopPresenter = page.locator(".game-table__desktop");
+    const desktopPresenter = page.locator(".desktop-game-table");
 
     if (viewport.mobile) {
       await expect(mobilePresenter).toBeVisible();

@@ -7,9 +7,6 @@ import type {
 import type {GameConnectionState} from "../../composables/useGameSessionController";
 import {useCardSelection} from "../../composables/useCardSelection";
 import {useGamePresentation} from "../../composables/useGamePresentation";
-import ActionPanel from "../ActionPanel.vue";
-import GameConnectionStatus from "../GameConnectionStatus.vue";
-import EconomySurface from "../interaction/EconomySurface.vue";
 import {
   economyActions,
   isEconomyAction,
@@ -23,15 +20,12 @@ import {
   type CardActionBinding,
   type CardActionState,
 } from "../actionModel";
-import GameContextPanel from "./GameContextPanel.vue";
+import DesktopGameTable from "./desktop/DesktopGameTable.vue";
 import MobileGameTable from "./mobile/MobileGameTable.vue";
 import {
-  currentPlayerName,
   uniqueCards,
   visibleCardsForProjection,
 } from "./gameTableViewModel";
-import OpponentRoster from "./OpponentRoster.vue";
-import OwnBoard from "./OwnBoard.vue";
 
 const props = defineProps<{
   projection: Projection;
@@ -207,63 +201,26 @@ onBeforeUnmount(() => {
     :data-state="projection.status"
   >
     <div class="game-table__desktop">
-      <header class="game-table__header">
-        <div>
-          <p class="eyebrow">КОМНАТА</p>
-          <code>{{ projection.game_id }}</code>
-        </div>
-        <div class="meta-badges" aria-label="Версия и профиль правил">
-          <span>v{{ projection.version }}</span>
-          <span>{{ projection.status }}</span>
-          <span>{{ projection.rules_profile_id }}</span>
-        </div>
-      </header>
-
-      <GameConnectionStatus
-        :state="connectionState"
-        :error-message="errorMessage"
-        @retry="emit('retry')"
-      />
-
-      <OpponentRoster :projection="projection" />
-      <GameContextPanel :projection="projection" />
-
-      <OwnBoard
+      <DesktopGameTable
         :projection="projection"
+        :connection-state="connectionState"
+        :error-message="errorMessage"
+        :action-busy="actionBusy"
+        :is-busy="isBusy"
+        :action-panel-entries="actionPanelEntries"
+        :economy-entries="economyActionEntries"
+        :visible-cards="visibleCards"
+        :player-names="playerNames"
+        :context-card-name="selectedCard?.name"
         :bindings-for-card="cardBindings"
         :state-for-card="cardState"
         :confirmed-card-ids="confirmedCardIDs"
+        @retry="emit('retry')"
+        @execute="runAction"
+        @execute-economy="emit('execute-economy', $event)"
         @activate="activateCard"
+        @close="closeCardActions"
       />
-
-      <EconomySurface
-        :projection="projection"
-        :actions="economyActionEntries"
-        :busy="actionBusy"
-        @submit="emit('execute-economy', $event)"
-      />
-
-      <section class="action-bar" aria-label="Действия текущей проекции">
-        <ActionPanel
-          :entries="actionPanelEntries"
-          :cards="visibleCards"
-          :player-names="playerNames"
-          :busy="actionBusy"
-          :context-card-name="selectedCard?.name"
-          @close="closeCardActions"
-          @execute="runAction"
-        />
-        <p
-          v-if="projection.status === 'active' && !genericActionEntries.length && !economyActionEntries.length"
-          class="action-bar__waiting"
-          role="status"
-        >
-          Ждём {{ currentPlayerName(projection) }}. Последнее подтверждённое состояние остаётся доступным.
-        </p>
-        <strong v-if="projection.status === 'finished'" class="action-bar__result">
-          Победитель: {{ playerNames[projection.winner_player_id ?? ""] ?? "игра завершена" }}
-        </strong>
-      </section>
     </div>
 
     <MobileGameTable

@@ -4,8 +4,8 @@ import type {
   CardActionBinding,
   CardActionState,
 } from "../actionModel";
-import CardZone from "./CardZone.vue";
-import HandBrowser from "./HandBrowser.vue";
+import GameCard from "../GameCard.vue";
+import SheetDialog from "../ui/SheetDialog.vue";
 import {buildOwnZones, ownCarriedCards} from "./gameTableViewModel";
 
 const props = defineProps<{
@@ -19,102 +19,213 @@ const emit = defineEmits<{
   activate: [binding: CardActionBinding];
 }>();
 
+const open = ref(false);
 const zones = computed(() => buildOwnZones(props.projection));
 const carriedCards = computed(() => ownCarriedCards(props.projection));
-const allOwnCards = computed<CardView[]>(() => [
-  ...props.projection.you.hand,
-  ...carriedCards.value,
-  ...zones.value.equipped,
+const ownZones = computed<Array<{key: string; title: string; cards: CardView[]}>>(() => [
+  {key: "hand", title: "Рука", cards: props.projection.you.hand},
+  {key: "equipped", title: "Экипировано", cards: zones.value.equipped},
+  {key: "carried", title: "Несёшь и черты", cards: carriedCards.value},
 ]);
+const totalCards = computed(() => ownZones.value.reduce((total, zone) => total + zone.cards.length, 0));
+
+function activate(binding: CardActionBinding) {
+  open.value = false;
+  emit("activate", binding);
+}
 </script>
 
 <template>
   <section class="own-board" aria-labelledby="own-board-title">
-    <div class="character-summary">
+    <header class="own-board__header">
       <div>
-        <p class="eyebrow">ТВОЙ ПЕРСОНАЖ — {{ projection.you.name }}</p>
-        <h2 id="own-board-title">Уровень {{ projection.you.level }}</h2>
+        <p class="eyebrow">ТВОЯ СТОРОНА</p>
+        <h2 id="own-board-title">{{ projection.you.name }}</h2>
       </div>
-      <div class="character-stats" aria-label="Характеристики персонажа">
-        <span>Сила {{ projection.you.combat_strength }}</span>
-        <span>Побег {{ projection.you.escape_bonus >= 0 ? "+" : "" }}{{ projection.you.escape_bonus }}</span>
-        <span>Лимит руки {{ projection.you.hand_limit }}</span>
-      </div>
-      <div v-if="projection.you.character_tags.length" class="tag-list" aria-label="Черты персонажа">
-        <span v-for="tag in projection.you.character_tags" :key="tag">{{ tag }}</span>
-      </div>
+      <button
+        class="own-board__open"
+        type="button"
+        aria-haspopup="dialog"
+        :aria-expanded="open"
+        @click="open = true"
+      >
+        Открыть персонажа
+      </button>
+    </header>
+
+    <div class="own-board__stats" aria-label="Сводка персонажа">
+      <span>Уровень {{ projection.you.level }}</span>
+      <strong>Сила {{ projection.you.combat_strength }}</strong>
+      <span>Побег {{ projection.you.escape_bonus >= 0 ? "+" : "" }}{{ projection.you.escape_bonus }}</span>
+      <span>Рука {{ projection.you.hand.length }}/{{ projection.you.hand_limit }}</span>
     </div>
 
-    <CardZone
-      title="Экипировано"
-      :cards="zones.equipped"
-      :content-set-id="projection.content_set_id"
-      :bindings-for-card="bindingsForCard"
-      :state-for-card="stateForCard"
-      :confirmed-card-ids="confirmedCardIds"
-      @activate="emit('activate', $event)"
-    />
+    <div class="own-board__zones" aria-label="Количество собственных зон">
+      <span>Карты · {{ totalCards }}</span>
+      <span>Экипировано · {{ zones.equipped.length }}</span>
+      <span>Черты · {{ zones.traits.length }}</span>
+    </div>
 
-    <CardZone
-      title="Несёшь и черты"
-      :cards="carriedCards"
-      :content-set-id="projection.content_set_id"
-      :bindings-for-card="bindingsForCard"
-      :state-for-card="stateForCard"
-      :confirmed-card-ids="confirmedCardIds"
-      @activate="emit('activate', $event)"
-    />
-
-    <HandBrowser
-      :cards="projection.you.hand"
-      :content-set-id="projection.content_set_id"
-      :bindings-for-card="bindingsForCard"
-      :state-for-card="stateForCard"
-      :confirmed-card-ids="confirmedCardIds"
-      @activate="emit('activate', $event)"
-    />
-
-    <p class="own-board__card-count" aria-live="polite">
-      Всего открыто собственных карт: {{ allOwnCards.length }}
-    </p>
+    <SheetDialog
+      :open="open"
+      title="Персонаж и собственные карты"
+      description="Карты доступны по запросу; действие всегда строится из текущей server projection."
+      v-bind="{titleID: 'own-board-sheet-title'}"
+      @close="open = false"
+    >
+      <div class="own-board__sheet-grid">
+        <section
+          v-for="zone in ownZones"
+          :key="zone.key"
+          class="own-board__sheet-zone"
+          :aria-labelledby="`own-zone-${zone.key}`"
+        >
+          <header>
+            <h3 :id="`own-zone-${zone.key}`">{{ zone.title }} · {{ zone.cards.length }}</h3>
+          </header>
+          <div v-if="zone.cards.length" class="own-board__cards" role="list">
+            <GameCard
+              v-for="card in zone.cards"
+              :key="`${zone.key}-${card.instance_id}`"
+              :card="card"
+              :content-set-id="projection.content_set_id"
+              compact
+              :action-bindings="bindingsForCard(card.instance_id)"
+              :action-state="stateForCard(card.instance_id)"
+              :motion-state="confirmedCardIds.has(card.instance_id) ? 'confirmed' : undefined"
+              role="listitem"
+              @activate="activate"
+            />
+          </div>
+          <p v-else class="own-board__empty" role="status">Пусто.</p>
+        </section>
+      </div>
+    </SheetDialog>
   </section>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .own-board {
   min-width: 0;
-  margin-top: 2rem;
-  border-top: 3px solid var(--acid);
-  padding-top: 1rem;
+  display: grid;
+  gap: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  padding: var(--space-3);
+  background: var(--color-paper);
 }
 
-.character-summary {
+.own-board__header {
+  min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: start;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-2);
 }
 
-.character-summary h2 { margin: .35rem 0 0; }
+.own-board__header h2,
+.own-board__header p {
+  margin: 0;
+}
 
-.character-stats,
-.tag-list {
+.own-board__header h2 {
+  margin-top: var(--space-1);
+  overflow-wrap: anywhere;
+  font-size: 1.15rem;
+}
+
+.own-board__open {
+  min-height: 2.75rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--color-accent-strong);
+  border-radius: var(--radius-control);
+  padding: .5rem .7rem;
+  color: var(--color-paper);
+  background: var(--color-accent-strong);
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.own-board__open:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.own-board__stats,
+.own-board__zones {
   display: flex;
   flex-wrap: wrap;
-  gap: .5rem;
+  gap: var(--space-1);
 }
 
-.character-stats span,
-.tag-list span {
-  border: 1px solid var(--line);
-  padding: .45rem .65rem;
-  font-size: .75rem;
+.own-board__stats span,
+.own-board__stats strong,
+.own-board__zones span {
+  border: 1px solid var(--color-line);
+  padding: .35rem .45rem;
+  font-size: .68rem;
 }
 
-.own-board__card-count {
-  margin: .5rem 0 0;
-  color: var(--muted);
-  font-size: .75rem;
+.own-board__stats strong {
+  border-color: var(--color-accent-strong);
+  color: var(--color-accent-strong);
+}
+
+.own-board__zones {
+  color: var(--color-text-muted);
+}
+
+.own-board__sheet-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.own-board__sheet-zone {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.own-board__sheet-zone header {
+  border-bottom: 1px solid var(--color-line);
+  padding-bottom: var(--space-2);
+}
+
+.own-board__sheet-zone h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.own-board__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+
+.own-board__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+@media (width <= 767px) {
+  .own-board__header {
+    flex-direction: column;
+  }
+
+  .own-board__open {
+    width: 100%;
+  }
+}
+
+@media (forced-colors: active) {
+  .own-board,
+  .own-board__open,
+  .own-board__stats span,
+  .own-board__stats strong,
+  .own-board__zones span {
+    border-color: CanvasText;
+  }
 }
 </style>

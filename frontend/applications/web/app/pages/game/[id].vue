@@ -90,6 +90,7 @@ onMounted(() => {
 
 <style lang="scss">
 @use "../../assets/scss/pages/game-mobile";
+@use "../../assets/scss/pages/game-desktop";
 </style>
 
 <style scoped>

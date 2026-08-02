@@ -2,15 +2,19 @@ import {expect, test, type Page} from "@playwright/test";
 
 import {openFixture, openFixtureAtViewport} from "./fixtureSupport.ts";
 
+async function hideDevtools(page: Page): Promise<void> {
+  await page.addStyleTag({
+    content: "nuxt-devtools-frame, nuxt-devtools-inspect-panel, #vue-tracer-overlay { display: none; }",
+  });
+}
+
 async function openLobby(page: Page, width: number, height: number): Promise<void> {
   await page.setViewportSize({width, height});
   await page.goto("/", {waitUntil: "domcontentloaded"});
   await expect(page.locator(".lobby-page")).toHaveAttribute("data-interactive", "true", {
     timeout: 15_000,
   });
-  await page.addStyleTag({
-    content: "nuxt-devtools-frame, nuxt-devtools-inspect-panel, #vue-tracer-overlay { display: none; }",
-  });
+  await hideDevtools(page);
 }
 
 test("lobby-mobile", async ({page}, testInfo) => {
@@ -31,34 +35,30 @@ test("lobby-desktop", async ({page}, testInfo) => {
   });
 });
 
-test("canonical chromium visual baseline stays stable", async ({page}, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
-  const fixture = await openFixture(page, "single-combat");
-  const encounterName = fixture.projection.turn.encounter?.name;
-  expect(encounterName).toBeDefined();
-  await expect(page.locator(".encounter-area")).toBeVisible();
-  await expect(
-    page.locator(".encounter-area .game-card").filter({hasText: encounterName ?? ""}),
-  ).toBeVisible();
-  await expect(page.locator(".combat-score")).toBeVisible();
-  await expect(page.locator(".own-board")).toBeVisible();
-  await expect(page.locator(".hand-browser")).toBeVisible();
-  await expect(page.locator(".action-bar")).toBeVisible();
-  await expect(page.locator(".game-table__desktop .game-connection-status")).toHaveAttribute(
-    "data-state",
-    "connected",
-  );
-  const devtoolsFrame = page.locator("nuxt-devtools-frame");
-  if (await devtoolsFrame.count()) {
-    await devtoolsFrame.evaluate((element) => {
-      (element as HTMLElement).style.display = "none";
+const desktopVisualCases = [
+  ["desktop-preparation", "single-preparation"],
+  ["desktop-door", "single-door-choice"],
+  ["desktop-combat-one", "single-combat"],
+  ["desktop-combat-multiple", "mobile-combat-multiple"],
+  ["desktop-reward", "run-away-result"],
+  ["desktop-run-away", "single-run-away"],
+  ["desktop-waiting", "stale-projection"],
+  ["desktop-death", "death-loot-observer"],
+  ["desktop-victory", "victory-six-player"],
+] as const;
+
+for (const [snapshotName, fixtureID] of desktopVisualCases) {
+  test(snapshotName, async ({page}, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
+    await openFixtureAtViewport(page, fixtureID, 1440, 900);
+    await hideDevtools(page);
+    await expect(page.locator(".desktop-game-table")).toBeVisible();
+    await expect(page).toHaveScreenshot(`${snapshotName}.png`, {
+      fullPage: false,
+      animations: "disabled",
     });
-  }
-  await expect(page).toHaveScreenshot("single-combat.png", {
-    fullPage: true,
-    animations: "disabled",
   });
-});
+}
 
 const mobileVisualCases = [
   ["mobile-setup", "single-setup"],
@@ -74,9 +74,7 @@ for (const [snapshotName, fixtureID] of mobileVisualCases) {
   test(snapshotName, async ({page}, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
     await openFixtureAtViewport(page, fixtureID, 360, 640);
-    await page.addStyleTag({
-      content: "nuxt-devtools-frame, nuxt-devtools-inspect-panel, #vue-tracer-overlay { display: none; }",
-    });
+    await hideDevtools(page);
     await expect(page.locator(".mobile-game-table")).toBeVisible();
     await expect(page).toHaveScreenshot(`${snapshotName}.png`, {
       fullPage: false,
