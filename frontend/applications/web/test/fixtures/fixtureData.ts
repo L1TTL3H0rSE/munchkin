@@ -924,6 +924,54 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       },
     );
   }),
+  makeFixture("lobby-state", "Лобби: состояние комнаты", (projection) => {
+    projection.status = "lobby";
+    projection.turn.phase = "";
+    projection.turn.available_actions = [action("start")];
+  }),
+  makeFixture("empty-hand", "Пустая рука: безопасная композиция", (projection) => {
+    projection.you.hand = [];
+    projection.turn.phase = "preparation";
+    projection.turn.available_actions = [action("open_door")];
+  }),
+  makeFixture("expired-choice", "Окно: подтверждённый timeout", (projection) => {
+    projection.turn.phase = "combat";
+    projection.interaction = interaction(
+      "response_window",
+      [],
+      {
+        response_required_for_you: false,
+        my_response_state: "timed_out",
+      },
+    );
+  }),
+  makeFixture("action-coverage", "Полный набор server action descriptors", (projection) => {
+    projection.turn.phase = "preparation";
+    projection.turn.available_actions = [
+      "start",
+      "finish_setup",
+      "play_card",
+      "play_target_effect",
+      "equip_item",
+      "unequip_item",
+      "discard_card",
+      "sell_items",
+      "open_door",
+      "look_for_trouble",
+      "loot_room",
+      "use_ability",
+      "resolve_combat",
+      "run_away",
+      "choose_effect",
+      "resolve_charity",
+      "propose_trade",
+      "propose_gift",
+      "attempt_theft",
+      "end_turn",
+      "fight",
+      "loot",
+    ].map((type) => action(type as Projection["turn"]["available_actions"][number]["type"]));
+  }),
   makeFixture("victory-six-player", "Шесть игроков: финал", (projection) => {
     projection.players = [0, 1, 2, 3, 4].map(player);
     projection.status = "finished";

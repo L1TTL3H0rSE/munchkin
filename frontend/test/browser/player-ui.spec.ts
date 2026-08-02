@@ -12,8 +12,16 @@ import {
   openFixture,
   openFixtureAtViewport,
 } from "./fixtureSupport.ts";
+import {figmaStateDescriptors} from "./figmaStateMatrix.ts";
 
-for (const fixtureID of fixtureIDs()) {
+const browserFixtureIDs = [
+  ...new Set([
+    ...fixtureIDs(),
+    ...figmaStateDescriptors.map((state) => state.fixtureID),
+  ]),
+];
+
+for (const fixtureID of browserFixtureIDs) {
   test(`fixture ${fixtureID} stays usable at representative width`, async ({page}) => {
     await openFixture(page, fixtureID);
     await assertNoRootOverflow(page);
