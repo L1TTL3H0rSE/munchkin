@@ -65,10 +65,13 @@ function toggleFromEvent(
   instanceID: string,
   event: Event,
 ) {
+  if (!(event.target instanceof HTMLInputElement)) {
+    return;
+  }
   toggle(
     entry,
     instanceID,
-    (event.target as HTMLInputElement).checked,
+    event.target.checked,
   );
 }
 

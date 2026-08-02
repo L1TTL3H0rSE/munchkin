@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import type {CardView} from "@munchkin/contracts";
+import SemanticButton from "./ui/SemanticButton.vue";
+import CardArtPlaceholder from "./game/primitives/CardArtPlaceholder.vue";
+import CardFrame from "./game/primitives/CardFrame.vue";
 import {
   actionLabel,
   type CardActionBinding,
@@ -14,12 +17,14 @@ const props = withDefaults(defineProps<{
   actionBindings?: CardActionBinding[];
   actionState?: CardActionState;
   motionState?: "confirmed";
+  showMeta?: boolean;
 }>(), {
   compact: false,
   imageUrl: "",
   actionBindings: () => [],
   actionState: "idle" as CardActionState,
   motionState: undefined,
+  showMeta: false,
 });
 
 const emit = defineEmits<{
@@ -57,215 +62,232 @@ function activate() {
 </script>
 
 <template>
-  <article
+  <CardFrame
     class="game-card"
-    :class="[
-      `game-card--${card.deck}`,
-      {'game-card--compact': compact},
-    ]"
+    :class="{'game-card--compact': compact}"
+    :deck="card.deck"
+    :compact="compact"
+    :aria-label="card.name"
     :data-action-state="actionState"
     :data-motion="motionState"
   >
-    <div class="game-card__route" aria-hidden="true">
-      <i />
-      <i />
-      <i />
-    </div>
-    <header class="game-card__header">
-      <span class="game-card__deck">
-        {{ card.deck === "door" ? "Дверь" : "Сокровище" }}
-      </span>
-      <small>{{ card.kind.replaceAll("_", " ") }}</small>
-    </header>
-    <div v-if="actionBindings.length" class="game-card__actions">
-      <button
-        class="game-card__activate"
-        type="button"
-        :disabled="actionButtonDisabled"
-        :aria-label="`${card.name}: ${activateCopy}`"
-        @click="activate"
-      >
-        {{ actionState === "pending" ? "Отправляем…" : activateCopy }}
-      </button>
-      <span
-        v-if="actionState === 'selected'"
-        class="game-card__action-state"
-      >
-        Действия карты открыты ниже
-      </span>
-      <span
-        v-else-if="actionState === 'confirmed'"
-        class="game-card__action-state"
-      >
-        Состояние подтверждено сервером
-      </span>
-    </div>
-    <div class="game-card__illustration">
+    <template #header>
+      <header class="game-card__header">
+        <div v-if="showMeta" class="game-card__meta">
+          <span class="game-card__deck">
+            {{ card.deck === "door" ? "Дверь" : "Сокровище" }}
+          </span>
+          <small>{{ card.kind.replaceAll("_", " ") }}</small>
+        </div>
+        <div v-if="actionBindings.length" class="game-card__actions">
+          <SemanticButton
+            class="game-card__activate"
+            variant="secondary"
+            :busy="actionState === 'pending'"
+            :disabled="actionButtonDisabled"
+            :aria-label="`${card.name}: ${activateCopy}`"
+            @click="activate"
+          >
+            {{ actionState === "pending" ? "Отправляем…" : activateCopy }}
+          </SemanticButton>
+          <span
+            v-if="actionState === 'selected'"
+            class="game-card__action-state"
+          >
+            Действия карты открыты ниже
+          </span>
+          <span
+            v-else-if="actionState === 'confirmed'"
+            class="game-card__action-state"
+          >
+            Состояние подтверждено сервером
+          </span>
+        </div>
+      </header>
+    </template>
+
+    <template #art>
       <img
         v-if="resolvedImageURL"
-        class="card-image"
+        class="game-card__image"
         :src="resolvedImageURL"
         :alt="card.alt_text || card.name"
       >
-      <div
+      <CardArtPlaceholder
         v-else
-        class="game-card__illustration-fallback"
-        role="img"
-        :aria-label="`Иллюстрация для карты «${card.name}» пока не создана`"
-      >
-        <span aria-hidden="true" />
-      </div>
-    </div>
-    <div class="card-copy">
+        :label="`Иллюстрация для карты «${card.name}» пока не создана`"
+      />
+    </template>
+
+    <div class="game-card__copy">
       <h3 class="game-card__name">{{ card.name }}</h3>
-      <div class="card-stats">
+      <div
+        v-if="card.combat_strength || card.bonus || card.value !== undefined"
+        class="game-card__stats"
+      >
         <span v-if="card.combat_strength">Сила {{ card.combat_strength }}</span>
-        <span v-if="card.treasure_count">Сокровища {{ card.treasure_count }}</span>
         <span v-if="card.bonus">Бонус +{{ card.bonus }}</span>
         <span v-if="card.value !== undefined">{{ card.value }} голдов</span>
       </div>
-      <p v-if="card.rules_text" class="card-rules">{{ card.rules_text }}</p>
-      <p v-if="card.flavor_text && !compact" class="card-flavor">
+      <p v-if="card.rules_text" class="game-card__rules">
+        {{ card.rules_text }}
+      </p>
+      <p v-if="card.flavor_text && !compact" class="game-card__flavor">
         {{ card.flavor_text }}
       </p>
     </div>
-    <div class="game-card__notches" aria-hidden="true" />
-  </article>
+
+    <template
+      v-if="card.kind === 'monster' && (card.levels_reward !== undefined || card.treasure_count !== undefined)"
+      #footer
+    >
+      <div class="game-card__reward-footer">
+        <span>
+          {{ card.levels_reward === undefined ? "—" : `+${card.levels_reward} уровень` }}
+        </span>
+        <span>
+          {{ card.treasure_count === undefined ? "—" : `${card.treasure_count} сокровищ` }}
+        </span>
+      </div>
+    </template>
+  </CardFrame>
 </template>
 
-<style scoped>
-.card-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
+<style scoped lang="scss">
+@use "../assets/scss/api" as api;
 
 .game-card {
-  --card-accent: #ef6d34;
-  --card-accent-deep: #71321f;
-  --card-route: #ff9a6f;
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  width: min(310px, 100%);
-  min-height: 430px;
-  padding: .72rem;
-  display: grid;
-  grid-template-rows: auto auto minmax(160px, 1fr) auto;
-  gap: .55rem;
-  color: #1c1c18;
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--card-accent), #171811 60%), #171811 38%),
-    #171811;
-  clip-path: polygon(0 18px, 18px 0, calc(100% - 34px) 0, 100% 28px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 26px 100%, 0 calc(100% - 30px));
-  filter: drop-shadow(0 14px 22px rgb(0 0 0 / 32%));
+  scroll-snap-align: start;
   transition:
     border-color var(--duration-quick) var(--easing-enter),
-    filter var(--duration-quick) var(--easing-enter),
+    box-shadow var(--duration-quick) var(--easing-enter),
     opacity var(--duration-quick) var(--easing-enter);
 }
 
-.game-card::before {
-  content: "";
-  position: absolute;
-  z-index: -2;
-  inset: 0;
-  color: var(--card-route);
-  background: url("../assets/card-frame-motif.svg") center / cover;
-  opacity: .16;
-  transform: rotate(-1.5deg) scale(1.04);
-}
-
-.game-card::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 5px;
-  border: 2px solid color-mix(in srgb, var(--card-accent), white 16%);
-  clip-path: polygon(0 15px, 15px 0, calc(100% - 31px) 0, 100% 25px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 23px 100%, 0 calc(100% - 27px));
-  pointer-events: none;
-}
-
-.game-card--door {
-  --card-accent: #c8ef36;
-  --card-accent-deep: #50620d;
-  --card-route: #e6ff77;
-}
-
-.game-card--treasure {
-  --card-accent: #f07136;
-  --card-accent-deep: #74321d;
-  --card-route: #ffad72;
-}
-
-.game-card__route {
-  position: absolute;
-  z-index: 3;
-  top: 3.2rem;
-  right: -.15rem;
-  display: grid;
-  gap: .22rem;
-}
-
-.game-card__route i {
-  width: 1.5rem;
-  height: .22rem;
+.game-card__image {
+  width: 100%;
+  height: 100%;
   display: block;
-  background: var(--card-accent);
+  object-fit: cover;
 }
-
-.game-card__route i:nth-child(2) { width: 2.1rem; transform: translateX(-.6rem); }
-.game-card__route i:nth-child(3) { width: .9rem; transform: translateX(.25rem); }
 
 .game-card__header {
   min-width: 0;
-  padding: .2rem .35rem .05rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: .5rem;
-  color: #f8f2df;
-}
-
-.game-card__actions {
-  position: relative;
-  z-index: 5;
-  min-width: 0;
   display: grid;
-  gap: .3rem;
+  gap: var(--space-2);
 }
 
-.game-card__activate {
-  width: 100%;
-  min-height: 2.75rem;
-  padding: .55rem .65rem;
-  border-color: var(--card-accent);
-  color: #15160e;
-  background: var(--card-accent);
-  font-size: .68rem;
-  line-height: 1.15;
-  letter-spacing: .04em;
+.game-card__meta {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.game-card__deck,
+.game-card__meta small {
+  font-size: .64rem;
+  font-weight: 900;
+  letter-spacing: .1em;
   text-transform: uppercase;
 }
 
-.game-card__activate:disabled {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--card-accent), #15160e 65%);
-  cursor: wait;
-  opacity: 1;
+.game-card__deck {
+  color: var(--card-accent);
+}
+
+.game-card__meta small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-card__actions {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.game-card__actions :deep(.semantic-button) {
+  width: 100%;
+  min-height: 2.75rem;
+  border-color: var(--card-accent);
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--card-accent), var(--color-paper) 72%);
 }
 
 .game-card__action-state {
-  color: var(--muted);
-  font-size: .62rem;
+  color: var(--color-text-muted);
+  font-size: .68rem;
   line-height: 1.25;
   text-align: center;
 }
 
+.game-card__copy {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) 0;
+}
+
+.game-card__name {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 1.08rem;
+  line-height: 1.08;
+}
+
+.game-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.game-card__stats span {
+  border: 1px solid var(--card-accent-deep);
+  padding: .18rem .32rem;
+  color: var(--card-accent-deep);
+  font-size: .62rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.game-card__rules,
+.game-card__flavor {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.36;
+}
+
+.game-card__rules {
+  font-size: .76rem;
+}
+
+.game-card__flavor {
+  color: var(--color-text-muted);
+  font-size: .68rem;
+  font-style: italic;
+  line-height: 1.3;
+}
+
+.game-card__reward-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--card-accent-deep);
+  font-size: .72rem;
+  font-weight: 900;
+}
+
 .game-card[data-action-state="available"] {
-  filter: drop-shadow(0 14px 22px rgb(0 0 0 / 32%))
-    drop-shadow(0 0 0.75rem color-mix(in srgb, var(--card-accent), transparent 62%));
+  box-shadow:
+    0 12px 24px rgb(31 52 42 / 18%),
+    0 0 0 3px color-mix(in srgb, var(--card-accent), transparent 55%);
 }
 
 .game-card[data-action-state="selected"] {
@@ -275,183 +297,66 @@ function activate() {
 
 .game-card[data-action-state="pending"] {
   border-color: var(--color-info);
-  filter: drop-shadow(0 10px 16px rgb(0 0 0 / 35%));
+  opacity: .8;
 }
 
 .game-card[data-action-state="disabled"] {
-  filter: grayscale(.7) drop-shadow(0 8px 14px rgb(0 0 0 / 30%));
-  opacity: .7;
+  filter: grayscale(.55);
+  opacity: .68;
 }
 
 .game-card[data-motion="confirmed"] {
-  animation: card-confirmed var(--duration-standard) var(--easing-enter) both;
+  animation: game-card-confirmed var(--duration-standard) var(--easing-enter) both;
 }
 
-@keyframes card-confirmed {
+.game-card--compact .game-card__header {
+  gap: var(--space-1);
+}
+
+.game-card--compact .game-card__actions :deep(.semantic-button) {
+  min-height: 2.5rem;
+  padding: .4rem .35rem;
+  font-size: .62rem;
+}
+
+.game-card--compact .game-card__meta small,
+.game-card--compact .game-card__deck {
+  font-size: .5rem;
+}
+
+.game-card--compact .game-card__copy {
+  gap: var(--space-1);
+  padding-inline: .35rem;
+}
+
+.game-card--compact .game-card__name {
+  font-size: .78rem;
+}
+
+.game-card--compact .game-card__stats span {
+  padding: .12rem .2rem;
+  font-size: .5rem;
+}
+
+.game-card--compact .game-card__rules {
+  font-size: .58rem;
+  line-height: 1.28;
+}
+
+.game-card--compact .game-card__flavor {
+  display: none;
+}
+
+.game-card--compact .game-card__reward-footer {
+  font-size: .56rem;
+}
+
+@keyframes game-card-confirmed {
   0% { transform: translateY(.35rem); }
   100% { transform: translateY(0); }
 }
 
-.game-card__deck,
-.game-card small {
-  font-size: .64rem;
-  font-weight: 900;
-  line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: .12em;
-}
-
-.game-card__deck { color: var(--card-accent); }
-
-.game-card small {
-  overflow: hidden;
-  color: #c9c4b3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.game-card__illustration {
-  position: relative;
-  min-height: 0;
-  aspect-ratio: 2 / 2.35;
-  overflow: hidden;
-  border: 2px solid var(--card-accent);
-  background: #10110d;
-  clip-path: polygon(0 12px, 12px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
-}
-
-.game-card__illustration::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  box-shadow: inset 0 0 0 5px rgb(17 18 13 / 42%);
-  pointer-events: none;
-}
-
-.game-card__illustration-fallback {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  color: var(--card-accent);
-  background:
-    radial-gradient(circle at 70% 26%, currentColor 0 5%, transparent 5.5%),
-    linear-gradient(35deg, transparent 0 43%, currentColor 43.5% 45%, transparent 45.5%),
-    linear-gradient(145deg, color-mix(in srgb, var(--card-accent-deep), #15160f 48%), #15160f);
-}
-
-.game-card__illustration-fallback::before,
-.game-card__illustration-fallback::after,
-.game-card__illustration-fallback span {
-  content: "";
-  position: absolute;
-  border: 2px solid currentColor;
-  transform: rotate(45deg);
-}
-
-.game-card__illustration-fallback::before {
-  width: 34%;
-  aspect-ratio: 1;
-}
-
-.game-card__illustration-fallback::after {
-  width: 18%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  transform: translate(52%, -48%);
-}
-
-.game-card__illustration-fallback span {
-  width: 55%;
-  height: 22%;
-  border-width: 0 0 2px;
-  transform: rotate(-18deg);
-}
-
-.card-copy {
-  position: relative;
-  min-width: 0;
-  margin-top: -.95rem;
-  padding: 1.15rem .78rem .7rem;
-  display: grid;
-  gap: .52rem;
-  background:
-    linear-gradient(115deg, transparent 0 12px, #eee8d7 12.5px) top left / 100% 100% no-repeat;
-  box-shadow: 5px 5px 0 color-mix(in srgb, var(--card-accent-deep), transparent 8%);
-}
-
-.game-card__name {
-  margin: 0;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 1.08rem;
-  line-height: 1.05;
-  letter-spacing: -.025em;
-}
-
-.card-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .28rem;
-}
-
-.card-stats span {
-  border: 1px solid var(--card-accent-deep);
-  padding: .18rem .32rem;
-  color: var(--card-accent-deep);
-  font-size: .62rem;
-  font-weight: 800;
-  line-height: 1.15;
-}
-
-.card-rules {
-  margin: 0;
-  font-size: .76rem;
-  line-height: 1.36;
-}
-
-.card-flavor {
-  margin: 0;
-  color: #686454;
-  font-size: .68rem;
-  font-style: italic;
-  line-height: 1.3;
-}
-
-.game-card__notches {
-  position: absolute;
-  z-index: 4;
-  right: .35rem;
-  bottom: .4rem;
-  width: 1.9rem;
-  height: .35rem;
-  border-top: 2px solid var(--card-accent);
-  border-bottom: 2px solid var(--card-accent);
-  transform: skewX(-28deg);
-}
-
-.game-card--compact {
-  flex: 0 0 178px;
-  width: 178px;
-  min-height: 272px;
-  padding: .48rem;
-  grid-template-rows: auto auto 112px auto;
-  gap: .35rem;
-  clip-path: polygon(0 11px, 11px 0, calc(100% - 22px) 0, 100% 17px, 100% calc(100% - 11px), calc(100% - 11px) 100%, 16px 100%, 0 calc(100% - 19px));
-}
-
-.game-card--compact::after { inset: 3px; border-width: 1px; }
-.game-card--compact .game-card__header { padding-inline: .2rem; }
-.game-card--compact .game-card__activate { min-height: 2.5rem; padding: .38rem .35rem; font-size: .58rem; }
-.game-card--compact .game-card__deck,
-.game-card--compact small { font-size: .5rem; }
-.game-card--compact .game-card__illustration { aspect-ratio: auto; }
-.game-card--compact .card-copy { margin-top: -.65rem; padding: .85rem .5rem .45rem; gap: .35rem; box-shadow: 3px 3px 0 var(--card-accent-deep); }
-.game-card--compact .game-card__name { font-size: .78rem; }
-.game-card--compact .card-stats span { font-size: .5rem; padding: .12rem .2rem; }
-.game-card--compact .card-rules { font-size: .58rem; line-height: 1.28; }
-.game-card--compact .card-flavor { display: none; }
-
-@media (prefers-reduced-motion: reduce) {
+@include api.reduced-motion {
   .game-card[data-motion="confirmed"] {
     animation: none;
     outline: 3px solid var(--color-success);

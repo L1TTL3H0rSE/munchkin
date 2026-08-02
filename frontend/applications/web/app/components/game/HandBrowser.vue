@@ -4,14 +4,17 @@ import type {
   CardActionBinding,
   CardActionState,
 } from "../actionModel";
+import CardRail from "./primitives/CardRail.vue";
 
 withDefaults(defineProps<{
   cards: CardView[];
   contentSetId: string;
+  showMeta?: boolean;
   bindingsForCard?: (cardID: string) => CardActionBinding[];
   stateForCard?: (cardID: string) => CardActionState;
   confirmedCardIds?: ReadonlySet<string>;
 }>(), {
+  showMeta: false,
   bindingsForCard: () => [],
   stateForCard: () => "idle" as CardActionState,
   confirmedCardIds: () => new Set<string>(),
@@ -47,7 +50,7 @@ function restoreFocus() {
     <div class="hand-browser__heading">
       <div>
         <p class="eyebrow">СОБСТВЕННЫЕ КАРТЫ</p>
-        <h3 id="hand-title">Рука — {{ cards.length }} карт</h3>
+        <h3 id="hand-title">Рука · {{ cards.length }}</h3>
       </div>
       <button
         ref="openButton"
@@ -60,11 +63,11 @@ function restoreFocus() {
       </button>
     </div>
 
-    <div
-      class="hand-browser__rail"
-      :role="cards.length ? 'list' : undefined"
-      :tabindex="cards.length ? 0 : undefined"
-      aria-label="Карты в руке, прокручиваемая лента"
+    <CardRail
+      title="Карты в руке"
+      :item-count="cards.length"
+      labelled-by="hand-title"
+      :show-heading="false"
     >
       <GameCard
         v-for="card in cards"
@@ -72,21 +75,26 @@ function restoreFocus() {
         :card="card"
         :content-set-id="contentSetId"
         compact
+        :show-meta="showMeta"
         :action-bindings="bindingsForCard(card.instance_id)"
         :action-state="stateForCard(card.instance_id)"
         :motion-state="confirmedCardIds.has(card.instance_id) ? 'confirmed' : undefined"
         role="listitem"
         @activate="emit('activate', $event)"
       />
-      <p v-if="!cards.length" class="hand-browser__empty">Карт нет.</p>
-    </div>
+    </CardRail>
 
-    <dialog ref="dialog" class="hand-sheet" aria-labelledby="hand-sheet-title" @close="restoreFocus">
+    <dialog
+      ref="dialog"
+      class="hand-sheet"
+      aria-labelledby="hand-sheet-title"
+      @close="restoreFocus"
+    >
       <form class="hand-sheet__surface" method="dialog">
         <header class="hand-sheet__header">
           <div>
             <p class="eyebrow">ПОЛНЫЙ ПРОСМОТР</p>
-            <h2 id="hand-sheet-title">Вся рука</h2>
+            <h2 id="hand-sheet-title">Рука · {{ cards.length }}</h2>
           </div>
           <button
             data-close-hand
@@ -105,6 +113,7 @@ function restoreFocus() {
             :card="card"
             :content-set-id="contentSetId"
             compact
+            :show-meta="showMeta"
             :action-bindings="bindingsForCard(card.instance_id)"
             :action-state="stateForCard(card.instance_id)"
             :motion-state="confirmedCardIds.has(card.instance_id) ? 'confirmed' : undefined"
@@ -117,95 +126,90 @@ function restoreFocus() {
   </section>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/scss/api" as api;
+
 .hand-browser {
   min-width: 0;
   display: grid;
-  gap: .5rem;
+  gap: var(--space-2);
 }
 
 .hand-browser__heading {
   display: flex;
   align-items: end;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .hand-browser__heading h3 {
   margin: .35rem 0 0;
 }
 
-.hand-browser__open {
+.hand-browser__open,
+.hand-sheet__close {
+  @include api.touch-target;
   flex: 0 0 auto;
-  min-height: 2.75rem;
-  border-color: var(--line);
-  color: var(--ink);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  padding: .5rem .7rem;
+  color: var(--color-text);
   background: transparent;
-  text-transform: none;
-  letter-spacing: 0;
+  font: inherit;
+  cursor: pointer;
 }
 
-.hand-browser__rail {
-  display: flex;
-  gap: .75rem;
-  min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  padding: 1rem .15rem;
-  scrollbar-gutter: stable;
+.hand-browser__open:focus-visible,
+.hand-sheet__close:focus-visible {
+  @include api.focus-ring;
 }
 
-.hand-browser__empty {
-  margin: 1rem 0;
-  color: var(--muted);
+.hand-browser__open:disabled {
+  cursor: not-allowed;
+  opacity: .55;
 }
 
 .hand-sheet {
   width: min(56rem, calc(100% - 1rem));
   max-width: none;
   max-height: min(90dvh, 56rem);
-  border: 1px solid var(--line);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sheet);
   padding: 0;
-  color: var(--ink);
-  background: var(--paper);
+  color: var(--color-text);
+  background: var(--color-paper);
 }
 
 .hand-sheet::backdrop {
-  background: rgb(0 0 0 / 72%);
+  background: var(--color-scrim);
 }
 
 .hand-sheet__surface {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-4);
   max-height: min(90dvh, 56rem);
   overflow: auto;
-  padding: 1rem;
+  padding: var(--space-4);
 }
 
 .hand-sheet__header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 1rem;
   position: sticky;
   top: 0;
   z-index: 1;
-  padding-bottom: .75rem;
-  background: var(--paper);
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-3);
+  background: var(--color-paper);
 }
 
 .hand-sheet__header h2 { margin: .35rem 0 0; }
 
-.hand-sheet__close {
-  border-color: var(--line);
-  color: var(--ink);
-  background: transparent;
-}
-
 .hand-sheet__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
-  gap: .75rem;
+  gap: var(--space-3);
 }
 
 @media (width <= 599px) {

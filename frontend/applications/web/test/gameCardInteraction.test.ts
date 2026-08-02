@@ -8,8 +8,12 @@ import {
   mapCardActions,
 } from "../app/components/actionModel";
 import {
+  buildStrengthBreakdown,
+} from "../app/components/game/gameTableViewModel";
+import {
   parseGameProjection,
 } from "../app/composables/useGameApi";
+import {reconcileCardSelection} from "../app/composables/useCardSelection";
 
 const card = (instanceID: string): CardView => ({
   instance_id: instanceID,
@@ -120,5 +124,23 @@ describe("card-first action surface", () => {
 
     expect(parseGameProjection(fixture).turn.available_actions[0]?.type)
       .toBe("propose_trade");
+  });
+
+  it("clears a stale selected card while preserving a live card", () => {
+    expect(reconcileCardSelection("card-1", ["card-1", "card-2"]))
+      .toBe("card-1");
+    expect(reconcileCardSelection("card-1", ["card-2"]))
+      .toBeNull();
+  });
+
+  it("keeps authoritative strength and labels the unattributed remainder", () => {
+    expect(buildStrengthBreakdown(14, [
+      {id: "level", label: "Уровень", value: 2},
+      {id: "sword", label: "Меч", value: 3},
+    ])).toEqual([
+      {id: "level", label: "Уровень", value: 2},
+      {id: "sword", label: "Меч", value: 3},
+      {id: "other-effects", label: "Прочие эффекты", value: 9},
+    ]);
   });
 });

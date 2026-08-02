@@ -5,6 +5,8 @@ import type {
   Projection,
 } from "@munchkin/contracts";
 import type {GameConnectionState} from "../../composables/useGameSessionController";
+import {useCardSelection} from "../../composables/useCardSelection";
+import {useGamePresentation} from "../../composables/useGamePresentation";
 import ActionPanel from "../ActionPanel.vue";
 import GameConnectionStatus from "../GameConnectionStatus.vue";
 import EconomySurface from "../interaction/EconomySurface.vue";
@@ -22,7 +24,11 @@ import {
   type CardActionState,
 } from "../actionModel";
 import GameContextPanel from "./GameContextPanel.vue";
-import {currentPlayerName, uniqueCards} from "./gameTableViewModel";
+import {
+  currentPlayerName,
+  uniqueCards,
+  visibleCardsForProjection,
+} from "./gameTableViewModel";
 import OpponentRoster from "./OpponentRoster.vue";
 import OwnBoard from "./OwnBoard.vue";
 
@@ -40,10 +46,11 @@ const emit = defineEmits<{
   "execute-economy": [request: EconomySubmission];
 }>();
 
-const selectedCardID = ref<string | null>(null);
 const pendingCardIDs = ref<Set<string>>(new Set());
 const confirmedCardIDs = ref<Set<string>>(new Set());
 let confirmedMotionTimer: ReturnType<typeof setTimeout> | undefined;
+
+const presentation = useGamePresentation(() => props.projection);
 
 const ownCards = computed(() => uniqueCards([
   ...props.projection.you.hand,
@@ -55,20 +62,11 @@ const ownCards = computed(() => uniqueCards([
 ]));
 
 const visibleCards = computed(() => uniqueCards([
-  ...ownCards.value,
-  ...props.projection.turn.resolving,
-  ...(props.projection.turn.encounter ? [props.projection.turn.encounter] : []),
-  ...props.projection.players.flatMap((player) => [
-    ...player.carried,
-    ...player.equipped,
-    ...player.traits,
-    ...player.attachments,
-    ...player.persistent_curses,
-  ]),
+  ...visibleCardsForProjection(props.projection),
 ]));
 
 const actionEntries = computed<ActionEntry[]>(() =>
-  props.projection.turn.available_actions.map((action, index) => ({action, index})),
+  presentation.value?.turnActions.map(({action, index}) => ({action, index})) ?? [],
 );
 
 const economyActionEntries = computed(() => economyActions(
@@ -82,6 +80,15 @@ const genericActionEntries = computed<ActionEntry[]>(() =>
 const cardActionMap = computed(() =>
   mapCardActions(ownCards.value, genericActionEntries.value),
 );
+
+const {
+  selectedCardID,
+  selectCard,
+  clearSelection,
+} = useCardSelection({
+  projectionVersion: () => props.projection.version,
+  availableCardIDs: () => [...cardActionMap.value.byCard.keys()],
+});
 
 const globalActionEntries = computed(() =>
   genericActionEntries.value.filter((entry) =>
@@ -148,11 +155,11 @@ function activateCard(binding: CardActionBinding) {
     runAction(binding, buildCommandPayload(binding.action));
     return;
   }
-  selectedCardID.value = binding.cardInstanceID;
+  selectCard(binding.cardInstanceID);
 }
 
 function closeCardActions() {
-  selectedCardID.value = null;
+  clearSelection();
 }
 
 watch(
@@ -182,15 +189,6 @@ watch(() => props.actionBusy, (busy) => {
     pendingCardIDs.value = new Set();
   }
 });
-
-watch(
-  () => selectedCardID.value,
-  (cardID) => {
-    if (cardID && !cardActionMap.value.byCard.has(cardID)) {
-      selectedCardID.value = null;
-    }
-  },
-);
 
 onBeforeUnmount(() => {
   if (confirmedMotionTimer) {

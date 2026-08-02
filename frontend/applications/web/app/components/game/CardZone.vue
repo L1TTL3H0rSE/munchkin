@@ -4,6 +4,7 @@ import type {
   CardActionBinding,
   CardActionState,
 } from "../actionModel";
+import CardRail from "./primitives/CardRail.vue";
 
 withDefaults(defineProps<{
   title: string;
@@ -11,12 +12,14 @@ withDefaults(defineProps<{
   contentSetId: string;
   emptyCopy?: string;
   compact?: boolean;
+  showMeta?: boolean;
   bindingsForCard?: (cardID: string) => CardActionBinding[];
   stateForCard?: (cardID: string) => CardActionState;
   confirmedCardIds?: ReadonlySet<string>;
 }>(), {
   emptyCopy: "Пока ничего.",
   compact: true,
+  showMeta: false,
   bindingsForCard: () => [],
   stateForCard: () => "idle" as CardActionState,
   confirmedCardIds: () => new Set<string>(),
@@ -28,51 +31,23 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section class="card-zone" :aria-label="title">
-    <h3>{{ title }}</h3>
-    <div
-      class="card-zone__rail"
-      :role="cards.length ? 'list' : undefined"
-      :tabindex="cards.length ? 0 : undefined"
-    >
-      <GameCard
-        v-for="card in cards"
-        :key="card.instance_id"
-        :card="card"
-        :content-set-id="contentSetId"
-        :compact="compact"
-        :action-bindings="bindingsForCard(card.instance_id)"
-        :action-state="stateForCard(card.instance_id)"
-        :motion-state="confirmedCardIds.has(card.instance_id) ? 'confirmed' : undefined"
-        role="listitem"
-        @activate="emit('activate', $event)"
-      />
-      <p v-if="!cards.length" class="card-zone__empty">{{ emptyCopy }}</p>
-    </div>
-  </section>
+  <CardRail
+    :title="title"
+    :item-count="cards.length"
+    :empty-copy="emptyCopy"
+  >
+    <GameCard
+      v-for="card in cards"
+      :key="card.instance_id"
+      :card="card"
+      :content-set-id="contentSetId"
+      :compact="compact"
+      :show-meta="showMeta"
+      :action-bindings="bindingsForCard(card.instance_id)"
+      :action-state="stateForCard(card.instance_id)"
+      :motion-state="confirmedCardIds.has(card.instance_id) ? 'confirmed' : undefined"
+      role="listitem"
+      @activate="emit('activate', $event)"
+    />
+  </CardRail>
 </template>
-
-<style scoped>
-.card-zone {
-  min-width: 0;
-}
-
-.card-zone h3 {
-  margin: 1.25rem 0 0;
-}
-
-.card-zone__rail {
-  display: flex;
-  gap: .75rem;
-  min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  padding: 1rem .15rem;
-  scrollbar-gutter: stable;
-}
-
-.card-zone__empty {
-  margin: 1rem 0;
-  color: var(--muted);
-}
-</style>
