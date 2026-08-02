@@ -3,12 +3,12 @@
 - **Plan ID:** `20260731T005309Z-569b95-infrastructure-p1-bonus-hardening`
 - **Статус:** draft
 - **Создан:** 2026-07-31 00:53:09 UTC
-- **Обновлён:** 2026-07-31 01:07:00 UTC
+- **Обновлён:** 2026-08-01 14:40:07 UTC
 - **Владелец:** —
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** current
 - **Режим параллельности:** exclusive
-- **Зависит от:** plan `20260731T005308Z-5ec80f-contest-readme-runbooks-and-demo`.
+- **Зависит от:** plans `20260731T005306Z-3de45e-production-compose-traefik-and-deploy`, `20260731T005307Z-54ac2f-telemetry-backend-dashboards-and-alerts`, `20260731T005308Z-5ec80f-contest-readme-runbooks-and-demo`.
 - **Блокирует:**
   `20260731T005309Z-784d5e-infrastructure-p2-platform-evolution`
 - **Связанные ADR/handoff:** ADR-0007, ADR-0009,
@@ -20,138 +20,103 @@
 {
   "schemaVersion": 1,
   "paths": [
-    ".github/**",
-    "README.md",
-    "backend/game/**",
-    "frontend/**",
-    "compose.production.yml",
-    "infra/ansible/**",
-    "infra/compose/**",
-    "infra/k6/**",
-    "infra/observability/**",
-    "infra/otel/**",
-    "infra/terraform/environments/production/**",
-    "scripts/production/**",
-    "docs/architecture/**",
-    "docs/operations/**",
-    "docs/demo/**",
     "docs/agents/INFRASTRUCTURE_ROADMAP.md",
     "docs/agents/plans/active/20260731T005309Z-569b95-infrastructure-p1-bonus-hardening.md",
     "docs/agents/plans/archive/20260731T005309Z-569b95-infrastructure-p1-bonus-hardening.md"
   ],
   "components": [
-    "repository-workflow",
-    "terraform-infrastructure",
-    "root-compose",
-    "go:backend/game",
-    "frontend-workspace"
+    "repository-workflow"
   ],
   "contracts": [
-    "observability:correlated-logs-v1",
-    "observability:host-stack-v1",
-    "operations:external-synthetic-v1",
-    "performance:k6-production-smoke-v1",
-    "security:advanced-production-v1"
+    "platform:p1-bonus-decision-v1"
   ],
   "dependsOn": [
+    "20260731T005306Z-3de45e-production-compose-traefik-and-deploy",
+    "20260731T005307Z-54ac2f-telemetry-backend-dashboards-and-alerts",
     "20260731T005308Z-5ec80f-contest-readme-runbooks-and-demo"
   ],
   "sharedResources": [
-    "infra:yandex-cloud-production-v1",
     "cloud:yandex-compute:fv4eule47h2vqo5ki48k",
     "observability:production-telemetry-v1",
-    "delivery:immutable-image-pair-v1",
-    "runtime:production-security-v1"
+    "delivery:production-release-evidence-v1",
+    "dns:munchkin.l1ttl3h0rse.ru"
   ]
 }
 ```
 
 ## Цель
 
-Заранее зафиксировать один editable, decision-gated plan для всех P1 bonuses
-INFRA-B01…B10. После завершения P0 выбрать owner-approved subset по
-демо-ценности, бюджету, VM headroom и риску, затем реализовать его по фазам без
-создания нового пустого umbrella plan. Любое сокращение/расширение выбранного
-subset и remote mutation set требует обновления этого же файла и нового
-approval.
+Честно закрыть contest P1 bonus как `all deferred`, не отбирая время и
+headroom у P0. Первый production deploy назначен на
+`2026-08-02 09:00–11:00 Europe/Moscow`, а P1 требовал полностью завершённый
+P0, затем минимум 24 часа stable evidence и hard cutoff
+`2026-08-02 18:00 Europe/Moscow`. Эти условия одновременно невыполнимы.
+Текущий plan разрешает только зафиксировать deferral; он не разрешает bonus
+code, workflow, load traffic, Monium changes или новые расходы.
 
 ## Критерии приёмки
 
-- [ ] До approval собраны P0 baseline, VM headroom, telemetry/storage/network
-  cost и contest deadline; для B01…B10 есть value/cost/risk/effort ranking.
-- [ ] **INFRA-B01:** structured JSON logs + Alloy/Loki (или выбранный
-  эквивалент) дают trace→correlated logs без credentials, player/game/card IDs,
-  payloads или unbounded labels.
-- [ ] **INFRA-B02:** node/container/PostgreSQL/Traefik metrics показывают CPU,
-  memory, disk, network, DB pool/query aggregates and ingress latency/errors;
-  collectors не получают лишний raw Docker access.
-- [ ] **INFRA-B03:** Alertmanager/managed alerts доставляют readiness, 5xx,
-  disk pressure and backup freshness/failure с dedup/silence/runbooks.
-- [ ] **INFRA-B04:** Trivy/SBOM/Dependabot/keyless Cosign or equivalent evidence
-  attached to exact image digest/full SHA; static signing/cloud keys absent.
-- [ ] **INFRA-B05:** Ansible or improved cloud-init воспроизводит current host
-  baseline на fresh disposable host from documented inventory, без secrets in
-  repository/state.
-- [ ] **INFRA-B06:** k6 smoke/load profiles имеют owner-approved latency/error
-  thresholds, bounded production rate/duration and manual/CI safety gate.
-- [ ] **INFRA-B07:** external synthetic monitor detects VPS/DNS/TLS outage from
-  outside production host and alerts through tested channel.
-- [ ] **INFRA-B08:** CSP/HSTS/nosniff/referrer and related browser headers
-  проверены automatically against real routes/WebSocket/assets without
-  breaking application.
-- [ ] **INFRA-B09:** deploy annotations link dashboard latency/error changes to
-  exact rollout SHA/digests and rollback.
-- [ ] **INFRA-B10:** Traefik uses file provider or narrowly scoped Docker socket
-  proxy; raw unrestricted `/var/run/docker.sock` отсутствует.
-- [ ] Selected subset has exact budget/write/remote mutation set, rollback and
-  evidence. Unselected bonuses остаются явно `deferred`, не claimed complete.
-- [ ] Full regression, soak/load/synthetic/security checks, canonical verify
-  and scope-check pass within approved production safety limits.
+- [ ] После archive всех P0 predecessors подтверждено, что первый deploy не
+  мог дать 24 полных часа evidence до P1 cutoff; пропущенные данные не
+  экстраполируются и deadline не переносится агентом.
+- [ ] `INFRA-B01`–`INFRA-B10` отмечены в roadmap как `deferred/not attempted`,
+  а не complete/partial; contest claims и README не начисляют за них бонус.
+- [ ] P1 не меняет `.github`, README/demo, application code, Compose,
+  Terraform, scripts, VM, Monium, DNS, alerts or public traffic.
+- [ ] Incremental budget остаётся `0 RUB/month`; существующие managed Monium
+  and owner-only email alerts не меняются.
+- [ ] Для возможного post-contest plan сохранена рекомендация: сначала только
+  `B09` deploy annotation, затем `B06` один bounded k6 smoke. Это не selected
+  slice и не authorization.
+- [ ] Future `B09` разрешается лишь после доказанного machine-readable release
+  artifact (full commit SHA, game/web digests, workflow run/result/timestamp)
+  и поддерживаемого idempotent Monium annotation endpoint/auth contract.
+- [ ] Future `B06` разрешается лишь после `B09`, минимум 24h stable baseline,
+  available RAM `>=1 GiB`, CPU p95 `<=70%`, disk free `>=30%`, no sustained
+  swap/unresolved incident; one run, `1–2 VUs`, `<=1 request/s`, `<=60s`, abort
+  on readiness/5xx/latency/resource guard.
 
 ## Контекст и подтверждённое состояние
 
-- P1 is optional and must not delay truthful P0 production/demo closure.
-- Existing roadmap recommends these ten bonuses, but final relevance depends on
-  actual P0 stack and contest time.
-- Single `2 vCPU / 4 GB` VM makes combined Loki/Alloy/exporters/cAdvisor
-  potentially unsafe; managed/off-host alternatives need price comparison.
-- Several bonuses overlap P0 security/telemetry work; this plan must consume
-  actual gaps rather than duplicate completed evidence.
+- Public DNS audit 2026-08-01 показывает Timeweb delegation и NXDOMAIN для
+  production hostname; P0 deploy/telemetry/backup/security/demo ещё не завершены.
+- Maintenance/deploy window начинается 2026-08-02 в 09:00 MSK. Даже
+  мгновенно успешный deploy не создаёт 24h baseline к cutoff 18:00 того же дня.
+- Broad P1 stack (Loki/Alloy/exporters/socket proxy/headers/infra tests и
+  другие B-items) не принадлежит этому plan и остаётся без implementation owner.
+- Владелец согласился с условной приоритизацией `B09 → B06`, нулевым budget и
+  deadline; audit evidence переводит условный результат в `all deferred`.
 
 ## Scope
 
 ### Входит
 
-- Evaluation and owner-approved implementation of B01…B10 in this plan file.
-- Config/code/infra/runbook/evidence needed for selected subset.
-- Measured resource/cost/latency/security impact and rollback.
+- Зафиксировать calendar/evidence decision и all-deferred status в roadmap.
+- Сохранить post-contest recommendation без implementation ownership.
 
 ### Не входит
 
-- Claiming all bonuses mandatory.
-- P2 admin/accounts/storage/staging/HA/Kubernetes/broker work.
-- Static cloud/signing keys, unbounded load tests or public management ports.
-- Paid service/cloud mutation before exact approval.
+- Любая реализация `B01`–`B10`.
+- Workflow/scripts/k6/docs-demo/README/runtime/cloud/Monium/DNS mutations.
+- Перенос deadline, ослабление 24h/headroom gates или claim partial bonus.
+- Создание post-contest implementation plan без нового owner request/approval.
 
 ## Архитектурный подход
 
-1. Score bonuses after P0 using demo value, reliability gain, monthly cost,
-   implementation risk, VM headroom and dependency overlap.
-2. Update this same plan with exact selected subset and narrow paths/resources;
-   obtain re-approval before code.
-3. Implement in safety order: socket/headers/supply-chain, host metrics/logs,
-   alerts/annotations/synthetics, bounded k6, reproducible host.
-4. Each phase is independently disableable and must preserve P0 deploy/rollback.
+1. Дождаться завершения P0 dependency chain только для truthful evidence links.
+2. Записать в roadmap, что contest P1 не запускался из-за доказанного
+   calendar gate, а не из-за подразумеваемой реализации.
+3. Завершить/архивировать этот decision-only plan без remote mutation.
+4. После contest при новом запросе создать отдельный narrow plan; повторно
+   проверить Monium annotation API/release artifact before considering `B09`,
+   затем отдельно проверить 24h headroom before `B06`.
 
 ## Затронутые компоненты и контракты
 
-| Фаза | Компоненты | Наблюдаемый контракт |
+| Компонент | Изменение | Контракт |
 |---|---|---|
-| B01–B03/B09 | logs/metrics/alerts/dashboards | Correlated low-cardinality operations |
-| B04/B08/B10 | CI/images/Traefik | Keyless evidence + browser/socket hardening |
-| B05 | host automation | Fresh-host reproducibility |
-| B06 | k6 | Bounded latency/error thresholds |
-| B07 | external monitor | Off-host outage detection |
+| repository workflow/docs | All-deferred decision only | `platform:p1-bonus-decision-v1` |
+| P0 VM/Monium/release evidence | Read-only proof | No mutation/no bonus claim |
 
 ## Координация с другими планами
 
@@ -159,71 +124,44 @@ approval.
 
 | Путь/ресурс | Режим | Причина |
 |---|---|---|
-| `.github/**` | write | B04/B06 workflow evidence |
-| `README.md` | write | Completed bonus evidence |
-| `backend/game/**` | write | Structured logs/metrics if selected |
-| `frontend/**` | write | Browser headers/RUM-safe tests if selected |
-| `compose.production.yml` | write | Selected production services |
-| `infra/ansible/**` | write | B05 host reproducibility |
-| `infra/compose/**` | write | B01–B03/B10 services/config |
-| `infra/k6/**` | write | B06 profiles |
-| `infra/observability/**` | write | B01–B03/B07/B09 definitions |
-| `infra/otel/**` | write | Logs/metrics pipeline |
-| `infra/terraform/environments/production/**` | write | Managed telemetry/synthetics/IAM |
-| `scripts/production/**` | write | Host/smoke/load/operations helpers |
-| `docs/architecture/**` | write | Selected architecture changes |
-| `docs/operations/**` | write | Selected runbooks |
-| `docs/demo/**` | write | Contest bonus evidence |
-| `docs/agents/INFRASTRUCTURE_ROADMAP.md` | write | B01–B10 status |
-| `docs/agents/plans/active/20260731T005309Z-569b95-infrastructure-p1-bonus-hardening.md` | write | Active lifecycle |
-| `docs/agents/plans/archive/20260731T005309Z-569b95-infrastructure-p1-bonus-hardening.md` | write | Archived lifecycle |
+| `docs/agents/INFRASTRUCTURE_ROADMAP.md` | write | Truthful P1 all-deferred status |
+| `docs/agents/plans/active/20260731T005309Z-569b95-infrastructure-p1-bonus-hardening.md` | write | Active decision lifecycle |
+| `docs/agents/plans/archive/20260731T005309Z-569b95-infrastructure-p1-bonus-hardening.md` | write | Archived decision lifecycle |
 
 ### Remote mutation set
 
 | Resource | Режим | Причина |
 |---|---|---|
-| Production VM/Compose | conditional controlled update | Selected agents/proxy |
-| Telemetry/alert/synthetic services | conditional create/update | Selected B01–B03/B07/B09 |
-| GitHub settings/evidence | conditional update | B04/B06 |
-| Disposable host | conditional create/destroy with approval | B05 proof |
+| GitHub, production VM, Monium, DNS, public endpoint | none | Decision-only all-deferred closure |
 
 ### Shared resources
 
 | Ресурс | Другие plans | Владелец | Порядок/стратегия |
 |---|---|---|---|
-| P0 production stack | all prior infra plans | dependencies | Baseline first, no regression |
-| VM resource budget | telemetry/backup/runtime | this plan evaluates | Stop above approved headroom |
-| Security/evidence | security plan | dependency | Extend only documented gaps |
+| P0 release/telemetry/VM evidence | deploy/telemetry/docs | predecessors | Read only after archive |
+| Roadmap | all infrastructure plans | this decision after P0 | Update only P1 status/evidence |
 
 ### Проверка конфликтов
 
-- **Проверены active plans:** 2026-07-31 01:07:00 UTC.
-- **Обнаруженные пересечения:** broad by design across completed P0 resources;
-  P2 follows after this plan.
-- **Решение:** this is deliberately incomplete and not eligible for approval.
-  Before approval update exact subset, narrow write set, budget, dependencies
-  and remote mutations in this same file; no new umbrella plan required.
+- **Проверены active plans:** 2026-08-01 14:44:19 UTC.
+- **Обнаруженные пересечения:** future bonus implementations would overlap P0
+  workflows/config/runtime; current plan overlaps only roadmap/lifecycle docs.
+- **Решение:** no predecessor files/resources are writable. A post-contest
+  bonus is a new scope requiring its own plan and approval.
 
 ## План реализации
 
-1. [ ] Refresh P0 evidence, deadline, costs and VM headroom.
-2. [ ] Score B01…B10 and choose exact subset with owner.
-3. [ ] Narrow this plan/write set/resources/checks and request approval.
-4. [ ] Implement selected phases one at a time behind disable/rollback switches.
-5. [ ] Run load/soak/synthetic/security/fresh-host evidence as applicable.
-6. [ ] Update README/demo/roadmap with completed bonuses only.
-7. [ ] Verify/scope-check and archive; record unselected bonuses as deferred.
+1. [ ] Verify archived P0 timestamps and link the evidence showing the missed
+   24h/cutoff combination.
+2. [ ] Mark every B-item deferred/not-attempted in roadmap without bonus claim.
+3. [ ] Run plan-lint, verify/scope-check and archive this decision-only plan.
+4. [ ] Stop. Do not create or execute post-contest work without a new request.
 
 ## Проверки
 
-- [ ] P0 regression: deploy/readiness/TLS/telemetry/backup/security
-- [ ] VM CPU/memory/disk/network soak under selected agents and k6
-- [ ] Privacy/cardinality/log/secret negative scan
-- [ ] Alert/synthetic/annotation end-to-end tests
-- [ ] Browser header/WebSocket/assets regression
-- [ ] Docker socket raw-access negative test
-- [ ] SBOM/keyless signature/evidence verification
-- [ ] Fresh disposable host baseline test if B05 selected
+- [ ] P0 completion/deploy timestamp versus 24h window and cutoff
+- [ ] B01–B10 all explicitly deferred/not attempted
+- [ ] No `.github`/code/Compose/Terraform/scripts/runtime/remote diff
 - [ ] `node .codex/hooks/plan-lint.mjs`
 - [ ] `./leinoctl verify --changed`
 - [ ] `./leinoctl scope-check --plan 20260731T005309Z-569b95-infrastructure-p1-bonus-hardening`
@@ -231,37 +169,39 @@ approval.
 
 ## Риски и откат
 
-- **Риск:** optional stack destabilizes/costs more than P0. **Снижение:** ranked
-  subset, hard budgets, phase toggles and measured soak.
-- **Риск:** observability expands sensitive/high-cardinality data. **Снижение:**
-  inherited allowlists, redaction and negative queries.
-- **Риск:** load test harms production. **Снижение:** explicit rate/duration/
-  environment gates and owner-approved window.
-- **Откат:** disable/remove selected phase and restore P0 digest/config; remote
-  deletion or disposable-host destroy uses separate exact approval.
+- **Риск:** deadline переносится молча ради bonus. **Снижение:** fixed cutoff
+  and all-deferred acceptance criterion.
+- **Риск:** future recommendation воспринимается как current authorization.
+  **Снижение:** decision-only manifest, empty remote set and new-plan gate.
+- **Риск:** docs claim unimplemented bonus. **Снижение:** evidence link and
+  explicit not-attempted wording.
+- **Откат:** revert exact roadmap/plan documentation diff; no remote state is
+  changed.
 
 ## Открытые вопросы
 
-- Exact selected subset, priority and contest deadline.
-- Additional monthly budget and minimum VM headroom.
-- Managed vs self-hosted logs/metrics/synthetic options.
-- Alert channel and disposable-host budget.
-- Until resolved, plan remains an incomplete non-approvable base.
+- Contest P1 decision is settled: all B-items are deferred under the current
+  deadline.
+- Whether to pursue post-contest `B09`/`B06` is intentionally outside this
+  plan and requires a new owner request.
 
 ## Согласование
 
-- **Статус:** not requested; incomplete optional draft
+- **Статус:** not requested; decision-only all-deferred draft
 - **Запрошено:** —
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** заранее определить всё из infra
-  roadmap; incomplete base plan acceptable. No static cloud keys and no
-  implementation/select/commit/push.
+- **Подтверждено:** owner accepted the original conditional priority/deadline;
+  formal approval of this corrected all-deferred decision remains pending.
+- **Формулировка/ограничения пользователя:** выбрать subset/priority/deadline/
+  budget/headroom/provider/channel. Audit selected no contest implementation
+  because the accepted gates are temporally impossible; no
+  select/implementation/commit/push.
 
 ## Ход выполнения
 
-- All roadmap B01…B10 captured in one editable decision-gated plan.
-- Implementation не начата, plan не selected.
+- 2026-08-01: conditional B09→B06 implementation scope removed after calendar
+  audit proved that 24h evidence cannot fit before cutoff.
+- All remote/code paths removed; no bonus implementation or traffic started.
 
 ## Итог
 
-Заполняется после реализации.
+Заполняется после all-deferred decision closure.
