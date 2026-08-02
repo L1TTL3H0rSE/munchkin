@@ -10,10 +10,10 @@ import { discoverRepository } from "./discovery.mjs";
 import { asLeinoError, EXIT_CODES, LeinoError } from "./errors.mjs";
 import { buildGeneratorCommands } from "./generators.mjs";
 import {
-  changedSinceBaseline,
   changedPaths,
   fingerprintSnapshotPaths,
   gitPreflight,
+  repositoryDeltaSinceBaseline,
   snapshotRepository,
   submoduleStatus,
   syncRepository,
@@ -28,7 +28,11 @@ import {
 } from "./plans.mjs";
 import { loadProfile } from "./profile.mjs";
 import { runCommands } from "./runner.mjs";
-import { inspectToolchain } from "./toolchain.mjs";
+import {
+  executableLaunchOptions,
+  inspectToolchain,
+  resolveExecutable,
+} from "./toolchain.mjs";
 import { checkTextPaths } from "./text.mjs";
 import {
   claimPlanLifecycle,
@@ -221,6 +225,10 @@ function pathSelection(repoRoot, options) {
     : changedPaths(repoRoot, { base: options.base });
 }
 
+function selectedSessionChangedPaths(repoRoot, session, current = snapshotRepository(repoRoot)) {
+  return repositoryDeltaSinceBaseline(repoRoot, session.baseline, current).changed;
+}
+
 function verificationPathSelection(repoRoot, profile, options, env = process.env) {
   if (options.paths?.length) {
     return options.paths;
@@ -232,7 +240,7 @@ function verificationPathSelection(repoRoot, profile, options, env = process.env
     const sessionId = resolveSessionId(options.session, env);
     const session = readSession(repoRoot, profile.runtimeDir, sessionId);
     if (session) {
-      return changedSinceBaseline(session.baseline, snapshotRepository(repoRoot));
+      return selectedSessionChangedPaths(repoRoot, session);
     }
   } catch {
     // Human and CI invocations without a selected session use the worktree.
@@ -244,14 +252,29 @@ function commandLine(command) {
   return `${command.cwd === "." ? "." : command.cwd}$ ${command.argv.join(" ")}`;
 }
 
-function commandRunnerOptions(repoRoot, options) {
+function commandRunnerOptions(repoRoot, profile, options, env = process.env) {
   return {
     repoRoot,
     dryRun: options["dry-run"] === true,
     capture: options.json === true,
+    env,
     onStart: options.json
       ? () => {}
       : (command) => process.stdout.write(`${commandLine(command)}\n`),
+    resolveCommandExecutable(executable) {
+      const resolution = resolveExecutable(executable, {
+        repoRoot,
+        profile,
+        env,
+      });
+      if (!resolution.path) {
+        return resolution;
+      }
+      return {
+        path: resolution.path,
+        ...executableLaunchOptions(resolution.path),
+      };
+    },
   };
 }
 
@@ -281,7 +304,7 @@ function maybeRecordChecks(
     `${profile.plans.archiveDir}/${session.planId}.md`,
   ]);
   const current = snapshotRepository(repoRoot);
-  const coveredPaths = changedSinceBaseline(session.baseline, current)
+  const coveredPaths = selectedSessionChangedPaths(repoRoot, session, current)
     .filter((repoPath) => !lifecyclePaths.has(repoPath))
     .filter((repoPath) => checkedPaths.some((selection) => selectionMatchesPath(selection, repoPath)))
     .sort();
@@ -342,7 +365,7 @@ function maybeRecordVerificationTargets(
     `${profile.plans.activeDir}/${session.planId}`,
     `${profile.plans.archiveDir}/${session.planId}`,
   ].map((prefix) => `${prefix}.md`));
-  const targets = changedSinceBaseline(session.baseline, current)
+  const targets = selectedSessionChangedPaths(repoRoot, session, current)
     .filter((repoPath) => !lifecyclePaths.has(repoPath))
     .filter((repoPath) => checkedPaths.some((selection) => selectionMatchesPath(selection, repoPath)));
   recordSessionTargets(repoRoot, profile, sessionId, targets);
@@ -598,7 +621,7 @@ async function execute(command, positionals, options, context) {
     }
 
     const current = snapshotRepository(repoRoot);
-    const changed = changedSinceBaseline(selectedSession.baseline, current);
+    const changed = selectedSessionChangedPaths(repoRoot, selectedSession, current);
     const graph = buildComponentGraph(repoRoot, profile);
     const requiredChecks = componentChecks(impactedComponents(graph, changed));
     const result = releaseSelectedPlanForRotation(
@@ -632,7 +655,7 @@ async function execute(command, positionals, options, context) {
       throw new LeinoError("session-not-selected", "no plan is selected for this session");
     }
     const current = snapshotRepository(repoRoot);
-    const changed = changedSinceBaseline(selectedSession.baseline, current);
+    const changed = selectedSessionChangedPaths(repoRoot, selectedSession, current);
     const graph = buildComponentGraph(repoRoot, profile);
     const requiredChecks = componentChecks(impactedComponents(graph, changed));
     const report = sessionScopeReport(repoRoot, profile, registry, {
@@ -686,7 +709,7 @@ async function execute(command, positionals, options, context) {
     const graph = buildComponentGraph(repoRoot, profile);
     const components = impactedComponents(graph, paths);
     const checks = componentChecks(components);
-    const runnerOptions = commandRunnerOptions(repoRoot, options);
+    const runnerOptions = commandRunnerOptions(repoRoot, profile, options);
     runnerOptions.onComplete = (result) => {
       maybeRecordChecks(repoRoot, profile, [result], paths, options.session);
     };
@@ -714,7 +737,7 @@ async function execute(command, positionals, options, context) {
     const commands = buildGeneratorCommands(profile.generators, requested, {
       check: options.check === true,
     });
-    const runnerOptions = commandRunnerOptions(repoRoot, options);
+    const runnerOptions = commandRunnerOptions(repoRoot, profile, options);
     runnerOptions.onComplete = (result) => {
       maybeRecordChecks(repoRoot, profile, [result], [], options.session);
     };
@@ -759,7 +782,10 @@ async function execute(command, positionals, options, context) {
         ...composeArgs,
       ],
     };
-    const results = await runCommands([commandSpec], commandRunnerOptions(repoRoot, options));
+    const results = await runCommands(
+      [commandSpec],
+      commandRunnerOptions(repoRoot, profile, options),
+    );
     return outputEnvelope(command, {
       commands: results.map((result) => ({
         id: result.command.id,
@@ -777,7 +803,7 @@ async function execute(command, positionals, options, context) {
       jobs,
       dryRun: options["dry-run"] === true,
       capture: options.json === true,
-      onStart: commandRunnerOptions(repoRoot, options).onStart,
+      onStart: commandRunnerOptions(repoRoot, profile, options).onStart,
     });
     return outputEnvelope(command, {
       commands: result.results.map((entry) => ({

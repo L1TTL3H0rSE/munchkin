@@ -123,7 +123,7 @@ function currentRuntimeCandidates(name, { env, platform }) {
   ));
 }
 
-function executableProbeOptions(executablePath, platform) {
+export function executableLaunchOptions(executablePath, platform = process.platform) {
   return platform === "win32" && /\.(?:cmd|bat)$/i.test(executablePath)
     ? { shell: true }
     : { shell: false };
@@ -251,7 +251,7 @@ export function inspectToolchain(repoRoot, profile, graph, {
           cwd: repoRoot,
           encoding: "utf8",
           env,
-          ...executableProbeOptions(executablePath, platform),
+          ...executableLaunchOptions(executablePath, platform),
           timeout: 10_000,
         });
       } catch {
@@ -314,7 +314,7 @@ export function inspectToolchain(repoRoot, profile, graph, {
       cwd: resolveExistingDirectoryInside(repoRoot, command.cwd, "capability cwd"),
       encoding: "utf8",
       env,
-      ...executableProbeOptions(executablePath, platform),
+      ...executableLaunchOptions(executablePath, platform),
       timeout: 10_000,
     });
     const available = result.status === 0;

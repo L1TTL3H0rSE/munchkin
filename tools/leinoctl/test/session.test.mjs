@@ -97,6 +97,59 @@ test("scope report catches out-of-plan and unledgered writes", () => {
   assert.equal(report.ok, false);
 });
 
+test("scope report accepts only fully in-scope fast-forward commit paths", () => {
+  const root = temporaryDirectory();
+  const profile = {
+    runtimeDir: ".leino/runtime",
+    plans: { activeDir: ".plans/active", archiveDir: ".plans/archive" },
+  };
+  selectSessionPlan(root, profile, registry(), "0100-fixture", {
+    sessionId: "thread-forward-commit",
+    snapshot: cleanSnapshot,
+  });
+  recordSessionTargets(root, profile, "thread-forward-commit", [
+    ".git/HEAD",
+    "src/new.js",
+  ]);
+  const current = {
+    ...cleanSnapshot,
+    root: { head: "def", entries: [] },
+  };
+  const report = sessionScopeReport(root, profile, registry(), {
+    sessionId: "thread-forward-commit",
+    current,
+    delta: {
+      changed: [".git/HEAD", "src/new.js"],
+      rootHeadTransition: {
+        mode: "fast-forward",
+        base: "abc",
+        head: "def",
+        paths: ["src/new.js"],
+      },
+    },
+  });
+  assert.deepEqual(report.outsideWriteSet, []);
+  assert.deepEqual(report.unledgered, []);
+  assert.equal(report.ok, true);
+
+  recordSessionTargets(root, profile, "thread-forward-commit", ["outside.txt"]);
+  const unauthorized = sessionScopeReport(root, profile, registry(), {
+    sessionId: "thread-forward-commit",
+    current,
+    delta: {
+      changed: [".git/HEAD", "outside.txt", "src/new.js"],
+      rootHeadTransition: {
+        mode: "fast-forward",
+        base: "abc",
+        head: "def",
+        paths: ["outside.txt", "src/new.js"],
+      },
+    },
+  });
+  assert.deepEqual(unauthorized.outsideWriteSet, [".git/HEAD", "outside.txt"]);
+  assert.equal(unauthorized.ok, false);
+});
+
 test("session ledger normalizes and idempotently merges repeated targets and checks", () => {
   const root = temporaryDirectory();
   const profile = {

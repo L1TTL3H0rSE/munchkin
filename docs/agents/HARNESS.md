@@ -124,6 +124,47 @@ scope, stale/missing required checks или незавершённом checklist
 | `plan release` ledger | completed archived plan, checklist и rotation guard | Git commit или push |
 | local commit | сохранённый Git snapshot | remote push, cloud apply или новая approval |
 
+## Fast-forward commits внутри selected plan
+
+Некоторые live-evidence plans должны сделать commit/push до завершения, чтобы
+получить terminal CI evidence. Такой commit не сбрасывает исходный session
+baseline. `leinoctl` принимает root HEAD transition только как fast-forward от
+baseline и добавляет в scope объединение всех путей, затронутых каждым commit в
+диапазоне `baseline..HEAD`. Поэтому временное изменение вне write set, позже
+возвращённое отдельным commit, всё равно остаётся видимым.
+
+`.git/HEAD` сохраняется в changed paths и verification fingerprint, но не
+требует добавления в source write set только когда вся fast-forward цепочка
+успешно разобрана и каждый committed path принадлежит lifecycle/write set.
+Rewind, rebase/divergent history, unborn transition или ошибка Git inspection
+оставляют `.git/HEAD` outside write set и останавливают scope-check. После
+любого следующего commit прежнее canonical evidence становится stale по HEAD
+fingerprint и должно быть записано заново.
+
+## Declared executable resolution
+
+Canonical execution uses the same profile resolver as toolchain inspection.
+For example, `pnpm@env:LEINO_PNPM_EXECUTABLE` means that actual component
+checks launch the resolved process-local path; they do not fall back to an
+unqualified `pnpm` from `PATH`. An unset or invalid declared resolver fails
+before the check starts and records command-start evidence in the ledger.
+
+On Windows a declared `.cmd`/`.bat` launcher uses the platform shell only for
+that trusted repository command and passes one quoted command line, avoiding
+Node's deprecated `shell: true` plus separate argv form. Other executables
+retain literal argv with `shell: false`. This prevents a standalone system
+`pnpm.exe` with a different embedded Node runtime from silently replacing the
+declared Node 24 toolchain.
+
+An outer automation timeout bounds the complete sequential `verify` command,
+not the last visible check. Report individual check/build duration separately;
+do not describe a 120-second aggregate timeout as a 120-second frontend build.
+
+Sandboxed Windows verification may also need an empty process-local
+`DOCKER_CONFIG` directory for the read-only `docker compose config` check.
+This avoids reading the owner's user-level Docker credentials/config and does
+not authenticate, push, pull or mutate Docker/Registry state.
+
 Прямые hooks, `leinoctl` tests, `plan-lint` или manual smoke могут быть зелёными
 и всё равно оставить `missingRequiredChecks`; штатная регистрация выполняется
 через canonical `verify`, а не ручным внутренним helper.

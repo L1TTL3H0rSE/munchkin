@@ -3,7 +3,7 @@
 - **Plan ID:** `20260802T164112Z-dfb164-production-live-wif-registry-evidence`
 - **Статус:** in_progress
 - **Создан:** 2026-08-02 16:41:12 UTC
-- **Обновлён:** 2026-08-02 16:55:00 UTC
+- **Обновлён:** 2026-08-02 18:19:00 UTC
 - **Владелец:** Codex
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся
@@ -20,7 +20,27 @@
 {
   "schemaVersion": 1,
   "paths": [
+    ".leino/profile.json",
+    ".github/workflows/security.yml",
     ".github/workflows/ci.yml",
+    "backend/game/Dockerfile",
+    "backend/game/go.mod",
+    "backend/game/go.sum",
+    "docs/agents/HARNESS.md",
+    "docs/agents/handoffs/20260802-production-ci-deploy-continuation.md",
+    "docs/agents/PROJECT_MEMORY.md",
+    "docs/agents/STACK.md",
+    "frontend/pnpm-workspace.yaml",
+    "frontend/pnpm-lock.yaml",
+    "tools/leinoctl/src/cli.mjs",
+    "tools/leinoctl/src/git.mjs",
+    "tools/leinoctl/src/runner.mjs",
+    "tools/leinoctl/src/session.mjs",
+    "tools/leinoctl/src/toolchain.mjs",
+    "tools/leinoctl/test/cli.test.mjs",
+    "tools/leinoctl/test/git.test.mjs",
+    "tools/leinoctl/test/runner.test.mjs",
+    "tools/leinoctl/test/session.test.mjs",
     "docs/agents/plans/active/20260802T164112Z-dfb164-production-live-wif-registry-evidence.md",
     "docs/agents/plans/archive/20260802T164112Z-dfb164-production-live-wif-registry-evidence.md"
   ],
@@ -33,6 +53,7 @@
   "sharedResources": [
     "github:repo:L1TTL3H0rSE/munchkin",
     "github:commit:0a3e9ef",
+    "github:commit:7bf8966",
     "github:environment:production-images",
     "cloud:yandex-folder:b1g55l8i2mtpv23b5ql7",
     "cloud:yandex-container-registry:crpdnmjudj1usiu90gdn",
@@ -92,13 +113,43 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
   digest for `0a3e9ef` has been observed yet.
 - GitHub Actions run `30757059688`, job `91521103366`, was inspected through
   the GitHub connector. All prerequisite jobs passed; WIF claim probe and
-  registry login passed. `Build, scan and publish immutable images` failed in
-  `scripts/ci/security-scan.sh` at the repository `trivy config` invocation
-  with exit code 1, before OSV/image scans, pushes, attestations, or evidence
-  upload. The run has no artifacts. The exact finding is not present in the
-  log because Trivy writes SARIF output and the failed step has no upload-on-
-  failure path; this is a security-scan remediation evidence gap, not a WIF or
-  environment-review failure.
+  registry login passed. The first run failed before diagnostics were
+  retained, so commit `7bf8966` added a failure-only security artifact upload.
+- GitHub Actions run `30758535510`, job `91524998561`, was inspected through
+  the GitHub connector. All prerequisite jobs passed; WIF claim probe and
+  registry login passed. `Build, scan and publish immutable images` failed
+  after Trivy filesystem/config scanning and during the OSV scan. Artifact
+  `8836749807` contains empty `trivy-fs.sarif` and `trivy-config.sarif`, plus
+  `osv-scanner.json`; no image SBOMs or attestations were produced because
+  publication stopped at the security gate.
+- OSV findings are: `github.com/jackc/pgx/v5` `5.9.0` fixed in `5.9.2`,
+  OpenTelemetry `1.43.0` fixed in `1.44.0`, `golang.org/x/net` `0.55.0`
+  fixed in `0.56.0`, Go `1.25.1` standard-library findings requiring the
+  patched `1.25.12` toolchain, and frontend `playwright`/`@playwright/test`
+  `1.52.0` fixed in `1.55.1`. This is a dependency/toolchain remediation,
+  not a WIF, environment-review, Trivy, VM, or Registry failure.
+- Local canonical verification exposed a separate repository-runner defect:
+  toolchain inspection honors `pnpm@env:LEINO_PNPM_EXECUTABLE`, but component
+  execution passes the unqualified `pnpm` name to `child_process.spawn`.
+  Windows therefore selects a standalone `pnpm.exe` with bundled Node 18.5
+  instead of the declared Node 24 `pnpm.cmd`, causing sandbox `EPERM` and
+  package-manager self-switch hangs. The 120-second interruption was an outer
+  command timeout over all sequential canonical checks; the Nuxt build itself
+  completed in about 34 seconds.
+- After resolver remediation, canonical verification completed every frontend,
+  Go, harness, leinoctl, plan-lint and shell check, then failed only because
+  Docker attempted to read sandbox-denied user config at
+  `C:\Users\Maks\.docker\config.json`. The read-only Compose check must use an
+  empty process-local `DOCKER_CONFIG`. A Node `DEP0190` warning from the first
+  `.cmd` launch implementation was removed by passing one quoted trusted
+  Windows command line instead of `shell: true` plus separate argv.
+- The first successful canonical run then exposed a lifecycle gap: this live
+  evidence plan must commit and push an in-scope workflow change before remote
+  CI can become terminal, while session scope represented the forward commit
+  only as `.git/HEAD`. The fix must preserve the original baseline, enumerate
+  every path touched by every fast-forward commit, keep the HEAD fingerprint in
+  verification evidence, and fail closed for rewinds/divergent history or any
+  committed path outside the approved write set.
 
 ## Scope
 
@@ -115,7 +166,8 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
 - VM bootstrap/deploy/rollback, Docker runtime or application secrets.
 - DNS/NS delegation, ACME/TLS, Lockbox payloads, telemetry, backup/restore.
 - GitHub workflow/settings mutation outside the narrowly scoped failure-only
-  SARIF diagnostic upload described in this plan.
+  SARIF diagnostic upload and exact dependency/toolchain remediation described
+  in this plan.
 - Registry deletion, tag cleanup, force push, or broad Terraform apply.
 
 ## Архитектурный подход
@@ -140,7 +192,27 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
 
 | Путь/ресурс | Режим | Причина |
 |---|---|---|
-| `.github/workflows/ci.yml` | write | Upload failed security SARIF for exact Trivy diagnosis |
+| `.leino/profile.json` | write | Raise repository Go minimum to patched `1.25.12` |
+| `.github/workflows/ci.yml` | write | Upload diagnostics and use patched Go toolchain |
+| `.github/workflows/security.yml` | write | Use patched Go toolchain |
+| `backend/game/Dockerfile` | write | Pin patched Go build image and digest |
+| `backend/game/go.mod` | write | Remediate OSV Go module findings |
+| `backend/game/go.sum` | write | Generated checksums for the remediated Go graph |
+| `docs/agents/HARNESS.md` | write | Document resolved-executable execution contract and aggregate timeout evidence |
+| `docs/agents/handoffs/20260802-production-ci-deploy-continuation.md` | write | Persist exact continuation steps for the next trusted session after push |
+| `docs/agents/PROJECT_MEMORY.md` | write | Persist the confirmed Windows resolver/timeout trap |
+| `docs/agents/STACK.md` | write | Keep declared Go toolchain documentation aligned |
+| `frontend/pnpm-workspace.yaml` | write | Remediate Playwright OSV finding |
+| `frontend/pnpm-lock.yaml` | write | Generated lockfile for the remediated Playwright graph |
+| `tools/leinoctl/src/cli.mjs` | write | Apply profile executable resolution to actual checks/generators/Compose commands |
+| `tools/leinoctl/src/git.mjs` | write | Enumerate fast-forward committed paths without resetting the selected-plan baseline |
+| `tools/leinoctl/src/runner.mjs` | write | Launch the resolved executable while preserving canonical argv evidence |
+| `tools/leinoctl/src/session.mjs` | write | Treat validated in-plan commits as auditable session deltas and fail closed on divergent HEAD transitions |
+| `tools/leinoctl/src/toolchain.mjs` | write | Share platform launch options for resolved scripts |
+| `tools/leinoctl/test/cli.test.mjs` | write | Regression test declared resolver use by canonical verify |
+| `tools/leinoctl/test/git.test.mjs` | write | Regression test full commit-range path enumeration and non-forward rejection |
+| `tools/leinoctl/test/runner.test.mjs` | write | Regression test resolved launch path and literal argv behavior |
+| `tools/leinoctl/test/session.test.mjs` | write | Regression test scoped fast-forward commits and unauthorized committed paths |
 | `docs/agents/plans/active/20260802T164112Z-dfb164-production-live-wif-registry-evidence.md` | write | Active lifecycle плана |
 | `docs/agents/plans/archive/20260802T164112Z-dfb164-production-live-wif-registry-evidence.md` | write | Archived lifecycle плана |
 
@@ -170,16 +242,31 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
 3. [ ] Run presence-only credential preflight and sanitized Terraform plan.
 4. [ ] If drift exists, apply only the reviewed WIF/registry change set;
       otherwise record empty plan.
-5. [ ] Add failure-only SARIF artifact upload, rerun CI, then verify immutable
-      `game`/`web` digests and release evidence without exposing tokens or
-      secret payloads.
-6. [ ] Run canonical verify/scope-check, archive and guarded release before
+5. [x] Add failure-only SARIF artifact upload and retain the failed scan
+      artifact for diagnosis.
+6. [ ] Remediate the exact OSV dependency/toolchain findings, run focused
+      backend/frontend checks, canonical verify and scope-check, then rerun CI.
+   - Fix the confirmed Windows `leinoctl` executable-resolution defect and
+     record regression evidence before accepting canonical verification.
+   - Preserve and validate fast-forward commit paths in the selected session so
+     the CI-triggering commit is checked by write set and canonical evidence;
+     do not whitelist `.git/HEAD` or reset the original baseline.
+7. [ ] Verify immutable `game`/`web` digests and release evidence without
+      exposing tokens or secret payloads.
+8. [ ] Run canonical verify/scope-check, archive and guarded release before
       the local lifecycle commit and next deploy plan.
 
 ## Проверки
 
 - [ ] `./leinoctl context --paths` and plan-lint — clean.
 - [ ] GitHub Actions required checks and publish evidence — terminal success.
+- [ ] OSV remediation evidence shows no vulnerable versions; Trivy SARIF is
+      empty; focused Go/frontend checks pass.
+- [ ] Declared executable resolver is used by actual `leinoctl verify`
+      execution; missing resolver fails closed; runner regression tests pass.
+- [ ] Forward root commits enumerate every touched path, remain tied to the
+      current HEAD fingerprint, and divergent/non-forward transitions fail
+      closed as `.git/HEAD`.
 - [ ] Sanitized Terraform plan/apply evidence — exact scope only.
 - [ ] `./leinoctl verify --changed` and `./leinoctl scope-check --plan ...` —
       pass; no unexpected local files.
@@ -201,8 +288,14 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
 - The publish job is not waiting for `production-images` review: it already
   ran, and no `Review deployments` control is expected for this failed run.
 - Per the user's standing approval for plan changes, the write set is extended
-  to `.github/workflows/ci.yml` for failure-only SARIF upload. This does not
-  change VM, cloud, DNS, Registry, or secret resources.
+  to the exact dependency/toolchain files listed above and to `.github/workflows`
+  only for the declared Go version alignment and failure-only SARIF upload.
+  This does not change VM, cloud, DNS, Registry, or secret resources.
+- 2026-08-02: owner explicitly approved fixing the discovered verification
+  problems now and recording all confirmed `leinoctl`/Node/timeout issues for
+  later maintenance.
+- 2026-08-02: owner explicitly approved this plan change after the canonical
+  scope-check exposed the mid-plan CI commit lifecycle gap.
 
 ## Согласование
 
@@ -221,6 +314,27 @@ Identity Federation → private Container Registry для commit `0a3e9ef`.
 - GitHub connector inspection completed for run `30757059688` / job
   `91521103366`; no remote mutation, artifact download, or secret access
   occurred.
+- GitHub connector inspection completed for run `30758535510` / job
+  `91524998561`; diagnostic artifact `8836749807` was downloaded and parsed.
+  It proves the current blocker is OSV dependency scanning: Trivy SARIF files
+  are empty. Dependabot PR #14 was separately checked and only updates
+  `@axe-core/playwright`; it does not fix `playwright` `1.52.0`.
+- Canonical verification passed all 16 required checks in 140.6 seconds. The
+  following scope-check had no missing/stale checks and no unledgered paths;
+  its only failure was `.git/HEAD`, caused by the already pushed in-plan commit
+  `7bf8966`. The approved lifecycle remediation above keeps this evidence
+  visible and does not weaken the source write set.
+- After implementing the lifecycle remediation, focused git/session/CLI/runner
+  tests passed `44/44` with one expected Windows symlink skip. Final pre-commit
+  canonical verification passed all 16 checks in 146.3 seconds; full leinoctl
+  was `80 passed / 0 failed / 1 expected skip`, harness was `42/42`, frontend
+  contract/web tests were `18 + 154`, and backend `go test ./...` passed.
+  Final pre-commit scope-check returned `ok=true`, `outsideWriteSet=[]`,
+  `unledgered=[]`, and no missing required checks.
+- The pinned full security script was not executed under Windows Git Bash
+  because it downloads Linux ELF tools. Ubuntu WSL exists but lacks `go` and
+  `jq`; no host packages were installed. The pushed Linux GitHub Actions run
+  remains the authoritative full repository/image security gate.
 
 ## Итог
 

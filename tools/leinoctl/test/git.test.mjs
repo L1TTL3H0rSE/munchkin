@@ -7,6 +7,7 @@ import {
   changedSinceBaseline,
   parseSubmoduleStatus,
   parsePorcelainZ,
+  repositoryDeltaSinceBaseline,
   snapshotWorktree,
   syncCommandSequence,
   syncRepository,
@@ -141,6 +142,41 @@ test("scope delta detects clean root and submodule HEAD transitions", () => {
     changedSinceBaseline(baseline, current),
     [".git/HEAD", "vendor/ui"],
   );
+});
+
+test("repository delta audits every fast-forward commit path and rejects rewinds", () => {
+  const root = temporaryDirectory();
+  initializeWorkRepository(root);
+  writeFile(root, "src/kept.txt", "base\n");
+  writeFile(root, "outside.txt", "base\n");
+  git(root, ["add", "."]);
+  git(root, ["commit", "-m", "base"]);
+  const baseline = {
+    root: snapshotWorktree(root),
+    submodules: {},
+  };
+
+  writeFile(root, "src/kept.txt", "changed\n");
+  writeFile(root, "outside.txt", "temporary unauthorized change\n");
+  git(root, ["add", "."]);
+  git(root, ["commit", "-m", "change both paths"]);
+  writeFile(root, "outside.txt", "base\n");
+  git(root, ["add", "."]);
+  git(root, ["commit", "-m", "restore outside path"]);
+  const current = {
+    root: snapshotWorktree(root),
+    submodules: {},
+  };
+
+  const forward = repositoryDeltaSinceBaseline(root, baseline, current);
+  assert.equal(forward.rootHeadTransition.mode, "fast-forward");
+  assert.deepEqual(forward.rootHeadTransition.paths, ["outside.txt", "src/kept.txt"]);
+  assert.deepEqual(forward.changed, [".git/HEAD", "outside.txt", "src/kept.txt"]);
+
+  const rewind = repositoryDeltaSinceBaseline(root, current, baseline);
+  assert.equal(rewind.rootHeadTransition.mode, "non-forward");
+  assert.deepEqual(rewind.rootHeadTransition.paths, []);
+  assert.deepEqual(rewind.changed, [".git/HEAD"]);
 });
 
 test("submodule status distinguishes pinned, missing, drifted and conflicted states", () => {

@@ -24,6 +24,60 @@ test("runner passes argv literally without shell interpolation", async () => {
   assert.equal(fs.existsSync(`${root}/${marker}`), false);
 });
 
+test("runner launches the executable selected by its resolver", async () => {
+  const root = temporaryDirectory();
+  const result = await runCommand({
+    id: "resolved-executable",
+    cwd: ".",
+    argv: [
+      "declared-node",
+      "-e",
+      "process.stdout.write('resolved-path')",
+    ],
+  }, {
+    repoRoot: root,
+    capture: true,
+    resolveCommandExecutable(executable) {
+      assert.equal(executable, "declared-node");
+      return { path: process.execPath, shell: false };
+    },
+  });
+  assert.equal(result.stdout, "resolved-path");
+  assert.deepEqual(result.command.argv, [
+    "declared-node",
+    "-e",
+    "process.stdout.write('resolved-path')",
+  ]);
+});
+
+test("runner records a fail-closed executable resolver error", async () => {
+  const root = temporaryDirectory();
+  let failure;
+  await assert.rejects(
+    () => runCommand({
+      id: "missing-declared-executable",
+      cwd: ".",
+      argv: ["declared-tool", "check"],
+    }, {
+      repoRoot: root,
+      capture: true,
+      resolveCommandExecutable() {
+        return {
+          path: null,
+          error: "declared resolver env:LEINO_DECLARED_TOOL is unset",
+        };
+      },
+    }),
+    (error) => {
+      failure = error;
+      return /declared resolver env:LEINO_DECLARED_TOOL is unset/.test(error.message);
+    },
+  );
+  assert.equal(failure.result.started, false);
+  assert.equal(failure.result.exitCode, 5);
+  assert.deepEqual(failure.result.command.argv, ["declared-tool", "check"]);
+});
+
 test("runner preserves command order and rejects cwd traversal", async () => {
   const root = temporaryDirectory();
   const started = [];

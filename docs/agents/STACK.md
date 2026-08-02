@@ -5,7 +5,7 @@
 
 ## Backend
 
-- Go directive: 1.25.1.
+- Go directive: 1.25.12.
 - Один module `backend/game`.
 - Standard `net/http` transport.
 - PostgreSQL через pgx v5.

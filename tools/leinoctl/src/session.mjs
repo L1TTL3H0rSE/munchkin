@@ -4,8 +4,8 @@ import path from "node:path";
 import { claimMatchesPath, normalizeClaim } from "./claims.mjs";
 import { EXIT_CODES, LeinoError } from "./errors.mjs";
 import {
-  changedSinceBaseline,
   fingerprintSnapshotPaths,
+  repositoryDeltaSinceBaseline,
   snapshotRepository,
 } from "./git.mjs";
 import { resolveInside, toPosix, writeJsonAtomic } from "./fs.mjs";
@@ -602,6 +602,7 @@ export function sessionScopeReport(repoRoot, profile, registry, {
   sessionId,
   current = snapshotRepository(repoRoot),
   requiredChecks = [],
+  delta,
 } = {}) {
   const resolvedSessionId = resolveSessionId(sessionId);
   const state = readSession(repoRoot, profile.runtimeDir, resolvedSessionId);
@@ -614,11 +615,22 @@ export function sessionScopeReport(repoRoot, profile, registry, {
   if (!plan || (!plan.eligible && !completedArchive)) {
     throw new LeinoError("selected-plan-not-eligible", `selected plan is no longer eligible: ${state.planId}`);
   }
-  const changed = changedSinceBaseline(state.baseline, current);
+  const repositoryDelta = delta
+    ?? repositoryDeltaSinceBaseline(repoRoot, state.baseline, current);
+  const changed = repositoryDelta.changed;
   const planLifecyclePaths = lifecyclePaths(profile, state.planId);
+  const pathIsAllowed = (changedPath) => (
+    planLifecyclePaths.has(changedPath)
+    || plan.writeSet.some((claim) => claimMatchesPath(claim.path, changedPath))
+  );
+  const rootHeadTransitionAllowed = (
+    repositoryDelta.rootHeadTransition.mode === "fast-forward"
+    && repositoryDelta.rootHeadTransition.paths.every(pathIsAllowed)
+  );
   const outsideWriteSet = changed.filter((changedPath) => (
-    !planLifecyclePaths.has(changedPath)
-    && !plan.writeSet.some((claim) => claimMatchesPath(claim.path, changedPath))
+    changedPath === ".git/HEAD"
+      ? !rootHeadTransitionAllowed
+      : !pathIsAllowed(changedPath)
   ));
   const ledgerTargets = normalizeLedgerPaths(state.ledger?.targets ?? []);
   const changedInputs = changed.filter((changedPath) => !planLifecyclePaths.has(changedPath));
@@ -655,6 +667,7 @@ export function sessionScopeReport(repoRoot, profile, registry, {
     schemaVersion: 1,
     planId: state.planId,
     sessionId: resolvedSessionId,
+    rootHeadTransition: repositoryDelta.rootHeadTransition,
     changed,
     outsideWriteSet,
     ledgerTargets,

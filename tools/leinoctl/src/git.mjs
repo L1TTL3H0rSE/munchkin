@@ -165,6 +165,83 @@ export function changedSinceBaseline(baseline, current) {
   return [...changed].sort();
 }
 
+export function inspectRootCommitTransition(
+  repoRoot,
+  baseline,
+  current,
+  { git = defaultGit } = {},
+) {
+  const base = baseline.root?.head ?? null;
+  const head = current.root?.head ?? null;
+  if (base === head) {
+    return { mode: "unchanged", base, head, paths: [] };
+  }
+  if (!base || !head) {
+    return {
+      mode: "unverified",
+      base,
+      head,
+      paths: [],
+      reason: "unborn-head-transition",
+    };
+  }
+
+  try {
+    const mergeBase = git(["merge-base", base, head], { cwd: repoRoot }).trim();
+    if (mergeBase !== base) {
+      return {
+        mode: "non-forward",
+        base,
+        head,
+        paths: [],
+        reason: "baseline-is-not-an-ancestor",
+      };
+    }
+    const raw = git(
+      ["log", "--format=", "--name-only", "-z", `${base}..${head}`, "--"],
+      { cwd: repoRoot },
+    );
+    return {
+      mode: "fast-forward",
+      base,
+      head,
+      paths: [...new Set(raw.split("\0").filter(Boolean).map(toPosix))].sort(),
+    };
+  } catch (error) {
+    return {
+      mode: "unverified",
+      base,
+      head,
+      paths: [],
+      reason: error?.code ?? "git-transition-inspection-failed",
+    };
+  }
+}
+
+export function repositoryDeltaSinceBaseline(
+  repoRoot,
+  baseline,
+  current,
+  { git = defaultGit } = {},
+) {
+  const changed = new Set(changedSinceBaseline(baseline, current));
+  const rootHeadTransition = inspectRootCommitTransition(
+    repoRoot,
+    baseline,
+    current,
+    { git },
+  );
+  if (rootHeadTransition.mode === "fast-forward") {
+    for (const repoPath of rootHeadTransition.paths) {
+      changed.add(repoPath);
+    }
+  }
+  return {
+    changed: [...changed].sort(),
+    rootHeadTransition,
+  };
+}
+
 export function changedPaths(repoRoot, { base, git = defaultGit } = {}) {
   const paths = new Set();
   if (base) {

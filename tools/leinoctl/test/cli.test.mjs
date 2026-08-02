@@ -352,6 +352,76 @@ test("verify records failed command evidence before returning the failure", asyn
   assert.match(check.inputFingerprint, /^[0-9a-f]{64}$/);
 });
 
+test("verify executes the profile-declared executable instead of a PATH shim", async () => {
+  const root = temporaryDirectory();
+  const variable = "LEINO_TEST_DECLARED_CHECK";
+  const previous = process.env[variable];
+  const declaredExecutable = process.platform === "win32"
+    ? writeFile(
+      root,
+      "bin/declared-check.cmd",
+      "@echo off\r\n<nul set /p \"=%~1\"\r\nexit /b 0\r\n",
+    )
+    : writeFile(
+      root,
+      "bin/declared-check",
+      "#!/bin/sh\nprintf declared-resolver\n",
+    );
+  if (process.platform !== "win32") {
+    fs.chmodSync(declaredExecutable, 0o755);
+  }
+  try {
+    process.env[variable] = declaredExecutable;
+    writeJson(root, ".leino/profile.json", fixtureProfile({
+      toolchain: {
+        requiredExecutables: [`declared-check@env:${variable}`],
+        minimumVersions: {},
+        versionProbes: {},
+        capabilities: [],
+      },
+    }));
+    writeJson(root, ".leino/components/declared.json", {
+      schemaVersion: 1,
+      id: "declared",
+      kind: "integration",
+      roots: ["planned.txt"],
+      checks: [{
+        id: "declared-check",
+        cwd: ".",
+        argv: ["declared-check", "declared resolver"],
+      }],
+    });
+    writeFile(root, "planned.txt", "fixture\n");
+
+    const stdout = captureStream();
+    const stderr = captureStream();
+    const exitCode = await main([
+      "verify",
+      "--paths",
+      "planned.txt",
+      "--repo",
+      root,
+      "--json",
+    ], {
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+    });
+    assert.equal(exitCode, EXIT_CODES.ok, stderr.value());
+    const envelope = JSON.parse(stdout.value());
+    assert.equal(envelope.data.checks[0].stdout, "declared resolver");
+    assert.deepEqual(envelope.data.checks[0].argv, [
+      "declared-check",
+      "declared resolver",
+    ]);
+  } finally {
+    if (previous === undefined) {
+      delete process.env[variable];
+    } else {
+      process.env[variable] = previous;
+    }
+  }
+});
+
 test("CLI rotates completed plans in one session only after a separate commit", async () => {
   const root = temporaryDirectory();
   const firstPlan = "0100-first";

@@ -8,12 +8,43 @@ function attachFailureResult(error, result) {
   return error;
 }
 
+function unresolvedExecutableFailure(normalized, executable, resolution) {
+  const message = resolution?.error
+    ?? `executable resolver did not return a path for ${executable}`;
+  const result = {
+    command: normalized,
+    exitCode: EXIT_CODES.checkFailed,
+    signal: null,
+    started: false,
+    timedOut: false,
+    stdout: "",
+    stderr: "",
+    dryRun: false,
+    error: message,
+  };
+  return attachFailureResult(new LeinoError(
+    "command-start-failed",
+    `failed to resolve ${executable}: ${message}`,
+    { exitCode: EXIT_CODES.checkFailed },
+  ), result);
+}
+
+function windowsShellCommand(executable, args) {
+  return [executable, ...args]
+    .map((entry) => `"${entry.replaceAll('"', '""')}"`)
+    .join(" ");
+}
+
 export async function runCommand(command, {
   repoRoot,
   dryRun = false,
   capture = false,
   env = process.env,
   onStart = () => {},
+  resolveCommandExecutable = (executable) => ({
+    path: executable,
+    shell: false,
+  }),
   timeoutMs = 0,
 } = {}) {
   const normalized = validateCommand(command);
@@ -34,17 +65,32 @@ export async function runCommand(command, {
     };
   }
 
+  let resolution;
+  try {
+    resolution = resolveCommandExecutable(executable);
+  } catch (error) {
+    throw unresolvedExecutableFailure(normalized, executable, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  if (!resolution?.path) {
+    throw unresolvedExecutableFailure(normalized, executable, resolution);
+  }
+
   return new Promise((resolve, reject) => {
     let settled = false;
     let timedOut = false;
     let timeoutHandle;
     let killHandle;
-    const child = spawn(executable, args, {
+    const spawnOptions = {
       cwd,
       env,
-      shell: false,
+      shell: resolution.shell === true,
       stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    });
+    };
+    const child = resolution.shell === true && process.platform === "win32"
+      ? spawn(windowsShellCommand(resolution.path, args), spawnOptions)
+      : spawn(resolution.path, args, spawnOptions);
     let stdout = "";
     let stderr = "";
     if (capture) {
@@ -92,7 +138,7 @@ export async function runCommand(command, {
         };
         reject(attachFailureResult(new LeinoError(
           "command-start-failed",
-          `failed to start ${executable}: ${error.message}`,
+          `failed to start ${resolution.path}: ${error.message}`,
           { exitCode: EXIT_CODES.checkFailed, cause: error },
         ), result));
       });
