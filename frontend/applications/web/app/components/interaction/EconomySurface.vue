@@ -25,11 +25,13 @@ const props = withDefaults(defineProps<{
   actions?: Array<{action: EconomyAction; index: number}>;
   interaction?: InteractionView;
   charityTransfer?: CharitySurfaceData;
+  forceDialog?: boolean;
   busy: boolean;
 }>(), {
   actions: () => [],
   interaction: undefined,
   charityTransfer: undefined,
+  forceDialog: false,
 });
 
 const emit = defineEmits<{
@@ -62,8 +64,11 @@ const charityCards = computed(() => (charityData.value?.instanceIDs ?? [])
   .map((instanceID) => ownCardByID(props.projection, instanceID))
   .filter((card): card is NonNullable<typeof card> => Boolean(card)));
 
-const hasForms = computed(() => offerEntries.value.length > 0 ||
-  theftEntries.value.length > 0 || Boolean(charityData.value));
+const hasForms = computed(() => props.forceDialog && (
+  offerEntries.value.length > 0 ||
+  theftEntries.value.length > 0 ||
+  Boolean(charityData.value)
+));
 
 function entryKey(action: EconomyAction, index: number): string {
   return economyActionKey(action, index);
@@ -456,7 +461,8 @@ function submitCharity(): void {
   min-width: 0;
   border: 1px solid var(--acid);
   padding: 1rem;
-  background: #171a0d;
+  color: var(--color-text);
+  background: var(--color-surface);
 }
 
 .economy-surface__header,
@@ -503,7 +509,7 @@ function submitCharity(): void {
   min-width: 0;
   border: 1px solid var(--line);
   padding: .85rem;
-  background: #11130c;
+  background: var(--color-paper);
 }
 
 .economy-card > * {
@@ -516,7 +522,7 @@ function submitCharity(): void {
 }
 
 .economy-card--charity {
-  background: #1a1d10;
+  background: var(--color-paper);
 }
 
 .economy-card fieldset {
@@ -565,8 +571,8 @@ function submitCharity(): void {
   text-overflow: ellipsis;
   border: 1px solid var(--line);
   padding: .55rem .65rem;
-  color: inherit;
-  background: var(--color-board);
+  color: var(--color-text);
+  background: var(--color-paper);
   font: inherit;
 }
 
@@ -594,7 +600,7 @@ function submitCharity(): void {
 .economy-surface__error {
   border: 1px solid #ef8d74;
   padding: .7rem;
-  color: #ffd2c6;
+  color: var(--color-danger);
 }
 
 @media (prefers-reduced-motion: reduce) {

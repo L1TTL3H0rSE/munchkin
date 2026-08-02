@@ -214,7 +214,8 @@ function submitPass(): void {
   min-width: 0;
   border: 1px solid var(--acid);
   padding: 1rem;
-  background: #171a0d;
+  color: var(--color-text);
+  background: var(--color-surface);
 }
 
 .death-loot-surface__header,
@@ -351,7 +352,7 @@ function submitPass(): void {
 
 .death-loot-option--selected {
   border-color: var(--acid);
-  background: #20270d;
+  background: var(--color-paper);
 }
 
 .death-loot-option input {

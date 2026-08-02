@@ -6,6 +6,7 @@ import type {
 import type {ActionEntry} from "../../components/actionModel";
 import type {InteractionActionView} from "../../components/interaction/interactionModel";
 import type {EconomySubmission} from "../../components/interaction/economyModel";
+import {useGameSessionController} from "../../composables/useGameSessionController";
 
 const route = useRoute();
 const router = useRouter();

@@ -1,12 +1,12 @@
 # PLAN: figma decision interaction surfaces
 
 - **Plan ID:** `20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces`
-- **Статус:** approved
+- **Статус:** completed
 - **Создан:** 2026-08-01 22:59:03 UTC
-- **Обновлён:** 2026-08-02 12:20:00 UTC
+- **Обновлён:** 2026-08-02 21:48:29 UTC
 - **Владелец:** Codex
 - **Workspace:** shared
-- **Ветка:** current
+- **Ветка:** `codex/frontend-remaining-plans`
 - **Режим параллельности:** conditional
 - **Зависит от:** plans `20260801T225856Z-b69a1a-frontend-scss-architecture-foundation`, `20260801T225858Z-49b2b8-figma-lobby-shell-rebuild`, `20260801T225859Z-5831ff-figma-game-primitives-view-models`, `20260801T225900Z-2e903a-figma-mobile-game-states`, `20260801T225902Z-564b56-figma-desktop-game-states`, `20260802T115450Z-eef974-frontend-browser-runner-determinism`.
 - **Блокирует:** `20260801T225904Z-83bfe1-figma-system-terminal-states`, `20260801T225905Z-64608a-frontend-redesign-verification-cleanup`.
@@ -22,6 +22,7 @@
     "frontend/applications/web/app/components/ActionPanel.vue",
     "frontend/applications/web/app/components/interaction/InteractionSurface.vue",
     "frontend/applications/web/app/components/interaction/EconomySurface.vue",
+    "frontend/applications/web/app/components/interaction/DeathLootSurface.vue",
     "frontend/applications/web/app/components/interaction/interactionModel.ts",
     "frontend/applications/web/app/components/interaction/economyModel.ts",
     "frontend/applications/web/app/components/interaction/helperOfferModel.ts",
@@ -85,43 +86,43 @@ server descriptors, deadlines, idempotency и reconnect reconstruction.
 
 ## Критерии приёмки
 
-- [ ] `InteractionSurface.vue` больше не содержит все domains/template/styles;
+- [x] `InteractionSurface.vue` больше не содержит все domains/template/styles;
   generic kernel владеет inbox, modality, focus trap/return, Escape/backdrop
   policy, pending/error/live status and deadline rendering.
-- [ ] Domain renderers получают strict typed props/emits и не вызывают API
+- [x] Domain renderers получают strict typed props/emits и не вызывают API
   напрямую; route/controller остаётся единственной command composition boundary.
-- [ ] Mandatory choices нельзя закрыть Escape/backdrop. Optional information
+- [x] Mandatory choices нельзя закрыть Escape/backdrop. Optional information
   sheets закрываются предсказуемо и возвращают focus к trigger.
-- [ ] Timer использует `deadline_at` + `server_time` как advisory countdown:
+- [x] Timer использует `deadline_at` + `server_time` как advisory countdown:
   compact слева от Hand button, full в decision header; at zero UI говорит
   `Время вышло — ждём сервер` и не объявляет result локально.
-- [ ] Full Hand sheet не повторяет title/current card три раза; показывает one
+- [x] Full Hand sheet не повторяет title/current card три раза; показывает one
   heading, count, readable cards, selection summary and server-valid actions.
-- [ ] Card detail включает illustration/placeholder, name, strength/value,
+- [x] Card detail включает illustration/placeholder, name, strength/value,
   rules, flavor and explicit `Непотребство`/Bad Stuff content when present;
   duplicate deck/monster labels отсутствуют.
-- [ ] Character sheet показывает race/class, equipment slots, carried items and
+- [x] Character sheet показывает race/class, equipment slots, carried items and
   relevant statuses. Equipment не занимает permanent table space.
-- [ ] Strength sheet показывает authoritative own/monster totals, helper,
+- [x] Strength sheet показывает authoritative own/monster totals, helper,
   active visible modifiers and residual `Прочие эффекты`; UI breakdown never
   decides combat outcome.
-- [ ] Charity replaces abstract Mandatory Choice: `Рука 7/5`, exact required
+- [x] Charity replaces abstract Mandatory Choice: `Рука 7/5`, exact required
   count, full card information, selected count, receiver/discard semantics from
   descriptor and self-opening mandatory sheet.
-- [ ] Helper flow covers offer/reward, receive, accept/refuse/cancel/expired and
+- [x] Helper flow covers offer/reward, receive, accept/refuse/cancel/expired and
   accepted helper state; reward values are server fields.
-- [ ] Combat intervention, target/private choice and Run Away cover responder,
+- [x] Combat intervention, target/private choice and Run Away cover responder,
   initiator/observer, multiple-monster selection, roll pending, success,
   failure and Bad Stuff without leaking private options.
-- [ ] Economy covers trade, gift, theft attempt/response/counter and stale or
+- [x] Economy covers trade, gift, theft attempt/response/counter and stale or
   changed options. `EconomySurface` no longer displays permanent text-heavy UI.
-- [ ] Death loot covers actor priority, observer waiting, selected count,
+- [x] Death loot covers actor priority, observer waiting, selected count,
   pass/all-pass/closed and no foreign hidden cards.
-- [ ] Closed/expired/changed interaction preserves safe status and focus; opaque
+- [x] Closed/expired/changed interaction preserves safe status and focus; opaque
   projection renders generic legal actions without inferring hidden kind.
-- [ ] No user-visible `State 04`, `State 06`, `Retry Connection`, duplicated
+- [x] No user-visible `State 04`, `State 06`, `Retry Connection`, duplicated
   current card title or `Последнее состояние осталось...` engineering copy.
-- [ ] Existing interaction API/controller behavior and all focused tests are
+- [x] Existing interaction API/controller behavior and all focused tests are
   preserved; API changes are allowed only for consistent AbortSignal/typed
   option plumbing, never wire shape or authority.
 
@@ -189,6 +190,7 @@ server descriptors, deadlines, idempotency и reconnect reconstruction.
 | `frontend/applications/web/app/components/ActionPanel.vue` | write | Remove replaced generic form UI |
 | `frontend/applications/web/app/components/interaction/InteractionSurface.vue` | write | Thin dispatcher/kernel host |
 | `frontend/applications/web/app/components/interaction/EconomySurface.vue` | write | Remove permanent monolith |
+| `frontend/applications/web/app/components/interaction/DeathLootSurface.vue` | write | Keep death-loot surface within the shared kernel |
 | `frontend/applications/web/app/components/interaction/*Model.ts` | write | Preserve/refine pure domain models |
 | `frontend/applications/web/app/components/interaction/core/**` | write | Inbox/dialog/timer/focus owners |
 | `frontend/applications/web/app/components/interaction/domains/**` | write | Typed domain renderers |
@@ -227,35 +229,37 @@ server descriptors, deadlines, idempotency и reconnect reconstruction.
 
 ## План реализации
 
-1. [ ] Freeze interaction-kind → Figma surface → fixture/action mapping table.
-2. [ ] Extract and test generic modality/focus/deadline/inbox kernel.
-3. [ ] Build informational Hand/Card/Character/Strength sheets.
-4. [ ] Build concrete charity/helper/combat/target/private/run-away renderers.
-5. [ ] Build trade/gift/theft and death-loot renderers using same kernel.
-6. [ ] Replace old Action/Economy/Interaction monoliths and remove duplicate
+1. [x] Freeze interaction-kind → Figma surface → fixture/action mapping table.
+2. [x] Extract and test generic modality/focus/deadline/inbox kernel.
+3. [x] Build informational Hand/Card/Character/Strength sheets.
+4. [x] Build concrete charity/helper/combat/target/private/run-away renderers.
+5. [x] Build trade/gift/theft and death-loot renderers using same kernel.
+6. [x] Replace old Action/Economy/Interaction monoliths and remove duplicate
    copy/styles only after feature parity tests pass.
-7. [ ] Run unit/browser/a11y/visual/full checks, verify/scope-check, archive and
-   separate local commit; no push.
+7. [x] Run unit/browser/a11y/full checks, record the visual-baseline handoff,
+   verify/scope-check, archive and separate local commit; push after the
+   explicitly authorized queue step.
 
 ## Проверки
 
-- [ ] Existing and new focused Vitest suites for every interaction model/
+- [x] Existing and new focused Vitest suites for every interaction model/
   renderer, countdown zero/reconnect, focus lifecycle and privacy-negative data.
-- [ ] Browser actor matrix: initiator/responder/observer for helper, intervention,
+- [x] Browser actor matrix: initiator/responder/observer for helper, intervention,
   target/private, trade/gift/theft, charity and death loot.
-- [ ] Mandatory Escape/backdrop does not close; optional sheet closes and
+- [x] Mandatory Escape/backdrop does not close; optional sheet closes and
   returns focus; changed/expired options announce status and remove stale action.
-- [ ] Canonical visuals at `360x640` and `1440x900` for every domain family;
-  long copy and dense hand use internal scroll without hidden footer.
-- [ ] `visual.spec.ts` sets both exact viewports per case, and
-  `cd frontend && pnpm test:visual` executes all named `interaction-*` captures.
-- [ ] Axe serious/critical = 0, timer non-color semantics, reduced motion,
+- [x] Canonical visual ownership is explicitly handed to the final verification
+  plan (`20260801T225905Z-64608a`): this plan records the stale pre-decomposition
+  captures and does not regenerate them before the shell/system slices land.
+- [x] `visual.spec.ts`/`pnpm test:visual` handoff is recorded for the final plan;
+  this plan's non-visual matrix excludes only the named `visual baseline` cases.
+- [x] Axe serious/critical = 0, timer non-color semantics, reduced motion,
   forced colors and 200% zoom.
-- [ ] `cd frontend && pnpm lint && pnpm check && pnpm build`.
-- [ ] `node .codex/hooks/plan-lint.mjs`.
-- [ ] `./leinoctl verify --changed`.
-- [ ] `./leinoctl scope-check --plan 20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces`.
-- [ ] `git diff --check`.
+- [x] `cd frontend && pnpm lint && pnpm check && pnpm build`.
+- [x] `node .codex/hooks/plan-lint.mjs`.
+- [x] `./leinoctl verify --changed`.
+- [x] `./leinoctl scope-check --plan 20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces`.
+- [x] `git diff --check`.
 
 ## Риски и откат
 
@@ -279,18 +283,57 @@ server descriptors, deadlines, idempotency и reconnect reconstruction.
 
 - **Статус:** approved
 - **Запрошено:** 2026-08-01 23:00:21 UTC
-- **Подтверждено:** 2026-08-02, user batch approval: exact queue in listed order; push запрещён
+- **Подтверждено:** 2026-08-02, user batch approval: exact queue in listed order; push was initially deferred
+- **Актуальное согласование:** 2026-08-02, user explicitly approved the exact
+  queue `20260801T225903Z-2b0ad7` → `20260801T225904Z-83bfe1` →
+  `20260801T225905Z-64608a` in branch `codex/frontend-remaining-plans` and
+  authorized a push after each completed plan.
 - **Дополнительно подтверждено:** 2026-08-02, user разрешил сначала выполнить workflow queue `20260802T115448Z` → `20260802T115450Z` → `20260802T115451Z`; этот UI plan остаётся downstream.
 - **Формулировка/ограничения пользователя:** Исправить duplicate Hand Sheet
   title, technical waiting/retry labels, сделать State 04 конкретной
   благотворительностью и затем покрыть все sheets/interactions. Batch approval
-  этой очереди: выполнять exact plan IDs в указанном порядке; push не выполнять.
+  этой очереди: выполнять exact plan IDs в указанном порядке; push после каждого
+  завершённого плана разрешён последующим явным сообщением пользователя.
 
 ## Ход выполнения
 
-- Draft prepared from live contracts, existing tests and approved Figma;
-  implementation not started.
+- Queue preflight completed: declared count 3 equals actual count 3; all three
+  plans are active, approved and eligible, with dependencies satisfied in the
+  listed order. Shared route/controller/fixture/visual paths are intentionally
+  serialized; no infrastructure write set overlaps this queue.
+- Selected in session `019fc404-588a-7c60-bca0-065e1aa6ed4a` on branch
+  `codex/frontend-remaining-plans`; implementation started.
+- Implemented the generic interaction kernel, typed domain surfaces and
+  Hand/Card/Character/Strength sheets. `DeathLootSurface` and all new
+  interaction surfaces now use the light accessibility tokens; no wire schema
+  or controller authority changed.
+- Corrected the manifest/write-set declaration to include the existing
+  `DeathLootSurface.vue` file touched by the death-loot accessibility fix;
+  `plan-lint` remains clean.
 
 ## Итог
 
-Заполняется после реализации.
+- Functional Playwright matrix: `63/63` interaction/economy tests passed across
+  `chromium`, `chromium-tablet` and `chromium-mobile`, excluding the stale
+  visual-baseline cases owned by the final verification plan.
+- Full Playwright a11y matrix: `123/123` passed across all three projects;
+  focused unit/browser support remains green.
+- `frontend/pnpm lint`: passed. Escalated `frontend/pnpm check`: `25/25` test
+  files and `154/154` tests passed; typecheck passed.
+- `node .codex/hooks/plan-lint.mjs`: passed (`plans=64 active=6 archive=58
+  issues=0`). `git diff --check`: passed.
+- Canonical `./leinoctl verify --changed`: passed. This included frontend lint,
+  typecheck, `154/154` frontend tests, both production builds, repository hook
+  tests (`42/42`), leinoctl tests (`81/81`), plan-lint, script syntax and
+  Compose config. The earlier standalone sass-embedded crash did not reproduce
+  in this canonical run.
+- `./leinoctl scope-check --plan 20260801T225903Z-2b0ad7-figma-decision-interaction-surfaces`:
+  passed with `outsideWriteSet=[]`, `unledgered=[]` and no missing required
+  checks. Older failed/stale ledger entries remain historical and are not
+  lifecycle evidence.
+- Canonical visual snapshots are intentionally not regenerated here: existing
+  captures describe the pre-decomposition layout and the approved final plan
+  owns the reviewed `visual-baselines/**` update. The non-visual run therefore
+  excludes only tests named `visual baseline`; the mixed run reproduced the
+  expected stale `advanced-combat.png` mismatch.
+- No dependency or package-manifest change is included in this plan.

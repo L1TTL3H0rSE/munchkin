@@ -91,7 +91,7 @@ test("charity deadline stays advisory and the surface survives 200 percent zoom"
     document.documentElement.style.fontSize = "200%";
   });
   await page.clock.fastForward(61_000);
-  await expect(dialog).toContainText("Срок по часам истёк; ждём актуальную проекцию сервера.");
+  await expect(dialog).toContainText("Время вышло — ждём сервер");
   await assertNoRootOverflow(page);
 });
 

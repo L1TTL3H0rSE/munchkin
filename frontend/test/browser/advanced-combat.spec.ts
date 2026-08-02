@@ -8,7 +8,7 @@ import {
 test("advanced combat renders projected monsters, effects and capabilities", async ({page}) => {
   await openFixture(page, "advanced-combat");
 
-  await expect(page.locator(".combat-monsters .game-card")).toHaveCount(2);
+  await expect(page.locator(".desktop-encounter-card .game-card")).toHaveCount(2);
   await expect(page.locator(".combat-effects")).toBeVisible();
   await expect(page.locator(".combat-effect")).toHaveCount(1);
   await expect(page.locator(".interaction-action").filter({
@@ -43,7 +43,7 @@ test("forced helper remains mandatory and does not invent a reward", async ({pag
 test("observer sees public combat state but no private intervention descriptors", async ({page}) => {
   await openFixture(page, "advanced-observer");
 
-  await expect(page.locator(".combat-monsters .game-card")).toHaveCount(2);
+  await expect(page.locator(".desktop-encounter-card .game-card")).toHaveCount(2);
   await expect(page.locator(".interaction-dialog__opaque")).toBeVisible();
   await expect(page.locator(".interaction-actions")).toHaveCount(0);
   await expect(page.locator(".interaction-dialog")).not.toContainText("Вызов дополнительного монстра");

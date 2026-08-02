@@ -6,17 +6,27 @@ import {
   openFixture,
 } from "./fixtureSupport.ts";
 
-test("target initiator can submit only a projected player target", async ({page}) => {
+test("target initiator can submit only a projected player target", async ({page}, testInfo) => {
   await openFixture(page, "target-initiator");
 
-  const targetCard = page.locator(".own-board .game-card").filter({
+  if (testInfo.project.name === "chromium") {
+    await page.locator(".own-board").getByRole("button", {
+      name: "Открыть персонажа",
+    }).click();
+  } else {
+    await page.getByRole("button", {name: /^Открыть руку/}).click();
+  }
+  const targetCard = page.locator("dialog[open] .game-card").filter({
     hasText: "Эффект с выбором цели",
   });
   await targetCard.getByRole("button", {
     name: "Эффект с выбором цели: Выбрать действие",
   }).click();
+  if (testInfo.project.name !== "chromium") {
+    await page.locator("dialog[open]").getByRole("button", {name: "Закрыть"}).click();
+  }
 
-  const targetSelect = page.locator(".target-select select");
+  const targetSelect = page.locator(".target-select select:visible");
   await expect(targetSelect.locator("option")).toHaveCount(2);
   await expect(targetSelect.locator("option").nth(1)).toContainText("Борис");
   await targetSelect.selectOption("player_1");
