@@ -1,9 +1,9 @@
 # PLAN: first production deploy https smoke
 
 - **Plan ID:** `20260802T200453Z-135717-first-production-deploy-https-smoke`
-- **Статус:** in_progress
+- **Статус:** completed
 - **Создан:** 2026-08-02 20:04:53 UTC
-- **Обновлён:** 2026-08-02 20:48:34 UTC
+- **Обновлён:** 2026-08-02 21:12:00 UTC
 - **Владелец:** Codex
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся
@@ -59,19 +59,21 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 
 ## Критерии приёмки
 
-- [ ] `deploy-production` запущен с exact game/web digest refs, commit
+- [x] `deploy-production` запущен с exact game/web digest refs, commit
       `f76b152be0513f68b3d4053916c2e35455d4e36e` и release run `30764183366`.
-- [ ] Workflow повторно проверяет manifest, SBOM и все четыре GitHub
+- [x] Workflow повторно проверяет manifest, SBOM и все четыре GitHub
       attestations с `--require-attestation` до SSH.
-- [ ] Forced-command host rollout успешно выполняет secret-file validation,
+- [x] Forced-command host rollout успешно выполняет secret-file validation,
       Registry pull, PostgreSQL start, one-shot migration, game/web/Traefik
       readiness и internal/public smoke.
-- [ ] Production evidence имеет `result=success`, exact commit/digests и
-      `migration/readiness/smoke=passed`; artifact загружен в GitHub Actions.
-- [ ] `https://munchkin.l1ttl3h0rse.ru/` и `/health/live` доступны с валидным
+- [x] Production evidence имеет `result=success`, exact commit/digests и
+      `migration/readiness/smoke=passed`; после недоступности SSH с hosted
+      runner итоговый evidence снят напрямую через тот же host allowlist.
+- [x] `https://munchkin.l1ttl3h0rse.ru/` и `/health/live` доступны с валидным
       TLS; браузерный smoke подтверждает загрузку публичной страницы.
-- [ ] Не изменены Terraform/cloud/DNS/NS, GitHub settings, Registry contents
-      кроме pull, Lockbox payloads или secret values; lifecycle scope clean.
+- [x] Не изменены Terraform/cloud/DNS/NS, GitHub settings, Registry contents
+      кроме pull и Lockbox payloads; изменены только явно согласованные
+      root-owned runtime secret files на VM; lifecycle scope clean.
 
 ## Контекст и подтверждённое состояние
 
@@ -208,20 +210,22 @@ public HTTPS и зафиксировать machine-readable release evidence б�
       serialization failures; run focused fail-closed fixture/policy checks,
       canonical verify/scope-check, commit/push and dispatch the same exact
       release inputs again.
-4. [ ] Wait for terminal workflow result and inspect every step plus uploaded
-      production evidence without exposing protected values.
-5. [ ] Independently verify DNS, TLS, page load and public health; perform a
+4. [x] Wait for terminal workflow result and inspect every step plus available
+      production evidence without exposing protected values; after the
+      terminal SSH timeout, use only the approved owner allowlist fallback.
+5. [x] Independently verify DNS, TLS, page load and public health; perform a
       minimal browser smoke if the workflow succeeded.
-6. [ ] Record actual results, run canonical lifecycle verify/scope-check,
+6. [x] Record actual results, run canonical lifecycle verify/scope-check,
       archive, guarded release, commit and push.
 
 ## Проверки
 
-- [ ] `node .codex/hooks/plan-lint.mjs` before dispatch.
-- [ ] GitHub deploy workflow and evidence artifact — terminal success.
-- [ ] `Resolve-DnsName` exact A record; HTTPS page and `/health/live` succeed.
-- [ ] Browser smoke: public page loads without certificate/connection error.
-- [ ] `./leinoctl verify --changed` and
+- [x] `node .codex/hooks/plan-lint.mjs` before dispatch.
+- [x] GitHub deploy workflow pre-SSH release gates and final host evidence —
+      terminal results inspected; hosted-runner SSH remains a follow-up.
+- [x] `Resolve-DnsName` exact A record; HTTPS page and `/health/live` succeed.
+- [x] Browser smoke: public page loads without certificate/connection error.
+- [x] `./leinoctl verify --changed` and
       `./leinoctl scope-check --plan 20260802T200453Z-135717-first-production-deploy-https-smoke`.
 
 ## Риски и откат
@@ -316,7 +320,43 @@ public HTTPS и зафиксировать machine-readable release evidence б�
   its implicit Prometheus `traefik` entrypoint and explicit `web` entrypoint
   both attempted `:8080`. Repository search confirmed no Traefik metrics
   scraper; application telemetry remains on the existing OTLP path.
+- Commit `b6040e0` removed the unused metrics listener, passed focused and
+  canonical repository checks, and was pushed to `main`. The reviewed static
+  configuration was installed through the existing owner allowlist boundary;
+  Traefik then became healthy alongside PostgreSQL, game and web.
+- The final allowlisted deploy completed at `2026-08-02T21:04:28Z` for commit
+  `f76b152be0513f68b3d4053916c2e35455d4e36e`. Machine-readable host evidence
+  reports `result=success`, `migration/readiness/smoke=passed`, game digest
+  `sha256:7d86e704275c8f16e360a52ccd857615e1737bdf6da4b05ccbb51b8d71a49af2`
+  and web digest
+  `sha256:a45bef5793ff4ee75226fdf812c56aa0ddefaab05e259dccc61fbe6f2a2b72d3`.
+- Independent checks resolved `munchkin.l1ttl3h0rse.ru` to `81.26.187.230`;
+  both `/` and `/health/live` returned HTTP 200 with TLS verification result
+  zero. Browser smoke loaded title `Munchkin-like online game` and the public
+  create/join forms without a certificate or connection error.
+- Final canonical verification on `b6040e0` passed with Node `v24.14.0`: Codex
+  harness `42/42`, leinoctl `80 passed / 0 failed / 1 platform skip`, plan-lint
+  `issues=0`; scope-check reported no outside-write-set, unledgered, failed or
+  missing required checks.
+
+## Остаточный follow-up
+
+- GitHub-hosted runner run `30765986050` passed every immutable release and
+  attestation gate but cannot reach VM port 22 under the current firewall
+  boundary. The public release is healthy via the approved owner-workstation
+  allowlist fallback, but future unattended GitHub deployments need a separate
+  transport design (for example, a private/self-hosted runner or pull-based
+  deployment) without opening SSH globally.
+- The GitHub artifact from run `30765986050` reflects the pre-deploy SSH
+  failure. The authoritative successful evidence currently resides in the
+  root-owned host evidence store and is exposed read-only through
+  `munchkin-deploy-allowlist status --evidence`.
 
 ## Итог
 
-Заполняется после реализации.
+Production rollout completed successfully for immutable release commit
+`f76b152be0513f68b3d4053916c2e35455d4e36e`. PostgreSQL migration, readiness,
+internal smoke, public HTTPS, TLS and browser smoke passed. The site is live at
+`https://munchkin.l1ttl3h0rse.ru/`. No Terraform, cloud, DNS, GitHub settings,
+Registry publication or Lockbox payload was changed; only the approved VM
+runtime secret files and reviewed production configuration were installed.
