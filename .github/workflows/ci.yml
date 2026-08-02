@@ -297,7 +297,7 @@ jobs:
             > "release/munchkin-images-${COMMIT_SHA}.json"
       - name: Upload failed security scan diagnostics
         if: always() && steps.publish-images.outcome == 'failure'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: munchkin-security-failure-${{ github.sha }}
           path: release/security
@@ -355,7 +355,7 @@ jobs:
             "$security_evidence" >"${security_evidence}.tmp"
           mv -f "${security_evidence}.tmp" "$security_evidence"
       - name: Upload verified image pair evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: munchkin-images-${{ github.sha }}
           path: release
