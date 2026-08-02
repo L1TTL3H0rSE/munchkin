@@ -1,10 +1,10 @@
 # PLAN: workflow runbook evidence hardening
 
 - **Plan ID:** `20260802T115451Z-fe7a2e-workflow-runbook-evidence-hardening`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-08-02 11:54:51 UTC
-- **Обновлён:** 2026-08-02 12:20:00 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-08-02 13:55:00 UTC
+- **Владелец:** `019fc267-5ce7-7cc0-9faf-0e3694e099b9`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** current
 - **Режим параллельности:** exclusive
@@ -57,37 +57,37 @@ authorization на code/cloud/push.
 
 ## Критерии приёмки
 
-- [ ] `AGENTS.md` и `docs/agents/plans/README.md` требуют queue preflight до
+- [x] `AGENTS.md` и `docs/agents/plans/README.md` требуют queue preflight до
   batch approval: exact IDs, exact order, count consistency, direct dependency
   graph, overlapping write sets/shared resources, current owner/session state.
   Текст с «7 plans» при перечислении 8 IDs должен fail/checkpoint, а не
   исправляться молча.
-- [ ] Документация прямо запрещает менять dependencies/order/write set/risk
+- [x] Документация прямо запрещает менять dependencies/order/write set/risk
   после approval без остановки и повторного согласования; `plan-lint` не
   используется как замена approval.
-- [ ] Lifecycle table фиксирует порядок: selected plan → focused checks →
+- [x] Lifecycle table фиксирует порядок: selected plan → focused checks →
   canonical `verify`/recorded ledger → `scope-check` → completed + archive →
   `plan release <plan-id> --session <session-id>` → отдельный local commit →
   next claim/select. Push остаётся explicit user authorization.
-- [ ] Runbook объясняет, что прямые hooks/leinoctl/plan-lint commands могут быть
+- [x] Runbook объясняет, что прямые hooks/leinoctl/plan-lint commands могут быть
   зелёными, но release всё ещё видит `missingRequiredChecks`, если результат
   не записан в текущий ledger; штатный способ регистрации описан через
   canonical verify/close, а не ручной внутренний helper.
-- [ ] Записан recovery protocol для stale owner: read-only проверить session,
+- [x] Записан recovery protocol для stale owner: read-only проверить session,
   repository identity и остановку прежнего owner; `--takeover` применять
   точечно; не удалять все `.leino/runtime/plan-owners` и не выбирать новый
   plan поверх selected session.
-- [ ] Browser runbook фиксирует bundled Node 24/Git Bash, cwd-agnostic runner,
+- [x] Browser runbook фиксирует bundled Node 24/Git Bash, cwd-agnostic runner,
   declared pnpm version, serial/bounded worker policy и output вне worktree;
   ignore rules названы defense-in-depth, а не основным artifact boundary.
-- [ ] Runbook отдельно предупреждает, что `pnpm install`/`--lockfile-only`
+- [x] Runbook отдельно предупреждает, что `pnpm install`/`--lockfile-only`
   может изменить lockfile/node_modules и не является бесплатной verification
   подготовкой; если lockfile входит в write set, это должно быть declared до
   approval.
-- [ ] Evidence taxonomy содержит минимум: focused test, browser assertion,
+- [x] Evidence taxonomy содержит минимум: focused test, browser assertion,
   visual/a11y matrix, canonical verify, scope-check, release ledger и local
   commit. Ни один слой не рекламируется как доказательство другого.
-- [ ] После изменений hooks/config/lifecycle rules зафиксирован новый trusted
+- [x] После изменений hooks/config/lifecycle rules зафиксирован новый trusted
   session boundary; текущая session не заявляет, что новые hooks уже активны.
 
 ## Контекст и подтверждённое состояние
@@ -193,27 +193,27 @@ resource is a write target.
 
 ## План реализации
 
-1. [ ] Add queue preflight section with a concrete 8-vs-7 mismatch example and
+1. [x] Add queue preflight section with a concrete 8-vs-7 mismatch example and
    exact dependency/order validation.
-2. [ ] Rewrite lifecycle section with selected/verify/scope/archive/release/
+2. [x] Rewrite lifecycle section with selected/verify/scope/archive/release/
    commit/select boundaries and correct CLI syntax.
-3. [ ] Add ledger/evidence taxonomy, stale-owner recovery and trusted-session
+3. [x] Add ledger/evidence taxonomy, stale-owner recovery and trusted-session
    handoff checklist.
-4. [ ] Add frontend runtime/artifact/install/snapshot policy and distinguish
+4. [x] Add frontend runtime/artifact/install/snapshot policy and distinguish
    ignore defense from temp output boundary.
-5. [ ] Run text-check, plan-lint, canonical verify/scope-check and review the
+5. [x] Run text-check, plan-lint, canonical verify/scope-check and review the
    documentation diff for scope creep; do not archive until all evidence is
    recorded.
 
 ## Проверки
 
-- [ ] `./leinoctl context --paths AGENTS.md,frontend/AGENTS.md,docs/agents/HARNESS.md,docs/agents/plans/README.md`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl text-check --paths AGENTS.md,frontend/AGENTS.md,docs/agents/HARNESS.md,docs/agents/plans/README.md`
-- [ ] `./leinoctl verify --paths AGENTS.md,frontend/AGENTS.md,docs/agents/HARNESS.md,docs/agents/plans/README.md`
-- [ ] `./leinoctl scope-check --plan 20260802T115451Z-fe7a2e-workflow-runbook-evidence-hardening`
-- [ ] `git diff --check`
-- [ ] Manual read-through confirms no instruction authorizes push, cloud
+- [x] `./leinoctl context --paths AGENTS.md,frontend/AGENTS.md,docs/agents/HARNESS.md,docs/agents/plans/README.md`
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl text-check --paths AGENTS.md,frontend/AGENTS.md,docs/agents/HARNESS.md,docs/agents/plans/README.md`
+- [x] `./leinoctl verify --paths AGENTS.md,frontend/AGENTS.md,docs/agents/HARNESS.md,docs/agents/plans/README.md`
+- [x] `./leinoctl scope-check --plan 20260802T115451Z-fe7a2e-workflow-runbook-evidence-hardening`
+- [x] `git diff --check`
+- [x] Manual read-through confirms no instruction authorizes push, cloud
   mutation, dependency install, snapshot update or broad stale-owner cleanup.
 
 ## Риски и откат
@@ -231,21 +231,25 @@ resource is a write target.
 
 ## Открытые вопросы
 
-- Где лучше разместить reusable queue-preflight command/template: generic
-  `leinoctl` (predecessor plan) или docs-only checklist; implementation choice
-  должна быть согласована до изменения command surface.
-- Нужно ли добавить отдельную документацию для `plan close` после того, как
-  generic plan зафиксирует окончательное имя и exit contract.
-- Как пользователь предпочитает оформлять trusted-session handoff после
-  lifecycle changes: отдельной командой или только SessionStart evidence.
+Решения зафиксированы:
+
+- Queue preflight остаётся docs-only checklist с exact IDs/count/order,
+  dependencies, overlap и owner/session state; command surface generic
+  `leinoctl` не расширяется этим plan.
+- Отдельный `plan close` не документируется: публичный `plan release <id>
+  --session <session-id>` остаётся lifecycle close boundary.
+- После изменения hooks/config/lifecycle/runbook rules требуется новая trusted
+  session с SessionStart evidence. Текущая session не заявляет, что новая
+  policy уже активна; это ограничение записано в HARNESS и plans README.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-08-02 12:00 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** расширить предыдущие планы и
-  записать их в репозиторий; implementation и push не запрашивались.
+- **Подтверждено:** 2026-08-02 12:41 UTC
+- **Формулировка/ограничения пользователя:** approve exact queue in order:
+  `20260802T115448Z`, `20260802T115450Z`, `20260802T115451Z`; не обновлять
+  snapshots и не выполнять push.
 
 ## Ход выполнения
 
@@ -253,8 +257,30 @@ resource is a write target.
 - 2026-08-02: добавлены findings о mismatch 7/8, 26 registry conflicts,
   stale owners, ledger evidence, outside-worktree artifacts, toolchain/cwd,
   lockfile side effects и trusted-session boundary.
-- Реализация не начата.
+- 2026-08-02 13:41 UTC: predecessor browser plan released and committed as
+  `e1704e9`; stale owner `019fc235-357e-7c61-ba58-4573e367bf1e` was taken
+  over after leinoctl confirmed its session state was absent. User approval
+  was recorded for this third queued plan; no scope/order/write-set expansion
+  is authorized.
+- 2026-08-02 13:45 UTC: updated only `AGENTS.md`, `frontend/AGENTS.md`,
+  `docs/agents/HARNESS.md` and `docs/agents/plans/README.md`. Added queue
+  preflight hard stops, exact lifecycle/release syntax, evidence taxonomy,
+  stale-owner recovery, browser temp/toolchain policy, no-install/no-snapshot
+  guardrails and trusted-session handoff.
+- 2026-08-02 13:48 UTC: context and strict text-check passed; canonical verify
+  passed with all required checks recorded (harness 42/42, leinoctl 75 pass/1
+  skip, plan-lint, frontend checks/build, bash syntax and Compose config).
+  Scope-check returned `ok=true`, with no outside, unledgered or missing paths.
+  `git diff --check` is clean; no code, lockfile, runtime ledger or remote
+  state changed.
 
 ## Итог
 
-Заполняется после реализации и отдельного lifecycle closure.
+Runbook evidence hardening реализован в пределах четырёх documentation paths.
+Queue approval теперь fail-closed на count/order/dependency/overlap mismatch;
+canonical ledger, scope, release, commit и push boundaries разделены; stale
+owner recovery точечный; browser output/install/snapshot policy явно описана.
+Новая trusted session требуется после этих instruction/lifecycle changes,
+поэтому текущая session не заявляет активацию обновлённых hooks/instructions.
+Plan готов к archive, guarded release и отдельному local commit; push не
+выполняется.

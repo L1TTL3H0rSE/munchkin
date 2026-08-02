@@ -36,6 +36,27 @@ Timestamp сортирует, entropy устраняет общий allocator, e
 Manifest нужен relevance scan. Таблица Write set нужна write authorization.
 Они описывают один scope, но не заменяют друг друга.
 
+## Queue preflight до approval
+
+Для batch approval сначала собери exact plan IDs в заданном порядке и проверь
+их read-only. Preflight обязан показать:
+
+1. объявленный count и фактический count IDs;
+2. каждый manifest, active/archive placement, status/eligibility и owner/session;
+3. direct `dependsOn` и то, что порядок очереди удовлетворяет dependency graph;
+4. пересечения write set и `sharedResources` между соседними plans;
+5. `./leinoctl context --paths ...` для совокупного impact.
+
+Пример обязательной остановки: если в сообщении написано `7 plans`, но после
+разбора перечислено 8 IDs, checkpoint должен вернуть mismatch и ждать решения
+пользователя. Нельзя молча отбросить восьмой ID, «починить» count, поменять
+порядок или переписать dependency metadata. `plan-lint` проверяет registry и
+manifest health, но не является approval.
+
+После explicit approval каждый ID и порядок считаются частью authorization.
+Изменение IDs, dependencies, write set, shared resources, risk или order —
+material scope change: очередь останавливается и требует повторного approval.
+
 ## Lifecycle
 
 1. Read-only research + `./leinoctl context --paths ...`.
@@ -47,7 +68,11 @@ Manifest нужен relevance scan. Таблица Write set нужна write au
 7. `./leinoctl plan select <plan-id>`.
 8. Выполнить только выбранный plan.
 9. При material scope/risk/contract change повторно согласовать.
-10. Verify, scope-check, `completed`, move в archive.
+10. Выполнить `verify`/recorded ledger и `scope-check`, затем поставить
+    `completed` и переместить тот же файл в archive.
+11. Выполнить `plan release <plan-id> --session <session-id>`.
+12. Создать отдельный local commit; push выполнять только при явном
+    разрешении пользователя.
 
 Статусы: `draft`, `awaiting_approval`, `approved`, `in_progress`, `blocked`,
 `completed`, `cancelled`. Completed/cancelled лежат только в archive.
@@ -70,12 +95,13 @@ Approval каждого plan всё равно записывается в ег�
 После полного завершения текущего plan:
 
 ```bash
+# focused/manual checks are evidence only; they do not replace the ledger
 ./leinoctl verify --changed
 ./leinoctl scope-check --plan <current-plan-id>
 # отметить completed и перенести current plan в archive
-./leinoctl plan release <current-plan-id>
+./leinoctl plan release <current-plan-id> --session <session-id>
 # создать отдельный local commit; push только если явно разрешён
-# при необходимости: plan claim next и записать его approval/status
+# только если next ID был заранее approved: plan claim next, записать status
 ./leinoctl plan select <next-plan-id>
 ```
 
@@ -86,13 +112,33 @@ plan, сохраняет предсуществующий dirty baseline и со
 Material scope/contract/risk/dependency/order change, failed check или новый
 unexpected dirty path останавливают очередь и требуют пользователя.
 
+`verify` должен быть именно canonical: он запускает required component checks и
+записывает успешные exit code/fingerprint в текущий session ledger. Прямые
+`node --test`, `pnpm lint`, `plan-lint` или browser/manual smoke могут быть
+полезны, но сами по себе не закрывают `missingRequiredChecks`. `scope-check`
+отдельно доказывает write-set/unledgered paths и свежесть ledger; release не
+является commit, а commit не является push.
+
+Для frontend browser evidence используй bundled Node 24/Git Bash, declared
+`pnpm@10.8.0`, cwd-agnostic runner, serial/bounded workers и unique temp output
+вне worktree. Успешный browser run чистит temp, failed run сохраняет и печатает
+evidence path. `frontend/test/browser/artifacts/` и ignore rules — только
+legacy defense-in-depth. `pnpm install`, `--lockfile-only` и автоматический
+`--update-snapshots` не являются verification setup и требуют отдельного
+разрешения/write set.
+
+Если меняются hooks, config или эти lifecycle/runbook rules, текущая session не
+доказывает, что новая policy уже активна: после diff/tests нужен новый trusted
+session с SessionStart evidence. Запиши это ограничение в handoff и не
+расширяй его до разрешения push/cloud/dependency mutation.
+
 ## Команды
 
 ```bash
 ./leinoctl context --paths <paths>
 ./leinoctl plan relevant --paths <paths>
 ./leinoctl plan claim <plan-id>
-./leinoctl plan release <plan-id>
+./leinoctl plan release <plan-id> --session <session-id>
 ./leinoctl plan select <plan-id>
 ./leinoctl scope-check --plan <plan-id>
 node .codex/hooks/plan-lint.mjs

@@ -18,8 +18,8 @@ core людям, hooks и CI. Это guardrail, не security boundary.
 
 ## Доверие
 
-После clone или изменения hooks/config, `tools/leinoctl` либо lifecycle-правил
-в `AGENTS.md`:
+После clone или изменения hooks/config, `tools/leinoctl`, `AGENTS.md` либо
+lifecycle/runbook documentation:
 
 1. Просмотри diff.
 2. Запусти harness/leinoctl tests.
@@ -28,7 +28,9 @@ core людям, hooks и CI. Это guardrail, не security boundary.
 
 Текущая session могла загрузить предыдущую версию. Поэтому bootstrap-session,
 которая впервые копирует hooks, проверяет их вручную, но не заявляет
-PreToolUse/Stop enforcement target repository.
+PreToolUse/Stop enforcement target repository. После изменения этих правил
+текущая session также не заявляет, что новые instructions/hooks уже активны;
+новая trusted session и SessionStart evidence — отдельный handoff checkpoint.
 
 ## Selected plan и baseline
 
@@ -47,6 +49,30 @@ root HEAD (включая unborn `null`), status/fingerprints и ledger.
 `plan release`/`plan claim`; `--takeover` используется только после проверки,
 что прежняя session остановлена.
 
+## Queue preflight и stale-owner recovery
+
+До batch approval зафиксируй exact IDs и порядок очереди, затем read-only
+сверь count, active/archive placement, direct `dependsOn`, eligibility,
+write-set/shared-resource overlap и текущие owner/session records. Если
+объявлено 7 plans, а перечислено 8 IDs, это mismatch и hard stop: нельзя
+молча удалять ID, менять порядок или чинить dependency metadata. `plan-lint`
+не является approval и не заменяет этот checkpoint.
+
+Для stale owner действуй точечно:
+
+1. Прочитай ошибку `plan claim` и проверь repository identity, owner record и
+   наличие session state; отсутствие state не доказывает, что живой owner
+   остановлен, пока это не подтверждено read-only проверкой.
+2. Если прежняя session действительно остановлена, выполни только
+   `./leinoctl plan claim <exact-plan-id> --takeover` и запиши, кого и почему
+   заменили.
+3. Если session жива или состояние неоднозначно, остановись и запроси
+   handoff; не удаляй весь `.leino/runtime/plan-owners`, не очищай ledger и
+   не выбирай новый plan поверх selected plan.
+
+Любой material change IDs, order, dependency, write set, shared resource или
+risk после approval требует остановки и повторного согласования.
+
 Один диалог/session может последовательно выполнить несколько заранее
 согласованных exact plan IDs. Переход является отдельным fail-closed state
 transition:
@@ -54,7 +80,7 @@ transition:
 1. Выполнить current plan и все required checks.
 2. Запустить `verify --changed` и `scope-check --plan <current>`.
 3. Поставить `completed` и перенести тот же plan в archive.
-4. Выполнить `plan release <current>`. Для selected plan команда повторно
+4. Выполнить `plan release <current> --session <session-id>`. Для selected plan команда повторно
    проверяет completed/archive, checklist, lint, scope и verification.
 5. Release удаляет active session/ownership, но сохраняет bounded rotation
    checkpoint. Обычные repository writes после этого не авторизованы.
@@ -85,6 +111,29 @@ diff; `scope-check` помечает их `unledgered`.
 
 Stop рассматривает только plan выбранной session. Он fail-closed при path вне
 scope, stale/missing required checks или незавершённом checklist.
+
+## Evidence taxonomy
+
+| Слой | Что доказывает | Что не доказывает |
+|---|---|---|
+| focused test / unit test | конкретную функцию или failure path | полный component impact или lifecycle ledger |
+| browser assertion / manual smoke | один видимый сценарий и его assertion | visual/a11y matrix, canonical verify или release |
+| visual/a11y matrix | выбранные viewport, raster или accessibility checks | product-wide accessibility или current ledger |
+| canonical `verify` | required component checks и записанный exit/fingerprint в session ledger | scope placement и archive/release |
+| `scope-check` | write-set, unledgered paths и свежесть required checks | correctness незапущенного browser слоя |
+| `plan release` ledger | completed archived plan, checklist и rotation guard | Git commit или push |
+| local commit | сохранённый Git snapshot | remote push, cloud apply или новая approval |
+
+Прямые hooks, `leinoctl` tests, `plan-lint` или manual smoke могут быть зелёными
+и всё равно оставить `missingRequiredChecks`; штатная регистрация выполняется
+через canonical `verify`, а не ручным внутренним helper.
+
+Frontend browser evidence использует bundled Node 24/Git Bash, declared
+`pnpm@10.8.0`, serial/bounded workers и output вне worktree. `pnpm install`,
+`--lockfile-only` и implicit snapshot refresh не являются бесплатной
+verification подготовкой; lockfile/node_modules mutation требует отдельного
+declared write set и approval. Ignore rules лишь защищают legacy paths и не
+заменяют outside-worktree temp boundary.
 
 ## Проверки
 

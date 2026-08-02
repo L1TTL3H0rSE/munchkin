@@ -49,6 +49,33 @@ verify/scope-check, стать `completed` и переместиться в arch
 dependencies, рисков или порядка очереди останавливает цепочку и требует
 повторного согласования.
 
+### Queue preflight до batch approval
+
+Если пользователь согласует несколько plans одним сообщением, до записи
+approval выполни read-only preflight и сохрани его вывод в текущем queue plan:
+
+- зафиксируй exact plan IDs в заданном порядке и сравни объявленный count с
+  фактическим числом IDs;
+- прочитай manifest каждого ID и проверь direct `dependsOn`, eligibility,
+  active/archive placement, владельца и состояние session;
+- проверь пересечения write set и `sharedResources`, а также то, что порядок
+  удовлетворяет dependency graph;
+- вызови `./leinoctl context --paths ...` для совокупного scope и покажи
+  пользователю список IDs, порядок и найденные конфликты до approval.
+
+Несовпадение вроде «объявлено 7 plans, перечислено 8 IDs» — hard stop:
+очередь нельзя сокращать, переупорядочивать или чинить metadata молча.
+`plan-lint` показывает registry health, но не заменяет explicit approval.
+После approval изменение IDs, порядка, dependencies, write set, shared
+resources или risk снова останавливает очередь и требует повторного
+согласования.
+
+В queued run каждый plan сохраняет отдельные границы focused checks,
+canonical `verify`/ledger, `scope-check`, archive, guarded release и local
+commit. Manual smoke или прямой hook test не заменяет recorded canonical
+evidence; push, cloud mutation, dependency install и snapshot update не
+становятся разрешёнными от одного approval очереди.
+
 Перед завершением:
 
 ```bash
@@ -128,5 +155,8 @@ node .codex/hooks/plan-lint.mjs
 ```
 
 После изменения `.codex`, `.leino`, `tools/leinoctl` или lifecycle-правил в
-этом файле просмотри diff, запусти tests и начни новую trusted session.
-Текущая session не доказывает загрузку новых hooks или инструкций.
+этом файле, а также `AGENTS.md`, frontend/runbook инструкций или lifecycle
+documentation, просмотри diff, запусти tests и начни новую trusted session.
+Текущая session не доказывает загрузку новых hooks или инструкций; это
+ограничение нужно записать в handoff/runbook и не выдавать текущую session за
+активировавшую новые правила.
