@@ -132,12 +132,30 @@ export async function openFixture(
   return fixture;
 }
 
+export async function openFixtureAtViewport(
+  page: Page,
+  fixtureID: string,
+  width: number,
+  height: number,
+): Promise<UiFixtureDefinition> {
+  await page.setViewportSize({width, height});
+  return openFixture(page, fixtureID);
+}
+
 export async function assertNoRootOverflow(page: Page): Promise<void> {
   const overflow = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+}
+
+export async function assertNoDocumentVerticalOverflow(page: Page): Promise<void> {
+  const overflow = await page.evaluate(() => ({
+    clientHeight: document.documentElement.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+  }));
+  expect(overflow.scrollHeight).toBeLessThanOrEqual(overflow.clientHeight);
 }
 
 export async function assertSkipLinkFocus(page: Page): Promise<void> {
@@ -150,10 +168,10 @@ export async function assertSkipLinkFocus(page: Page): Promise<void> {
 export async function assertLabeledRails(page: Page): Promise<void> {
   await expect(page.locator("header.topbar")).toHaveCount(1);
   await expect(page.locator("main#main-content")).toHaveCount(1);
-  const actionDock = page.locator(".action-dock");
+  const actionDock = page.locator(".action-dock:visible");
   if (await actionDock.count()) {
     await expect(actionDock).toHaveAttribute("aria-labelledby", "action-dock-title");
-    await expect(page.locator("#action-dock-title")).toHaveCount(1);
+    await expect(page.locator("#action-dock-title:visible")).toHaveCount(1);
   }
 }
 

@@ -1,0 +1,497 @@
+@use "../api" as api;
+
+@media (width <= #{api.breakpoint(tablet-small)}) {
+  html:has(.game-route),
+  body:has(.game-route) {
+    overflow: hidden;
+  }
+
+  .app-shell[data-route="game"] {
+    min-height: 100svh;
+    min-height: 100dvh;
+  }
+
+  .app-shell[data-route="game"] > .topbar {
+    display: none;
+  }
+
+  .app-main:has(.game-route) {
+    height: 100svh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .game-route {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .game-table {
+    --color-text-muted: #526158;
+    --muted: var(--color-text-muted);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    overflow: hidden;
+    padding: max(4px, env(safe-area-inset-top, 0px))
+      max(8px, env(safe-area-inset-right, 0px))
+      0
+      max(8px, env(safe-area-inset-left, 0px));
+  }
+
+  .game-table__desktop {
+    display: none;
+  }
+
+  .game-table > .mobile-game-table {
+    display: grid !important;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    gap: var(--space-2);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-game-table__status {
+    min-height: 0;
+  }
+
+  .mobile-game-table .game-connection-status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 1.45rem;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    padding: .2rem .45rem;
+    color: var(--color-text-muted);
+    background: color-mix(in srgb, var(--color-paper), transparent 20%);
+    font-size: .62rem;
+  }
+
+  .mobile-game-table .game-connection-status[data-state="connected"] {
+    min-height: 0;
+    border-color: transparent;
+    padding-block: 0;
+    background: transparent;
+  }
+
+  .mobile-game-table .game-connection-status[data-state="connected"] .game-connection-status__state {
+    display: none;
+  }
+
+  .mobile-game-table .game-connection-status__state,
+  .mobile-game-table .game-connection-status__error {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-game-table .game-connection-status__error {
+    color: var(--color-danger);
+  }
+
+  .mobile-game-table .game-connection-status__retry {
+    min-height: 2.25rem;
+    margin-inline-start: auto;
+    padding: .3rem .5rem;
+    font-size: .65rem;
+  }
+
+  .mobile-game-table__stage {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .mobile-game-table .mobile-opponent-chip {
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: .35rem .45rem;
+  }
+
+  .mobile-game-table .mobile-opponent-chip__avatar {
+    width: 1.8rem;
+    height: 1.8rem;
+  }
+
+  .mobile-game-table .mobile-opponent-chip__status {
+    grid-column: auto !important;
+    white-space: nowrap;
+  }
+
+  .mobile-game-table .mobile-combat-summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mobile-game-table .mobile-combat-summary__result {
+    grid-column: auto;
+    color: var(--color-accent-strong);
+    font-size: .62rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .mobile-encounter-stage {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .mobile-encounter-stage .card-rail__viewport {
+    min-height: 276px;
+    max-height: 276px;
+    overflow-y: hidden;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    scroll-padding-inline: var(--space-2);
+  }
+
+  .mobile-encounter-card .card-frame--compact {
+    height: 272px;
+    min-height: 272px;
+    grid-template-rows: auto 112px minmax(0, 1fr) auto;
+  }
+
+  .mobile-encounter-card .card-frame__content {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .mobile-encounter-stage .card-rail__viewport::after {
+    content: "";
+    position: sticky;
+    right: 0;
+    align-self: stretch;
+    width: 1.5rem;
+    flex: 0 0 1.5rem;
+    margin-inline-start: -1.5rem;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--color-paper));
+  }
+
+  .mobile-game-table__dock {
+    max-height: min(27svh, 11rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-top: 1px solid var(--color-line);
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-1);
+    background: var(--color-paper);
+    scrollbar-gutter: stable;
+  }
+
+  .mobile-game-table__dock--compact {
+    max-height: 4.25rem;
+    overflow: hidden;
+  }
+
+  .mobile-game-table__dock--compact .action-dock {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .mobile-game-table__dock--compact .action-dock__header {
+    display: block;
+    min-width: 0;
+  }
+
+  .mobile-game-table__dock--compact .action-dock__header h2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-game-table__dock--compact .action-dock__close,
+  .mobile-game-table__dock--compact .action-dock__hint,
+  .mobile-game-table__dock--compact .action-dock__empty,
+  .mobile-game-table__dock--compact .action-choice > strong,
+  .mobile-game-table__dock--compact .action-choice__source,
+  .mobile-game-table__dock--compact .action-options,
+  .mobile-game-table__dock--compact .target-select {
+    display: none;
+  }
+
+  .mobile-game-table__dock--compact .action-list {
+    display: block;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .mobile-game-table__dock--compact .action-choice {
+    display: block;
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .mobile-game-table__dock--compact .action-choice__submit {
+    width: auto;
+    min-width: 7rem;
+    min-height: 2.5rem;
+    padding: .3rem .55rem;
+    white-space: nowrap;
+  }
+
+  .mobile-game-table__dock .action-dock {
+    gap: var(--space-1);
+  }
+
+  .mobile-game-table__dock .action-dock__header {
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0;
+  }
+
+  .mobile-game-table__dock .action-dock__header h2 {
+    margin: 0;
+    font-size: .82rem;
+  }
+
+  .mobile-game-table__dock .action-dock__hint {
+    display: none;
+  }
+
+  .mobile-game-table__dock .action-dock__header .eyebrow {
+    display: none;
+    margin: 0;
+    font-size: .56rem;
+  }
+
+  .mobile-game-table__dock .action-dock__close {
+    min-height: 2.25rem;
+    padding: .25rem .45rem;
+    font-size: .68rem;
+  }
+
+  .mobile-game-table__dock .action-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-1);
+    max-height: 8rem;
+    overflow-y: auto;
+  }
+
+  .mobile-game-table__dock .action-choice {
+    gap: var(--space-1);
+    padding: .4rem;
+  }
+
+  .mobile-game-table__dock .action-choice > strong {
+    font-size: .64rem;
+  }
+
+  .mobile-game-table__dock .action-choice__source,
+  .mobile-game-table__dock .action-options small {
+    font-size: .6rem;
+  }
+
+  .mobile-game-table__dock .action-choice__submit {
+    min-height: 2.5rem;
+    padding: .3rem .4rem;
+    font-size: .68rem;
+  }
+
+  .mobile-game-table__dock .economy-surface {
+    max-height: 8rem;
+    overflow-y: auto;
+  }
+
+  .game-route > .interaction-surface {
+    position: fixed;
+    z-index: 40;
+    right: max(8px, env(safe-area-inset-right, 0px));
+    bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    left: max(8px, env(safe-area-inset-left, 0px));
+  }
+
+  .game-route > .interaction-surface .interaction-inbox {
+    border-radius: var(--radius-control);
+    padding: .5rem .65rem;
+  }
+}
+
+@media (width <= 374px) {
+  .mobile-game-table {
+    gap: .25rem;
+  }
+
+  .mobile-game-table__status:has(.game-connection-status[data-state="connected"]) {
+    display: none;
+  }
+
+  .mobile-opponents {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .mobile-opponents__header {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .mobile-opponents__header > div {
+    min-width: 0;
+  }
+
+  .mobile-opponents__eyebrow,
+  .mobile-encounter-stage__eyebrow {
+    display: none;
+  }
+
+  .mobile-opponents h2 {
+    margin: 0;
+    font-size: .74rem;
+    white-space: nowrap;
+  }
+
+  .mobile-opponents__details {
+    min-height: 2rem;
+    padding: .2rem .4rem;
+    font-size: .62rem;
+  }
+
+  .mobile-opponents__details-full {
+    display: none !important;
+  }
+
+  .mobile-opponents__details-compact {
+    display: inline !important;
+  }
+
+  .mobile-opponents__rail {
+    min-width: 0;
+    gap: var(--space-1);
+    padding: 0;
+  }
+
+  .mobile-game-table .mobile-opponent-chip {
+    flex: 1 1 0;
+    min-height: 2.25rem;
+    gap: var(--space-1);
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    padding: .2rem .3rem;
+  }
+
+  .mobile-game-table .mobile-opponent-chip__avatar {
+    width: 1.55rem;
+    height: 1.55rem;
+  }
+
+  .mobile-game-table .mobile-opponent-chip__copy {
+    gap: 0;
+  }
+
+  .mobile-game-table .mobile-opponent-chip__copy strong {
+    font-size: .65rem;
+  }
+
+  .mobile-game-table .mobile-opponent-chip__copy small,
+  .mobile-game-table .mobile-opponent-chip__status {
+    font-size: .54rem;
+  }
+
+  .mobile-game-table .mobile-opponent-chip__status {
+    grid-column: 2 !important;
+    line-height: 1;
+    white-space: normal;
+  }
+
+  .mobile-encounter-stage {
+    gap: var(--space-1);
+  }
+
+  .mobile-encounter-stage__header {
+    align-items: center;
+  }
+
+  .mobile-encounter-stage h2 {
+    margin: 0;
+    font-size: .86rem;
+  }
+
+  .mobile-game-table .mobile-combat-summary {
+    gap: var(--space-1);
+    padding: .3rem .4rem;
+  }
+
+  .mobile-game-table .mobile-combat-summary__numbers {
+    gap: .3rem;
+  }
+
+  .mobile-game-table .mobile-combat-summary__details {
+    min-height: 2.2rem;
+    padding: .2rem .4rem;
+  }
+
+  .mobile-game-table .mobile-combat-summary__result {
+    font-size: .56rem;
+  }
+}
+
+@media (width > #{api.breakpoint(tablet-small)}) {
+  .mobile-game-table {
+    display: none !important;
+  }
+}
+
+// 320px, short-height and landscape are safety-only: preserve access and allow
+// a bounded page scroll instead of promising the 360x640 composition.
+@media (width <= 319px), (height <= 639px), (orientation: landscape) and (width <= 844px) {
+  html:has(.game-route),
+  body:has(.game-route) {
+    overflow: auto;
+  }
+
+  .app-main:has(.game-route),
+  .game-route,
+  .game-table {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  .game-table > .mobile-game-table {
+    height: auto;
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .mobile-game-table__stage {
+    overflow: visible;
+  }
+
+  .mobile-game-table__dock {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@include api.reduced-motion {
+  .mobile-game-table .mobile-opponents__rail,
+  .mobile-game-table .card-rail__viewport {
+    scroll-behavior: auto;
+    scroll-snap-type: none;
+  }
+}
+
+@include api.forced-colors {
+  .mobile-game-table .mobile-opponent-chip,
+  .mobile-game-table .mobile-combat-summary,
+  .mobile-game-table .mobile-run-away,
+  .mobile-game-table .mobile-decision-summary,
+  .mobile-game-table .mobile-game-table__dock {
+    border-color: CanvasText;
+    forced-color-adjust: none;
+  }
+}

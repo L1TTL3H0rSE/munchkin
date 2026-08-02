@@ -1,6 +1,6 @@
 import {expect, test, type Page} from "@playwright/test";
 
-import {openFixture} from "./fixtureSupport.ts";
+import {openFixture, openFixtureAtViewport} from "./fixtureSupport.ts";
 
 async function openLobby(page: Page, width: number, height: number): Promise<void> {
   await page.setViewportSize({width, height});
@@ -44,7 +44,10 @@ test("canonical chromium visual baseline stays stable", async ({page}, testInfo)
   await expect(page.locator(".own-board")).toBeVisible();
   await expect(page.locator(".hand-browser")).toBeVisible();
   await expect(page.locator(".action-bar")).toBeVisible();
-  await expect(page.locator(".game-connection-status")).toHaveAttribute("data-state", "connected");
+  await expect(page.locator(".game-table__desktop .game-connection-status")).toHaveAttribute(
+    "data-state",
+    "connected",
+  );
   const devtoolsFrame = page.locator("nuxt-devtools-frame");
   if (await devtoolsFrame.count()) {
     await devtoolsFrame.evaluate((element) => {
@@ -56,3 +59,28 @@ test("canonical chromium visual baseline stays stable", async ({page}, testInfo)
     animations: "disabled",
   });
 });
+
+const mobileVisualCases = [
+  ["mobile-setup", "single-setup"],
+  ["mobile-door", "single-door-choice"],
+  ["mobile-combat-one", "single-combat"],
+  ["mobile-combat-multiple", "mobile-combat-multiple"],
+  ["mobile-reward", "run-away-result"],
+  ["mobile-run-away", "single-run-away"],
+  ["mobile-waiting", "stale-projection"],
+] as const;
+
+for (const [snapshotName, fixtureID] of mobileVisualCases) {
+  test(snapshotName, async ({page}, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
+    await openFixtureAtViewport(page, fixtureID, 360, 640);
+    await page.addStyleTag({
+      content: "nuxt-devtools-frame, nuxt-devtools-inspect-panel, #vue-tracer-overlay { display: none; }",
+    });
+    await expect(page.locator(".mobile-game-table")).toBeVisible();
+    await expect(page).toHaveScreenshot(`${snapshotName}.png`, {
+      fullPage: false,
+      animations: "disabled",
+    });
+  });
+}

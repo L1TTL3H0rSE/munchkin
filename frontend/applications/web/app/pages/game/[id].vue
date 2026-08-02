@@ -88,6 +88,10 @@ onMounted(() => {
   </section>
 </template>
 
+<style lang="scss">
+@use "../../assets/scss/pages/game-mobile";
+</style>
+
 <style scoped>
 .center-state {
   display: grid;

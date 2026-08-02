@@ -293,6 +293,21 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     };
     projection.turn.available_actions = [action("resolve_combat")];
   }),
+  makeFixture("mobile-combat-multiple", "Мобильный бой: несколько карт", (projection) => {
+    projection.players = [player(0), player(1)];
+    projection.turn.phase = "combat";
+    projection.turn.encounter = encounter;
+    projection.turn.combat = {
+      player_strength: 4,
+      monster_strength: 14,
+      player_winning: false,
+      tie_wins: false,
+      combat_closed: false,
+      monsters: [encounter, additionalMonster],
+      effects: [],
+    };
+    projection.turn.available_actions = [action("resolve_combat")];
+  }),
   makeFixture("card-action-rail", "Карточное действие с contextual rail", (projection) => {
     projection.turn.available_actions = [{
       ...action("play_card"),
