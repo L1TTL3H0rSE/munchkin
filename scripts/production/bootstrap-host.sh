@@ -147,7 +147,7 @@ esac
 ALLOWLIST
 chmod 0750 "$allowlist_path"
 
-install -m 0750 -o root -g root /dev/null "$gateway_path"
+install -m 0755 -o root -g root /dev/null "$gateway_path"
 cat >"$gateway_path" <<'GATEWAY'
 #!/usr/bin/env bash
 set -Eeuo pipefail
@@ -162,7 +162,8 @@ case "$command_name" in
     ;;
 esac
 GATEWAY
-chmod 0750 "$gateway_path"
+chmod 0755 "$gateway_path"
+usermod --shell "$gateway_path" "$deploy_user"
 
 ssh_dir="/var/lib/$deploy_user/.ssh"
 install -d -m 0700 -o "$deploy_user" -g "$deploy_user" "$ssh_dir"
