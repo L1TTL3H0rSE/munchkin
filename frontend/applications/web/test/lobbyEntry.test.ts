@@ -40,7 +40,7 @@ describe("lobby form model", () => {
     expect(result).toEqual({
       field: "gameID",
       kind: "not_found",
-      message: "Комната не найдена. Проверьте ID и повторите попытку.",
+      message: "Комната не найдена. Проверьте код и повторите попытку.",
       retryable: false,
     });
     expect(result.message).not.toContain("token=secret");
@@ -54,9 +54,27 @@ describe("lobby form model", () => {
       field: "form",
       kind: "offline",
       retryable: true,
-      message: "Нет связи с сервером игры.",
+      message: "Проверьте подключение и повторите попытку.",
     });
-    expect(unexpected.message).toBe("Не удалось выполнить запрос к игре.");
+    expect(unexpected.message).toBe("Не удалось открыть комнату. Повторите попытку.");
     expect(unexpected.message).not.toContain("raw provider response");
+  });
+
+  it("uses product-language messages for every server failure kind", () => {
+    const kinds = [
+      "auth",
+      "validation",
+      "conflict",
+      "stale_version",
+      "protocol",
+      "unexpected",
+    ] as const;
+
+    for (const kind of kinds) {
+      const result = lobbyFormError(new GameApiError(kind, "raw backend detail"));
+      expect(result.field).toBe("form");
+      expect(result.message).not.toContain("raw backend detail");
+      expect(result.message).not.toMatch(/sessionStorage|bearer|SSR|URL|API|version/i);
+    }
   });
 });

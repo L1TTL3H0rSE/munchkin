@@ -1,28 +1,39 @@
 <template>
   <aside class="lobby-recovery" aria-labelledby="lobby-recovery-title">
-    <p class="lobby-recovery__eyebrow">СЕССИЯ ВКЛАДКИ</p>
-    <h2 id="lobby-recovery-title">Повторный вход без раскрытия credential</h2>
+    <p class="lobby-recovery__eyebrow">ЕСЛИ ВЫ УЖЕ ИГРАЛИ</p>
+    <h2 id="lobby-recovery-title">Вернитесь за знакомый стол</h2>
     <p>
-      Гостевой доступ хранится только в sessionStorage этой вкладки. Credential
-      не попадает в URL, SSR и сообщения об ошибках; для возврата используйте
-      открытую вкладку или сохранённый ID комнаты.
+      Откройте комнату по её коду и укажите своё имя ещё раз.
     </p>
   </aside>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/scss/api" as api;
+
 .lobby-recovery {
   display: grid;
-  gap: .65rem;
+  gap: var(--space-2);
   max-width: 62ch;
-  margin-top: 1.5rem;
-  padding: 1rem;
-  border: 1px solid var(--line);
-  color: var(--muted);
-  background: color-mix(in srgb, var(--panel), transparent 20%);
+  margin: 0;
+  padding: 1rem 1.125rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-surface) 72%, var(--color-canvas));
 }
 .lobby-recovery h2,
 .lobby-recovery p { margin: 0; }
-.lobby-recovery h2 { color: var(--ink); font-size: 1rem; }
-.lobby-recovery__eyebrow { color: var(--acid); font-size: .7rem; font-weight: 800; letter-spacing: .14em; }
+.lobby-recovery h2 { color: var(--color-ink); font-size: 1rem; }
+.lobby-recovery__eyebrow {
+  color: var(--color-accent-strong);
+  font-family: var(--font-meta);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+@include api.forced-colors {
+  .lobby-recovery { background: Canvas; }
+}
 </style>

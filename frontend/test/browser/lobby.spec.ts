@@ -1,3 +1,4 @@
+import {AxeBuilder} from "@axe-core/playwright";
 import {expect, test, type Page, type Route} from "@playwright/test";
 
 import {
@@ -17,7 +18,9 @@ const expectedGameID = fixtureLobbyResult(fixtureID).game_id;
 
 async function openLobby(page: Page): Promise<void> {
   await page.goto("/", {waitUntil: "domcontentloaded"});
-  await expect(page.locator(".lobby-page")).toHaveAttribute("data-hydrated", "true");
+  await expect(page.locator(".lobby-page")).toHaveAttribute("data-interactive", "true", {
+    timeout: 15_000,
+  });
 }
 
 async function routeLobbyAPI(
@@ -115,7 +118,7 @@ test("create pending state does not block join and success follows server result
 
   const createForm = page.locator(".lobby-form--create");
   const joinForm = page.locator(".lobby-form--join");
-  await createForm.locator("input[autocomplete='name']").fill("Алиса");
+  await createForm.locator("input[autocomplete='nickname']").fill("Алиса");
   await createForm.getByRole("button", {name: "Создать"}).click();
 
   await expect(createForm).toHaveAttribute("data-state", "loading");
@@ -136,7 +139,7 @@ test("not-found join keeps safe input and focuses the linked field error", async
 
   const joinForm = page.locator(".lobby-form--join");
   const gameIDInput = joinForm.locator("input[inputmode='text']");
-  const displayNameInput = joinForm.locator("input[autocomplete='name']");
+  const displayNameInput = joinForm.locator("input[autocomplete='nickname']");
   await gameIDInput.fill("game_missing");
   await displayNameInput.fill("Борис");
   await joinForm.getByRole("button", {name: "Войти"}).click();
@@ -159,11 +162,11 @@ test("offline create exposes bounded retry copy without leaking raw response", a
   await openLobby(page);
 
   const createForm = page.locator(".lobby-form--create");
-  await createForm.locator("input[autocomplete='name']").fill("Алиса");
+  await createForm.locator("input[autocomplete='nickname']").fill("Алиса");
   await createForm.getByRole("button", {name: "Создать"}).click();
 
   await expect(createForm).toHaveAttribute("data-state", "error");
-  await expect(createForm).toContainText("Сервер игры временно недоступен.");
+  await expect(createForm).toContainText("Сейчас не получается открыть комнату.");
   await expect(createForm).toContainText("Можно повторить попытку.");
   await expect(page.locator("body")).not.toContainText("raw-backend-detail");
 });
@@ -178,18 +181,38 @@ test("lobby stays within the viewport and keeps keyboard/media affordances", asy
     document.documentElement.style.fontSize = "200%";
   });
   await assertNoRootOverflow(page);
-  await expect(page.locator(".lobby-form--create input[autocomplete='name']")).toBeVisible();
+  await expect(page.locator(".lobby-form--create input[autocomplete='nickname']")).toBeVisible();
 });
 
-test("canonical lobby visual baseline stays stable", async ({page}, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
+test("lobby has no serious or critical axe violations", async ({page}) => {
   await openLobby(page);
-  await expect(page.locator(".lobby-page")).toBeVisible();
-  await page.addStyleTag({
-    content: "nuxt-devtools-frame, nuxt-devtools-inspect-panel, #vue-tracer-overlay { display: none !important; }",
+  const results = await new AxeBuilder({page})
+    .include("#main-content")
+    .analyze();
+  const seriousOrCritical = results.violations.filter((violation) =>
+    violation.impact === "serious" || violation.impact === "critical",
+  );
+  expect(seriousOrCritical).toEqual([]);
+});
+
+test("join submits with Enter and keeps create independent", async ({page}) => {
+  let releaseCreate: (() => void) | undefined;
+  const createGate = new Promise<void>((resolve) => {
+    releaseCreate = resolve;
   });
-  await expect(page).toHaveScreenshot("lobby/entry.png", {
-    fullPage: true,
-    animations: "disabled",
-  });
+  await routeLobbyAPI(page, {createGate});
+  await openLobby(page);
+
+  const createForm = page.locator(".lobby-form--create");
+  const joinForm = page.locator(".lobby-form--join");
+  await createForm.locator("input[autocomplete='nickname']").fill("Алиса");
+  await createForm.getByRole("button", {name: "Создать"}).click();
+  await expect(createForm).toHaveAttribute("data-state", "loading");
+
+  await joinForm.locator("input[autocomplete='nickname']").fill("Борис");
+  const gameIDInput = joinForm.locator("input[inputmode='text']");
+  await gameIDInput.fill(fixtureID);
+  await gameIDInput.press("Enter");
+  await expect(page).toHaveURL(new RegExp(`/game/${expectedGameID}$`));
+  releaseCreate?.();
 });

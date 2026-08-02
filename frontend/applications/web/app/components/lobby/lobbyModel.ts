@@ -5,6 +5,7 @@ import {
 
 export type LobbyFormMode = "create" | "join";
 export type LobbyField = "displayName" | "gameID" | "form";
+export type LobbyFormState = "idle" | "loading" | "success" | "error" | "offline";
 
 export type LobbyFormInput =
   | {
@@ -60,9 +61,7 @@ export function validateLobbyInput(
 export function lobbyFormError(error: unknown): LobbyFormError {
   const normalized = normalizeGameApiError(error);
   const field = normalized.kind === "not_found" ? "gameID" : "form";
-  const message = normalized.kind === "not_found"
-    ? "Комната не найдена. Проверьте ID и повторите попытку."
-    : normalized.message;
+  const message = lobbyErrorMessage(normalized.kind);
 
   return {
     field,
@@ -70,4 +69,28 @@ export function lobbyFormError(error: unknown): LobbyFormError {
     message,
     retryable: normalized.kind === "offline" || normalized.kind === "transient",
   };
+}
+
+function lobbyErrorMessage(kind: GameApiErrorKind): string {
+  switch (kind) {
+    case "not_found":
+      return "Комната не найдена. Проверьте код и повторите попытку.";
+    case "offline":
+      return "Проверьте подключение и повторите попытку.";
+    case "transient":
+      return "Сейчас не получается открыть комнату. Повторите попытку через несколько секунд.";
+    case "validation":
+      return "Проверьте данные и повторите попытку.";
+    case "stale_version":
+      return "Комната изменилась. Повторите вход ещё раз.";
+    case "conflict":
+      return "Попытка уже обработана. Повторите ещё раз.";
+    case "auth":
+      return "Не удалось открыть комнату. Попробуйте ещё раз.";
+    case "aborted":
+      return "Попытка остановлена. Можно повторить её снова.";
+    case "protocol":
+    case "unexpected":
+      return "Не удалось открыть комнату. Повторите попытку.";
+  }
 }

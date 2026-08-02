@@ -6,6 +6,7 @@ import {
   type LobbyFormError,
   type LobbyFormInput,
   type LobbyFormMode,
+  type LobbyFormState,
 } from "./lobbyModel";
 
 const props = defineProps<{
@@ -18,9 +19,8 @@ const props = defineProps<{
 
 const displayName = ref("");
 const gameID = ref("");
-const state = ref<"idle" | "loading" | "success" | "error" | "offline">("idle");
+const state = ref<LobbyFormState>("idle");
 const formError = ref<LobbyFormError>();
-const formElement = ref<HTMLFormElement | null>(null);
 const displayNameInput = ref<HTMLInputElement | null>(null);
 const gameIDInput = ref<HTMLInputElement | null>(null);
 
@@ -96,7 +96,6 @@ async function handleSubmit(): Promise<void> {
 
 <template>
   <form
-    ref="formElement"
     class="lobby-form"
     :class="`lobby-form--${props.mode}`"
     :aria-labelledby="headingID"
@@ -119,7 +118,8 @@ async function handleSubmit(): Promise<void> {
           :id="`${formID}-display-name`"
           ref="displayNameInput"
           v-model="displayName"
-          autocomplete="name"
+          name="display_name"
+          autocomplete="nickname"
           maxlength="40"
           minlength="1"
           required
@@ -141,8 +141,11 @@ async function handleSubmit(): Promise<void> {
           :id="`${formID}-game-id`"
           ref="gameIDInput"
           v-model="gameID"
+          name="game_id"
           autocomplete="off"
+          autocapitalize="none"
           inputmode="text"
+          maxlength="80"
           required
           :aria-describedby="formError?.field === 'gameID' ? gameIDErrorID : undefined"
           :aria-invalid="formError?.field === 'gameID' ? 'true' : undefined"
@@ -174,50 +177,78 @@ async function handleSubmit(): Promise<void> {
       class="lobby-form__submit"
       type="submit"
       :disabled="state === 'loading'"
+      :aria-busy="state === 'loading'"
+      :aria-describedby="formError?.field === 'form' ? errorID : undefined"
     >
       {{ state === "loading" ? pendingLabel : submitLabel }}
     </button>
   </form>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/scss/api" as api;
+
 .lobby-form {
   display: grid;
   min-width: 0;
-  gap: 1rem;
+  gap: var(--space-4);
   align-content: start;
   padding: clamp(1rem, 3vw, 1.5rem);
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel), transparent 8%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  box-shadow: 0 8px 0 rgb(38 55 46 / 6%);
 }
 
-.lobby-form[data-state="loading"] { border-color: var(--acid); }
-.lobby-form[data-state="success"] { border-color: var(--success, #38b978); }
+.lobby-form[data-state="loading"] { border-color: var(--color-accent-strong); }
+.lobby-form[data-state="success"] { border-color: var(--color-success); }
 .lobby-form[data-state="offline"],
-.lobby-form[data-state="error"] { border-color: var(--orange); }
-.lobby-form__number { color: var(--orange); font-size: .72rem; }
-.lobby-form h2 { margin: 0; font-size: clamp(1.5rem, 4vw, 2rem); }
-.lobby-form__description { min-height: 2.8em; margin: 0; color: var(--muted); }
+.lobby-form[data-state="error"] { border-color: var(--color-danger); }
+.lobby-form__number {
+  color: var(--color-rust);
+  font-family: var(--font-meta);
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+.lobby-form h2 { margin: 0; font-size: clamp(1.45rem, 3vw, 1.9rem); }
+.lobby-form__description { min-height: 2.8em; margin: 0; color: var(--color-text-muted); }
 .lobby-form__fields {
   display: grid;
   min-width: 0;
-  gap: .85rem;
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   border: 0;
 }
 .lobby-form__legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.lobby-form label { display: grid; gap: .15rem; }
+.lobby-form label { display: grid; gap: .15rem; color: var(--color-text-muted); }
 .lobby-form input { min-height: 44px; margin-top: .2rem; }
-.lobby-form input[aria-invalid="true"] { border-color: var(--orange); }
+.lobby-form input[aria-invalid="true"] { border-color: var(--color-danger); }
 .lobby-form__field-error,
 .lobby-form__error,
 .lobby-form__status { margin: -.45rem 0 0; font-size: .9rem; line-height: 1.4; }
 .lobby-form__field-error,
-.lobby-form__error { color: #ffd3bd; }
-.lobby-form__error { border-left: 4px solid var(--orange); padding: .75rem; background: #381c13; }
-.lobby-form__status { color: var(--acid); }
-.lobby-form__submit { min-height: 44px; }
+.lobby-form__error { color: var(--color-danger); }
+.lobby-form__error {
+  border-left: 4px solid var(--color-danger);
+  border-radius: var(--radius-control);
+  padding: .75rem;
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-paper));
+}
+.lobby-form__status { color: var(--color-success); }
+.lobby-form__submit { min-height: 44px; justify-self: start; min-width: 132px; }
+.lobby-form__submit:disabled {
+  border-color: var(--color-line);
+  background: var(--color-line);
+  color: var(--color-text);
+  opacity: 1;
+}
+
+@include api.forced-colors {
+  .lobby-form { box-shadow: none; }
+  .lobby-form__error { border: 2px solid CanvasText; }
+}
 
 @media (max-width: 374px) {
   .lobby-form { padding: 1rem; }

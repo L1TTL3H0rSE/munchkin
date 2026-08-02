@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import {computed} from "vue";
+
+const route = useRoute();
+const isLobby = computed(() => route.path === "/");
+
 useHead({
   meta: [
     {
@@ -10,11 +15,15 @@ useHead({
 </script>
 
 <template>
-  <div class="app-shell">
+  <div
+    class="app-shell"
+    :class="{'app-shell--lobby': isLobby}"
+    :data-route="isLobby ? 'lobby' : 'game'"
+  >
     <a class="skip-link" href="#main-content">
       Перейти к основному содержимому
     </a>
-    <header class="topbar">
+    <header v-if="!isLobby" class="topbar">
       <NuxtLink class="brand" to="/">MUNCHKIN CLONE // ORIGINAL DEMO</NuxtLink>
       <span class="status-pill">authoritative server</span>
     </header>
