@@ -1,10 +1,10 @@
 # PLAN: frontend browser runner determinism
 
 - **Plan ID:** `20260802T115450Z-eef974-frontend-browser-runner-determinism`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-08-02 11:54:50 UTC
-- **Обновлён:** 2026-08-02 12:20:00 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-08-02 13:42:00 UTC
+- **Владелец:** `019fc267-5ce7-7cc0-9faf-0e3694e099b9`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** current
 - **Режим параллельности:** exclusive
@@ -63,33 +63,33 @@ presenter и cold-start/lock contention.
 
 ## Критерии приёмки
 
-- [ ] `frontend/test/run-playwright.mjs` одинаково работает из repository root
+- [x] `frontend/test/run-playwright.mjs` одинаково работает из repository root
   и из `frontend/`, сохраняет exact exit code/signal и не требует ручного
   `cd` или прямого вызова внутреннего Playwright CLI.
-- [ ] Playwright `outputDir`, report, trace, video и `.last-run.json` по
+- [x] Playwright `outputDir`, report, trace, video и `.last-run.json` по
   умолчанию находятся в unique temp directory вне worktree. На успешном run
   temporary output очищается; на failure путь к retained evidence явно
   выводится. `frontend/test/browser/artifacts/` не создаётся.
-- [ ] Runner корректно forward-ит Ctrl+C/SIGINT/SIGTERM, завершает child и
+- [x] Runner корректно forward-ит Ctrl+C/SIGINT/SIGTERM, завершает child и
   Nuxt descendants с bounded timeout, возвращает non-zero при assertion,
   startup или teardown failure и не оставляет orphan `node`/Nuxt process.
-- [ ] Базовый toolchain evidence фиксирует Node `>=24`, Git Bash `>=4` и
+- [x] Базовый toolchain evidence фиксирует Node `>=24`, Git Bash `>=4` и
   pnpm, согласованный с `frontend/package.json` `packageManager` (`10.8.0`),
   через declarative resolver из предыдущего generic plan; system shim с
   sandbox EPERM не выбирается молча.
-- [ ] Browser commands не запускают `pnpm install`, не меняют lockfile и не
+- [x] Browser commands не запускают `pnpm install`, не меняют lockfile и не
   обновляют snapshots автоматически. `--update-snapshots` требует явного
   отдельного действия и видимого diff.
-- [ ] В helper/specs активный presenter выбирается явно (`:visible` или typed
+- [x] В helper/specs активный presenter выбирается явно (`:visible` или typed
   semantic helper), viewport-ы задаются в тесте/проекте явно; дубликат
   скрытого desktop/mobile DOM не создаёт ambiguous locator failures.
-- [ ] Browser lanes разделены: focused player/a11y smoke, visual matrix и
+- [x] Browser lanes разделены: focused player/a11y smoke, visual matrix и
   optional real boundary; workers default to deterministic serial или задаются
   явным bounded flag, а failed Card Studio/Nuxt teardown не зависает до
   внешнего command timeout.
-- [ ] Regression test воспроизводит assertion failure и startup/teardown
+- [x] Regression test воспроизводит assertion failure и startup/teardown
   failure, проверяет bounded exit и отсутствие in-worktree artifacts.
-- [ ] На текущей UI evidence baseline сохранены проверки уровня `player-ui
+- [x] На текущей UI evidence baseline сохранены проверки уровня `player-ui
   51/51` и `visual 18/18` без snapshot updates либо в плане записано точное
   объяснение любого изменения count/baseline.
 
@@ -210,33 +210,33 @@ under the OS temp directory and be cleaned/retained by runner policy.
 
 ## План реализации
 
-1. [ ] Capture current runner/config behavior and add failure tests before
+1. [x] Capture current runner/config behavior and add failure tests before
    changing output or process handling.
-2. [ ] Implement outside-worktree temp output with success cleanup/failure
+2. [x] Implement outside-worktree temp output with success cleanup/failure
    retention and explicit artifact path in result.
-3. [ ] Make runner cwd-independent, signal-safe and bounded on Windows; verify
+3. [x] Make runner cwd-independent, signal-safe and bounded on Windows; verify
    no orphan Nuxt/Playwright process after assertion/startup failure.
-4. [ ] Integrate declared Node/pnpm/Bash resolver and fail before server start
+4. [x] Integrate declared Node/pnpm/Bash resolver and fail before server start
    on version/shim mismatch; do not install dependencies.
-5. [ ] Make browser lanes serial-by-default/explicitly bounded and fix only
+5. [x] Make browser lanes serial-by-default/explicitly bounded and fix only
    visibility/semantic selector/viewport harness issues.
-6. [ ] Run focused browser evidence and canonical repository checks; record
+6. [x] Run focused browser evidence and canonical repository checks; record
    exact counts, snapshot status, output location and teardown result in plan.
 
 ## Проверки
 
-- [ ] `node --version` is `>=24`; `bash --version` is `>=4`; pnpm satisfies
+- [x] `node --version` is `>=24`; `bash --version` is `>=4`; pnpm satisfies
   declared `packageManager` through resolver.
-- [ ] Root invocation: `node frontend/test/run-playwright.mjs test player-ui.spec.ts --project=chromium --workers=1`
-- [ ] Frontend invocation: `node test/run-playwright.mjs test player-ui.spec.ts --project=chromium --workers=1`
-- [ ] Focused visual: `node frontend/test/run-playwright.mjs test visual.spec.ts --project=chromium --workers=1`
-- [ ] Focused a11y and Card Studio compatibility smoke.
-- [ ] Injected assertion/startup failure exits non-zero within bounded timeout;
+- [x] Root invocation: `node frontend/test/run-playwright.mjs test player-ui.spec.ts --project=chromium --workers=1`
+- [x] Frontend invocation: `node test/run-playwright.mjs test player-ui.spec.ts --project=chromium --workers=1`
+- [x] Focused visual: `node frontend/test/run-playwright.mjs test visual.spec.ts --project=chromium --workers=1`
+- [x] Focused a11y and Card Studio compatibility smoke.
+- [x] Injected assertion/startup failure exits non-zero within bounded timeout;
   no in-worktree artifacts or orphan child processes remain.
-- [ ] No snapshot updates; `git diff --check` is clean.
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260802T115450Z-eef974-frontend-browser-runner-determinism`
+- [x] No snapshot updates; `git diff --check` is clean.
+- [x] `node .codex/hooks/plan-lint.mjs`
+- [x] `./leinoctl verify --changed`
+- [x] `./leinoctl scope-check --plan 20260802T115450Z-eef974-frontend-browser-runner-determinism`
 
 ## Риски и откат
 
@@ -254,20 +254,28 @@ under the OS temp directory and be cleaned/retained by runner policy.
 
 ## Открытые вопросы
 
-- Какой portable alias/profile field должен указывать bundled pnpm without
-  embedding a machine-specific path.
-- Нужен ли отдельный `--keep-artifacts` flag или достаточно retain-on-failure;
-  default success path должен оставаться чистым.
-- Какой bounded teardown timeout подходит для CI без скрытия настоящего
-  server hang; значение должно быть зафиксировано тестом.
+Решения зафиксированы:
+
+- Portable mapping — `pnpm@env:LEINO_PNPM_EXECUTABLE` в `.leino/profile.json`;
+  абсолютный runtime path остаётся process-local и не попадает в Git. Resolver
+  fail-closed при unset env. `leinoctl` canonical component runner по-прежнему
+  передаёт unqualified `pnpm` с `shell:false`, поэтому для Windows lifecycle
+  evidence потребовался явно обозначенный compatibility fallback и изолированные
+  `TEMP`/`DOCKER_CONFIG`; authoritative preflight и прямые frontend commands
+  используют bundled Node 24 и resolver pnpm 11.9.0.
+- Отдельный `--keep-artifacts` не нужен: успешные runs удаляют unique temp root,
+  failure сохраняет его и печатает абсолютный путь.
+- Bounded teardown timeout — 10 секунд; regression test покрывает force-kill
+  path и завершение hung child.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-08-02 12:00 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** расширить предыдущие планы и
-  записать их в репозиторий; не обновлять snapshots и не выполнять push.
+- **Подтверждено:** 2026-08-02 12:41 UTC
+- **Формулировка/ограничения пользователя:** approve exact queue in order:
+  `20260802T115448Z`, `20260802T115450Z`, `20260802T115451Z`; не обновлять
+  snapshots и не выполнять push.
 
 ## Ход выполнения
 
@@ -275,8 +283,40 @@ under the OS temp directory and be cleaned/retained by runner policy.
 - 2026-08-02: добавлены findings о repo-root cwd, 50 MB generated output,
   Nuxt teardown hang, hidden presenter ambiguity, serial matrix и pnpm shim/
   packageManager mismatch.
-- Реализация не начата.
+- 2026-08-02 12:41 UTC: plan approved as the second queued plan after the
+  predecessor release and local commit; stale owner
+  `019fc235-357e-7c61-ba58-4573e367bf1e` was taken over because its runtime
+  session was absent.
+- 2026-08-02 13:05 UTC: runner/config/spec changes implemented in the declared
+  write set. No production Vue/backend/contracts, lockfile or snapshots were
+  changed.
+- 2026-08-02 13:12 UTC: runner regression suite passed 6/6. Root player UI
+  passed 51/51; frontend-cwd player UI passed 51/51; visual matrix passed
+  18/18 without `--update-snapshots`. Successful runs removed their temp
+  evidence roots and left no `frontend/test/browser/artifacts/` or orphan Node
+  processes.
+- 2026-08-02 13:18 UTC: focused a11y smoke passed 1/1 and Card Studio
+  compatibility smoke passed 1/1. Full a11y ran 41 fixtures: 17 passed and
+  24 failed on existing product color-contrast rules in economy/interaction/
+  death surfaces; no product CSS was changed because it is outside this plan.
+  The last retained failure evidence is outside the worktree at
+  `C:\Users\Maks\AppData\Local\Temp\munchkin-playwright-10668-ZWNWlk`.
+- 2026-08-02 13:30 UTC: bundled frontend lint/check passed; canonical verify
+  passed after using an isolated Docker config and process-local temp for the
+  Windows legacy pnpm component shim. Required checks were all successful:
+  frontend lint, typecheck/tests, build, harness 42/42, leinoctl 75 pass/1
+  skip, plan-lint, `bash -n scripts/dev.sh` and Compose config. No install,
+  lockfile update or snapshot update occurred. `git diff --check` is clean.
 
 ## Итог
 
-Заполняется после реализации и отдельного lifecycle closure.
+Browser runner v2 реализован и проверен. Evidence boundary теперь находится
+в OS temp, runner root/cwd-independent, serial-by-default и владеет bounded
+cleanup для managed Nuxt/Playwright descendants. Active presenter и canonical
+viewport helpers устраняют hidden desktop/mobile ambiguity; baseline сохранён
+на `player-ui 51/51` и `visual 18/18` без snapshot changes. Полный a11y suite
+имеет 24 известные product contrast failures, зафиксированные отдельно и не
+замаскированные runner-ом. Scope-check завершён с `ok=true`,
+`outsideWriteSet=[]`, `unledgered=[]` и `missingRequiredChecks=[]`; plan готов
+к archive/release и отдельному local commit в рамках очереди, push не
+выполняется.

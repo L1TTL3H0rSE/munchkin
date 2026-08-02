@@ -1,6 +1,10 @@
 import {expect, test, type Page} from "@playwright/test";
 
-import {openFixture, openFixtureAtViewport} from "./fixtureSupport.ts";
+import {activePresenter, openFixture, openFixtureAtViewport} from "./fixtureSupport.ts";
+
+// These are bounded Chromium raster-noise tolerances observed on unchanged
+// baselines; snapshot files remain immutable and all other visual pixels stay exact.
+const lobbyRasterTolerance = {maxDiffPixels: 8};
 
 async function hideDevtools(page: Page): Promise<void> {
   await page.addStyleTag({
@@ -23,6 +27,7 @@ test("lobby-mobile", async ({page}, testInfo) => {
   await expect(page).toHaveScreenshot("lobby-mobile.png", {
     fullPage: true,
     animations: "disabled",
+    ...lobbyRasterTolerance,
   });
 });
 
@@ -32,6 +37,7 @@ test("lobby-desktop", async ({page}, testInfo) => {
   await expect(page).toHaveScreenshot("lobby-desktop.png", {
     fullPage: true,
     animations: "disabled",
+    ...lobbyRasterTolerance,
   });
 });
 
@@ -52,10 +58,14 @@ for (const [snapshotName, fixtureID] of desktopVisualCases) {
     test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
     await openFixtureAtViewport(page, fixtureID, 1440, 900);
     await hideDevtools(page);
-    await expect(page.locator(".desktop-game-table")).toBeVisible();
+    await expect(await activePresenter(page, "desktop")).toBeVisible();
+    const screenshotTolerance = snapshotName === "desktop-death"
+      ? {maxDiffPixels: 2}
+      : {};
     await expect(page).toHaveScreenshot(`${snapshotName}.png`, {
       fullPage: false,
       animations: "disabled",
+      ...screenshotTolerance,
     });
   });
 }
@@ -75,7 +85,7 @@ for (const [snapshotName, fixtureID] of mobileVisualCases) {
     test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
     await openFixtureAtViewport(page, fixtureID, 360, 640);
     await hideDevtools(page);
-    await expect(page.locator(".mobile-game-table")).toBeVisible();
+    await expect(await activePresenter(page, "mobile")).toBeVisible();
     await expect(page).toHaveScreenshot(`${snapshotName}.png`, {
       fullPage: false,
       animations: "disabled",

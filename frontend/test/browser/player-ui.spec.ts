@@ -7,6 +7,7 @@ import {
   assertNoDocumentVerticalOverflow,
   assertMediaPreferences,
   assertSkipLinkFocus,
+  activePresenter,
   fixtureIDs,
   openFixture,
   openFixtureAtViewport,
@@ -35,17 +36,15 @@ test("media preferences preserve motion and focus policy", async ({page}) => {
 
 test("card action rail exposes labeled close and removes contextual state", async ({page}) => {
   const fixture = await openFixture(page, "card-action-rail");
-  const handTab = page.locator(".mobile-game-table .hand-tab");
-  if (await handTab.isVisible()) {
+  const presenter = await activePresenter(page);
+  const handTab = presenter.locator(".hand-tab:visible");
+  if (await handTab.count()) {
     await handTab.click();
     await expect(page.locator(".sheet-dialog[open]")).toBeVisible();
   } else {
-    await page.locator(".desktop-game-table .own-board__open").click();
+    await presenter.locator(".own-board__open:visible").click();
     await expect(page.locator(".sheet-dialog[open]")).toBeVisible();
   }
-  const presenter = (await page.locator(".mobile-game-table:visible").count())
-    ? page.locator(".mobile-game-table")
-    : page.locator(".desktop-game-table");
   const activate = presenter.locator(".game-card__activate").first();
   await activate.click();
   await expect(presenter.locator(".action-dock__close")).toBeVisible();
@@ -57,7 +56,7 @@ test("card action rail exposes labeled close and removes contextual state", asyn
 
 test("1440x900 uses one bounded desktop presenter without legacy telemetry", async ({page}) => {
   await openFixtureAtViewport(page, "single-combat", 1440, 900);
-  const presenter = page.locator(".desktop-game-table");
+  const presenter = await activePresenter(page, "desktop");
 
   await expect(presenter).toBeVisible();
   await expect(page.locator(".mobile-game-table")).toBeHidden();
@@ -72,7 +71,7 @@ test("1440x900 uses one bounded desktop presenter without legacy telemetry", asy
 
 test("desktop density stays bounded at laptop and ultra-wide targets", async ({page}) => {
   await openFixtureAtViewport(page, "full-roster-long-copy", 1280, 720);
-  await expect(page.locator(".desktop-game-table")).toBeVisible();
+  await expect(await activePresenter(page, "desktop")).toBeVisible();
   await assertNoRootOverflow(page);
 
   await page.setViewportSize({width: 1920, height: 1080});
@@ -90,7 +89,7 @@ test.describe("desktop input and zoom safety", () => {
 
     expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBeTruthy();
 
-    const presenter = page.locator(".desktop-game-table:visible");
+    const presenter = await activePresenter(page, "desktop");
     const rail = presenter.locator(".card-rail__viewport").first();
     await expect(rail).toHaveAttribute("tabindex", "0");
     await rail.focus();
@@ -112,7 +111,7 @@ test.describe("desktop input and zoom safety", () => {
 
 test("360x640 uses one mobile presenter without document scrolling", async ({page}) => {
   await openFixtureAtViewport(page, "single-combat", 360, 640);
-  await expect(page.locator(".mobile-game-table")).toBeVisible();
+  await expect(await activePresenter(page, "mobile")).toBeVisible();
   await expect(page.locator(".game-table__desktop")).toBeHidden();
   await assertNoRootOverflow(page);
   await assertNoDocumentVerticalOverflow(page);
@@ -122,11 +121,13 @@ test("360x640 uses one mobile presenter without document scrolling", async ({pag
 
 test("mobile hand stays behind a safe-area-aware tab until card actions exist", async ({page}) => {
   await openFixtureAtViewport(page, "single-combat", 360, 640);
-  await expect(page.locator(".mobile-game-table .hand-tab")).toHaveCount(0);
+  const mobilePresenter = await activePresenter(page, "mobile");
+  await expect(mobilePresenter.locator(".hand-tab:visible")).toHaveCount(0);
 
   await openFixtureAtViewport(page, "card-action-rail", 360, 640);
-  await expect(page.locator(".mobile-game-table .hand-tab")).toBeVisible();
-  await expect(page.locator(".mobile-game-table .hand-tab")).toContainText("Рука · 3");
+  const actionPresenter = await activePresenter(page, "mobile");
+  await expect(actionPresenter.locator(".hand-tab:visible")).toBeVisible();
+  await expect(actionPresenter.locator(".hand-tab:visible")).toContainText("Рука · 3");
 });
 
 test("mobile breakpoints and safety viewports keep the action reachable", async ({page}) => {
@@ -149,23 +150,17 @@ test("mobile breakpoints and safety viewports keep the action reachable", async 
 
   for (const viewport of viewports) {
     await page.setViewportSize({width: viewport.width, height: viewport.height});
-    const mobilePresenter = page.locator(".mobile-game-table");
-    const desktopPresenter = page.locator(".desktop-game-table");
-
-    if (viewport.mobile) {
-      await expect(mobilePresenter).toBeVisible();
-      await expect(desktopPresenter).toBeHidden();
-    } else {
-      await expect(mobilePresenter).toBeHidden();
-      await expect(desktopPresenter).toBeVisible();
-    }
+    const presenter = await activePresenter(page, viewport.mobile ? "mobile" : "desktop");
+    const hiddenPresenter = page.locator(
+      viewport.mobile ? ".desktop-game-table" : ".mobile-game-table",
+    );
+    await expect(hiddenPresenter).toBeHidden();
 
     await assertNoRootOverflow(page);
     if (!viewport.documentScroll) {
       await assertNoDocumentVerticalOverflow(page);
     }
 
-    const presenter = viewport.mobile ? mobilePresenter : desktopPresenter;
     const action = presenter.locator(".action-dock button:not([disabled])").first();
     await expect(action).toHaveCount(1);
     await action.scrollIntoViewIfNeeded();
@@ -181,7 +176,8 @@ test.describe("mobile input and zoom safety", () => {
 
     expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBeTruthy();
 
-    const rail = page.locator(".mobile-game-table .mobile-encounter-stage .card-rail__viewport");
+    const rail = (await activePresenter(page, "mobile"))
+      .locator(".mobile-encounter-stage .card-rail__viewport");
     await expect(rail).toHaveAttribute("tabindex", "0");
     await rail.focus();
     await expect(rail).toBeFocused();

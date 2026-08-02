@@ -20,8 +20,8 @@
       "find",
       "git",
       "go",
-      "node",
-      "pnpm",
+      "node@current-runtime",
+      "pnpm@env:LEINO_PNPM_EXECUTABLE",
       "rg"
     ],
     "minimumVersions": {

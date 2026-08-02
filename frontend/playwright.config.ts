@@ -1,29 +1,46 @@
+import os from "node:os";
+import path from "node:path";
 import {fileURLToPath} from "node:url";
 
 import {defineConfig, devices} from "@playwright/test";
 
 const webRoot = fileURLToPath(new URL("./applications/web/", import.meta.url));
 const backendGameRoot = fileURLToPath(new URL("../backend/game/", import.meta.url));
+const frontendRoot = fileURLToPath(new URL("./", import.meta.url));
+
+const unmanagedRunDirectory = path.join(
+  os.tmpdir(),
+  `munchkin-playwright-${process.pid}`,
+);
+const outputDir = process.env.MUNCHKIN_PLAYWRIGHT_OUTPUT_DIR
+  ?? path.join(unmanagedRunDirectory, "artifacts");
+const reportDir = process.env.MUNCHKIN_PLAYWRIGHT_REPORT_DIR
+  ?? path.join(unmanagedRunDirectory, "report");
+const nodeCommand = process.platform === "win32"
+  ? `"${process.execPath}"`
+  : process.execPath;
 
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
 const apiPort = Number(process.env.PLAYWRIGHT_API_PORT ?? 18080);
 const isRealE2E = process.env.MUNCHKIN_REAL_E2E === "1";
+const managedByRunner = process.env.MUNCHKIN_PLAYWRIGHT_MANAGED_SERVERS === "1";
 const baseURL = process.env.WEB_BASE_URL ?? `http://127.0.0.1:${port}`;
 const gameContentPath = process.env.GAME_CONTENT_PATH ?? (
   isRealE2E
     ? "../../content/sets/moscow/v4/cards.json"
     : "../../content/sets/demo/cards.json"
 );
+const nuxtCommand = `${nodeCommand} node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port ${port} --no-fork`;
 
 export default defineConfig({
-  testDir: "./test/browser",
-  outputDir: "./test/browser/artifacts",
-  fullyParallel: true,
+  testDir: path.join(frontendRoot, "test/browser"),
+  outputDir,
+  fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: Number(process.env.MUNCHKIN_PLAYWRIGHT_WORKERS ?? 1),
   reporter: process.env.CI
-    ? [["dot"], ["html", {outputFolder: "test/browser/report", open: "never"}]]
+    ? [["dot"], ["html", {outputFolder: reportDir, open: "never"}]]
     : "list",
   snapshotPathTemplate: "{testDir}/visual-baselines/{projectName}/{arg}{ext}",
   expect: {
@@ -65,7 +82,9 @@ export default defineConfig({
       },
     },
   ],
-  webServer: isRealE2E
+  webServer: managedByRunner
+    ? undefined
+    : isRealE2E
     ? [
       {
         command: "go run ./cmd/server",
@@ -81,7 +100,7 @@ export default defineConfig({
         },
       },
       {
-        command: `node node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port ${port}`,
+        command: nuxtCommand,
         cwd: webRoot,
         url: baseURL,
         reuseExistingServer: true,
@@ -92,7 +111,7 @@ export default defineConfig({
       },
   ]
     : {
-      command: `node node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port ${port}`,
+      command: nuxtCommand,
       cwd: webRoot,
       url: baseURL,
       reuseExistingServer: true,

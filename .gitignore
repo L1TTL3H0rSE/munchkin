@@ -13,6 +13,12 @@ dist/
 .nuxt/
 .output/
 
+# Browser runner keeps active evidence in the OS temp directory. These legacy
+# paths remain ignored so an older direct Playwright invocation cannot pollute
+# lifecycle scope accidentally.
+frontend/test/browser/artifacts/
+frontend/test/browser/report/
+
 *.log
 *.tmp
 *.swp

@@ -1,4 +1,4 @@
-import {expect, type Page, type Route} from "@playwright/test";
+import {expect, type Locator, type Page, type Route} from "@playwright/test";
 
 import {
   commandResultSchema,
@@ -12,6 +12,25 @@ import {
 } from "../../applications/web/test/fixtures/fixtureAdapter.ts";
 
 export const fixtureCredential = "fixture-browser-token-0000000000000000000000000000";
+
+export const canonicalViewports = {
+  mobile: {width: 360, height: 640},
+  desktop: {width: 1440, height: 900},
+} as const;
+
+export type PresenterKind = "mobile" | "desktop";
+
+export async function activePresenter(
+  page: Page,
+  expectedKind?: PresenterKind,
+): Promise<Locator> {
+  const selector = expectedKind
+    ? `.${expectedKind}-game-table:visible`
+    : ".mobile-game-table:visible, .desktop-game-table:visible";
+  const presenter = page.locator(selector);
+  await expect(presenter).toHaveCount(1);
+  return presenter;
+}
 
 export async function installFixture(
   page: Page,
@@ -129,6 +148,7 @@ export async function openFixture(
   await expect(page.locator("#main-content")).toBeVisible();
   await expect(page.locator(".game-table")).toBeVisible();
   await expect(page.locator(".center-state")).toHaveCount(0);
+  await activePresenter(page);
   return fixture;
 }
 
@@ -168,10 +188,11 @@ export async function assertSkipLinkFocus(page: Page): Promise<void> {
 export async function assertLabeledRails(page: Page): Promise<void> {
   await expect(page.locator("header.topbar")).toHaveCount(1);
   await expect(page.locator("main#main-content")).toHaveCount(1);
-  const actionDock = page.locator(".action-dock:visible");
+  const presenter = await activePresenter(page);
+  const actionDock = presenter.locator(".action-dock:visible");
   if (await actionDock.count()) {
     await expect(actionDock).toHaveAttribute("aria-labelledby", "action-dock-title");
-    await expect(page.locator("#action-dock-title:visible")).toHaveCount(1);
+    await expect(presenter.locator("#action-dock-title:visible")).toHaveCount(1);
   }
 }
 

@@ -14,9 +14,9 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "check": "pnpm typecheck && pnpm test",
-    "test:browser": "node test/run-playwright.mjs test",
-    "test:a11y": "node test/run-playwright.mjs test a11y.spec.ts",
-    "test:visual": "node test/run-playwright.mjs test visual.spec.ts"
+    "test:browser": "node test/run-playwright.mjs test --workers=1",
+    "test:a11y": "node test/run-playwright.mjs test a11y.spec.ts --workers=1",
+    "test:visual": "node test/run-playwright.mjs test visual.spec.ts --workers=1"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
