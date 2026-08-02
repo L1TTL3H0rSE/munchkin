@@ -295,6 +295,14 @@ jobs:
             --arg web_digest "$web_digest" \
             '{schemaVersion: 1, repository: $repository, commit: $commit, workflowRunId: $run_id, workflowRunAttempt: $run_attempt, created: $created, images: {game: {ref: $game_ref, digest: $game_digest, image: ($game_ref + "@" + $game_digest)}, web: {ref: $web_ref, digest: $web_digest, image: ($web_ref + "@" + $web_digest)}}}' \
             > "release/munchkin-images-${COMMIT_SHA}.json"
+      - name: Upload failed security scan diagnostics
+        if: always() && steps.publish-images.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: munchkin-security-failure-${{ github.sha }}
+          path: release/security
+          if-no-files-found: warn
+          retention-days: 14
       - name: Attest game provenance
         id: attest-game-provenance
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
