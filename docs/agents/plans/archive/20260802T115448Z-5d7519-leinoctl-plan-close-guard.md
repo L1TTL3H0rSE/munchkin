@@ -1,10 +1,10 @@
 # PLAN: leinoctl plan close guard
 
 - **Plan ID:** `20260802T115448Z-5d7519-leinoctl-plan-close-guard`
-- **Статус:** draft
+- **Статус:** completed
 - **Создан:** 2026-08-02 11:54:48 UTC
-- **Обновлён:** 2026-08-02 12:20:00 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-08-02 12:36:30 UTC
+- **Владелец:** `019fc267-5ce7-7cc0-9faf-0e3694e099b9`
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** current
 - **Режим параллельности:** exclusive
@@ -59,33 +59,37 @@ push остаются отдельными действиями и не выпо
 
 ## Критерии приёмки
 
-- [ ] Добавлена явная close/finalize-команда или эквивалентный подкомандный
+- [x] Добавлена явная close/finalize-команда или эквивалентный подкомандный
   режим `leinoctl`, который принимает exact plan ID и session ID, проверяет
   selected-plan ownership, checklist, archive placement, lint, scope,
-  required checks и current fingerprints; при отказе не меняет plan, owner,
-  session или rotation checkpoint.
-- [ ] После успешного close/release в ledger присутствуют все required checks,
+  required checks и current fingerprints; `plan release <id> --session <id>`
+  остался этим guarded close-переходом, а отказ не меняет plan, owner, session
+  или rotation checkpoint.
+- [x] После успешного close/release в ledger присутствуют все required checks,
   вычисленные из impacted components, включая Codex hooks tests, leinoctl tests
-  и plan-lint для `repository-workflow`; повторный ручной запуск одного и того
-  же check не требуется только для его регистрации.
-- [ ] `verify --changed` записывает для каждого запуска `id`, `cwd`, точный
+  и plan-lint для `repository-workflow`; canonical verify записал все три без
+  ручного внутреннего helper.
+- [x] `verify --changed` записывает для каждого запуска `id`, `cwd`, точный
   `argv`, `exitCode`, `dryRun`, `checkedPaths` и input fingerprint; неуспешный
-  или dry-run результат не маскируется как успешное lifecycle evidence.
-- [ ] `recordSessionTargets` выполняет нормализацию и атомарное объединение
+  или dry-run результат не маскируется как успешное lifecycle evidence; failed
+  spawn/exit также сохраняется до throw.
+- [x] `recordSessionTargets` выполняет нормализацию и атомарное объединение
   targets без потери записей при последовательных/повторных PostToolUse
-  событиях; повторная запись idempotent.
-- [ ] Scope report различает outside-write-set, unledgered и stale-check
+  событиях; повторная запись idempotent. Canonical verify дополнительно
+  регистрирует выбранные concrete changed targets.
+- [x] Scope report различает outside-write-set, unledgered и stale-check
   состояния, не превращая предупреждение о generated temp output в скрытый
   зелёный release. Для in-scope write потеря target evidence видна в ошибке
   close, а не исправляется ручным вызовом внутреннего helper.
-- [ ] Recovery показывает owner/session mismatch и отсутствие session state;
+- [x] Recovery показывает owner/session mismatch и отсутствие session state;
   `--takeover` остаётся явным действием, автоматического удаления всех stale
-  owner-файлов нет. Добавлен тест, что takeover одной записи не затрагивает
-  другие планы.
-- [ ] Toolchain inspection может вернуть resolved executable path и version,
+  owner-файлов нет. Тест takeover одной записи подтверждает, что другие планы
+  не затрагиваются.
+- [x] Toolchain inspection может вернуть resolved executable path и version,
   применяет declared resolver/alias до системного PATH и fail-closed при
-  mismatch; в коде нет hardcoded пользовательского пути `C:\Users\...`.
-- [ ] API сохраняет отдельные границы: close/release не делает Git commit,
+  mismatch; в изменённом коде нет hardcoded пользовательского пути
+  `C:\Users\...`. Windows `.cmd` version probes исполняются корректно.
+- [x] API сохраняет отдельные границы: close/release не делает Git commit,
   push, plan select следующего ID, cloud mutation, dependency install или
   изменение production/frontend UI.
 
@@ -196,31 +200,40 @@ push остаются отдельными действиями и не выпо
 
 ## План реализации
 
-1. [ ] Зафиксировать текущий CLI/session contract тестами до изменения
+1. [x] Зафиксировать текущий CLI/session contract тестами до изменения
    реализации, включая точный порядок `plan release <id> --session`.
-2. [ ] Вынести единый required-check descriptor и записывать результаты вместе
+2. [x] Вынести единый required-check descriptor и записывать результаты вместе
    с checked paths/fingerprint даже при non-zero exit.
-3. [ ] Исправить atomic/idempotent target/check ledger и добавить stale-owner
+3. [x] Исправить atomic/idempotent target/check ledger и добавить stale-owner
    read-only diagnostics без broad cleanup.
-4. [ ] Реализовать close/finalize guard с fail-closed preconditions и
+4. [x] Реализовать close/finalize guard с fail-closed preconditions и
    transaction-like rollback при ошибке lifecycle write.
-5. [ ] Добавить declarative toolchain resolver и тесты системного shim,
+5. [x] Добавить declarative toolchain resolver и тесты системного shim,
    bundled path, version mismatch и missing executable.
-6. [ ] Выполнить generic harness gates и показать diff; затем остановиться для
+6. [x] Выполнить generic harness gates и показать diff; затем остановиться для
    отдельного lifecycle approval/release этого plan.
 
 ## Проверки
 
-- [ ] `node --test --test-isolation=none tools/leinoctl/test/*.test.mjs`
-- [ ] Focused session/CLI/runner/toolchain tests: success, failed check,
+- [x] `node --test --test-isolation=none tools/leinoctl/test/*.test.mjs` — Node
+  24.14.0: 75 pass, 1 symlink-permission skip, 0 fail.
+- [x] Focused session/CLI/runner/toolchain tests: success, failed check,
   dry-run, stale fingerprint, duplicate target, stale owner and failed close.
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl preflight --require-toolchain`
-- [ ] `./leinoctl verify --paths tools/leinoctl/src,tools/leinoctl/test`
-- [ ] `./leinoctl scope-check --plan 20260802T115448Z-5d7519-leinoctl-plan-close-guard`
-- [ ] `git diff --check`
-- [ ] Release evidence proves no commit/push/next-select was performed by the
-  close command.
+- [x] `node .codex/hooks/plan-lint.mjs` — `plans=61 active=8 archive=53
+  issues=0`.
+- [x] `./leinoctl preflight --require-toolchain` — Node24, Go1.26.5, Bash5.2
+  and pnpm11.9 pass; Docker Compose capability returned exit 1 because local
+  Docker access is unavailable, so this remains an environment limitation.
+- [x] `./leinoctl verify --paths tools/leinoctl/src,tools/leinoctl/test` —
+  repository-workflow required checks: Codex hooks 42/42, leinoctl 75/0/1
+  (pass/fail/skip), plan-lint clean; all recorded with exitCode 0 and current
+  concrete-path fingerprints.
+- [x] `./leinoctl scope-check --plan 20260802T115448Z-5d7519-leinoctl-plan-close-guard`
+  — `ok=true`, `outsideWriteSet=[]`, `unledgered=[]`,
+  `missingRequiredChecks=[]`; historical stale entries are warnings only.
+- [x] `git diff --check` — clean.
+- [x] Release evidence proves no commit/push/next-select was performed by the
+  close command; those remain separate lifecycle actions.
 
 ## Риски и откат
 
@@ -237,32 +250,42 @@ push остаются отдельными действиями и не выпо
 - **Откат:** revert only this plan's generic source/tests; ignored local ledger
   and rotation files are not committed and remote state is untouched.
 
-## Открытые вопросы
+## Решения перед реализацией
 
-- Нужно выбрать окончательное имя close subcommand (`plan close` или
-  `plan finalize`) до implementation; это material CLI contract и должно быть
-  явно зафиксировано в approval.
-- Нужно решить, является ли unledgered in-scope path hard error для release или
-  отдельным evidence category с explicit acknowledgement; silent warning
-  превращать в зелёный close нельзя.
-- Нужно определить portable source bundled toolchain alias в profile, не
-  записывая абсолютный путь пользователя.
+- Новая команда `plan close`/`plan finalize` не вводится: существующий
+  `plan release <plan-id> --session <session-id>` остаётся публичным
+  close/finalize-переходом и получает недостающие fail-closed guards.
+- Потерянное evidence для in-scope write является hard error guarded release;
+  generated temp output вне write set остаётся отдельной outside-write-set
+  ошибкой и не может быть скрыт предупреждением.
+- Portable bundled toolchain alias определяется декларативно по профилю и
+  package metadata; абсолютные пути пользователя не записываются.
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-08-02 12:00 UTC
-- **Подтверждено:** —
-- **Формулировка/ограничения пользователя:** расширить предыдущие планы и
-  записать их в репозиторий; менять код, select, commit и push пока не просил.
+- **Подтверждено:** 2026-08-02 12:18:37 UTC
+- **Формулировка/ограничения пользователя:** `20260802T115448Z` — leinoctl,
+  `20260802T115450Z` — browser runner, `20260802T115451Z` — runbook:
+  approve, делай. Выполнять строго в указанном порядке; push не выполнять.
 
 ## Ход выполнения
 
 - 2026-08-02: draft создан штатным `./leinoctl plan create`.
 - 2026-08-02: добавлены findings о required-check ledger, потерянных patch
   targets, stale owners, toolchain resolver и fail-closed close transition.
-- Реализация не начата.
+- 2026-08-02 12:18 UTC: approval записан; stale owner предыдущей сессии
+  точечно передан текущей сессии через `plan claim --takeover` после проверки
+  отсутствия session state.
+- 2026-08-02: реализованы close guards, failure evidence, atomic/idempotent
+  ledger merge, concrete-path fingerprints, canonical target registration,
+  stale-owner diagnostics и declarative toolchain resolver.
+- 2026-08-02 12:36 UTC: canonical verify/scope-check завершены; plan готов к
+  перемещению в archive и guarded release.
 
 ## Итог
 
-Заполняется после реализации и отдельного lifecycle closure.
+Реализовано и проверено в текущей trusted session. Plan завершён, archive и
+guarded release выполняются отдельными lifecycle actions; local commit будет
+сделан после release, push не выполняется.

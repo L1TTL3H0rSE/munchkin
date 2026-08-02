@@ -34,6 +34,7 @@ import {
   claimPlanLifecycle,
   readSession,
   recordSessionCheck,
+  recordSessionTargets,
   releasePlanLifecycle,
   releaseSelectedPlanForRotation,
   resolveSessionId,
@@ -279,25 +280,72 @@ function maybeRecordChecks(
     `${profile.plans.activeDir}/${session.planId}.md`,
     `${profile.plans.archiveDir}/${session.planId}.md`,
   ]);
-  const coveredPaths = [...new Set(checkedPaths)]
+  const current = snapshotRepository(repoRoot);
+  const coveredPaths = changedSinceBaseline(session.baseline, current)
     .filter((repoPath) => !lifecyclePaths.has(repoPath))
+    .filter((repoPath) => checkedPaths.some((selection) => selectionMatchesPath(selection, repoPath)))
     .sort();
-  const inputFingerprint = fingerprintSnapshotPaths(
-    snapshotRepository(repoRoot),
-    coveredPaths,
-  );
+  const inputFingerprint = fingerprintSnapshotPaths(current, coveredPaths);
   for (const result of results) {
     recordSessionCheck(repoRoot, profile, sessionId, {
       id: result.command.id,
       cwd: result.command.cwd,
       argv: result.command.argv,
       exitCode: result.exitCode,
+      signal: result.signal ?? null,
+      started: result.started !== false,
+      timedOut: result.timedOut === true,
       dryRun: result.dryRun,
       checkedPaths: coveredPaths,
       inputFingerprint,
       completedAt: new Date().toISOString(),
     });
   }
+}
+
+function selectionMatchesPath(selection, repoPath) {
+  const normalizedSelection = String(selection).replaceAll("\\", "/").replace(/^\.\//, "").replace(/\/$/, "");
+  const normalizedPath = String(repoPath).replaceAll("\\", "/").replace(/^\.\//, "");
+  if (!normalizedSelection || normalizedSelection === ".") {
+    return true;
+  }
+  if (normalizedSelection.endsWith("/**")) {
+    return normalizedPath === normalizedSelection.slice(0, -3)
+      || normalizedPath.startsWith(`${normalizedSelection.slice(0, -3)}/`);
+  }
+  return normalizedPath === normalizedSelection
+    || normalizedPath.startsWith(`${normalizedSelection}/`);
+}
+
+function maybeRecordVerificationTargets(
+  repoRoot,
+  profile,
+  checkedPaths,
+  explicitSessionId,
+  env = process.env,
+) {
+  if (!explicitSessionId && !env.CODEX_THREAD_ID && !env.LEINO_SESSION_ID) {
+    return;
+  }
+  let sessionId;
+  try {
+    sessionId = resolveSessionId(explicitSessionId, env);
+  } catch {
+    return;
+  }
+  const session = readSession(repoRoot, profile.runtimeDir, sessionId);
+  if (!session) {
+    return;
+  }
+  const current = snapshotRepository(repoRoot);
+  const lifecyclePaths = new Set([
+    `${profile.plans.activeDir}/${session.planId}`,
+    `${profile.plans.archiveDir}/${session.planId}`,
+  ].map((prefix) => `${prefix}.md`));
+  const targets = changedSinceBaseline(session.baseline, current)
+    .filter((repoPath) => !lifecyclePaths.has(repoPath))
+    .filter((repoPath) => checkedPaths.some((selection) => selectionMatchesPath(selection, repoPath)));
+  recordSessionTargets(repoRoot, profile, sessionId, targets);
 }
 
 function helpText() {
@@ -571,8 +619,8 @@ async function execute(command, positionals, options, context) {
       releasedAt: result.releasedAt,
       completedChecks: result.report.completedChecks.map((check) => check.id),
     }, {
-      warnings: result.report.unledgered.length
-        ? [`${result.report.unledgered.length} changed path(s) were not recorded by post-write hooks`]
+      warnings: result.report.staleChecks.length
+        ? [`${result.report.staleChecks.length} successful check result(s) no longer cover current inputs`]
         : [],
     });
   }
@@ -601,15 +649,14 @@ async function execute(command, positionals, options, context) {
     return outputEnvelope(command, report, {
       ok: report.ok,
       warnings: [
-        ...(report.unledgered.length
-          ? [`${report.unledgered.length} changed path(s) were not recorded by a post-write hook`]
+        ...(report.failedChecks.length
+          ? [`${report.failedChecks.length} failed or dry-run check result(s) are not lifecycle evidence`]
           : []),
-        ...(report.staleChecks.length
-          ? [`${report.staleChecks.length} successful check result(s) no longer cover current inputs`]
-          : []),
+        ...report.staleChecks.map((check) => `stale check: ${check.id} (${check.cwd})`),
       ],
       errors: [
         ...report.outsideWriteSet.map((entry) => `outside write set: ${entry}`),
+        ...report.unledgered.map((entry) => `unledgered target: ${entry}`),
         ...report.missingRequiredChecks.map(
           (entry) => `required check not completed: ${entry.id} (${entry.cwd})`,
         ),
@@ -635,6 +682,7 @@ async function execute(command, positionals, options, context) {
 
   if (command === "verify") {
     const paths = verificationPathSelection(repoRoot, profile, options);
+    maybeRecordVerificationTargets(repoRoot, profile, paths, options.session);
     const graph = buildComponentGraph(repoRoot, profile);
     const components = impactedComponents(graph, paths);
     const checks = componentChecks(components);
@@ -650,6 +698,10 @@ async function execute(command, positionals, options, context) {
         id: result.command.id,
         cwd: result.command.cwd,
         argv: result.command.argv,
+        exitCode: result.exitCode,
+        signal: result.signal ?? null,
+        started: result.started !== false,
+        timedOut: result.timedOut === true,
         dryRun: result.dryRun,
         stdout: options.json ? result.stdout : undefined,
         stderr: options.json ? result.stderr : undefined,

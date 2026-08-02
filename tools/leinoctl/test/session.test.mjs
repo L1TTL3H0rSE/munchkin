@@ -97,6 +97,35 @@ test("scope report catches out-of-plan and unledgered writes", () => {
   assert.equal(report.ok, false);
 });
 
+test("session ledger normalizes and idempotently merges repeated targets and checks", () => {
+  const root = temporaryDirectory();
+  const profile = {
+    runtimeDir: ".leino/runtime",
+    plans: { activeDir: ".plans/active", archiveDir: ".plans/archive" },
+  };
+  selectSessionPlan(root, profile, registry(), "0100-fixture", {
+    sessionId: "thread-ledger-merge",
+    snapshot: cleanSnapshot,
+  });
+  recordSessionTargets(root, profile, "thread-ledger-merge", [".\\src\\two.js", "src/one.js"]);
+  recordSessionTargets(root, profile, "thread-ledger-merge", ["src/one.js", "./src/three.js"]);
+  const check = {
+    id: "fixture-check",
+    cwd: ".",
+    argv: ["node", "--test"],
+    exitCode: 0,
+    dryRun: false,
+    checkedPaths: ["src\\one.js", "./src/two.js"],
+    inputFingerprint: "fingerprint",
+  };
+  recordSessionCheck(root, profile, "thread-ledger-merge", check);
+  recordSessionCheck(root, profile, "thread-ledger-merge", check);
+  const state = readSession(root, profile.runtimeDir, "thread-ledger-merge");
+  assert.deepEqual(state.ledger.targets, ["src/one.js", "src/three.js", "src/two.js"]);
+  assert.equal(state.ledger.checks.length, 1);
+  assert.deepEqual(state.ledger.checks[0].checkedPaths, ["src/one.js", "src/two.js"]);
+});
+
 test("scope report catches generated, migration, deleted and submodule writes", () => {
   const root = temporaryDirectory();
   const profile = {
@@ -223,6 +252,7 @@ test("scope report expires successful checks after checked inputs change", () =>
     sessionId: "thread-stale-check",
     snapshot: cleanSnapshot,
   });
+  recordSessionTargets(root, profile, "thread-stale-check", ["src/new.js"]);
   recordSessionCheck(root, profile, "thread-stale-check", {
     ...requiredChecks[0],
     exitCode: 0,
@@ -341,6 +371,20 @@ test("plan lifecycle ownership supports explicit handoff and release", () => {
     lifecyclePlanIdsForSession(root, runtimeDir, "thread-other"),
     [],
   );
+});
+
+test("takeover changes only the requested owner and reports missing prior session state", () => {
+  const root = temporaryDirectory();
+  const runtimeDir = ".leino/runtime";
+  claimPlanLifecycle(root, runtimeDir, "0100-fixture", "thread-old");
+  claimPlanLifecycle(root, runtimeDir, "0101-other", "thread-old");
+  assert.throws(
+    () => claimPlanLifecycle(root, runtimeDir, "0100-fixture", "thread-new"),
+    (error) => /existing session state: absent/.test(error.details.join("\n")),
+  );
+  claimPlanLifecycle(root, runtimeDir, "0100-fixture", "thread-new", { takeover: true });
+  assert.deepEqual(lifecyclePlanIdsForSession(root, runtimeDir, "thread-old"), ["0101-other"]);
+  assert.deepEqual(lifecyclePlanIdsForSession(root, runtimeDir, "thread-new"), ["0100-fixture"]);
 });
 
 test("selected release requires completed archive and preserves state on failure", () => {
@@ -577,6 +621,7 @@ test("rotation preserves pre-existing dirty paths and permits only next lifecycl
     sessionId: "thread-dirty-baseline",
     snapshot: baseline,
   });
+  recordSessionTargets(root, profile, "thread-dirty-baseline", ["src/change.js"]);
   releaseSelectedPlanForRotation(
     root,
     profile,
@@ -641,6 +686,7 @@ test("rotation preserves pre-existing dirty paths and permits only next lifecycl
     sessionId: "thread-mutated-baseline",
     snapshot: baseline,
   });
+  recordSessionTargets(secondRoot, profile, "thread-mutated-baseline", ["src/change.js"]);
   releaseSelectedPlanForRotation(
     secondRoot,
     profile,

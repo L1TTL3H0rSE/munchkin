@@ -5,7 +5,7 @@ import test from "node:test";
 import { main } from "../src/cli.mjs";
 import { EXIT_CODES } from "../src/errors.mjs";
 import { snapshotRepository } from "../src/git.mjs";
-import { readSession, selectSessionPlan } from "../src/session.mjs";
+import { readSession, recordSessionTargets, selectSessionPlan } from "../src/session.mjs";
 import { fixtureProfile, temporaryDirectory, writeFile, writeJson } from "./helpers.mjs";
 
 function captureStream() {
@@ -290,6 +290,68 @@ test("verify without an explicit base ignores dirty state that predates session 
   );
 });
 
+test("verify records failed command evidence before returning the failure", async () => {
+  const root = temporaryDirectory();
+  const profile = fixtureProfile();
+  writeJson(root, ".leino/profile.json", profile);
+  writeJson(root, ".leino/components/failing.json", {
+    schemaVersion: 1,
+    id: "failing",
+    kind: "integration",
+    roots: ["planned.txt"],
+    checks: [{
+      id: "failing-check",
+      cwd: ".",
+      argv: ["node", "-e", "process.exit(7)"],
+    }],
+  });
+  writeFile(root, ".gitignore", ".leino/runtime/\n");
+  writeFile(root, "planned.txt", "baseline\n");
+  execFileSync("git", ["init", "--initial-branch=main"], { cwd: root });
+  execFileSync("git", ["config", "user.email", "fixture@example.test"], { cwd: root });
+  execFileSync("git", ["config", "user.name", "Fixture"], { cwd: root });
+  execFileSync("git", ["add", "."], { cwd: root });
+  execFileSync("git", ["commit", "-m", "fixture"], { cwd: root });
+
+  selectSessionPlan(root, profile, {
+    active: [{
+      planId: "0100-fixture",
+      eligible: true,
+      writeSet: [{ path: "planned.txt", mode: "write" }],
+    }],
+  }, "0100-fixture", {
+    sessionId: "failed-verify-session",
+    snapshot: snapshotRepository(root),
+  });
+  writeFile(root, "planned.txt", "changed\n");
+
+  const stdout = captureStream();
+  const stderr = captureStream();
+  const exitCode = await main([
+    "verify",
+    "--changed",
+    "--session",
+    "failed-verify-session",
+    "--repo",
+    root,
+    "--json",
+  ], {
+    stdout: stdout.stream,
+    stderr: stderr.stream,
+  });
+  assert.equal(exitCode, EXIT_CODES.checkFailed, stderr.value());
+  const state = readSession(root, profile.runtimeDir, "failed-verify-session");
+  assert.deepEqual(state.ledger.targets, ["planned.txt"]);
+  const check = state.ledger.checks[0];
+  assert.equal(check.id, "failing-check");
+  assert.equal(check.cwd, ".");
+  assert.deepEqual(check.argv, ["node", "-e", "process.exit(7)"]);
+  assert.equal(check.exitCode, 7);
+  assert.equal(check.dryRun, false);
+  assert.deepEqual(check.checkedPaths, ["planned.txt"]);
+  assert.match(check.inputFingerprint, /^[0-9a-f]{64}$/);
+});
+
 test("CLI rotates completed plans in one session only after a separate commit", async () => {
   const root = temporaryDirectory();
   const firstPlan = "0100-first";
@@ -330,6 +392,7 @@ test("CLI rotates completed plans in one session only after a separate commit", 
   assert.equal(exitCode, EXIT_CODES.ok, stderr.value());
 
   writeFile(root, "src/change.js", "export const changed = true;\n");
+  recordSessionTargets(root, fixtureProfile(), "queue-session", ["src/change.js"]);
   fs.unlinkSync(`${root}/.plans/active/${firstPlan}.md`);
   writeFile(
     root,

@@ -1,17 +1,135 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { claimMatchesPath } from "./claims.mjs";
+import { claimMatchesPath, normalizeClaim } from "./claims.mjs";
 import { EXIT_CODES, LeinoError } from "./errors.mjs";
 import {
   changedSinceBaseline,
   fingerprintSnapshotPaths,
   snapshotRepository,
 } from "./git.mjs";
-import { resolveInside, writeJsonAtomic } from "./fs.mjs";
+import { resolveInside, toPosix, writeJsonAtomic } from "./fs.mjs";
+
+const SESSION_LOCK_ATTEMPTS = 100;
+const SESSION_LOCK_WAIT_MS = 5;
 
 function safeSessionId(value) {
   return String(value).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 160);
+}
+
+function normalizeLedgerPath(value) {
+  return normalizeClaim(toPosix(String(value ?? "")).replace(/^\.\//, ""));
+}
+
+function normalizeLedgerPaths(values) {
+  if (!Array.isArray(values)) {
+    throw new LeinoError("session-ledger-invalid", "session ledger paths must be an array");
+  }
+  return [...new Set(values.map(normalizeLedgerPath))].sort();
+}
+
+function normalizeRecordedCheck(check) {
+  if (!check || typeof check !== "object") {
+    throw new LeinoError("session-check-invalid", "session check must be an object");
+  }
+  if (!check.id || !Array.isArray(check.argv)) {
+    throw new LeinoError("session-check-invalid", "session check requires id and argv");
+  }
+  return {
+    ...check,
+    id: String(check.id),
+    cwd: normalizeLedgerPath(check.cwd ?? "."),
+    argv: check.argv.map((entry) => String(entry)),
+    exitCode: Number.isInteger(check.exitCode) ? check.exitCode : null,
+    signal: check.signal ?? null,
+    started: check.started !== false,
+    timedOut: check.timedOut === true,
+    dryRun: check.dryRun === true,
+    checkedPaths: normalizeLedgerPaths(check.checkedPaths ?? []),
+    inputFingerprint: check.inputFingerprint ?? null,
+  };
+}
+
+function sessionCheckKey(check) {
+  return JSON.stringify([
+    check.id,
+    check.cwd,
+    check.argv,
+    check.exitCode,
+    check.signal,
+    check.started,
+    check.timedOut,
+    check.dryRun,
+    check.checkedPaths,
+    check.inputFingerprint,
+  ]);
+}
+
+function withSessionLedgerLock(filePath, callback) {
+  const lockPath = `${filePath}.lock`;
+  let descriptor;
+  for (let attempt = 0; attempt < SESSION_LOCK_ATTEMPTS; attempt += 1) {
+    try {
+      descriptor = fs.openSync(lockPath, "wx", 0o600);
+      try {
+        fs.writeFileSync(descriptor, `${process.pid}\n`, "utf8");
+      } catch (error) {
+        fs.closeSync(descriptor);
+        descriptor = undefined;
+        try {
+          fs.unlinkSync(lockPath);
+        } catch (cleanupError) {
+          if (cleanupError?.code !== "ENOENT") {
+            throw cleanupError;
+          }
+        }
+        throw error;
+      }
+      break;
+    } catch (error) {
+      if (error?.code !== "EEXIST" || attempt === SESSION_LOCK_ATTEMPTS - 1) {
+        throw new LeinoError(
+          "session-ledger-locked",
+          `session ledger is locked: ${path.basename(filePath)}`,
+          { cause: error },
+        );
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, SESSION_LOCK_WAIT_MS);
+    }
+  }
+  try {
+    return callback();
+  } finally {
+    try {
+      fs.closeSync(descriptor);
+    } finally {
+      try {
+        fs.unlinkSync(lockPath);
+      } catch (error) {
+        if (error?.code !== "ENOENT") {
+          throw error;
+        }
+      }
+    }
+  }
+}
+
+function updateSessionLedger(repoRoot, runtimeDir, sessionId, updater) {
+  const resolvedSessionId = resolveSessionId(sessionId);
+  const filePath = sessionFile(repoRoot, runtimeDir, resolvedSessionId);
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  return withSessionLedgerLock(filePath, () => {
+    const state = readSession(repoRoot, runtimeDir, resolvedSessionId);
+    if (!state) {
+      return null;
+    }
+    const next = updater(state);
+    next.updatedAt = new Date().toISOString();
+    writeJsonAtomic(filePath, next);
+    return next;
+  });
 }
 
 export function resolveSessionId(explicit, env = process.env) {
@@ -90,9 +208,25 @@ export function claimPlanLifecycle(repoRoot, runtimeDir, planId, sessionId, {
     const existing = JSON.parse(fs.readFileSync(filePath, "utf8"));
     if (existing.sessionId !== resolvedSessionId) {
       if (!takeover) {
+        let priorSessionState = "absent";
+        try {
+          if (fs.existsSync(sessionFile(repoRoot, runtimeDir, existing.sessionId))) {
+            readSession(repoRoot, runtimeDir, existing.sessionId);
+            priorSessionState = "present";
+          }
+        } catch {
+          priorSessionState = "invalid";
+        }
         throw new LeinoError(
           "plan-lifecycle-owned",
           `plan lifecycle is owned by another session: ${planId}; use explicit takeover after confirming handoff`,
+          {
+            details: [
+              `existing owner session: ${existing.sessionId}`,
+              `existing session state: ${priorSessionState}`,
+              "takeover is explicit and must be limited to this plan",
+            ],
+          },
         );
       }
       const ownership = {
@@ -255,6 +389,8 @@ export function releaseSelectedPlanForRotation(
       {
         details: [
           ...report.outsideWriteSet.map((entry) => `outside write set: ${entry}`),
+          ...report.unledgered.map((entry) => `unledgered target: ${entry}`),
+          ...report.staleChecks.map((check) => `stale check: ${check.id} (${check.cwd})`),
           ...report.missingRequiredChecks.map(
             (entry) => `required check not completed: ${entry.id} (${entry.cwd})`,
           ),
@@ -438,30 +574,28 @@ export function selectSessionPlan(repoRoot, profile, registry, planId, {
 }
 
 export function recordSessionTargets(repoRoot, profile, sessionId, targets) {
-  const resolvedSessionId = resolveSessionId(sessionId);
-  const state = readSession(repoRoot, profile.runtimeDir, resolvedSessionId);
-  if (!state) {
-    return null;
-  }
-  state.ledger.targets = [...new Set([
-    ...(state.ledger?.targets ?? []),
-    ...targets,
-  ])].sort();
-  state.updatedAt = new Date().toISOString();
-  writeJsonAtomic(sessionFile(repoRoot, profile.runtimeDir, resolvedSessionId), state);
-  return state;
+  const normalizedTargets = normalizeLedgerPaths(targets);
+  return updateSessionLedger(repoRoot, profile.runtimeDir, sessionId, (state) => {
+    state.ledger = state.ledger ?? { targets: [], checks: [] };
+    state.ledger.targets = normalizeLedgerPaths([
+      ...(state.ledger.targets ?? []),
+      ...normalizedTargets,
+    ]);
+    return state;
+  });
 }
 
 export function recordSessionCheck(repoRoot, profile, sessionId, check) {
-  const resolvedSessionId = resolveSessionId(sessionId);
-  const state = readSession(repoRoot, profile.runtimeDir, resolvedSessionId);
-  if (!state) {
-    return null;
-  }
-  state.ledger.checks = [...(state.ledger?.checks ?? []), check];
-  state.updatedAt = new Date().toISOString();
-  writeJsonAtomic(sessionFile(repoRoot, profile.runtimeDir, resolvedSessionId), state);
-  return state;
+  const normalizedCheck = normalizeRecordedCheck(check);
+  return updateSessionLedger(repoRoot, profile.runtimeDir, sessionId, (state) => {
+    state.ledger = state.ledger ?? { targets: [], checks: [] };
+    const checks = (state.ledger.checks ?? []).map(normalizeRecordedCheck);
+    if (!checks.some((entry) => sessionCheckKey(entry) === sessionCheckKey(normalizedCheck))) {
+      checks.push(normalizedCheck);
+    }
+    state.ledger.checks = checks;
+    return state;
+  });
 }
 
 export function sessionScopeReport(repoRoot, profile, registry, {
@@ -486,13 +620,23 @@ export function sessionScopeReport(repoRoot, profile, registry, {
     !planLifecyclePaths.has(changedPath)
     && !plan.writeSet.some((claim) => claimMatchesPath(claim.path, changedPath))
   ));
-  const ledgerTargets = state.ledger?.targets ?? [];
-  const unledgered = changed.filter((changedPath) => !ledgerTargets.includes(changedPath));
+  const ledgerTargets = normalizeLedgerPaths(state.ledger?.targets ?? []);
+  const changedInputs = changed.filter((changedPath) => !planLifecyclePaths.has(changedPath));
+  const unledgered = changedInputs.filter((changedPath) => !ledgerTargets.includes(changedPath));
+  const unledgeredInWriteSet = unledgered.filter((changedPath) => (
+    plan.writeSet.some((claim) => claimMatchesPath(claim.path, changedPath))
+  ));
+  const unledgeredOutsideWriteSet = unledgered.filter((changedPath) => (
+    !unledgeredInWriteSet.includes(changedPath)
+  ));
   const requiredInputPaths = changed.filter(
     (changedPath) => !planLifecyclePaths.has(changedPath),
   );
   const successfulChecks = (state.ledger?.checks ?? []).filter(
-    (check) => check.exitCode === 0 && check.dryRun === false,
+    (check) => check.exitCode === 0 && check.dryRun === false && check.timedOut !== true,
+  );
+  const failedChecks = (state.ledger?.checks ?? []).filter(
+    (check) => check.exitCode !== 0 || check.dryRun === true || check.timedOut === true,
   );
   const completedChecks = successfulChecks.filter((check) => (
     Array.isArray(check.checkedPaths)
@@ -502,7 +646,8 @@ export function sessionScopeReport(repoRoot, profile, registry, {
   const staleChecks = successfulChecks.filter((check) => !completedChecks.includes(check));
   const missingRequiredChecks = requiredChecks.filter((required) => (
     !completedChecks.some((completed) => (
-      completed.cwd === required.cwd
+      completed.id === required.id
+      && completed.cwd === required.cwd
       && JSON.stringify(completed.argv) === JSON.stringify(required.argv)
     ))
   ));
@@ -514,10 +659,15 @@ export function sessionScopeReport(repoRoot, profile, registry, {
     outsideWriteSet,
     ledgerTargets,
     unledgered,
+    unledgeredInWriteSet,
+    unledgeredOutsideWriteSet,
     requiredChecks,
     completedChecks,
+    failedChecks,
     staleChecks,
     missingRequiredChecks,
-    ok: outsideWriteSet.length === 0 && missingRequiredChecks.length === 0,
+    ok: outsideWriteSet.length === 0
+      && unledgered.length === 0
+      && missingRequiredChecks.length === 0,
   };
 }
