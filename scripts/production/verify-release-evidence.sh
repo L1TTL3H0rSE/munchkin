@@ -109,32 +109,28 @@ done
 verify_attestation() {
   local image_ref="$1"
   local bundle_path="$2"
-  local predicate_type="${3:-https://slsa.dev/provenance/v1}"
-  local verification_output
-  verification_output="$(mktemp "${TMPDIR:-/tmp}/munchkin-attestation.XXXXXX")"
-  if ! gh attestation verify "oci://$image_ref" \
+  local predicate_type="${3:-slsaprovenance1}"
+  local digest="${image_ref##*@sha256:}"
+  if ! cosign verify-blob-attestation \
     --bundle "$evidence_dir/$bundle_path" \
-    --repo "$github_repo" \
-    --signer-workflow "$github_repo/.github/workflows/ci.yml" \
-    --source-digest "$release_commit" \
-    --predicate-type "$predicate_type" \
-    --deny-self-hosted-runners \
-    --format json >"$verification_output"; then
-    rm -f -- "$verification_output"
-    die "GitHub attestation verification failed for $(basename "$image_ref")"
+    --digest "$digest" \
+    --digestAlg sha256 \
+    --type "$predicate_type" \
+    --certificate-identity "https://github.com/$github_repo/.github/workflows/ci.yml@refs/heads/main" \
+    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+    --certificate-github-workflow-repository "$github_repo" \
+    --certificate-github-workflow-ref "refs/heads/main" \
+    --certificate-github-workflow-sha "$release_commit" \
+    --certificate-github-workflow-name "Munchkin CI" \
+    --certificate-github-workflow-trigger push \
+    --check-claims=true \
+    --new-bundle-format=true >/dev/null; then
+    die "Sigstore attestation verification failed for $(basename "$image_ref")"
   fi
-  local digest="sha256:${image_ref##*@sha256:}"
-  jq -e --arg digest "$digest" \
-    'length > 0 and all(.[]; any(.verificationResult.statement.subject[]; .digest == $digest))' \
-    "$verification_output" >/dev/null || {
-      rm -f -- "$verification_output"
-      die "attestation subject digest mismatch for $(basename "$image_ref")"
-    }
-  rm -f -- "$verification_output"
 }
 
 if [[ "$require_attestation" == true ]]; then
-  command -v gh >/dev/null 2>&1 || die "GitHub CLI is required for attestation verification"
+  command -v cosign >/dev/null 2>&1 || die "Cosign is required for attestation verification"
   game_provenance="$(jq -er '.attestations.game.provenanceBundle' "$security_evidence")"
   web_provenance="$(jq -er '.attestations.web.provenanceBundle' "$security_evidence")"
   game_sbom="$(jq -er '.attestations.game.sbomBundle' "$security_evidence")"

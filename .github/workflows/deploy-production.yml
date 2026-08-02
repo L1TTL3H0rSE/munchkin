@@ -56,6 +56,11 @@ jobs:
           [[ "$RELEASE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ -n "$DEPLOY_HOST" && "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
 
+      - name: Install pinned Cosign verifier
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
+        with:
+          cosign-release: v3.0.6
+
       - name: Verify release SBOM and keyless attestation evidence
         shell: bash
         env:

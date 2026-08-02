@@ -3,7 +3,7 @@
 - **Plan ID:** `20260802T200453Z-135717-first-production-deploy-https-smoke`
 - **Статус:** in_progress
 - **Создан:** 2026-08-02 20:04:53 UTC
-- **Обновлён:** 2026-08-02 20:04:53 UTC
+- **Обновлён:** 2026-08-02 20:30:09 UTC
 - **Владелец:** Codex
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся
@@ -102,15 +102,19 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 - Exact manifest serialization fix in
   `scripts/production/verify-release-evidence.sh`; security evidence and all
   four attestations remain mandatory and unchanged.
+- Exact registry-free attestation fix confirmed by run `30765399436`: install
+  pinned Cosign v3.0.6 and verify each local Sigstore bundle against the exact
+  image digest plus GitHub workflow identity/ref/SHA before SSH.
 - Lifecycle evidence in this plan, archive, local commit and push to `main`.
 
 ### Не входит
 
-- Any repository source/config/workflow change except the two exact pre-SSH
-  release-gate fixes confirmed by runs `30764956972` and `30765108163`: invoke
-  the verifier through `bash`, then compare the manifest's exact
-  `repo:commit`, digest and combined `repo:commit@digest` fields with the
-  requested immutable `repo@digest` input.
+- Any repository source/config/workflow change except the three exact pre-SSH
+  release-gate fixes confirmed by runs `30764956972`, `30765108163` and
+  `30765399436`: invoke the verifier through `bash`; compare the manifest's
+  exact `repo:commit`, digest and combined `repo:commit@digest` fields; and use
+  pinned Cosign digest-only verification for the already downloaded local
+  Sigstore bundles without requiring Registry credentials on the runner.
 - Terraform apply, Yandex resource mutation, DNS/NS edit, firewall change,
   Registry delete/retag/push, GitHub settings/environment/secret mutation.
 - Reading, printing or rotating SSH/application/ACME/Lockbox secret values.
@@ -120,7 +124,9 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 ## Архитектурный подход
 
 - Use the existing fail-closed chain: release evidence verification first,
-  protected SSH material second, then one forced-command host operation.
+  including registry-free cryptographic Sigstore bundle verification with
+  pinned Cosign, protected SSH material second, then one forced-command host
+  operation.
 - Trust only immutable digest refs and the exact public commit/run pair.
 - Treat workflow `success` plus host evidence and independent public HTTPS
   checks as completion; no UI inference substitutes for recorded evidence.
@@ -129,7 +135,7 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 
 | Компонент | Изменение | Публичный контракт/данные |
 |---|---|---|
-| GitHub Actions | explicit Bash invocation plus dispatch/read | unchanged verification contract and exact inputs |
+| GitHub Actions | explicit Bash invocation, pinned Cosign install and dispatch/read | exact inputs plus registry-free cryptographic bundle verification |
 | Existing VM runtime | controlled rollout through gateway | `production-release-evidence-v1` |
 | Public edge | read-only HTTPS validation | hostname/TLS/health availability |
 | Repository | lifecycle, workflow launcher and manifest contract fix | no attestation-policy weakening |
@@ -140,8 +146,8 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 
 | Путь/ресурс | Режим | Причина |
 |---|---|---|
-| `.github/workflows/deploy-production.yml` | write | Invoke existing verifier through Bash on Linux runner |
-| `scripts/production/verify-release-evidence.sh` | write | Verify exact manifest ref/digest serialization |
+| `.github/workflows/deploy-production.yml` | write | Invoke verifier through Bash and install pinned Cosign v3.0.6 |
+| `scripts/production/verify-release-evidence.sh` | write | Verify exact manifest serialization and local bundle identity/digest |
 | `docs/agents/plans/active/20260802T200453Z-135717-first-production-deploy-https-smoke.md` | write | Active lifecycle плана |
 | `docs/agents/plans/archive/20260802T200453Z-135717-first-production-deploy-https-smoke.md` | write | Archived lifecycle плана |
 
@@ -168,7 +174,7 @@ public HTTPS и зафиксировать machine-readable release evidence б�
 1. [x] Select this exact plan and confirm clean `main`/release inputs.
 2. [x] Dispatch `deploy-production` with the exact two digests, full SHA and
       release run ID; do not change workflow/environment/secrets.
-3. [ ] Fix the confirmed pre-SSH workflow portability and manifest
+3. [x] Fix the confirmed pre-SSH workflow portability and manifest
       serialization failures; run focused fail-closed fixture/policy checks,
       canonical verify/scope-check, commit/push and dispatch the same exact
       release inputs again.
@@ -246,6 +252,20 @@ public HTTPS и зафиксировать machine-readable release evidence б�
   digests in manifest/security evidence; the scoped verifier fix requires the
   exact manifest ref, digest and recomposed image instead of weakening string
   matching.
+- Real artifact fixture passed the corrected verifier, while a tampered game
+  digest was rejected. Git Bash syntax, action-pin policy, canonical
+  repository-workflow verify and scope-check passed. Fix commit `bb4fe34` was
+  pushed and exact retry run `30765399436` dispatched with unchanged release
+  inputs.
+- Retry `30765399436`, job `91543078239`, passed manifest/SBOM validation and
+  failed closed before SSH because `gh attestation verify oci://... --bundle`
+  still authenticates to the private Registry even when the local bundle and
+  immutable digest are supplied. No VM step ran. The approved scoped repair
+  pins Cosign v3.0.6 and verifies the four local Sigstore v0.3 bundles directly
+  by digest while enforcing the exact GitHub Actions issuer, repository,
+  workflow identity/name, main ref, push trigger and release SHA.
+- All four real release bundles passed that Cosign policy locally without
+  Registry credentials; a tampered game digest was rejected.
 
 ## Итог
 
