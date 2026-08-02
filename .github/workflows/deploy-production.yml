@@ -73,7 +73,7 @@ jobs:
           security_evidence="$(find "$evidence_dir" -type f -name "security-evidence-${RELEASE_COMMIT}.json" -print -quit)"
           [[ -n "$manifest" && -n "$security_evidence" ]]
           jq -e --arg run "$RELEASE_RUN_ID" '.workflowRunId == $run' "$manifest" >/dev/null
-          scripts/production/verify-release-evidence.sh \
+          bash scripts/production/verify-release-evidence.sh \
             --game-image "$GAME_IMAGE" \
             --web-image "$WEB_IMAGE" \
             --commit "$RELEASE_COMMIT" \
