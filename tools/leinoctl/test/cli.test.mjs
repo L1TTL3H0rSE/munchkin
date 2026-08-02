@@ -365,7 +365,7 @@ test("verify executes the profile-declared executable instead of a PATH shim", a
     : writeFile(
       root,
       "bin/declared-check",
-      "#!/bin/sh\nprintf declared-resolver\n",
+      "#!/bin/sh\nprintf '%s' \"$1\"\n",
     );
   if (process.platform !== "win32") {
     fs.chmodSync(declaredExecutable, 0o755);

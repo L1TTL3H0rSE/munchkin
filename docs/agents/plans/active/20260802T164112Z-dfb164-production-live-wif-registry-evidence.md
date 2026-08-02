@@ -3,7 +3,7 @@
 - **Plan ID:** `20260802T164112Z-dfb164-production-live-wif-registry-evidence`
 - **Статус:** in_progress
 - **Создан:** 2026-08-02 16:41:12 UTC
-- **Обновлён:** 2026-08-02 18:58:58 UTC
+- **Обновлён:** 2026-08-02 19:05:56 UTC
 - **Владелец:** Codex
 - **Workspace:** `C:\Dev\_Personal\_Pet\munchkin`
 - **Ветка:** `main`; отдельная ветка не создаётся
@@ -369,6 +369,22 @@ remediation commit.
   scanner-contract checks, action-pin policy, plan-lint and `git diff --check`
   all passed locally. The authoritative full pinned scan remains the next Linux
   GitHub Actions run.
+- Commit `192a09f` passed canonical verify in 155.3 seconds and scope-check with
+  `outsideWriteSet=[]`, `unledgered=[]` and no missing checks, then was pushed.
+  Security run `30762515463` correctly skipped unavailable private-repository
+  CodeQL and started the pinned scanner. Parallel CI run `30762515454` exposed
+  a Linux-only test-fixture mismatch in `tools/leinoctl/test/cli.test.mjs`: the
+  fixture printed a hard-coded hyphenated value instead of its quoted first
+  argument. Production resolver behavior and the Windows fixture were not at
+  fault; the existing approved test write set covers the one-line portability
+  correction.
+- Security run `30762515463` reached terminal success for commit `192a09f`:
+  full-SHA policy and pinned Gitleaks/Trivy/OSV/govulncheck scanners passed,
+  CodeQL was intentionally skipped for private visibility, and artifact
+  `8837905772` retained `security-evidence-192a09f0bfb5b90c3178c6dd346a0f7559652d1a`
+  with digest `sha256:62b6ea9d0c04da5808e61f8d97e989fd0814719fbc47eef00734df884f096d5d`.
+  The POSIX fixture now prints its quoted first argument; the focused resolver
+  test, a direct Git Bash spaced-argument probe, plan-lint and diff checks pass.
 
 ## Итог
 
