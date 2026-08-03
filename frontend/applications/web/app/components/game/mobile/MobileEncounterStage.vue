@@ -2,6 +2,7 @@
 import type {Projection} from "@munchkin/contracts";
 
 import GameCard from "../../GameCard.vue";
+import DeckBack from "../primitives/DeckBack.vue";
 import CardRail from "../primitives/CardRail.vue";
 import PhaseLabel from "../../ui/PhaseLabel.vue";
 import SheetDialog from "../../ui/SheetDialog.vue";
@@ -18,6 +19,7 @@ const presentation = useGamePresentation(() => props.projection);
 const strengthOpen = ref(false);
 
 const encounterCards = computed(() => mobileEncounterCards(props.projection));
+const selectedCardIndex = computed(() => encounterCards.value.length > 1 ? 1 : 0);
 const combat = computed(() => props.projection.turn.combat);
 const runAway = computed(() => props.projection.turn.run_away);
 const stateFamily = computed(() => mobileStateFamily(props.projection));
@@ -150,15 +152,21 @@ watch(encounterCards, prepareCardScrollRegions);
 
     <CardRail
       v-if="encounterCards.length"
+      data-node-id="101:46"
       title="Карты текущего решения"
       labelled-by="mobile-encounter-title"
       :item-count="encounterCards.length"
       :show-heading="false"
     >
       <div
-        v-for="card in encounterCards"
+        v-for="(card, index) in encounterCards"
         :key="card.instance_id"
         class="mobile-encounter-card"
+        :class="{
+          'mobile-encounter-card--selected': index === selectedCardIndex,
+          'mobile-encounter-card--previous': index < selectedCardIndex,
+          'mobile-encounter-card--next': index > selectedCardIndex,
+        }"
         role="listitem"
       >
         <div
@@ -175,13 +183,34 @@ watch(encounterCards, prepareCardScrollRegions);
             :content-set-id="projection.content_set_id"
             compact
           />
+          <span
+            v-if="card.combat_strength !== undefined"
+            class="mobile-encounter-card__level"
+            aria-hidden="true"
+          >
+            {{ card.combat_strength }}
+          </span>
         </div>
       </div>
     </CardRail>
 
-    <div v-else class="mobile-encounter-stage__empty">
-      <PhaseLabel :phase="projection.turn.phase" />
-      <p>{{ phaseCopy }}</p>
+    <div
+      v-else
+      class="mobile-encounter-stage__empty"
+      :class="{'mobile-encounter-stage__empty--door': stateFamily === 'door-choice'}"
+    >
+      <template v-if="stateFamily === 'door-choice'">
+        <div>
+          <p class="mobile-encounter-stage__eyebrow">ДВЕРЬ</p>
+          <strong>Открой верхнюю карту двери.</strong>
+          <p>Вышиби дверь, чтобы продолжить подтверждённый ход.</p>
+        </div>
+        <DeckBack deck="door" label="Закрытая карта двери" />
+      </template>
+      <template v-else>
+        <PhaseLabel :phase="projection.turn.phase" />
+        <p>{{ phaseCopy }}</p>
+      </template>
     </div>
 
     <section v-if="runAway" class="mobile-run-away" aria-label="Прогресс побега">
@@ -300,6 +329,27 @@ watch(encounterCards, prepareCardScrollRegions);
   padding: var(--space-3);
 }
 
+.mobile-encounter-stage__empty--door {
+  align-content: start;
+  justify-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.mobile-encounter-stage__empty--door > div {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+}
+
+.mobile-encounter-stage__empty--door strong {
+  font-size: .92rem;
+}
+
+.mobile-encounter-stage__empty--door :deep(.deck-back) {
+  width: 7rem;
+}
+
 .mobile-encounter-stage__empty p,
 .mobile-combat-summary__result,
 .mobile-run-away p {
@@ -334,6 +384,23 @@ watch(encounterCards, prepareCardScrollRegions);
 
 .mobile-encounter-card__trigger:not(:disabled) {
   cursor: pointer;
+}
+
+.mobile-encounter-card__level {
+  position: absolute;
+  z-index: 2;
+  top: .75rem;
+  left: .75rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--color-border-card);
+  border-radius: 50%;
+  color: var(--color-action-response);
+  background: var(--color-surface);
+  font-size: 1.25rem;
+  font-weight: 800;
 }
 
 .mobile-combat-summary {

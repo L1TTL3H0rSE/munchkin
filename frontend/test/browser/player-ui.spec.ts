@@ -155,6 +155,14 @@ test.describe("desktop input and zoom safety", () => {
 test("360x640 uses one mobile presenter without document scrolling", async ({page}) => {
   await openFixtureAtViewport(page, "single-combat", 360, 640);
   await expect(await activePresenter(page, "mobile")).toBeVisible();
+  const mobileTable = page.locator(".mobile-game-table:visible");
+  const headerBox = await mobileTable.locator(".mobile-game-header").boundingBox();
+  const stageBox = await mobileTable.locator(".mobile-game-table__stage").boundingBox();
+  const dockBox = await mobileTable.locator(".mobile-game-table__dock").boundingBox();
+  expect(headerBox).toMatchObject({x: 14, y: 12, width: 332, height: 32});
+  expect(stageBox).toMatchObject({x: 0, y: 98, width: 360, height: 416});
+  expect(dockBox).toMatchObject({x: 16, y: 554, width: 328, height: 62});
+  await expect(mobileTable.locator(".action-choice__submit")).toBeVisible();
   await expect(page.locator(".game-table__desktop")).toBeHidden();
   await assertNoRootOverflow(page);
   await assertNoDocumentVerticalOverflow(page);

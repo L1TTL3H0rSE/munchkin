@@ -15,6 +15,8 @@ const props = defineProps<{
   title: string;
   description: string;
   submit: (input: LobbyFormInput) => Promise<void>;
+  compact?: boolean;
+  labelledBy?: string;
 }>();
 
 const displayName = ref("");
@@ -26,10 +28,11 @@ const gameIDInput = ref<HTMLInputElement | null>(null);
 
 const formID = computed(() => `lobby-${props.mode}-form`);
 const headingID = computed(() => `${formID.value}-heading`);
+const formLabelledBy = computed(() => props.labelledBy ?? headingID.value);
 const errorID = computed(() => `${formID.value}-error`);
 const displayNameErrorID = computed(() => `${formID.value}-display-name-error`);
 const gameIDErrorID = computed(() => `${formID.value}-game-id-error`);
-const submitLabel = computed(() => props.mode === "create" ? "Создать" : "Войти");
+const submitLabel = computed(() => props.mode === "create" ? "Создать комнату" : "Войти в комнату");
 const pendingLabel = computed(() => props.mode === "create" ? "Создаём…" : "Входим…");
 
 function values(): LobbyFormInput {
@@ -97,23 +100,23 @@ async function handleSubmit(): Promise<void> {
 <template>
   <form
     class="lobby-form"
-    :class="`lobby-form--${props.mode}`"
-    :aria-labelledby="headingID"
+    :class="[`lobby-form--${props.mode}`, {'lobby-form--compact': props.compact}]"
+    :aria-labelledby="formLabelledBy"
     :aria-busy="state === 'loading'"
     :data-state="state"
     novalidate
     @invalid.capture="handleInvalid"
     @submit.prevent="handleSubmit"
   >
-    <span class="lobby-form__number">{{ props.number }}</span>
-    <h2 :id="headingID">{{ props.title }}</h2>
-    <p class="lobby-form__description">{{ props.description }}</p>
+    <span v-if="!props.compact" class="lobby-form__number">{{ props.number }}</span>
+    <h2 v-if="!props.compact" :id="headingID">{{ props.title }}</h2>
+    <p v-if="!props.compact" class="lobby-form__description">{{ props.description }}</p>
 
     <fieldset class="lobby-form__fields">
       <legend class="lobby-form__legend">{{ props.title }}</legend>
 
       <label :for="`${formID}-display-name`">
-        Имя игрока
+        {{ props.compact ? "Твоё имя" : "Имя игрока" }}
         <input
           :id="`${formID}-display-name`"
           ref="displayNameInput"
@@ -123,6 +126,7 @@ async function handleSubmit(): Promise<void> {
           maxlength="40"
           minlength="1"
           required
+          :placeholder="props.compact ? 'Как тебя назвать?' : undefined"
           :aria-describedby="formError?.field === 'displayName' ? displayNameErrorID : undefined"
           :aria-invalid="formError?.field === 'displayName' ? 'true' : undefined"
         >
@@ -136,7 +140,7 @@ async function handleSubmit(): Promise<void> {
       </p>
 
       <label v-if="props.mode === 'join'" :for="`${formID}-game-id`">
-        ID игры
+        {{ props.compact ? "ID комнаты" : "ID игры" }}
         <input
           :id="`${formID}-game-id`"
           ref="gameIDInput"
@@ -147,6 +151,7 @@ async function handleSubmit(): Promise<void> {
           inputmode="text"
           maxlength="80"
           required
+          :placeholder="props.compact ? 'Например, K7M2' : undefined"
           :aria-describedby="formError?.field === 'gameID' ? gameIDErrorID : undefined"
           :aria-invalid="formError?.field === 'gameID' ? 'true' : undefined"
         >

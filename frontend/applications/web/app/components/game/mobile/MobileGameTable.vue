@@ -106,10 +106,14 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
 
       <div class="mobile-game-table__stage">
         <MobileEncounterStage :projection="projection" />
+      </div>
+
+      <section
+        class="mobile-game-table__dock"
+        :class="{'mobile-game-table__dock--compact': compactActionDock}"
+        aria-label="Действия текущей проекции"
+      >
         <MobileOwnState
-          v-if="hasActionableHand || projection.you.equipped.length || projection.you.carried.length
-            || projection.you.traits.length || projection.you.attachments.length
-            || projection.you.persistent_curses.length"
           :projection="projection"
           :show-hand="hasActionableHand"
           :has-interaction="Boolean(projection.interaction?.response_required_for_you)"
@@ -119,13 +123,7 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
           :confirmed-card-ids="confirmedCardIds"
           @activate="emit('activate', $event)"
         />
-      </div>
 
-      <section
-        class="mobile-game-table__dock"
-        :class="{'mobile-game-table__dock--compact': compactActionDock}"
-        aria-label="Действия текущей проекции"
-      >
         <EconomySurface
           v-if="economyEntries.length"
           :projection="projection"
@@ -173,14 +171,13 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
 }
 
 .mobile-game-table__stage {
-  display: grid;
-  align-content: start;
-  gap: var(--space-2);
+  min-height: 0;
 }
 
 .mobile-game-table__dock {
   display: grid;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .mobile-game-table__waiting,

@@ -2,9 +2,7 @@
 import type {Projection} from "@munchkin/contracts";
 
 import {useGamePresentation} from "../../../composables/useGamePresentation";
-import PhaseLabel from "../../ui/PhaseLabel.vue";
 import SheetDialog from "../../ui/SheetDialog.vue";
-import StrengthIndicator from "../../ui/StrengthIndicator.vue";
 
 const props = defineProps<{
   projection: Projection;
@@ -19,23 +17,62 @@ const turnCopy = computed(() => {
     return "Состояние загружается";
   }
   return current.isActorTurn
-    ? "Твой ход"
-    : `Ход: ${current.currentPlayerName}`;
+    ? "ТВОЙ ХОД"
+    : `ХОДИТ ${current.currentPlayerName}`;
 });
 
 const statusCopy = computed(() => {
   switch (props.projection.status) {
     case "lobby":
-      return "Лобби";
+      return "ЛОББИ";
     case "active":
-      return "Игра идёт";
+      return "ИГРА ИДЁТ";
     case "finished":
-      return "Игра завершена";
+      return "ИГРА ЗАВЕРШЕНА";
     default: {
       const exhaustive: never = props.projection.status;
       return exhaustive;
     }
   }
+});
+
+const phaseCopy = computed(() => {
+  switch (props.projection.turn.phase) {
+    case "setup":
+    case "preparation":
+      return "Сборы";
+    case "door_choice":
+      return "Дверь";
+    case "combat":
+      return "Бой";
+    case "run_away":
+      return "Побег";
+    case "resolve_effect":
+      return "Эффект";
+    case "charity":
+      return "Награда";
+    case "end_turn":
+      return "Итог";
+    case "":
+      return "Ждём";
+    default: {
+      const exhaustive: never = props.projection.turn.phase;
+      return exhaustive;
+    }
+  }
+});
+
+const pagerCopy = computed(() => {
+  const count = props.projection.turn.combat?.monsters.length ??
+    (props.projection.turn.encounter ? 1 : 1);
+  return `1 / ${Math.max(1, count)}`;
+});
+
+const scoreCopy = computed(() => {
+  const combat = props.projection.turn.combat;
+  return combat
+    ? `${combat.player_strength} : ${combat.monster_strength}`
+    : String(props.projection.you.combat_strength);
 });
 
 function closeDetails() {
@@ -44,34 +81,47 @@ function closeDetails() {
 </script>
 
 <template>
-  <header class="mobile-game-header">
+  <header
+    class="mobile-game-header"
+    data-node-id="152:19"
+    :aria-label="`${statusCopy}. ${turnCopy}`"
+  >
     <div class="mobile-game-header__context">
-      <p class="mobile-game-header__kicker">MUNCHKIN · ИГРОВОЙ СТОЛ</p>
-      <div class="mobile-game-header__title-row">
-        <h1>{{ turnCopy }}</h1>
-        <PhaseLabel :phase="projection.turn.phase" />
-      </div>
-      <p class="mobile-game-header__status" role="status">
-        {{ statusCopy }} · версия {{ projection.version }} подтверждена сервером
-      </p>
+      <span
+        class="mobile-game-header__phase"
+        :data-phase="projection.turn.phase"
+      >
+        {{ phaseCopy }}
+      </span>
+      <span class="mobile-game-header__pager" aria-label="Позиция встречи">
+        {{ pagerCopy }}
+      </span>
     </div>
 
-    <div class="mobile-game-header__stats">
-      <StrengthIndicator
-        :value="projection.you.combat_strength"
-        label="Сила"
-        compact
-      />
-      <button
-        class="mobile-game-header__details"
-        type="button"
-        aria-haspopup="dialog"
-        :aria-expanded="detailsOpen"
-        @click="detailsOpen = true"
-      >
-        Детали
-      </button>
+    <button
+      class="mobile-game-header__strength"
+      type="button"
+      aria-label="Открыть разбор подтверждённой силы"
+      :aria-expanded="detailsOpen"
+      @click="detailsOpen = true"
+    >
+      {{ scoreCopy }}
+    </button>
+
+    <div class="mobile-game-header__turn" role="status">
+      {{ turnCopy }}
     </div>
+
+    <button
+      class="mobile-game-header__details"
+      type="button"
+      aria-label="Открыть технические детали комнаты"
+      aria-haspopup="dialog"
+      :aria-expanded="detailsOpen"
+      @click="detailsOpen = true"
+    >
+      ···
+    </button>
   </header>
 
   <SheetDialog
@@ -107,70 +157,92 @@ function closeDetails() {
 <style scoped lang="scss">
 .mobile-game-header {
   min-width: 0;
-  display: flex;
+  height: 32px;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding-inline: var(--space-1);
-}
-
-.mobile-game-header__context,
-.mobile-game-header__stats,
-.mobile-game-header__title-row {
-  min-width: 0;
+  gap: 8px;
 }
 
 .mobile-game-header__context {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.mobile-game-header__kicker,
-.mobile-game-header__status {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-family: var(--font-meta);
-  font-size: .58rem;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
-
-.mobile-game-header__title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-
-.mobile-game-header h1 {
   min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: clamp(1rem, 4vw, 1.35rem);
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.mobile-game-header__status {
-  max-width: 38ch;
+.mobile-game-header__phase {
+  display: inline-flex;
+  align-items: center;
   overflow: hidden;
+  width: 45px;
+  height: 25px;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #fff;
+  background: var(--color-action-response);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  line-height: 12px;
+  text-transform: uppercase;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-transform: none;
 }
 
-.mobile-game-header__stats {
-  display: grid;
-  justify-items: end;
-  gap: var(--space-2);
-  flex: 0 0 auto;
+.mobile-game-header__pager,
+.mobile-game-header__strength {
+  height: 25px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-control);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+
+.mobile-game-header__pager {
+  min-width: 42px;
+  padding-inline: 8px;
+}
+
+.mobile-game-header__strength {
+  min-width: 77px;
+  border: 1px solid var(--color-line);
+  padding-inline: 8px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.mobile-game-header__turn {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-accent-strong);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mobile-game-header__details {
-  min-height: 2.5rem;
-  border: 1px solid var(--color-line);
-  padding: .35rem .6rem;
-  color: var(--color-text);
+  width: 25px;
+  height: 25px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: var(--color-text-muted);
   background: transparent;
-  font-size: .72rem;
+  font-size: 12px;
+  letter-spacing: .05em;
 }
 
 .mobile-game-details {
@@ -196,20 +268,5 @@ function closeDetails() {
   margin: var(--space-1) 0 0;
   overflow-wrap: anywhere;
   line-height: 1.35;
-}
-
-@media (width <= 374px) {
-  .mobile-game-header {
-    align-items: start;
-  }
-
-  .mobile-game-header__status {
-    max-width: 24ch;
-  }
-
-  .mobile-game-header__details {
-    min-height: 2.25rem;
-    padding-inline: .45rem;
-  }
 }
 </style>

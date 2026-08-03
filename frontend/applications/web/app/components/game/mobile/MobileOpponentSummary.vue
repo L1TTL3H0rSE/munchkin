@@ -28,6 +28,7 @@ function closeDetails() {
   <section
     v-if="projection.players.length"
     class="mobile-opponents"
+    data-node-id="92:19"
     aria-labelledby="mobile-opponents-title"
   >
     <header class="mobile-opponents__header">
@@ -69,7 +70,7 @@ function closeDetails() {
         </span>
         <span class="mobile-opponent-chip__copy">
           <strong>{{ player.name }}</strong>
-          <small>ур. {{ player.level }} · рука {{ player.hand_count }}</small>
+          <small>· {{ player.level }}</small>
         </span>
         <span class="mobile-opponent-chip__status">
           {{ mobileOpponentStatusLabel(mobileOpponentStatus(projection, player)) }}

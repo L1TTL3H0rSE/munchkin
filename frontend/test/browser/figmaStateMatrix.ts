@@ -559,15 +559,47 @@ export const figmaFlowModes = {
   },
 } as const;
 
-export const unresolvedFigmaHandoffs = [
-  {
-    source: "approved mobile state handoff",
-    nodeId: null,
-    reason: "The archive names the approved mobile set but does not record a concrete node ID; production parity is not claimed until the source node is resolved.",
+export const figmaCompactHandoffs = {
+  integratedStates: {
+    nodeId: "147:671",
+    route: "/game/:id",
+    viewport: "360x640",
+    component: "mobile-game-table",
+    source: "Integrated States / Compact Integrated States / Board · 360×640",
+    fixtureIDs: ["single-combat", "mobile-combat-multiple", "offline-stale"],
   },
+  coreLoop: {
+    nodeId: "160:1140",
+    route: "/game/:id",
+    viewport: "360x640",
+    component: "mobile-game-table",
+    source: "Core Loop & Interactions / Board · 360×640",
+    fixtureIDs: ["single-setup", "single-door-choice", "single-run-away", "run-away-result"],
+  },
+  lobbySelectedB: {
+    nodeId: "225:14",
+    route: "/",
+    viewport: "360x640",
+    component: "lobby-entry",
+    source: "Lobby Entry / Selected B Flow · 360×640",
+    fixtureIDs: ["lobby-state"],
+  },
+  lobbyDesktopSelectedB: {
+    nodeId: "240:50",
+    route: "/",
+    viewport: "1440x900",
+    component: "lobby-entry",
+    source: "Lobby Entry / Desktop States · 1440×900",
+    fixtureIDs: ["lobby-state"],
+  },
+} as const;
+
+export const excludedFigmaSources = [
   {
-    source: "approved lobby Flow B handoff",
-    nodeId: null,
-    reason: "The archive names Flow B but does not record a concrete node ID; lobby parity is not claimed until the source node is resolved.",
+    nodeId: "122:3",
+    viewport: "360x800",
+    reason: "User explicitly excluded 360×800 screenshots; compact parity uses only 360×640 source nodes.",
   },
 ] as const;
+
+export const unresolvedFigmaHandoffs = [] as const;
