@@ -80,6 +80,38 @@
 - **Пересечения:** —
 - **Решение:** —
 
+## Delegation strategy
+
+- **Classification:** large — planning delegation required / small — not
+  needed.
+- **Причина:** risk и независимые workstreams; для small — конкретная причина,
+  почему отдельный agent не даст полезного независимого evidence.
+- **Root parallel work:** полезная работа root во время каждого package.
+- **Write boundary:** delegated `write_set: []`; возможная запись — только
+  `root-only pending worktree orchestration`.
+
+### Preliminary work packages
+
+Для каждого package до spawn заполни:
+
+- **Package / role / model / effort:** — / explorer / Luna / high.
+- **Bounded scope и context/history:** точный вопрос, пути и `fork_turns`.
+- **Independent from:** чем package не дублирует root или другой package.
+- **Access / write set:** `read-only` / `[]`.
+- **Expected output:** evidence with paths.
+- **Stop condition:** —.
+- **Root parallel work:** —.
+- **Expected savings:** —.
+
+### Actual delegation evidence
+
+| Package | Result | Evidence/findings | Влияние на plan |
+|---|---|---|---|
+| — | completed / stopped / not run | — | — |
+
+- **Adversarial review:** результат и закрытие findings / `not needed` с
+  причиной для small plan.
+
 ## План реализации
 
 1. [ ] Шаг.

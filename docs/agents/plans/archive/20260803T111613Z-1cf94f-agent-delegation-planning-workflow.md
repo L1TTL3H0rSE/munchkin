@@ -1,12 +1,12 @@
 # PLAN: agent delegation planning workflow
 
 - **Plan ID:** `20260803T111613Z-1cf94f-agent-delegation-planning-workflow`
-- **Статус:** awaiting_approval
+- **Статус:** completed
 - **Создан:** 2026-08-03 11:16:13 UTC
-- **Обновлён:** 2026-08-03 15:02 MSK
+- **Обновлён:** 2026-08-03 15:43 MSK
 - **Владелец:** Codex
 - **Workspace:** shared
-- **Ветка:** `codex/frontend-remaining-plans`
+- **Ветка:** `main`
 - **Режим параллельности:** exclusive
 - **Зависит от:** plan `20260802T164112Z-dfb164-production-live-wif-registry-evidence`.
 - **Блокирует:** plan `20260803T115527Z-a5636f-parallel-agent-worktree-orchestration`
@@ -67,30 +67,30 @@ read-only agents исследуют и проверяют, а все repository 
 
 ## Критерии приёмки
 
-- [ ] `AGENTS.md` и domain skills явно требуют planning agents для большой
+- [x] `AGENTS.md` и domain skills явно требуют planning agents для большой
       задачи, поэтому local Codex получает положительный delegation trigger, а
       не только разрешение вызвать агента.
-- [ ] Большая задача определяется по risk/independent workstreams, а не по
+- [x] Большая задача определяется по risk/independent workstreams, а не по
       длине Markdown; маленький plan обязан записать `not needed` с причиной.
-- [ ] Новый plan template содержит обязательный `Delegation strategy` с
+- [x] Новый plan template содержит обязательный `Delegation strategy` с
       classification, предварительными work packages, role/model/effort,
       scope, output, stop condition, root parallel work и фактическим evidence.
-- [ ] Workflow не содержит chicken-and-egg: initial context предшествует
+- [x] Workflow не содержит chicken-and-egg: initial context предшествует
       skeleton plan, агенты запускаются после предварительной delegation map,
       затем тот же draft уточняется до запроса approval.
-- [ ] Default routing использует root/Sol для synthesis и решений,
+- [x] Default routing использует root/Sol для synthesis и решений,
       Luna explorer для узкого bounded research и Terra reviewer для широкого
       cross-plan/cross-component review; escalation зависит от ambiguity/risk,
       а не от фиксированной доли токенов.
-- [ ] Agent profiles, project config и SessionStart reminder согласованы с
+- [x] Agent profiles, project config и SessionStart reminder согласованы с
       documented routing и ограничением `max_depth = 1`.
-- [ ] `DELEGATION_META` остаётся read-only и fail-closed с пустым write set;
+- [x] `DELEGATION_META` остаётся read-only и fail-closed с пустым write set;
       plan template при этом умеет помечать потенциальный write package как
       `root-only pending worktree orchestration`, не запуская writer.
-- [ ] Harness tests проверяют model/profile/config/template/reminder contract;
+- [x] Harness tests проверяют model/profile/config/template/reminder contract;
       canonical repository-workflow checks, plan-lint, preflight, text-check и
       diff review выполнены и записаны.
-- [ ] После изменения hooks/config/instructions подготовлен handoff checkpoint:
+- [x] После изменения hooks/config/instructions подготовлен handoff checkpoint:
       текущая session не заявляет новую policy активной; проверка выполняется в
       новой trusted session по SessionStart evidence.
 
@@ -240,23 +240,38 @@ read-only agents исследуют и проверяют, а все repository 
 - **Authority:** root принимает решения, вносит изменения, проверяет результат
   и закрывает plan.
 
+### Actual delegation evidence
+
+- **Config/hook audit — Luna explorer, completed:** подтвердил current profile,
+  SessionStart и test gaps; предложил Luna/high default, Terra/high reviewer и
+  strict-config proof. Root параллельно проектировал docs/template contract.
+- **Docs/skills audit — Luna explorer, completed:** сопоставил positive trigger,
+  skeleton-first lifecycle, package fields и bootstrap boundary во всех
+  инструкциях. Root параллельно готовил executable config/hook patch.
+- **Adversarial diff review — Terra reviewer, completed:** нашёл один P2 —
+  static tests не защищали trigger в `AGENTS.md` и четырёх skills. Root добавил
+  per-surface large/small assertions; follow-up reviewer подтвердил finding
+  закрытым без остаточных замечаний.
+- **Write evidence:** все delegated packages были `read-only` с
+  `write_set: []`; все repository edits выполнил root.
+
 ## План реализации
 
-1. [ ] Добавить `docs/agents/DELEGATION.md` с large/small criteria,
+1. [x] Добавить `docs/agents/DELEGATION.md` с large/small criteria,
        skeleton-plan-first sequence, model routing, escalation и готовым
        bounded `DELEGATION_META` примером.
-2. [ ] Обновить `AGENTS.md`, README/HARNESS и четыре domain skills так, чтобы
+2. [x] Обновить `AGENTS.md`, README/HARNESS и четыре domain skills так, чтобы
        large planning fan-out был явным требованием, а small path требовал
        записанной причины.
-3. [ ] Добавить `Delegation strategy` в template и уточнить plan lifecycle:
+3. [x] Добавить `Delegation strategy` в template и уточнить plan lifecycle:
        preliminary packages фиксируются до spawn, actual evidence — до approval.
-4. [ ] Настроить agent profiles/config: Luna для bounded explorer, Terra для
+4. [x] Настроить agent profiles/config: Luna для bounded explorer, Terra для
        broad reviewer, depth `1` и bounded read concurrency; worker profile и
        write policy остаются follow-up scope.
-5. [ ] Обновить SessionStart reminder и static configuration tests.
-6. [ ] Просмотреть diff, выполнить focused hooks tests, полный leinoctl suite,
+5. [x] Обновить SessionStart reminder и static configuration tests.
+6. [x] Просмотреть diff, выполнить focused hooks tests, полный leinoctl suite,
        plan-lint, canonical `verify --changed`, text-check и scope-check.
-7. [ ] Записать bootstrap limitation, завершить/archive/release plan и создать
+7. [x] Записать bootstrap limitation, завершить/archive/release plan и создать
        отдельный local commit; новую policy подтвердить новой trusted session.
 
 ## Оценка времени
@@ -267,16 +282,19 @@ read-only agents исследуют и проверяют, а все repository 
 
 ## Проверки
 
-- [ ] `node --test --test-isolation=none .codex/hooks/test/*.test.mjs`
-- [ ] `(cd tools/leinoctl && node --test)`
-- [ ] `node .codex/hooks/plan-lint.mjs`
-- [ ] `./leinoctl preflight`
-- [ ] `./leinoctl text-check --changed`
-- [ ] `./leinoctl verify --changed`
-- [ ] `./leinoctl scope-check --plan 20260803T111613Z-1cf94f-agent-delegation-planning-workflow`
-- [ ] `git diff --check` и scoped diff review
-- [ ] Новая trusted session сообщает `Munchkin harness is active` и новый
-      planning-delegation reminder; это post-commit handoff evidence.
+- [x] `node --test --test-isolation=none .codex/hooks/test/*.test.mjs` — 44/44.
+- [x] `(cd tools/leinoctl && node --test)` — 81/81.
+- [x] `node .codex/hooks/plan-lint.mjs` — `issues=0`.
+- [x] `./leinoctl preflight` — toolchain ready, включая pnpm `10.8.0`.
+- [x] `./leinoctl text-check --changed` — issues отсутствуют.
+- [x] `./leinoctl verify --changed` — repository-workflow checks успешны.
+- [x] `./leinoctl scope-check --plan 20260803T111613Z-1cf94f-agent-delegation-planning-workflow`
+      — outside/unledgered paths отсутствуют, required checks свежие.
+- [x] `git diff --check` и scoped diff review — clean; Terra review finding
+      закрыт и подтверждён follow-up review.
+- [x] Post-commit handoff checkpoint записан: только новая trusted session
+      должна сообщить `Munchkin harness is active` и новый planning-delegation
+      reminder; текущая session не считается activation evidence.
 
 ## Риски и откат
 
@@ -303,14 +321,17 @@ read-only agents исследуют и проверяют, а все repository 
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** approved
 - **Запрошено:** 2026-08-03 после read-only impact/conflict анализа
-- **Подтверждено:** —
+- **Подтверждено:** 2026-08-03 15:27 MSK, пользователь явно утвердил exact
+  plan ID и полную реализацию по lifecycle.
 - **Формулировка/ограничения пользователя:** отредактировать harness под новый
   workflow; task-specific agents заранее описывать в plan, permanent
   trigger/routing хранить в harness. После выделения отдельного worktree plan
   первый этап оставляет root единственным writer и не строит временный
-  cooperative механизм.
+  cooperative механизм. Для реализации разрешены адаптивные bounded read-only
+  сабагенты без формальной квоты; repository writes выполняет только root;
+  обязательны проверки, scope-check, archive и отдельный локальный commit.
 
 ## Ход выполнения
 
@@ -318,7 +339,22 @@ read-only agents исследуют и проверяют, а все repository 
   атомарно; product/harness implementation не начата.
 - Read-only context подтвердил repository-workflow impact, direct dependency и
   lint-clean registry; чужие active plans не изменялись.
+- Пользователь утвердил exact plan; session
+  `019fc743-f079-7d30-9756-e9aedfd5592e` выбрала его на clean source baseline.
+- Root реализовал permanent delegation contract, routing profiles/config,
+  SessionStart reminder и static regression coverage; write-сабагенты не
+  использовались.
+- Два bounded explorers и отдельный Terra reviewer выполнили read-only
+  packages. Единственный reviewer finding о coverage был исправлен и закрыт
+  повторной проверкой.
+- Canonical verify и scope-check завершились успешно; plan подготовлен к
+  guarded release и отдельному локальному commit без push.
 
 ## Итог
 
-Заполняется после реализации.
+Planning delegation теперь является явным harness contract: large plans
+создают skeleton и bounded packages до approval, small записывают `not needed`,
+root/Sol синтезирует решения, Luna/high исследует узкие вопросы, Terra/high
+проверяет цельный plan. Delegated writes остаются fail-closed и root-only до
+отдельного worktree-orchestration plan. Активация новых instructions/config
+должна быть подтверждена только новой trusted session после commit.

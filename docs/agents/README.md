@@ -21,6 +21,7 @@ git status --short
 | `INFRASTRUCTURE_ROADMAP.md` | Production deployment, observability, recovery и конкурсный backlog |
 | `../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md` | Owner prerequisites до первого Yandex Cloud/Terraform implementation plan |
 | `HARNESS.md` | Hooks, selected plan, ledger, CI |
+| `DELEGATION.md` | Large/small criteria, planning packages и model routing |
 | `PROJECT_MEMORY.md` | Подтверждённые устойчивые ловушки |
 | `plans/README.md` | Plan lifecycle и manifests |
 | `decisions/` | Принятые сквозные решения |

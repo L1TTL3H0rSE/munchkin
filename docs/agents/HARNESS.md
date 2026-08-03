@@ -44,6 +44,21 @@ Selection разрешает только active `approved|in_progress` plan б�
 получает lifecycle ownership и сохраняет repository identity, session ID,
 root HEAD (включая unborn `null`), status/fingerprints и ledger.
 
+## Planning delegation
+
+До approval действует skeleton-plan-first workflow из
+[`DELEGATION.md`](DELEGATION.md). Large определяется риском и несколькими
+независимыми workstreams, а не объёмом текста: root фиксирует read-only
+packages до spawn, Luna explorers собирают bounded evidence, root синтезирует
+решения, а Terra reviewer adversarially проверяет цельный draft. Small plan
+обязан записать `not needed` с конкретной причиной.
+
+Каждый package задаёт scope, output, stop condition, bounded history,
+`root_parallel_work`, ожидаемую экономию и `write_set: []`. Routing зависит от
+ambiguity/risk, без фиксированной квоты агентов или токенов. Потенциальная
+запись маркируется `root-only pending worktree orchestration`; до отдельного
+worktree plan все repository writes выполняет root.
+
 Повторный select того же ID идемпотентен. Пока plan выбран, прямой select
 другого ID запрещён. Draft ownership без selected plan передаётся через
 `plan release`/`plan claim`; `--takeover` используется только после проверки,

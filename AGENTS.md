@@ -129,10 +129,20 @@ presentation content.
 
 ## Делегирование
 
+До approval каждый plan заполняет `Delegation strategy` по
+[`docs/agents/DELEGATION.md`](docs/agents/DELEGATION.md). Large задача по
+risk/independent-workstream критериям обязана использовать planning agents:
+root создаёт skeleton plan, заранее описывает bounded read-only packages,
+запускает explorers, синтезирует evidence и отдаёт цельный draft отдельному
+reviewer. Small задача записывает `not needed` и конкретную причину; длина
+Markdown не является критерием.
+
 Сабагент получает ограниченную независимую read-only задачу, пока root делает
 другую полезную работу. Первая строка содержит `DELEGATION_META`, history
 bounded, роль `explorer`/`reviewer`, пустой write set и stop condition.
-Write-сабагенты в общем worktree запрещены.
+Возможный write package помечается `root-only pending worktree orchestration`:
+до отдельного worktree plan все repository writes выполняет root, а
+write-сабагенты в общем worktree запрещены.
 
 ## Где хранить знания
 

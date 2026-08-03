@@ -29,7 +29,11 @@ try {
     "Before repository writes, run leinoctl plan select <plan-id>; hooks enforce only that selected plan.",
     "Use leinoctl context --paths <paths> to load impacted components and relevant plans.",
     "Read repository text as strict UTF-8; use rg or Get-Content -Raw -Encoding utf8.",
-    "Docker Compose requires --parallel >= 4. Agent delegation requires DELEGATION_META.",
+    "Classify plan delegation before approval: large requires bounded explorers plus adversarial review; small records not needed with a reason.",
+    "Default planning routing: root/Sol synthesizes, Luna explorer researches bounded questions, Terra reviewer checks the whole plan; escalate on ambiguity or risk.",
+    "Use docs/agents/DELEGATION.md and DELEGATION_META; delegated writes remain root-only pending worktree orchestration.",
+    "After harness changes, only a new trusted session proves the updated planning policy is active.",
+    "Docker Compose requires --parallel >= 4.",
     `Active plans: ${active.join(", ") || "none"}.`,
     `Selected plan: ${selected?.planId ?? "none"}.`,
     issues.length

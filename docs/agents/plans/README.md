@@ -60,18 +60,23 @@ material scope change: очередь останавливается и треб
 ## Lifecycle
 
 1. Read-only research + `./leinoctl context --paths ...`.
-2. `plan create`.
-3. Заполнить criteria/scope/architecture/checks/risks/dependencies/write set.
-4. `node .codex/hooks/plan-lint.mjs`.
-5. Показать точный ID и получить явное approval.
-6. Записать формулировку, поставить `approved|in_progress`.
-7. `./leinoctl plan select <plan-id>`.
-8. Выполнить только выбранный plan.
-9. При material scope/risk/contract change повторно согласовать.
-10. Выполнить `verify`/recorded ledger и `scope-check`, затем поставить
+2. `plan create` и заполнить skeleton: manifest, preliminary scope/non-goals,
+   risks, dependencies, write set, shared resources и `Delegation strategy`.
+3. Классифицировать задачу по `DELEGATION.md`. Для large до spawn записать
+   bounded read-only work packages; для small записать `not needed` и причину.
+4. Выполнить planning packages, синтезировать evidence в тот же draft и дать
+   цельный large plan отдельному adversarial reviewer.
+5. Завершить criteria/scope/architecture/checks/risks и actual delegation
+   evidence, затем выполнить `node .codex/hooks/plan-lint.mjs`.
+6. Показать точный ID и получить явное approval.
+7. Записать формулировку, поставить `approved|in_progress`.
+8. `./leinoctl plan select <plan-id>`.
+9. Выполнить только выбранный plan.
+10. При material scope/risk/contract change повторно согласовать.
+11. Выполнить `verify`/recorded ledger и `scope-check`, затем поставить
     `completed` и переместить тот же файл в archive.
-11. Выполнить `plan release <plan-id> --session <session-id>`.
-12. Создать отдельный local commit; push выполнять только при явном
+12. Выполнить `plan release <plan-id> --session <session-id>`.
+13. Создать отдельный local commit; push выполнять только при явном
     разрешении пользователя.
 
 Статусы: `draft`, `awaiting_approval`, `approved`, `in_progress`, `blocked`,
