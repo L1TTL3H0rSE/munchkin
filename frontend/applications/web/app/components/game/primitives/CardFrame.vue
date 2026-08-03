@@ -4,10 +4,12 @@ import CardArtPlaceholder from "./CardArtPlaceholder.vue";
 
 withDefaults(defineProps<{
   deck: CardView["deck"];
+  kind?: CardView["kind"];
   compact?: boolean;
   ariaLabel?: string;
 }>(), {
   compact: false,
+  kind: undefined,
   ariaLabel: undefined,
 });
 </script>
@@ -17,6 +19,7 @@ withDefaults(defineProps<{
     class="card-frame"
     :class="{'card-frame--compact': compact}"
     :data-deck="deck"
+    :data-kind="kind"
     :aria-label="ariaLabel"
   >
     <header v-if="$slots.header" class="card-frame__header">
@@ -81,13 +84,45 @@ withDefaults(defineProps<{
   --card-accent-deep: #874d33;
 }
 
+.card-frame[data-kind="monster"] {
+  --card-accent: var(--color-action-primary);
+  --card-accent-deep: #7a2f21;
+}
+
+.card-frame[data-kind="curse"] {
+  --card-accent: var(--color-action-response);
+  --card-accent-deep: #563f75;
+}
+
 .card-frame__header,
 .card-frame__content,
 .card-frame__footer {
   min-width: 0;
 }
 
+.card-frame__header {
+  grid-row: 1;
+}
+
 .card-frame__art {
+  grid-row: 2;
+}
+
+.card-frame__content {
+  grid-row: 3;
+}
+
+.card-frame__footer {
+  grid-row: 4;
+}
+
+.card-frame__content {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.card-frame__art {
+  position: relative;
   min-width: 0;
   min-height: 0;
   aspect-ratio: 2 / 2.35;

@@ -86,7 +86,7 @@ const mobileVisualCases: readonly [
   ["mobile-setup", "Preparation", "single-setup"],
   ["mobile-door", "DoorReady", figmaStateMatrix.DoorReady.fixtureID],
   ["mobile-combat-one", "PostDoorChoice", figmaStateMatrix.PostDoorChoice.fixtureID],
-  ["mobile-combat-multiple", "RunAwayNextMonster", figmaStateMatrix.RunAwayNextMonster.fixtureID],
+  ["mobile-combat-multiple", "ActiveTurn", figmaStateMatrix.ActiveTurn.fixtureID],
   ["mobile-reward", "RewardReceived", figmaStateMatrix.RewardReceived.fixtureID],
   ["mobile-run-away", "RunAwayChoice", figmaStateMatrix.RunAwayChoice.fixtureID],
   ["mobile-waiting", "Waiting", figmaStateMatrix.Waiting.fixtureID],

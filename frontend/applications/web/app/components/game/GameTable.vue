@@ -23,6 +23,8 @@ import {
 } from "../actionModel";
 import DesktopGameTable from "./desktop/DesktopGameTable.vue";
 import MobileGameTable from "./mobile/MobileGameTable.vue";
+import {buildGamePresentationModel} from "./gamePresentationModel";
+import SheetDialog from "../ui/SheetDialog.vue";
 import {
   uniqueCards,
   visibleCardsForProjection,
@@ -45,9 +47,29 @@ const emit = defineEmits<{
 
 const pendingCardIDs = ref<Set<string>>(new Set());
 const confirmedCardIDs = ref<Set<string>>(new Set());
+const compactPresenter = ref(false);
+const strengthOpen = ref(false);
 let confirmedMotionTimer: ReturnType<typeof setTimeout> | undefined;
+let compactMediaQuery: MediaQueryList | undefined;
+
+function syncPresenter(event?: MediaQueryListEvent): void {
+  compactPresenter.value = event?.matches ?? compactMediaQuery?.matches ?? false;
+}
+
+onMounted(() => {
+  compactMediaQuery = window.matchMedia("(width <= 599px)");
+  syncPresenter();
+  compactMediaQuery.addEventListener("change", syncPresenter);
+});
 
 const presentation = useGamePresentation(() => props.projection);
+const presentationModel = computed(() => buildGamePresentationModel(props.projection));
+
+watch(() => presentationModel.value.primary.kind, (kind) => {
+  if (["door-choice", "run-away", "result", "required-decision"].includes(kind)) {
+    strengthOpen.value = false;
+  }
+});
 
 const ownCards = computed(() => uniqueCards([
   ...props.projection.you.hand,
@@ -77,8 +99,6 @@ const genericActionEntries = computed<ActionEntry[]>(() =>
 const cardActionMap = computed(() =>
   mapCardActions(ownCards.value, genericActionEntries.value),
 );
-
-const hasActionableHand = computed(() => cardActionMap.value.byCard.size > 0);
 
 const {
   selectedCardID,
@@ -190,6 +210,7 @@ watch(() => props.actionBusy, (busy) => {
 });
 
 onBeforeUnmount(() => {
+  compactMediaQuery?.removeEventListener("change", syncPresenter);
   if (confirmedMotionTimer) {
     clearTimeout(confirmedMotionTimer);
   }
@@ -198,13 +219,18 @@ onBeforeUnmount(() => {
 
 <template>
   <section
+    v-if="!projection.you.dead"
     class="game-table"
+    tabindex="-1"
     :aria-busy="isBusy"
     :data-state="projection.status"
+    :data-presenter="compactPresenter ? 'compact' : 'desktop'"
   >
-    <div class="game-table__desktop">
+    <div v-if="!compactPresenter" class="game-table__desktop">
       <DesktopGameTable
         :projection="projection"
+        :presentation-model="presentationModel"
+        :strength-open="strengthOpen"
         :connection-state="connectionState"
         :error-kind="errorKind"
         :error-message="errorMessage"
@@ -223,11 +249,15 @@ onBeforeUnmount(() => {
         @execute-economy="emit('execute-economy', $event)"
         @activate="activateCard"
         @close="closeCardActions"
+        @open-strength="strengthOpen = true"
       />
     </div>
 
     <MobileGameTable
+      v-else
       :projection="projection"
+      :presentation-model="presentationModel"
+      :strength-open="strengthOpen"
       :connection-state="connectionState"
       :error-kind="errorKind"
       :error-message="errorMessage"
@@ -238,7 +268,7 @@ onBeforeUnmount(() => {
       :visible-cards="visibleCards"
       :player-names="playerNames"
       :context-card-name="selectedCard?.name"
-      :has-actionable-hand="hasActionableHand"
+      :has-hand="projection.you.hand.length > 0"
       :bindings-for-card="cardBindings"
       :state-for-card="cardState"
       :confirmed-card-ids="confirmedCardIDs"
@@ -247,7 +277,28 @@ onBeforeUnmount(() => {
       @execute-economy="emit('execute-economy', $event)"
       @activate="activateCard"
       @close="closeCardActions"
+      @open-strength="strengthOpen = true"
     />
+
+    <SheetDialog
+      :open="strengthOpen"
+      title="Разбор подтверждённой силы"
+      title-id="game-strength-title"
+      data-figma-node="271:3010"
+      description="Итоговые значения берутся только из actor-specific server projection."
+      @close="strengthOpen = false"
+    >
+      <dl class="game-strength-sheet">
+        <div>
+          <dt>Игрок</dt>
+          <dd>{{ projection.turn.combat?.player_strength ?? projection.you.combat_strength }}</dd>
+        </div>
+        <div>
+          <dt>Встреча</dt>
+          <dd>{{ projection.turn.combat?.monster_strength ?? "Нет открытого боя" }}</dd>
+        </div>
+      </dl>
+    </SheetDialog>
   </section>
 </template>
 
@@ -312,6 +363,30 @@ onBeforeUnmount(() => {
   display: block;
   padding: .8rem;
   color: var(--acid);
+}
+
+.game-strength-sheet {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.game-strength-sheet > div {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
+}
+
+.game-strength-sheet dt {
+  color: var(--color-text-muted);
+  font-size: .7rem;
+  text-transform: uppercase;
+}
+
+.game-strength-sheet dd {
+  margin: var(--space-1) 0 0;
+  font-weight: 800;
 }
 
 @media (width <= 767px) {

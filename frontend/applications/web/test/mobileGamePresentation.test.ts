@@ -2,11 +2,11 @@ import {describe, expect, it} from "vitest";
 
 import {buildGamePresentation} from "../app/composables/useGamePresentation";
 import {
+  encounterCards,
+  gameStateFamily,
   hasActionableDeadline,
-  mobileEncounterCards,
-  mobileOpponentStatus,
-  mobileStateFamily,
-} from "../app/components/game/mobile/mobileGameModel";
+  opponentStatus,
+} from "../app/components/game/gamePresentationModel";
 import {fixtureAdapter} from "./fixtures/fixtureAdapter";
 
 describe("mobile game presentation", () => {
@@ -18,11 +18,11 @@ describe("mobile game presentation", () => {
     ["single-run-away", "run-away"],
     ["single-charity", "charity"],
     ["single-finished", "finished"],
-    ["stale-projection", "preparation"],
+    ["stale-projection", "combat"],
   ] as const)("maps %s to the named mobile state family", (fixtureID, family) => {
     const projection = fixtureAdapter.getProjection(fixtureID);
 
-    expect(mobileStateFamily(projection)).toBe(family);
+    expect(gameStateFamily(projection)).toBe(family);
   });
 
   it("keeps authoritative actions and combat totals from the projection", () => {
@@ -44,7 +44,7 @@ describe("mobile game presentation", () => {
 
   it("shows every public combat card without inventing a second total", () => {
     const projection = fixtureAdapter.getProjection("advanced-combat");
-    const cards = mobileEncounterCards(projection);
+    const cards = encounterCards(projection);
 
     expect(cards.map((card) => card.instance_id)).toEqual([
       "encounter-monster",
@@ -60,7 +60,7 @@ describe("mobile game presentation", () => {
     expect(opponent).toBeDefined();
     expect(opponent?.hand_count).toBeGreaterThan(0);
     expect(Object.hasOwn(opponent ?? {}, "hand")).toBe(false);
-    expect(mobileOpponentStatus(projection, opponent!)).toBe("ready");
+    expect(opponentStatus(projection, opponent!)).toBe("ready");
   });
 
   it("only marks a server-projected response window as actionable deadline", () => {

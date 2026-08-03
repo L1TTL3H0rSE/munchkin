@@ -82,25 +82,12 @@
   min-width: 0;
 }
 
-.lobby-page__eyebrow {
-  margin: 0;
-  color: var(--color-accent-strong);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .12em;
-}
-
 .lobby-page h1 {
   max-width: 12ch;
   margin: 0;
   color: var(--color-text-primary);
   font-size: clamp(2.2rem, 5vw, 3.25rem);
   line-height: 1.04;
-}
-
-.lobby-page h1 em {
-  color: var(--color-action-response);
-  font-style: normal;
 }
 
 .lobby-page__lede {
@@ -296,7 +283,7 @@
   .lobby-page__inner {
     width: min(1024px, 100%);
     min-height: calc(100dvh - 64px);
-    grid-template-columns: 520px 480px;
+    grid-template-columns: minmax(0, 520px) minmax(400px, 480px);
     align-items: center;
     justify-content: center;
     column-gap: 24px;
@@ -325,7 +312,7 @@
 
   .lobby-entry {
     position: relative;
-    width: 480px;
+    width: 100%;
     min-height: 560px;
     justify-self: center;
     gap: 24px;

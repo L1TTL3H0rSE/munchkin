@@ -16,10 +16,12 @@ const props = withDefaults(defineProps<{
   entries: ActionEntry[];
   cards: CardView[];
   playerNames?: Record<string, string>;
+  labelOverrides?: Record<string, string>;
   busy: boolean;
   contextCardName?: string;
 }>(), {
   playerNames: () => ({}),
+  labelOverrides: () => ({}),
   contextCardName: "",
 });
 
@@ -40,6 +42,9 @@ watch(
 const cardNames = computed(() => new Map(
   props.cards.map((card) => [card.instance_id, card.name]),
 ));
+function entryLabel(entry: ActionEntry): string {
+  return props.labelOverrides[entry.action.type] ?? actionLabel(entry.action);
+}
 const panelEyebrow = computed(() =>
   props.entries.length === 1 && !props.contextCardName
     ? "ДОСТУПНОЕ ДЕЙСТВИЕ"
@@ -51,7 +56,7 @@ const panelTitle = computed(() => {
   }
   const [entry] = props.entries;
   return props.entries.length === 1 && entry
-    ? `Можно ${actionLabel(entry.action).toLocaleLowerCase("ru-RU")}`
+    ? `Можно ${entryLabel(entry).toLocaleLowerCase("ru-RU")}`
     : "Что можно сделать";
 });
 const panelHint = computed(() => {
@@ -167,7 +172,7 @@ function isPlayerTarget(action: ActionDescriptor, targetID: string) {
         class="action-choice"
         :data-state="busy ? 'pending' : 'available'"
       >
-        <strong>{{ actionLabel(entry.action) }}</strong>
+        <strong>{{ entryLabel(entry) }}</strong>
         <small v-if="entry.action.source_instance_id" class="action-choice__source">
           Источник: {{ optionLabel(entry.action.source_instance_id) }}
         </small>
@@ -220,7 +225,7 @@ function isPlayerTarget(action: ActionDescriptor, targetID: string) {
           :disabled="busy || !valid(entry)"
           @click="submit(entry)"
         >
-          {{ busy ? "Отправляем…" : actionLabel(entry.action) }}
+          {{ busy ? "Отправляем…" : entryLabel(entry) }}
         </button>
       </article>
     </div>

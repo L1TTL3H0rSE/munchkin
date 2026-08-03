@@ -17,16 +17,17 @@ import type {
 } from "../../interaction/economyModel";
 import ActionPanel from "../../ActionPanel.vue";
 import GameConnectionStatus from "../../GameConnectionStatus.vue";
-import EconomySurface from "../../interaction/EconomySurface.vue";
 import GameCard from "../../GameCard.vue";
 import DesktopEncounterStage from "./DesktopEncounterStage.vue";
 import DesktopGameHeader from "./DesktopGameHeader.vue";
-import {desktopStateFamily} from "./desktopGameModel";
+import type {GamePresentationModel} from "../gamePresentationModel";
 import OpponentRoster from "../OpponentRoster.vue";
 import OwnBoard from "../OwnBoard.vue";
 
 const props = defineProps<{
   projection: Projection;
+  presentationModel: GamePresentationModel;
+  strengthOpen: boolean;
   connectionState: GameConnectionState;
   errorKind: GameApiErrorKind | null;
   errorMessage: string;
@@ -42,18 +43,12 @@ const props = defineProps<{
   confirmedCardIds: ReadonlySet<string>;
 }>();
 
-const stateFamily = computed(() => desktopStateFamily(props.projection));
 const availableHandCount = computed(() => props.projection.you.hand.filter((card) =>
   props.bindingsForCard(card.instance_id).length > 0 && props.stateForCard(card.instance_id) !== "disabled",
 ).length);
 const showActionDock = computed(() =>
   props.actionPanelEntries.length > 0 || Boolean(props.contextCardName),
 );
-const winner = computed(() => {
-  const participants = [props.projection.you, ...props.projection.players];
-  return participants.find((player) => player.player_id === props.projection.winner_player_id)
-    ?? props.projection.you;
-});
 const viewerWon = computed(() => props.projection.winner_player_id === props.projection.you.player_id);
 
 const emit = defineEmits<{
@@ -62,6 +57,7 @@ const emit = defineEmits<{
   "execute-economy": [request: EconomySubmission];
   activate: [binding: CardActionBinding];
   close: [];
+  "open-strength": [];
 }>();
 
 function runAction(entry: ActionEntry, payload: CommandPayload) {
@@ -72,7 +68,8 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
 <template>
   <section
     class="desktop-game-table"
-    :data-state-family="stateFamily"
+    :data-state-family="presentationModel.family"
+    :data-figma-node="presentationModel.desktopNodeID"
     :data-phase="projection.turn.phase || 'waiting'"
     :data-state="projection.status"
     :aria-busy="isBusy"
@@ -80,6 +77,7 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
   >
     <DesktopGameHeader
       :projection="projection"
+      :presentation-model="presentationModel"
       :connection-state="connectionState"
       :finished="projection.status === 'finished'"
       :victory="viewerWon"
@@ -99,14 +97,14 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
 
     <div class="desktop-game-table__main">
       <div class="desktop-game-table__center">
-        <DesktopEncounterStage :projection="projection" />
+        <DesktopEncounterStage
+          :projection="projection"
+          :presentation-model="presentationModel"
+        />
 
         <section class="desktop-hand-tray" aria-labelledby="desktop-hand-title">
           <header class="desktop-hand-tray__header">
-            <div>
-              <p class="eyebrow">ТВОЯ РУКА</p>
-              <h2 id="desktop-hand-title">Карты игрока · {{ projection.you.hand.length }}</h2>
-            </div>
+            <p id="desktop-hand-title" class="eyebrow">РУКА · {{ projection.you.hand.length }}</p>
             <span>{{ availableHandCount }} {{ availableHandCount === 1 ? "карта доступна" : "карты доступны" }} сейчас</span>
           </header>
           <div
@@ -121,6 +119,7 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
               :key="`desktop-hand-${card.instance_id}`"
               :card="card"
               :content-set-id="projection.content_set_id"
+              choice
               compact
               :action-bindings="bindingsForCard(card.instance_id)"
               :action-state="stateForCard(card.instance_id)"
@@ -134,61 +133,27 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
       </div>
 
       <aside class="desktop-game-table__side" aria-label="Сводка игрока и контекстные действия">
-        <section
-          v-if="projection.status === 'finished'"
-          class="desktop-victory-summary"
-          aria-labelledby="desktop-victory-summary-title"
-        >
-          <p id="desktop-victory-summary-title" class="eyebrow">
-            {{ viewerWon ? "ИТОГ ПАРТИИ" : "АРХИВ ПАРТИИ" }}
-          </p>
-          <div class="desktop-victory-summary__card">
-            <p class="eyebrow">{{ viewerWon ? "ИТОГ ПАРТИИ" : "АРХИВ ПАРТИИ" }}</p>
-            <h2>{{ viewerWon ? `1 место · ${winner.name}` : "Итоги сохранены" }}</h2>
-            <p>Победитель: {{ winner.name }}</p>
-            <p>Уровень {{ winner.level }}</p>
-          </div>
-        </section>
-
         <OwnBoard
           :projection="projection"
+          :presentation-model="presentationModel"
           :bindings-for-card="bindingsForCard"
           :state-for-card="stateForCard"
           :confirmed-card-ids="confirmedCardIds"
           @activate="emit('activate', $event)"
+          @open-strength="emit('open-strength')"
         />
 
         <section
-          v-if="projection.status === 'finished'"
-          class="desktop-victory-actions"
-          aria-labelledby="desktop-victory-actions-title"
-        >
-          <p class="eyebrow">ИТОГИ</p>
-          <h2 id="desktop-victory-actions-title">
-            {{ viewerWon ? "Посмотреть результаты" : "Посмотреть таблицу" }}
-          </h2>
-          <p>История партии сохранена сервером и доступна только для чтения.</p>
-          <NuxtLink to="/">Вернуться в лобби</NuxtLink>
-        </section>
-
-        <section
-          v-else-if="economyEntries.length || showActionDock"
+          v-if="projection.status !== 'finished' && showActionDock"
           class="desktop-game-table__actions"
           aria-label="Контекстные действия текущей проекции"
         >
-          <EconomySurface
-            v-if="economyEntries.length"
-            :projection="projection"
-            :actions="economyEntries"
-            :busy="actionBusy"
-            @submit="emit('execute-economy', $event)"
-          />
-
           <ActionPanel
             v-if="showActionDock"
             :entries="actionPanelEntries"
             :cards="visibleCards"
             :player-names="playerNames"
+            :label-overrides="{open_door: 'Открыть дверь', end_turn: 'Продолжить'}"
             :busy="actionBusy"
             :context-card-name="contextCardName"
             @close="emit('close')"
@@ -229,7 +194,7 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
 .desktop-game-table__main {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 768px) minmax(0, 360px);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
   align-items: start;
   gap: 16px;
 }
@@ -259,10 +224,10 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 14px;
   overflow: hidden;
   border-radius: var(--radius-panel);
-  padding: 14px 16px 12px;
+  padding: 18px 20px 14px;
   color: #fff9ef;
   background: var(--color-surface-inverse);
 }
@@ -276,7 +241,6 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
 }
 
 .desktop-hand-tray__header p,
-.desktop-hand-tray__header h2,
 .desktop-hand-tray__header span {
   margin: 0;
 }
@@ -284,12 +248,6 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
 .desktop-hand-tray__header .eyebrow {
   color: #b9d8cc;
   font-size: .58rem;
-}
-
-.desktop-hand-tray__header h2 {
-  margin-top: 3px;
-  font-size: .8rem;
-  letter-spacing: .03em;
 }
 
 .desktop-hand-tray__header > span {
@@ -303,10 +261,11 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
   min-height: 0;
   display: flex;
   align-items: stretch;
-  gap: 10px;
+  justify-content: safe center;
+  gap: 16px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 2px 2px 4px;
+  padding: 0;
   scrollbar-color: #756659 transparent;
 }
 
@@ -360,91 +319,12 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
   color: var(--color-accent-strong);
 }
 
-.desktop-victory-summary {
-  min-width: 0;
-  display: grid;
-  gap: var(--space-3);
-}
-
-.desktop-victory-summary > .eyebrow,
-.desktop-victory-summary__card p,
-.desktop-victory-summary__card h2 {
-  margin: 0;
-}
-
-.desktop-victory-summary__card {
-  min-width: 0;
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-panel);
-  padding: 16px;
-  color: var(--color-text-primary);
-  background: var(--color-surface-control);
-}
-
-.desktop-victory-summary__card h2 {
-  margin-top: 8px;
-  overflow-wrap: anywhere;
-  font-size: 1.1rem;
-}
-
-.desktop-victory-summary__card p:not(.eyebrow) {
-  color: var(--color-text-secondary);
-  font-size: .72rem;
-}
-
-.desktop-victory-actions {
-  min-width: 0;
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-panel);
-  padding: 16px;
-  color: var(--color-text-primary);
-  background: var(--color-surface-control);
-}
-
-.desktop-victory-actions .eyebrow,
-.desktop-victory-actions h2,
-.desktop-victory-actions p {
-  margin: 0;
-}
-
-.desktop-victory-actions h2 {
-  margin-top: 10px;
-  font-size: .92rem;
-}
-
-.desktop-victory-actions p {
-  color: var(--color-text-secondary);
-  font-size: .68rem;
-  line-height: 1.4;
-}
-
-.desktop-victory-actions a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 52px;
-  margin-top: auto;
-  border-radius: var(--radius-control);
-  padding: .65rem 1rem;
-  color: #fff9ef;
-  background: var(--color-action-primary);
-  font-weight: 800;
-  text-decoration: none;
-}
-
 @media (width >= 1024px) {
   .desktop-game-table {
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-    grid-template-columns: 248px minmax(0, 768px) 360px;
-    grid-template-rows: 56px minmax(0, 1fr);
+    min-height: 868px;
+    overflow: visible;
+    grid-template-columns: clamp(200px, 18vw, 248px) minmax(0, 1fr) clamp(280px, 25vw, 360px);
+    grid-template-rows: 56px minmax(796px, auto);
     column-gap: 16px;
     row-gap: 16px;
   }
@@ -461,44 +341,25 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
 
   .desktop-game-table > .desktop-game-table__main {
     min-height: 0;
-    height: 100%;
+    align-self: stretch;
     grid-column: 2 / -1;
     grid-row: 2;
   }
 
   .desktop-game-table__main > .desktop-game-table__center {
     min-height: 0;
-    height: 100%;
+    align-self: stretch;
     grid-column: 1;
     grid-row: 1;
   }
 
   .desktop-game-table__main > .desktop-game-table__side {
     min-height: 0;
-    height: 100%;
+    align-self: stretch;
     grid-column: 2;
     grid-row: 1;
   }
 
-  .desktop-game-table[data-state="finished"] .desktop-game-table__side {
-    gap: 16px;
-  }
-
-  .desktop-game-table[data-state="finished"] .desktop-victory-summary {
-    min-height: 332px;
-    grid-template-rows: auto 236px;
-    gap: 64px;
-  }
-
-  .desktop-game-table[data-state="finished"] .desktop-victory-summary__card {
-    height: 236px;
-    box-sizing: border-box;
-  }
-
-  .desktop-game-table[data-state="finished"] .desktop-victory-actions {
-    min-height: 204px;
-    margin-top: 8px;
-  }
 }
 
 @media (width <= 1023px) {

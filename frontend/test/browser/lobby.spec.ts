@@ -207,6 +207,42 @@ test("selected lobby mode controls the compact entry form", async ({page}) => {
   await expect(page.locator(".lobby-form--join")).toBeVisible();
 });
 
+for (const viewport of [{width: 360, height: 640}, {width: 1024, height: 768}, {width: 1440, height: 900}]) {
+  test(`lobby copy and regions match the selected flow at ${viewport.width}px`, async ({page}) => {
+    await page.setViewportSize(viewport);
+    await openLobby(page);
+    const heading = page.locator("#lobby-page-title");
+    await expect(heading).toHaveText("Собери друзей.Начни игру.");
+    await expect(page.locator(".lobby-page__eyebrow")).toHaveCount(0);
+    await expect(heading.locator("em, strong")).toHaveCount(0);
+    await expect(page.locator(".lobby-entry__header")).toContainText(
+      "Создай новую комнату или войди по приглашению.",
+    );
+
+    for (const region of [page.locator(".lobby-page__hero"), page.locator(".lobby-entry")]) {
+      const box = await region.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+    }
+    await assertNoRootOverflow(page);
+  });
+}
+
+test("compact lobby keeps the focused field above the visual keyboard viewport", async ({page}) => {
+  await page.setViewportSize({width: 360, height: 640});
+  await openLobby(page);
+  const input = page.locator(".lobby-form--create input[autocomplete='nickname']");
+  await input.focus();
+  await expect(input).toBeFocused();
+  const visible = await input.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    return box.top >= 0 && box.bottom <= (viewport?.height ?? window.innerHeight);
+  });
+  expect(visible).toBe(true);
+});
+
 test("lobby has no serious or critical axe violations", async ({page}) => {
   await openLobby(page);
   const results = await new AxeBuilder({page})

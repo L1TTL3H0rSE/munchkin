@@ -34,7 +34,7 @@ test("invited helper sees party terms while observer sees an opaque window", asy
   await openFixture(page, "helper-observer");
   await expect(page.locator(".interaction-helper-form")).toHaveCount(0);
   await expect(page.locator(".interaction-helper-summary")).toHaveCount(0);
-  await expect(page.locator(".interaction-dialog")).toContainText(
+  await expect(page.locator("dialog[data-figma-owner='interaction-sheet'][open]")).toContainText(
     "нет действия для этого игрока",
   );
 });

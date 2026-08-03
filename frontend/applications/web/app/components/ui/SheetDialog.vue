@@ -1,6 +1,10 @@
-<script setup lang="ts">
-import {nextTick, onMounted, ref, watch} from "vue";
+<script lang="ts">
+import {computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch} from "vue";
 
+let activeSheetDialog: HTMLDialogElement | null = null;
+</script>
+
+<script setup lang="ts">
 const props = withDefaults(defineProps<{
   open: boolean;
   title: string;
@@ -10,7 +14,7 @@ const props = withDefaults(defineProps<{
   closeLabel?: string;
 }>(), {
   description: "",
-  titleID: "sheet-dialog-title",
+  titleID: "",
   dismissible: true,
   closeLabel: "Закрыть",
 });
@@ -21,13 +25,26 @@ const emit = defineEmits<{
 }>();
 
 const dialog = ref<HTMLDialogElement | null>(null);
+const generatedTitleID = `sheet-dialog-title-${useId()}`;
+const resolvedTitleID = computed(() => props.titleID || generatedTitleID);
+let opener: HTMLElement | null = null;
+let fallbackFocusTarget: HTMLElement | null = null;
 
 function syncDialog(open: boolean) {
   if (!dialog.value) {
     return;
   }
   if (open && !dialog.value.open) {
+    if (activeSheetDialog && activeSheetDialog !== dialog.value) {
+      activeSheetDialog.close();
+    }
+    opener = document.activeElement instanceof HTMLElement
+      && document.activeElement !== document.body
+      ? document.activeElement
+      : null;
+    fallbackFocusTarget = dialog.value.closest<HTMLElement>(".game-table");
     dialog.value.showModal();
+    activeSheetDialog = dialog.value;
     emit("opened");
     void nextTick(() => {
       dialog.value?.querySelector<HTMLElement>("[data-dialog-autofocus]")?.focus();
@@ -59,6 +76,20 @@ function handleBackdropClick(event: MouseEvent) {
 }
 
 function handleNativeClose() {
+  const returnTarget = opener;
+  const fallbackTarget = fallbackFocusTarget;
+  opener = null;
+  fallbackFocusTarget = null;
+  if (activeSheetDialog === dialog.value) {
+    activeSheetDialog = null;
+  }
+  void nextTick(() => {
+    if (returnTarget?.isConnected) {
+      returnTarget.focus();
+    } else if (fallbackTarget?.isConnected) {
+      fallbackTarget.focus();
+    }
+  });
   if (props.open) {
     emit("close");
   }
@@ -67,14 +98,23 @@ function handleNativeClose() {
 watch(() => props.open, syncDialog);
 
 onMounted(() => syncDialog(props.open));
+
+onBeforeUnmount(() => {
+  const returnTarget = opener;
+  opener = null;
+  if (activeSheetDialog === dialog.value) {
+    activeSheetDialog = null;
+  }
+  void nextTick(() => returnTarget?.isConnected && returnTarget.focus());
+});
 </script>
 
 <template>
   <dialog
     ref="dialog"
     class="sheet-dialog"
-    :aria-labelledby="titleID"
-    :aria-describedby="description ? `${titleID}-description` : undefined"
+    :aria-labelledby="resolvedTitleID"
+    :aria-describedby="description ? `${resolvedTitleID}-description` : undefined"
     aria-modal="true"
     @cancel="handleCancel"
     @close="handleNativeClose"
@@ -83,8 +123,8 @@ onMounted(() => syncDialog(props.open));
     <form class="sheet-dialog__surface" method="dialog" @click.stop>
       <header class="sheet-dialog__header">
         <div>
-          <h2 :id="titleID">{{ title }}</h2>
-          <p v-if="description" :id="`${titleID}-description`">
+          <h2 :id="resolvedTitleID" tabindex="-1" data-dialog-autofocus>{{ title }}</h2>
+          <p v-if="description" :id="`${resolvedTitleID}-description`">
             {{ description }}
           </p>
         </div>
@@ -93,7 +133,6 @@ onMounted(() => syncDialog(props.open));
           class="sheet-dialog__close"
           type="button"
           :aria-label="closeLabel"
-          data-dialog-autofocus
           @click="requestClose"
         >
           {{ closeLabel }}
@@ -152,6 +191,10 @@ onMounted(() => syncDialog(props.open));
   margin: 0;
 }
 
+.sheet-dialog__header [data-dialog-autofocus]:focus {
+  outline: none;
+}
+
 .sheet-dialog__header p {
   max-width: 56ch;
   margin-top: var(--space-2);
@@ -183,5 +226,32 @@ onMounted(() => syncDialog(props.open));
   flex-wrap: wrap;
   justify-content: end;
   gap: var(--space-2);
+}
+
+@media (width <= 599px) {
+  .sheet-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 170px);
+    margin: auto 0 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .sheet-dialog__surface {
+    min-height: min(470px, calc(100dvh - 170px));
+    max-height: calc(100dvh - 170px);
+    box-sizing: border-box;
+    padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .sheet-dialog__footer {
+    margin-top: auto;
+  }
+
+  .sheet-dialog.mobile-door-decision .sheet-dialog__surface {
+    padding-bottom: calc(36px + env(safe-area-inset-bottom, 0px));
+  }
 }
 </style>

@@ -2,159 +2,37 @@
 import type {Projection} from "@munchkin/contracts";
 
 import GameCard from "../../GameCard.vue";
-import DeckBack from "../primitives/DeckBack.vue";
 import CardRail from "../primitives/CardRail.vue";
-import PhaseLabel from "../../ui/PhaseLabel.vue";
-import SheetDialog from "../../ui/SheetDialog.vue";
-import StrengthIndicator from "../../ui/StrengthIndicator.vue";
-import {buildStrengthBreakdown} from "../gameTableViewModel";
-import {useGamePresentation} from "../../../composables/useGamePresentation";
-import {mobileEncounterCards, mobileStateFamily} from "./mobileGameModel";
+import type {GamePresentationModel} from "../gamePresentationModel";
 
 const props = defineProps<{
   projection: Projection;
+  presentationModel: GamePresentationModel;
 }>();
 
-const presentation = useGamePresentation(() => props.projection);
-const strengthOpen = ref(false);
+const encounterCards = computed(() => props.presentationModel.encounterCards);
+const selectedCardIndex = computed(() => props.presentationModel.activeEncounterIndex);
+const stateFamily = computed(() => props.presentationModel.family);
+const primarySurface = computed(() => props.presentationModel.primary);
+const preparationCards = computed(() => [
+  ...props.projection.you.carried,
+  ...props.projection.you.equipped,
+  ...props.projection.you.hand,
+].slice(0, 3));
 
-const encounterCards = computed(() => mobileEncounterCards(props.projection));
-const selectedCardIndex = computed(() => encounterCards.value.length > 1 ? 1 : 0);
-const combat = computed(() => props.projection.turn.combat);
-const runAway = computed(() => props.projection.turn.run_away);
-const stateFamily = computed(() => mobileStateFamily(props.projection));
-const encounterStage = ref<HTMLElement>();
-
-const monsterBreakdown = computed(() => buildStrengthBreakdown(
-  combat.value?.monster_strength ?? 0,
-  encounterCards.value.map((card) => ({
-    id: card.instance_id,
-    label: card.name,
-    value: card.combat_strength ?? 0,
-  })),
-));
-
-const playerBreakdown = computed(() => buildStrengthBreakdown(
-  combat.value?.player_strength ?? props.projection.you.combat_strength,
-  [{
-    id: "authoritative-player-strength",
-    label: "Подтверждённая сила игрока",
-    value: combat.value?.player_strength ?? props.projection.you.combat_strength,
-  }],
-));
-
-const runAwayPlayerName = computed(() => {
-  const playerID = runAway.value?.current_player_id;
-  if (!playerID) {
-    return "текущего игрока";
-  }
-  if (playerID === props.projection.you.player_id) {
-    return props.projection.you.name;
-  }
-  return props.projection.players.find((player) => player.player_id === playerID)?.name
-    ?? "другого игрока";
-});
-
-const runAwayMonsterName = computed(() => {
-  const cardID = runAway.value?.current_monster_instance_id;
-  return encounterCards.value.find((card) => card.instance_id === cardID)?.name
-    ?? "текущей карты";
-});
-
-const phaseCopy = computed(() => {
-  const current = presentation.value;
-  if (!current) {
-    return "Ждём подтверждённую проекцию.";
-  }
-  if (current.phase.kind === "waiting") {
-    return `Сейчас ходит ${current.currentPlayerName}. Легальные действия появятся из новой проекции.`;
-  }
-  if (current.phase.kind === "lobby") {
-    return "Комната готовит переход к игре.";
-  }
-  if (current.phase.kind === "finished") {
-    return "Итог игры подтверждён сервером.";
-  }
-  return "Текущий контекст и доступные действия подтверждены сервером.";
-});
-
-function closeStrength() {
-  strengthOpen.value = false;
-}
-
-function openStrengthFromCard() {
-  if (combat.value) {
-    strengthOpen.value = true;
-  }
-}
-
-function prepareCardScrollRegions() {
-  void nextTick(() => {
-    encounterStage.value?.querySelectorAll<HTMLElement>(
-      ".mobile-encounter-card .card-frame__content",
-    ).forEach((content) => {
-      const card = content.closest<HTMLElement>(".game-card");
-      const cardName = card?.getAttribute("aria-label") ?? "карты";
-      content.tabIndex = 0;
-      content.setAttribute("role", "region");
-      content.setAttribute("aria-label", `Текст ${cardName}, прокручиваемая область`);
-    });
-  });
-}
-
-onMounted(prepareCardScrollRegions);
-watch(encounterCards, prepareCardScrollRegions);
 </script>
 
 <template>
   <section
-    ref="encounterStage"
     class="mobile-encounter-stage"
+    :data-primary-surface="primarySurface.kind"
     :data-state-family="stateFamily"
-    aria-labelledby="mobile-encounter-title"
+    aria-label="Карты встречи"
   >
-    <header class="mobile-encounter-stage__header">
-      <div>
-        <p class="mobile-encounter-stage__eyebrow">ТЕКУЩИЙ КОНТЕКСТ</p>
-        <h2 id="mobile-encounter-title">
-          {{ combat ? "Бой" : "Текущая задача" }}
-        </h2>
-      </div>
-      <PhaseLabel :phase="projection.turn.phase" />
-    </header>
-
-    <section v-if="combat" class="mobile-combat-summary" aria-label="Подтверждённая сила боя">
-      <div class="mobile-combat-summary__numbers">
-        <StrengthIndicator
-          :value="combat.player_strength"
-          label="Твоя сила"
-          compact
-        />
-        <span class="mobile-combat-summary__versus" aria-hidden="true">vs</span>
-        <StrengthIndicator
-          :value="combat.monster_strength"
-          label="Сила встречи"
-          compact
-        />
-        <span class="mobile-combat-summary__result" role="status">
-          {{ combat.player_winning ? "Победа подтверждена" : "Бой не выигран" }}
-        </span>
-      </div>
-      <button
-        class="mobile-combat-summary__details"
-        type="button"
-        :aria-expanded="strengthOpen"
-        @click="strengthOpen = true"
-      >
-        Разбор силы
-      </button>
-    </section>
-
     <CardRail
-      v-if="encounterCards.length"
-      data-node-id="101:46"
+      v-if="encounterCards.length && ['combat', 'waiting', 'run-away', 'result'].includes(primarySurface.kind)"
+      data-figma-node="101:106"
       title="Карты текущего решения"
-      labelled-by="mobile-encounter-title"
       :item-count="encounterCards.length"
       :show-heading="false"
     >
@@ -169,63 +47,39 @@ watch(encounterCards, prepareCardScrollRegions);
         }"
         role="listitem"
       >
-        <div
-          class="mobile-encounter-card__trigger"
-          :role="combat ? 'group' : undefined"
-          :tabindex="combat ? 0 : undefined"
-          :aria-label="combat ? `Открыть разбор силы: ${card.name}` : undefined"
-          @click="openStrengthFromCard"
-          @keydown.enter.prevent="openStrengthFromCard"
-          @keydown.space.prevent="openStrengthFromCard"
-        >
+        <div class="mobile-encounter-card__trigger">
           <GameCard
             :card="card"
             :content-set-id="projection.content_set_id"
             compact
+            :encounter="index === selectedCardIndex"
+            :encounter-peek-side="index < selectedCardIndex ? 'previous' : index > selectedCardIndex ? 'next' : undefined"
           />
-          <span
-            v-if="card.combat_strength !== undefined"
-            class="mobile-encounter-card__level"
-            aria-hidden="true"
-          >
-            {{ card.combat_strength }}
-          </span>
         </div>
       </div>
     </CardRail>
 
-    <div
-      v-else
-      class="mobile-encounter-stage__empty"
-      :class="{'mobile-encounter-stage__empty--door': stateFamily === 'door-choice'}"
+    <section
+      v-else-if="primarySurface.kind === 'phase' && ['setup', 'preparation'].includes(primarySurface.family)"
+      class="mobile-preparation"
+      aria-label="Подготовка персонажа"
     >
-      <template v-if="stateFamily === 'door-choice'">
-        <div>
-          <p class="mobile-encounter-stage__eyebrow">ДВЕРЬ</p>
-          <strong>Открой верхнюю карту двери.</strong>
-          <p>Вышиби дверь, чтобы продолжить подтверждённый ход.</p>
-        </div>
-        <DeckBack deck="door" label="Закрытая карта двери" />
-      </template>
-      <template v-else>
-        <PhaseLabel :phase="projection.turn.phase" />
-        <p>{{ phaseCopy }}</p>
-      </template>
-    </div>
-
-    <section v-if="runAway" class="mobile-run-away" aria-label="Прогресс побега">
-      <div>
-        <p class="mobile-encounter-stage__eyebrow">ПОБЕГ</p>
-        <strong>{{ runAway.completed ? "Шаги завершены сервером" : "Текущий шаг" }}</strong>
+      <header><h2>Подготовка персонажа</h2><p>Выбери карты перед открытием двери.</p></header>
+      <div class="mobile-preparation__cards" role="list">
+        <GameCard
+          v-for="card in preparationCards"
+          :key="`mobile-preparation-${card.instance_id}`"
+          :card="card"
+          :content-set-id="projection.content_set_id"
+          choice
+          role="listitem"
+        />
       </div>
-      <p>
-        {{ runAwayPlayerName }} · от карты «{{ runAwayMonsterName }}» · попыток:
-        {{ runAway.attempts.length }}
-      </p>
+      <small>ЭКИПИРУЙ ИЛИ ОСТАВЬ В РУКЕ</small>
     </section>
 
     <section
-      v-if="projection.turn.pending_decision"
+      v-if="primarySurface.kind === 'required-decision' && projection.turn.pending_decision"
       class="mobile-decision-summary"
       aria-label="Ожидающее решение"
     >
@@ -234,7 +88,7 @@ watch(encounterCards, prepareCardScrollRegions);
     </section>
 
     <CardRail
-      v-if="projection.turn.resolving.length"
+      v-if="primarySurface.kind === 'resolving'"
       title="Разрешение"
       :item-count="projection.turn.resolving.length"
     >
@@ -247,47 +101,9 @@ watch(encounterCards, prepareCardScrollRegions);
         role="listitem"
       />
     </CardRail>
+
   </section>
 
-  <SheetDialog
-    :open="strengthOpen"
-    title="Разбор подтверждённой силы"
-    title-id="mobile-strength-details-title"
-    description="Итоговые числа пришли из actor-specific projection; остаток не приписывается локальному правилу."
-    @close="closeStrength"
-  >
-    <div class="mobile-strength-details">
-      <section aria-labelledby="mobile-player-strength-title">
-        <h3 id="mobile-player-strength-title">Игрок</h3>
-        <StrengthIndicator
-          :value="combat?.player_strength ?? projection.you.combat_strength"
-          label="Итог"
-        />
-        <ul>
-          <li v-for="contributor in playerBreakdown" :key="contributor.id">
-            <span>{{ contributor.label }}</span>
-            <strong>{{ contributor.value >= 0 ? "+" : "" }}{{ contributor.value }}</strong>
-          </li>
-        </ul>
-      </section>
-      <section aria-labelledby="mobile-monster-strength-title">
-        <h3 id="mobile-monster-strength-title">Встреча</h3>
-        <StrengthIndicator
-          :value="combat?.monster_strength ?? 0"
-          label="Итог"
-        />
-        <ul>
-          <li v-for="contributor in monsterBreakdown" :key="contributor.id">
-            <span>{{ contributor.label }}</span>
-            <strong>{{ contributor.value >= 0 ? "+" : "" }}{{ contributor.value }}</strong>
-          </li>
-        </ul>
-      </section>
-    </div>
-    <template #footer>
-      <button type="button" @click="strengthOpen = false">Готово</button>
-    </template>
-  </SheetDialog>
 </template>
 
 <style scoped lang="scss">
@@ -297,6 +113,28 @@ watch(encounterCards, prepareCardScrollRegions);
   align-content: start;
   gap: var(--space-2);
 }
+
+.mobile-preparation {
+  height: 416px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 14px;
+  box-sizing: border-box;
+  padding: 16px;
+}
+.mobile-preparation header h2,
+.mobile-preparation header p { margin: 0; }
+.mobile-preparation header h2 { font-size: 18px; line-height: 24px; }
+.mobile-preparation header p { margin-top: 6px; color: var(--color-text-secondary); font-size: 11px; }
+.mobile-preparation__cards {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+.mobile-preparation small { color: var(--color-text-muted); font-size: 9px; letter-spacing: .05em; }
 
 .mobile-encounter-stage__header {
   display: flex;

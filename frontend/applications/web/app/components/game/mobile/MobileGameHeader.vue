@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import type {Projection} from "@munchkin/contracts";
 
-import {useGamePresentation} from "../../../composables/useGamePresentation";
-import SheetDialog from "../../ui/SheetDialog.vue";
+import type {GamePresentationModel} from "../gamePresentationModel";
 
 const props = defineProps<{
   projection: Projection;
+  presentationModel: GamePresentationModel;
+  strengthOpen: boolean;
 }>();
 
-const presentation = useGamePresentation(() => props.projection);
-const detailsOpen = ref(false);
+const emit = defineEmits<{"open-strength": []}>();
 
 const turnCopy = computed(() => {
-  const current = presentation.value;
-  if (!current) {
-    return "Состояние загружается";
-  }
-  return current.isActorTurn
+  const isActorTurn = props.projection.turn.player_id === props.projection.you.player_id;
+  const currentPlayerName = props.projection.players.find((player) =>
+    player.player_id === props.projection.turn.player_id,
+  )?.name ?? "другой игрок";
+  return isActorTurn
     ? "ТВОЙ ХОД"
-    : `ХОДИТ ${current.currentPlayerName}`;
+    : `ХОДИТ ${currentPlayerName}`;
 });
 
 const statusCopy = computed(() => {
@@ -37,6 +37,13 @@ const statusCopy = computed(() => {
 });
 
 const phaseCopy = computed(() => {
+  const primary = props.presentationModel.primary;
+  if (primary.kind === "result") {
+    return primary.source === "reward" ? "Лут" : "Побег";
+  }
+  if (primary.kind === "run-away") {
+    return "Побег";
+  }
   switch (props.projection.turn.phase) {
     case "setup":
     case "preparation":
@@ -63,21 +70,27 @@ const phaseCopy = computed(() => {
 });
 
 const pagerCopy = computed(() => {
-  const count = props.projection.turn.combat?.monsters.length ??
-    (props.projection.turn.encounter ? 1 : 1);
-  return `1 / ${Math.max(1, count)}`;
+  return `${props.presentationModel.encounterPage} / ${props.presentationModel.encounterPageCount}`;
 });
 
 const scoreCopy = computed(() => {
+  const primary = props.presentationModel.primary;
+  if (primary.kind === "run-away" || (primary.kind === "result" && primary.source === "run-away")) {
+    const bonus = props.projection.you.escape_bonus;
+    return `ПБ ${bonus >= 0 ? "+" : "−"}${Math.abs(bonus)}`;
+  }
+  if (primary.kind === "result" && primary.source === "reward") {
+    return String(props.projection.you.combat_strength);
+  }
   const combat = props.projection.turn.combat;
   return combat
     ? `${combat.player_strength} : ${combat.monster_strength}`
     : String(props.projection.you.combat_strength);
 });
+const strengthDisabled = computed(() => ["door-choice", "run-away", "result", "required-decision"].includes(
+  props.presentationModel.primary.kind,
+));
 
-function closeDetails() {
-  detailsOpen.value = false;
-}
 </script>
 
 <template>
@@ -101,9 +114,10 @@ function closeDetails() {
     <button
       class="mobile-game-header__strength"
       type="button"
-      aria-label="Открыть разбор подтверждённой силы"
-      :aria-expanded="detailsOpen"
-      @click="detailsOpen = true"
+      aria-label="Открыть подтверждённую силу"
+      :aria-expanded="strengthOpen"
+      :disabled="strengthDisabled"
+      @click="emit('open-strength')"
     >
       {{ scoreCopy }}
     </button>
@@ -111,47 +125,8 @@ function closeDetails() {
     <div class="mobile-game-header__turn" role="status">
       {{ turnCopy }}
     </div>
-
-    <button
-      class="mobile-game-header__details"
-      type="button"
-      aria-label="Открыть технические детали комнаты"
-      aria-haspopup="dialog"
-      :aria-expanded="detailsOpen"
-      @click="detailsOpen = true"
-    >
-      ···
-    </button>
   </header>
 
-  <SheetDialog
-    :open="detailsOpen"
-    title="Детали комнаты"
-    title-id="mobile-game-details-title"
-    description="Технический контекст доступен по запросу и не занимает игровую область."
-    @close="closeDetails"
-  >
-    <dl class="mobile-game-details">
-      <div>
-        <dt>Комната</dt>
-        <dd><code>{{ projection.game_id }}</code></dd>
-      </div>
-      <div>
-        <dt>Профиль правил</dt>
-        <dd>{{ projection.rules_profile_id }} · v{{ projection.rules_profile_version }}</dd>
-      </div>
-      <div>
-        <dt>Контент</dt>
-        <dd>{{ projection.content_set_id }} · v{{ projection.content_version }}</dd>
-      </div>
-      <div>
-        <dt>Колоды</dt>
-        <dd>
-          Двери {{ projection.door_deck_count }} · сокровища {{ projection.treasure_deck_count }}
-        </dd>
-      </div>
-    </dl>
-  </SheetDialog>
 </template>
 
 <style scoped lang="scss">
@@ -159,7 +134,7 @@ function closeDetails() {
   min-width: 0;
   height: 32px;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
 }
@@ -231,18 +206,6 @@ function closeDetails() {
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.mobile-game-header__details {
-  width: 25px;
-  height: 25px;
-  border: 0;
-  border-radius: 999px;
-  padding: 0;
-  color: var(--color-text-muted);
-  background: transparent;
-  font-size: 12px;
-  letter-spacing: .05em;
 }
 
 .mobile-game-details {
