@@ -17,6 +17,7 @@ const props = withDefaults(defineProps<{
   deadlineLabel?: string;
   inboxLabel?: string;
   inboxStatus?: string;
+  eyebrow?: string;
   dialogId?: string;
 }>(), {
   countdownText: "",
@@ -24,6 +25,7 @@ const props = withDefaults(defineProps<{
   deadlineLabel: "",
   inboxLabel: "ВХОДЯЩЕЕ ВЗАИМОДЕЙСТВИЕ",
   inboxStatus: "",
+  eyebrow: "СЕРВЕРНОЕ ОКНО",
   dialogId: "interaction-dialog",
 });
 
@@ -150,7 +152,7 @@ onMounted(() => {
       >
         <header class="interaction-dialog__header">
           <div>
-            <p class="interaction-dialog__eyebrow">СЕРВЕРНОЕ ОКНО</p>
+            <p class="interaction-dialog__eyebrow">{{ eyebrow }}</p>
             <h2 :id="`${dialogId}-title`">{{ title }}</h2>
             <p class="interaction-dialog__context">{{ context }}</p>
           </div>

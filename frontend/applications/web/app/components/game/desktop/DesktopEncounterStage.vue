@@ -19,6 +19,12 @@ const encounterStage = ref<HTMLElement>();
 const encounterCards = computed(() => desktopEncounterCards(props.projection));
 const combat = computed(() => props.projection.turn.combat);
 const activeCard = computed(() => encounterCards.value[activeCardIndex.value]);
+const winner = computed(() => {
+  const participants = [props.projection.you, ...props.projection.players];
+  return participants.find((player) => player.player_id === props.projection.winner_player_id)
+    ?? props.projection.you;
+});
+const viewerWon = computed(() => props.projection.winner_player_id === props.projection.you.player_id);
 const currentPlayerName = computed(() => {
   if (props.projection.turn.player_id === props.projection.you.player_id) {
     return props.projection.you.name;
@@ -87,17 +93,50 @@ function selectCard(index: number) {
     aria-labelledby="desktop-encounter-title"
     :data-has-encounter="encounterCards.length > 0"
   >
-    <header class="desktop-encounter-stage__heading">
+    <header
+      class="desktop-encounter-stage__heading"
+      :class="{'desktop-encounter-stage__heading--finished': projection.status === 'finished'}"
+    >
       <div>
-        <p class="eyebrow">ЦЕНТР СТОЛА</p>
+        <p class="eyebrow">{{ projection.status === "finished" ? "ИТОГ ПАРТИИ" : "ЦЕНТР СТОЛА" }}</p>
         <h2 id="desktop-encounter-title">
-          {{ encounterCards.length ? "Открытая встреча" : "Состояние стола" }}
+          {{ projection.status === "finished"
+            ? viewerWon ? "Победа!" : "Партия завершена"
+            : encounterCards.length ? "Открытая встреча" : "Состояние стола" }}
         </h2>
+        <p v-if="projection.status === 'finished'" class="desktop-encounter-stage__finished-context">
+          {{ viewerWon ? "Последний уровень получен за победу." : "Ты открыл уже завершённую игру." }}
+        </p>
       </div>
-      <PhaseLabel :phase="projection.turn.phase" />
+      <PhaseLabel v-if="projection.status !== 'finished'" :phase="projection.turn.phase" />
     </header>
 
-    <div class="desktop-encounter-stage__board">
+    <div v-if="encounterCards.length" class="desktop-encounter-pager" aria-live="polite">
+      {{ activeCardIndex + 1 }} / {{ encounterCards.length }} · {{ activeCard?.name }}
+    </div>
+
+    <div v-if="projection.status === 'finished'" class="desktop-victory-result" role="status">
+      <span class="desktop-victory-result__badge">
+        {{ viewerWon ? "ПОБЕДИТЕЛЬ" : "ЗАВЕРШЕНО" }}
+      </span>
+      <strong>
+        {{ viewerWon ? `${winner.name} · ${winner.level} уровень` : `Победитель: ${winner.name}` }}
+      </strong>
+      <p>
+        {{ viewerWon
+          ? "Последний уровень получен за победу над Архивной пылью."
+          : `Итоговый уровень ${winner.level}. Партия завершена сервером.` }}
+      </p>
+      <small>ИТОГ ПОДТВЕРЖДЁН СЕРВЕРОМ</small>
+    </div>
+
+    <p v-if="projection.status === 'finished'" class="desktop-victory-stage__note">
+      {{ viewerWon
+        ? "ИТОГ ПАРТИИ ЗАФИКСИРОВАН СЕРВЕРОМ"
+        : "ИСТОРИЯ И ФИНАЛЬНЫЕ РЕЗУЛЬТАТЫ ДОСТУПНЫ ТОЛЬКО ДЛЯ ЧТЕНИЯ" }}
+    </p>
+
+    <div v-else class="desktop-encounter-stage__board">
       <aside class="desktop-deck-rail" aria-label="Колоды и сбросы">
         <div class="desktop-deck">
           <DeckBack deck="door" label="Закрытая колода дверей" />
@@ -137,14 +176,19 @@ function selectCard(index: number) {
               :card="card"
               :content-set-id="projection.content_set_id"
             />
+            <span
+              v-if="card.combat_strength"
+              class="desktop-encounter-card__strength"
+              :aria-label="`Сила карты ${card.combat_strength}`"
+            >
+              {{ card.combat_strength }}
+            </span>
           </div>
         </CardRail>
         <div v-else class="desktop-phase-card" role="status">
           <span class="desktop-phase-card__mark" aria-hidden="true">+</span>
           <PhaseLabel :phase="projection.turn.phase" />
-          <strong>
-            {{ projection.status === "finished" ? "Победа подтверждена" : "Ждём следующую карту" }}
-          </strong>
+          <strong>Ждём следующую карту</strong>
           <p>
             {{ projection.turn.phase === "preparation"
               ? "Подготовь ход, затем выбери действие рядом с затронутой зоной."
@@ -262,6 +306,62 @@ function selectCard(index: number) {
   margin-top: var(--space-1);
   overflow-wrap: anywhere;
   font-size: clamp(1.3rem, 2vw, 1.8rem);
+}
+
+.desktop-encounter-stage__finished-context {
+  margin: .35rem 0 0;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.desktop-victory-result {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  padding: var(--space-6);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.desktop-victory-result__badge {
+  border: 1px solid var(--color-accent-strong);
+  border-radius: 999px;
+  padding: .45rem 1.5rem;
+  color: var(--color-surface);
+  background: var(--color-accent-strong);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.desktop-victory-result strong {
+  font-size: clamp(1.35rem, 2.5vw, 1.8rem);
+}
+
+.desktop-victory-result p,
+.desktop-victory-result small,
+.desktop-victory-stage__note {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.desktop-victory-result small,
+.desktop-victory-stage__note {
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.desktop-victory-stage__note {
+  border: 0;
+  color: var(--color-text-muted);
 }
 
 .desktop-encounter-stage__board {
@@ -530,6 +630,367 @@ function selectCard(index: number) {
   .desktop-run-away,
   .desktop-pending-decision {
     border-color: CanvasText;
+  }
+}
+
+@media (width >= 1024px) {
+  .desktop-encounter-stage {
+    position: relative;
+    height: 100%;
+    box-sizing: border-box;
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    padding: 0;
+    background: var(--color-surface);
+  }
+
+  .desktop-encounter-stage__heading {
+    position: absolute;
+    z-index: -1;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .desktop-encounter-stage__heading--finished {
+    position: absolute;
+    z-index: 1;
+    top: 20px;
+    right: 24px;
+    left: 24px;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  .desktop-encounter-stage__heading--finished h2 {
+    margin-top: 6px;
+    font-size: 1.2rem;
+  }
+
+  .desktop-encounter-stage__heading--finished .desktop-encounter-stage__finished-context {
+    margin-top: 6px;
+    font-size: .72rem;
+  }
+
+  .desktop-victory-result {
+    position: absolute;
+    top: 129px;
+    left: 103px;
+    width: 560px;
+    height: 250px;
+    box-sizing: border-box;
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  .desktop-victory-stage__note {
+    position: absolute;
+    right: 24px;
+    bottom: 44px;
+    left: 24px;
+  }
+
+  .desktop-encounter-stage__heading .eyebrow {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: .58rem;
+    letter-spacing: .1em;
+  }
+
+  .desktop-encounter-stage__heading h2 {
+    margin-top: 3px;
+    color: var(--color-text-primary);
+    font-size: .86rem;
+    letter-spacing: .02em;
+  }
+
+  .desktop-encounter-stage__heading :deep(.phase-label) {
+    font-size: .62rem;
+  }
+
+  .desktop-encounter-stage__board {
+    min-height: 0;
+    height: 100%;
+    display: block;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .desktop-deck-rail {
+    display: none;
+  }
+
+  .desktop-encounter-stage__content {
+    position: relative;
+    min-height: 0;
+    height: 100%;
+    display: block;
+  }
+
+  .desktop-encounter-pager {
+    position: absolute;
+    z-index: 5;
+    top: 7px;
+    left: 50%;
+    width: 140px;
+    min-height: 32px;
+    box-sizing: border-box;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    transform: translateX(-50%);
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    padding: 0 14px;
+    color: var(--color-text-secondary);
+    background: var(--color-surface);
+    font-size: .62rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .desktop-encounter-stage__content > .card-rail {
+    min-height: 0;
+    height: 100%;
+    display: block;
+  }
+
+  .desktop-encounter-stage__content > .card-rail :deep(.card-rail__header) {
+    display: none;
+  }
+
+  .desktop-encounter-stage__content :deep(.card-rail__viewport) {
+    position: absolute;
+    top: 83px;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    min-height: 0;
+    height: auto;
+    align-items: stretch;
+    gap: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 12px;
+  }
+
+  .desktop-encounter-card {
+    flex: 0 0 240px;
+    width: 240px;
+    height: 400px;
+    box-sizing: border-box;
+    gap: 0;
+    border: 0;
+    border-radius: 16px;
+    padding: 0;
+    background: transparent;
+  }
+
+  .desktop-encounter-card__index {
+    position: absolute;
+    z-index: 2;
+    top: 10px;
+    left: 12px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-meta);
+    font-size: .56rem;
+    letter-spacing: .08em;
+  }
+
+  .desktop-encounter-card :deep(.card-frame) {
+    width: 240px;
+    height: 400px;
+    min-height: 400px;
+    box-sizing: border-box;
+    grid-template-rows: 0 236px minmax(0, 1fr) auto;
+    gap: 0;
+    border: 1px solid var(--color-border-card);
+    border-radius: 16px;
+    padding: 0;
+    background: var(--color-surface);
+    box-shadow: 0 3px 12px rgb(46 43 41 / 10%);
+  }
+
+  .desktop-encounter-card :deep(.card-frame__art) {
+    aspect-ratio: auto;
+    border: 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .desktop-encounter-card :deep(.card-frame__content) {
+    min-height: 0;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .desktop-encounter-card :deep(.game-card__copy) {
+    position: relative;
+    gap: 8px;
+    padding: 14px 16px 12px;
+  }
+
+  .desktop-encounter-card :deep(.game-card__copy)::before {
+    position: absolute;
+    top: -56px;
+    right: 0;
+    left: 0;
+    height: 56px;
+    background: rgb(40 49 46 / 82%);
+    content: "";
+  }
+
+  .desktop-encounter-card :deep(.game-card__name) {
+    position: absolute;
+    z-index: 1;
+    top: -44px;
+    right: 16px;
+    left: 16px;
+    margin: 0;
+    font-family: var(--font-card);
+    color: #fff9ef;
+    font-size: 1.05rem;
+    line-height: 1.2;
+  }
+
+  .desktop-encounter-card :deep(.game-card__rules) {
+    color: var(--color-text-secondary);
+    font-size: .72rem;
+    line-height: 1.35;
+  }
+
+  .desktop-encounter-card :deep(.game-card__flavor) {
+    color: var(--color-text-muted);
+  }
+
+  .desktop-encounter-card--active {
+    flex-basis: 256px;
+    width: 256px;
+    height: 416px;
+    margin-top: -8px;
+    margin-bottom: -8px;
+    border: 8px solid var(--color-action-response);
+    padding: 0;
+    background: var(--color-action-response);
+  }
+
+  .desktop-encounter-card--active :deep(.card-frame) {
+    width: 240px;
+    height: 400px;
+    min-height: 400px;
+    border-color: var(--color-action-response);
+    border-radius: 9px;
+  }
+
+  .desktop-encounter-card__strength {
+    position: absolute;
+    z-index: 3;
+    top: 14px;
+    left: 14px;
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    border: 3px solid var(--color-border-card);
+    border-radius: 50%;
+    color: var(--color-action-response);
+    background: var(--color-surface);
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 800;
+  }
+
+  .desktop-encounter-card--active .desktop-encounter-card__strength {
+    top: 14px;
+    left: 14px;
+  }
+
+  .desktop-encounter-card :deep(.game-card__stats) {
+    display: none;
+  }
+
+  .desktop-encounter-card--active .desktop-encounter-card__index {
+    top: 6px;
+    left: 8px;
+    color: #fff9ef;
+  }
+
+  .desktop-encounter-stage__content :deep(.card-rail__pager) {
+    justify-content: center;
+    gap: 12px;
+    color: var(--color-text-secondary);
+    font-size: .64rem;
+  }
+
+  .desktop-encounter-stage__content :deep(.card-rail__pager button) {
+    min-height: 28px;
+    border-color: var(--color-line);
+    border-radius: 999px;
+    padding: 0 10px;
+    background: var(--color-surface-control);
+    font-size: .62rem;
+  }
+
+  .desktop-phase-card {
+    min-height: 400px;
+    border-color: var(--color-line);
+    border-radius: 16px;
+    background: var(--color-surface-control);
+  }
+
+  .desktop-combat-summary {
+    position: absolute;
+    right: 16px;
+    bottom: 8px;
+    left: 16px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    gap: 8px;
+    border-top: 0;
+    padding-top: 0;
+    pointer-events: none;
+  }
+
+  .desktop-combat-summary__numbers,
+  .desktop-combat-summary__result,
+  .desktop-combat-summary__details {
+    font-size: .6rem;
+  }
+
+  .desktop-combat-summary__numbers {
+    gap: 6px;
+  }
+
+  .desktop-combat-summary__result {
+    flex: 0 1 auto;
+    color: var(--color-text-muted);
+  }
+
+  .desktop-combat-summary__details {
+    min-height: 28px;
+    padding: 4px 8px;
+    pointer-events: auto;
+  }
+
+  .desktop-run-away,
+  .desktop-pending-decision,
+  .desktop-resolving-rail {
+    position: absolute;
+    right: 16px;
+    bottom: 42px;
+    left: 16px;
+    z-index: 4;
   }
 }
 </style>

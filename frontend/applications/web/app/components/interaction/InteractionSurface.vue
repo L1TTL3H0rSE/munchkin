@@ -138,6 +138,18 @@ const responseStateMessage = computed(() => interactionResponseMessage(
 const surfaceTitle = computed(() => interaction.value
   ? interactionTitle(interaction.value)
   : "Действия экономики");
+const dialogEyebrow = computed(() => {
+  if (charityForm.value) {
+    return "БЛАГОТВОРИТЕЛЬНОСТЬ";
+  }
+  if (helperOfferMode.value || invitedHelperOffer.value) {
+    return "ПОМОЩЬ";
+  }
+  if (interaction.value?.response_required_for_you) {
+    return "ОТВЕТ НА ВМЕШАТЕЛЬСТВО";
+  }
+  return "СЕРВЕРНОЕ ОКНО";
+});
 const surfaceContext = computed(() => {
   if (economyOnly.value) {
     return "Выберите карты и цели только из доступных действий текущей проекции.";
@@ -311,6 +323,7 @@ watch(
     class="interaction-surface"
     data-testid="interaction-surface"
     :data-state="terminal ? 'terminal' : busy ? 'pending' : 'open'"
+    :tabindex="showRunAwaySummary && !interaction ? 0 : undefined"
   >
     <AcceptedHelperSummary
       v-if="acceptedHelper"
@@ -335,6 +348,7 @@ watch(
       :countdown-text="countdownText"
       :deadline-at="interaction?.deadline_at"
       :deadline-label="deadlineLabel"
+      :eyebrow="dialogEyebrow"
       :inbox-label="economyOnly ? 'ДЕЙСТВИЯ ТЕКУЩЕГО ХОДА' : undefined"
       :inbox-status="economyOnly
         ? 'Доступны решения по картам и целям'
@@ -347,7 +361,10 @@ watch(
         class="interaction-info-actions"
         aria-label="Информационные листы"
       >
-        <HandSheet :cards="projection.you.hand" />
+        <HandSheet
+          :cards="projection.you.hand"
+          :content-set-id="projection.content_set_id"
+        />
         <CharacterSheet :projection="projection" />
         <StrengthSheet :projection="projection" />
       </div>

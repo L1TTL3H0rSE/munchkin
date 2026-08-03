@@ -18,22 +18,30 @@ $breakpoints: (
 :root {
   color-scheme: light;
 
-  --color-text: #26372e;
-  --color-text-muted: #68776d;
-  --color-canvas: #f1eee5;
-  --color-board: #30483b;
-  --color-surface: #fbfaf4;
-  --color-paper: #fffaf0;
-  --color-ink: #26372e;
-  --color-accent: #5f806a;
-  --color-accent-strong: #315e45;
-  --color-rust: #a4563e;
-  --color-success: #2d7653;
-  --color-danger: #a33f3f;
-  --color-info: #356c86;
-  --color-scrim: rgb(28 42 34 / 68%);
-  --color-focus: #b24f31;
-  --color-line: #c8d0c7;
+  /* Figma foundation: warm paper, tea green actions, rust response states. */
+  --color-text: #2e2b29;
+  --color-text-primary: #2e2b29;
+  --color-text-secondary: #756659;
+  --color-text-muted: #756659;
+  --color-canvas: #f6f3ec;
+  --color-board: #2e2b29;
+  --color-surface: #fff9ef;
+  --color-surface-control: #f7f2e8;
+  --color-surface-inverse: #2e2b29;
+  --color-paper: #fff9ef;
+  --color-ink: #2e2b29;
+  --color-accent: #2f6b5f;
+  --color-accent-strong: #2f6b5f;
+  --color-action-primary: #2f6b5f;
+  --color-action-response: #874d33;
+  --color-rust: #874d33;
+  --color-success: #2f6b5f;
+  --color-danger: #9a463d;
+  --color-info: #1e6670;
+  --color-scrim: rgb(46 43 41 / 68%);
+  --color-focus: #874d33;
+  --color-line: #cfc2b1;
+  --color-border-card: #6d4d43;
 
   --ink: var(--color-text);
   --muted: var(--color-text-muted);
@@ -43,9 +51,10 @@ $breakpoints: (
   --orange: var(--color-rust);
   --line: var(--color-line);
 
-  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Arial Black", "Segoe UI Black", system-ui, sans-serif;
-  --font-meta: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  --font-body: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-card: Literata, Georgia, "Times New Roman", serif;
+  --font-meta: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --duration-instant: 60ms;
   --duration-quick: 140ms;
@@ -62,9 +71,9 @@ $breakpoints: (
   --space-8: 32px;
   --space-12: 48px;
 
-  --radius-card: 4px;
-  --radius-control: 8px;
-  --radius-panel: 12px;
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --radius-panel: 16px;
   --radius-sheet: 16px;
 
   --breakpoint-mobile-max: #{breakpoint(mobile)};

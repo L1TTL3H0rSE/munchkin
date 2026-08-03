@@ -12,8 +12,16 @@ import {
   openFixture,
   openFixtureAtViewport,
 } from "./fixtureSupport.ts";
+import {figmaStateDescriptors} from "./figmaStateMatrix.ts";
 
-for (const fixtureID of fixtureIDs()) {
+const browserFixtureIDs = [
+  ...new Set([
+    ...fixtureIDs(),
+    ...figmaStateDescriptors.map((state) => state.fixtureID),
+  ]),
+];
+
+for (const fixtureID of browserFixtureIDs) {
   test(`fixture ${fixtureID} stays usable at representative width`, async ({page}) => {
     await openFixture(page, fixtureID);
     await assertNoRootOverflow(page);
@@ -34,15 +42,15 @@ test("media preferences preserve motion and focus policy", async ({page}) => {
   await assertMediaPreferences(page);
 });
 
-test("finished projection uses a terminal surface and closes stale actions", async ({page}) => {
+test("finished projection uses the final result shell and closes stale actions", async ({page}) => {
   const fixture = await openFixtureAtViewport(page, "single-finished", 1440, 900);
   const presenter = await activePresenter(page);
-  const surface = presenter.locator(".system-state-surface[data-state='victory']");
+  const surface = presenter.locator(".desktop-victory-result");
 
   await expect(surface).toBeVisible();
-  await expect(surface).toContainText("Победа подтверждена");
+  await expect(surface).toContainText("ИТОГ ПОДТВЕРЖДЁН СЕРВЕРОМ");
   await expect(surface).toContainText(fixture.projection.you.name);
-  await expect(surface.locator("a[href='/']")).toContainText("Вернуться в лобби");
+  await expect(presenter.locator("a[href='/']")).toContainText("Вернуться в лобби");
   await expect(page.locator(".action-dock")).toHaveCount(0);
   await expect(page.locator(".interaction-surface")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("Состояние игры недоступно");
@@ -72,10 +80,13 @@ test("card action rail exposes labeled close and removes contextual state", asyn
     await presenter.locator(".own-board__open:visible").click();
     await expect(page.locator(".sheet-dialog[open]")).toBeVisible();
   }
-  const activate = presenter.locator(".game-card__activate").first();
+  const openSheet = page.locator(".sheet-dialog[open]");
+  const openSheetCount = await openSheet.count();
+  const activate = openSheetCount
+    ? openSheet.locator(".game-card__activate").first()
+    : presenter.locator(".game-card__activate").first();
   await activate.click();
   await expect(presenter.locator(".action-dock__close")).toBeVisible();
-  const openSheet = page.locator(".sheet-dialog[open]");
   if (await openSheet.count()) {
     await openSheet.locator(".sheet-dialog__close").click();
     await expect(openSheet).toHaveCount(0);
@@ -96,7 +107,7 @@ test("1440x900 uses one bounded desktop presenter without legacy telemetry", asy
   await expect(presenter.locator(".action-bar")).toHaveCount(0);
   await expect(presenter.locator(".own-board__card-count")).toHaveCount(0);
   await expect(presenter.locator(".desktop-encounter-stage .game-card")).toBeVisible();
-  await expect(presenter.locator(".desktop-combat-summary")).toBeVisible();
+  await expect(presenter.locator(".own-board__combat")).toBeVisible();
   await assertNoRootOverflow(page);
   await assertNoDocumentVerticalOverflow(page);
 });

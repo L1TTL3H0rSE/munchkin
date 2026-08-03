@@ -17,6 +17,7 @@ const props = defineProps<{
 
 const density = computed(() => opponentDensity(props.projection.players.length));
 const selectedPlayerID = ref("");
+const roomIDVisible = ref(false);
 const selectedPlayer = computed(() => props.projection.players.find((player) =>
   player.player_id === selectedPlayerID.value,
 ));
@@ -38,8 +39,8 @@ function closeDetails() {
   >
     <header class="opponent-roster__heading">
       <div>
-        <p class="eyebrow">ПУБЛИЧНЫЙ СТОЛ</p>
-        <h2 id="opponent-roster-title">{{ projection.players.length }} соперников</h2>
+        <p class="eyebrow">ПУБЛИЧНЫЕ ЗОНЫ</p>
+        <h2 id="opponent-roster-title">СОПЕРНИКИ · {{ projection.players.length }}</h2>
       </div>
       <p>Статус, уровень и открытые зоны видны по запросу. Руки соперников скрыты.</p>
     </header>
@@ -88,6 +89,19 @@ function closeDetails() {
     <p v-else class="opponent-roster__empty" role="status">
       В комнате пока нет других игроков.
     </p>
+
+    <section class="opponent-roster__room" aria-labelledby="opponent-room-title">
+      <p id="opponent-room-title" class="eyebrow">КОМНАТА</p>
+      <strong>{{ projection.players.length + 1 }} игрока</strong>
+      <span>Стол готов</span>
+      <button
+        type="button"
+        :aria-pressed="roomIDVisible"
+        @click="roomIDVisible = !roomIDVisible"
+      >
+        {{ roomIDVisible ? projection.game_id : "Показать ID комнаты" }}
+      </button>
+    </section>
 
     <SheetDialog
       v-if="selectedPlayer"
@@ -263,6 +277,45 @@ function closeDetails() {
   color: var(--color-text-muted);
 }
 
+.opponent-roster__room {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  padding: var(--space-3);
+  background: var(--color-surface-control);
+}
+
+.opponent-roster__room p,
+.opponent-roster__room strong,
+.opponent-roster__room span {
+  margin: 0;
+}
+
+.opponent-roster__room strong {
+  font-size: 1rem;
+}
+
+.opponent-roster__room span {
+  color: var(--color-text-secondary);
+  font-size: .72rem;
+}
+
+.opponent-roster__room button {
+  justify-self: start;
+  min-height: 2.25rem;
+  border: 0;
+  padding: 0;
+  color: var(--color-accent-strong);
+  background: transparent;
+  font: inherit;
+  font-size: .68rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
 .opponent-detail__summary {
   display: grid;
   gap: var(--space-1);
@@ -313,6 +366,127 @@ function closeDetails() {
   .opponent-roster__empty,
   .opponent-detail__empty {
     border-color: CanvasText;
+  }
+}
+
+@media (width >= 1024px) {
+  .opponent-roster {
+    height: 100%;
+    box-sizing: border-box;
+    align-content: start;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 20px;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    padding: 16px 16px 24px;
+    background: var(--color-surface);
+  }
+
+  .opponent-roster__heading {
+    display: block;
+  }
+
+  .opponent-roster__heading > p {
+    display: none;
+  }
+
+  .opponent-roster__heading h2 {
+    margin-top: 0;
+    color: var(--color-text-primary);
+    font-size: .78rem;
+    letter-spacing: .08em;
+  }
+
+  .opponent-roster__heading .eyebrow {
+    display: none;
+  }
+
+  .opponents {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-content: start;
+    gap: 8px;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+
+  .player-strip {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 82px;
+    box-sizing: border-box;
+    gap: 8px;
+    border-color: var(--color-line);
+    border-radius: 12px;
+    padding: 12px;
+    background: var(--color-surface-control);
+    box-shadow: none;
+  }
+
+  .player-strip.active {
+    border-color: var(--color-accent);
+    box-shadow: inset 3px 0 var(--color-accent);
+  }
+
+  .player-strip__avatar {
+    display: none;
+  }
+
+  .player-strip__body {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .player-strip__headline strong {
+    color: var(--color-text-primary);
+    font-size: .78rem;
+  }
+
+  .player-strip__stats,
+  .player-strip__status {
+    font-size: .64rem;
+  }
+
+  .player-strip__details {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 32px;
+    border: 0;
+    padding: 0;
+    color: var(--color-accent-strong);
+    font-size: .62rem;
+    font-weight: 800;
+  }
+
+  .opponent-roster__room {
+    min-height: 141px;
+    box-sizing: border-box;
+    align-content: start;
+    margin-top: auto;
+    border-radius: 12px;
+    padding: 12px;
+    background: var(--color-surface-control);
+  }
+
+  .opponent-roster__room .eyebrow {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: .58rem;
+    letter-spacing: .1em;
+  }
+
+  .opponent-roster__room strong {
+    font-size: .82rem;
+  }
+
+  .opponent-roster__room span {
+    font-size: .64rem;
+  }
+
+  .opponent-roster__room button {
+    min-height: 28px;
+    font-size: .62rem;
   }
 }
 </style>

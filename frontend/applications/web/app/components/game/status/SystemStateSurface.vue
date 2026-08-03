@@ -27,7 +27,7 @@ const skeletonRows = ["one", "two", "three"] as const;
     :class="`system-state-surface--${model.tone}`"
     :data-state="kind"
     :aria-busy="kind === 'loading'"
-    aria-labelledby="system-state-title"
+    :aria-labelledby="titleID"
   >
     <div class="system-state-surface__mark" aria-hidden="true">
       <span v-if="model.icon === 'loading'" class="system-state-surface__spinner" />
@@ -43,6 +43,7 @@ const skeletonRows = ["one", "two", "three"] as const;
       <p class="system-state-surface__eyebrow">{{ model.eyebrow }}</p>
       <h1 :id="titleID">{{ model.title }}</h1>
       <p class="system-state-surface__description">{{ model.description }}</p>
+      <p v-if="kind === 'loading'" class="system-state-surface__note">Не закрывайте вкладку</p>
       <p v-if="model.winnerName" class="system-state-surface__winner">
         Победитель: <strong>{{ model.winnerName }}</strong>
       </p>
@@ -144,10 +145,15 @@ const skeletonRows = ["one", "two", "three"] as const;
 }
 
 .system-state-surface__description,
-.system-state-surface__winner {
+.system-state-surface__winner,
+.system-state-surface__note {
   margin-top: var(--space-2);
   color: var(--color-text-muted);
   line-height: 1.5;
+}
+
+.system-state-surface__note {
+  color: var(--color-accent-strong);
 }
 
 .system-state-surface__winner strong {

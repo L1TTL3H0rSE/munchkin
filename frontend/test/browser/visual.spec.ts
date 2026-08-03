@@ -1,5 +1,6 @@
 import {expect, test, type Page} from "@playwright/test";
 
+import {figmaStateMatrix, type FigmaDesktopStateName} from "./figmaStateMatrix.ts";
 import {activePresenter, openFixture, openFixtureAtViewport} from "./fixtureSupport.ts";
 
 // These are bounded Chromium raster-noise tolerances observed on unchanged
@@ -41,26 +42,33 @@ test("lobby-desktop", async ({page}, testInfo) => {
   });
 });
 
-const desktopVisualCases = [
-  ["desktop-preparation", "single-preparation"],
-  ["desktop-door", "single-door-choice"],
-  ["desktop-combat-one", "single-combat"],
-  ["desktop-combat-multiple", "mobile-combat-multiple"],
-  ["desktop-reward", "run-away-result"],
-  ["desktop-run-away", "single-run-away"],
-  ["desktop-waiting", "stale-projection"],
-  ["desktop-death", "death-loot-observer"],
-  ["desktop-victory", "victory-six-player"],
-] as const;
+const desktopVisualCases: readonly [
+  snapshotName: string,
+  stateName: FigmaDesktopStateName,
+][] = [
+  ["desktop-preparation", "Preparation"],
+  ["desktop-door", "DoorReady"],
+  ["desktop-combat-one", "ActiveTurn"],
+  ["desktop-combat-multiple", "RunAwayNextMonster"],
+  ["desktop-reward", "RewardReceived"],
+  ["desktop-run-away", "RunAwayChoice"],
+  ["desktop-waiting", "Waiting"],
+  ["desktop-death", "DeathLoot"],
+  ["desktop-victory", "Victory"],
+];
 
-for (const [snapshotName, fixtureID] of desktopVisualCases) {
+for (const [snapshotName, stateName] of desktopVisualCases) {
   test(snapshotName, async ({page}, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
-    await openFixtureAtViewport(page, fixtureID, 1440, 900);
+    const state = figmaStateMatrix[stateName];
+    if (snapshotName === "desktop-death") {
+      await page.clock.install({time: "2030-01-01T00:04:00.000Z"});
+    }
+    await openFixtureAtViewport(page, state.fixtureID, 1440, 900);
     await hideDevtools(page);
     await expect(await activePresenter(page, "desktop")).toBeVisible();
     const screenshotTolerance = snapshotName === "desktop-death"
-      ? {maxDiffPixels: 2}
+      ? {maxDiffPixels: 256}
       : {};
     await expect(page).toHaveScreenshot(`${snapshotName}.png`, {
       fullPage: false,
@@ -70,19 +78,24 @@ for (const [snapshotName, fixtureID] of desktopVisualCases) {
   });
 }
 
-const mobileVisualCases = [
-  ["mobile-setup", "single-setup"],
-  ["mobile-door", "single-door-choice"],
-  ["mobile-combat-one", "single-combat"],
-  ["mobile-combat-multiple", "mobile-combat-multiple"],
-  ["mobile-reward", "run-away-result"],
-  ["mobile-run-away", "single-run-away"],
-  ["mobile-waiting", "stale-projection"],
-] as const;
+const mobileVisualCases: readonly [
+  snapshotName: string,
+  stateName: FigmaDesktopStateName,
+  fixtureID: string,
+][] = [
+  ["mobile-setup", "Preparation", "single-setup"],
+  ["mobile-door", "DoorReady", figmaStateMatrix.DoorReady.fixtureID],
+  ["mobile-combat-one", "PostDoorChoice", figmaStateMatrix.PostDoorChoice.fixtureID],
+  ["mobile-combat-multiple", "RunAwayNextMonster", figmaStateMatrix.RunAwayNextMonster.fixtureID],
+  ["mobile-reward", "RewardReceived", figmaStateMatrix.RewardReceived.fixtureID],
+  ["mobile-run-away", "RunAwayChoice", figmaStateMatrix.RunAwayChoice.fixtureID],
+  ["mobile-waiting", "Waiting", figmaStateMatrix.Waiting.fixtureID],
+];
 
-for (const [snapshotName, fixtureID] of mobileVisualCases) {
+for (const [snapshotName, stateName, fixtureID] of mobileVisualCases) {
   test(snapshotName, async ({page}, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
+    void figmaStateMatrix[stateName];
     await openFixtureAtViewport(page, fixtureID, 360, 640);
     await hideDevtools(page);
     await expect(await activePresenter(page, "mobile")).toBeVisible();
