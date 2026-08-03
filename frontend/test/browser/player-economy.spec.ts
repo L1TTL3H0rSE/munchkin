@@ -91,7 +91,7 @@ test("charity deadline stays advisory and the surface survives 200 percent zoom"
     document.documentElement.style.fontSize = "200%";
   });
   await page.clock.fastForward(61_000);
-  await expect(dialog).toContainText("Срок по часам истёк; ждём актуальную проекцию сервера.");
+  await expect(dialog).toContainText("Время вышло — ждём сервер");
   await assertNoRootOverflow(page);
 });
 
@@ -107,5 +107,7 @@ test("economy surface has a canonical Chromium visual baseline", async ({page}, 
   await expect(page).toHaveScreenshot("player-economy/charity-transfer.png", {
     fullPage: true,
     animations: "disabled",
+    // The advisory response timer is live while the screenshot is captured.
+    maxDiffPixels: 256,
   });
 });

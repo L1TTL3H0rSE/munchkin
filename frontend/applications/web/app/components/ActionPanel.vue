@@ -40,6 +40,28 @@ watch(
 const cardNames = computed(() => new Map(
   props.cards.map((card) => [card.instance_id, card.name]),
 ));
+const panelEyebrow = computed(() =>
+  props.entries.length === 1 && !props.contextCardName
+    ? "ДОСТУПНОЕ ДЕЙСТВИЕ"
+    : "СЕРВЕРНЫЕ ДЕЙСТВИЯ",
+);
+const panelTitle = computed(() => {
+  if (props.contextCardName) {
+    return `Карта: ${props.contextCardName}`;
+  }
+  const [entry] = props.entries;
+  return props.entries.length === 1 && entry
+    ? `Можно ${actionLabel(entry.action).toLocaleLowerCase("ru-RU")}`
+    : "Что можно сделать";
+});
+const panelHint = computed(() => {
+  if (props.contextCardName) {
+    return "Выберите один из вариантов для этой карты.";
+  }
+  return props.entries.length === 1
+    ? "Подтверди действие, чтобы продолжить серверный ход."
+    : "Доступные действия появятся здесь после подтверждённого состояния.";
+});
 
 function selected(entry: ActionEntry) {
   return selections[actionKey(entry.action, entry.index)] ?? [];
@@ -113,20 +135,15 @@ function isPlayerTarget(action: ActionDescriptor, targetID: string) {
   <aside
     class="action-dock"
     :data-state="busy ? 'pending' : entries.length ? 'available' : 'idle'"
+    :data-entry-count="entries.length"
     :aria-busy="busy"
     aria-labelledby="action-dock-title"
   >
     <header class="action-dock__header">
       <div>
-        <p class="eyebrow">СЕРВЕРНЫЕ ДЕЙСТВИЯ</p>
-        <h2 id="action-dock-title">
-          {{ contextCardName ? `Карта: ${contextCardName}` : "Что можно сделать" }}
-        </h2>
-        <p class="action-dock__hint">
-          {{ contextCardName
-            ? "Выберите один из вариантов для этой карты."
-            : "Доступные действия появятся здесь после подтверждённого состояния." }}
-        </p>
+        <p class="eyebrow">{{ panelEyebrow }}</p>
+        <h2 id="action-dock-title">{{ panelTitle }}</h2>
+        <p class="action-dock__hint">{{ panelHint }}</p>
       </div>
       <button
         v-if="contextCardName"
@@ -273,12 +290,13 @@ function isPlayerTarget(action: ActionDescriptor, targetID: string) {
   align-content: start;
   gap: .7rem;
   border: 1px solid var(--line);
-  background: #15160f;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-control);
   padding: .8rem;
 }
 
 .action-choice > strong {
-  color: var(--acid);
+  color: var(--color-text-primary);
   font-size: .78rem;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -318,14 +336,26 @@ function isPlayerTarget(action: ActionDescriptor, targetID: string) {
 .target-select select {
   width: 100%;
   border: 1px solid var(--line);
-  background: #10110c;
-  color: var(--ink);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
   padding: .65rem;
 }
 
 .action-choice__submit {
   width: 100%;
   min-height: 2.75rem;
+  border-color: var(--color-action-primary);
+  border-radius: var(--radius-control);
+  color: #fff9ef;
+  background: var(--color-action-primary);
+  font-weight: 800;
+}
+
+.action-choice__submit:disabled {
+  border-color: var(--color-line);
+  color: var(--color-text-muted);
+  background: var(--color-line);
 }
 
 @media (width <= 599px) {

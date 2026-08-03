@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import type {Projection} from "@munchkin/contracts";
+import type {GameConnectionState} from "../../../composables/useGameSessionController";
+import {useInteractionCountdown} from "../../../composables/useInteractionCountdown";
 import PhaseLabel from "../../ui/PhaseLabel.vue";
 import {desktopStateFamily} from "./desktopGameModel";
 
 const props = defineProps<{
   projection: Projection;
+  connectionState: GameConnectionState;
+  finished?: boolean;
+  victory?: boolean;
 }>();
 
 const stateFamily = computed(() => desktopStateFamily(props.projection));
+const isActorTurn = computed(() =>
+  props.projection.turn.player_id === props.projection.you.player_id,
+);
 const currentPlayerName = computed(() => {
   if (props.projection.turn.player_id === props.projection.you.player_id) {
     return props.projection.you.name;
@@ -16,28 +24,68 @@ const currentPlayerName = computed(() => {
     player.player_id === props.projection.turn.player_id,
   )?.name ?? "другой игрок";
 });
+const interactionCountdown = useInteractionCountdown(
+  () => props.projection.interaction?.deadline_at,
+  () => props.projection.interaction?.server_time,
+);
+const responseCopy = computed(() => {
+  if (!props.projection.interaction?.response_required_for_you) {
+    return "";
+  }
+  const remainingSeconds = interactionCountdown.remainingSeconds.value;
+  const minutes = Math.floor(remainingSeconds / 60).toString().padStart(2, "0");
+  const seconds = (remainingSeconds % 60).toString().padStart(2, "0");
+  return `ОТВЕТ · ${minutes}:${seconds}`;
+});
+const headerTitle = computed(() => {
+  if (props.finished) {
+    return props.victory ? "ИГРА ОКОНЧЕНА" : "ПАРТИЯ ОКОНЧЕНА";
+  }
+  if (props.connectionState === "offline") {
+    return "ПЕРЕПОДКЛЮЧЕНИЕ";
+  }
+  if (props.connectionState === "failed") {
+    return "СВЯЗЬ ПОТЕРЯНА";
+  }
+  if (props.connectionState === "connecting" || props.connectionState === "resyncing") {
+    return "ПОДКЛЮЧЕНИЕ";
+  }
+  if (responseCopy.value) {
+    return responseCopy.value;
+  }
+  return isActorTurn.value ? "ТВОЙ ХОД" : `ХОД: ${currentPlayerName.value}`;
+});
+const connectionLabel = computed(() =>
+  props.connectionState === "connected" ? "В СЕТИ" : "НЕТ СВЯЗИ",
+);
 </script>
 
 <template>
-  <header class="desktop-game-header">
-    <div class="desktop-game-header__identity">
-      <p class="eyebrow">ИГРОВОЙ СТОЛ</p>
-      <h1>Комната {{ projection.game_id }}</h1>
-      <p class="desktop-game-header__context">
-        {{ projection.status === "finished" ? "Финал подтверждён сервером" : "Твой ход и открытые зоны" }}
-      </p>
+  <header class="desktop-game-header" aria-label="Сводка игрового стола">
+    <div class="desktop-game-header__phase" aria-label="Текущая фаза">
+      <span v-if="finished" class="desktop-game-header__finished-phase">
+        {{ victory ? "ПОБЕДА" : "ЗАВЕРШЕНО" }}
+      </span>
+      <PhaseLabel v-else :phase="projection.turn.phase" />
     </div>
 
-    <div class="desktop-game-header__phase" aria-label="Текущая фаза и участник хода">
-      <PhaseLabel :phase="projection.turn.phase" />
-      <strong>{{ currentPlayerName }}</strong>
-      <span>{{ stateFamily === "waiting" ? "Ожидаем подтверждённое состояние" : "Текущая проекция" }}</span>
+    <div class="desktop-game-header__turn">
+      <h1>{{ headerTitle }}</h1>
+      <span>{{ stateFamily === "waiting" ? "ОЖИДАЕМ ПОДТВЕРЖДЕНИЕ" : "ПОДТВЕРЖДЕНО СЕРВЕРОМ" }}</span>
     </div>
 
-    <div class="desktop-game-header__summary" aria-label="Сводка персонажа">
-      <span>Уровень {{ projection.you.level }}</span>
-      <strong>Сила {{ projection.you.combat_strength }}</strong>
-      <span>Рука {{ projection.you.hand.length }}</span>
+    <div class="desktop-game-header__online" aria-label="Состояние соединения">
+      <span
+        class="desktop-game-header__online-dot"
+        :class="{'desktop-game-header__online-dot--offline': connectionState !== 'connected'}"
+        aria-hidden="true"
+      />
+      <span>{{ connectionLabel }}</span>
+    </div>
+
+    <div class="desktop-game-header__version" aria-label="Версия проекции">
+      <span>ВЕРСИЯ</span>
+      <strong>{{ projection.version }}</strong>
     </div>
   </header>
 </template>
@@ -45,87 +93,147 @@ const currentPlayerName = computed(() => {
 <style scoped lang="scss">
 .desktop-game-header {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(12rem, .8fr) auto;
-  align-items: end;
-  gap: var(--space-6);
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-4);
   min-width: 0;
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-line);
+  min-height: 56px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  padding: 0 16px;
+  background: var(--color-surface);
+  box-shadow: 0 2px 0 rgb(46 43 41 / 3%);
 }
 
-.desktop-game-header__identity,
 .desktop-game-header__phase {
   min-width: 0;
-  display: grid;
-  gap: var(--space-1);
+  display: flex;
+  align-items: center;
 }
 
-.desktop-game-header .eyebrow,
 .desktop-game-header h1,
-.desktop-game-header p {
+.desktop-game-header p,
+.desktop-game-header span {
   margin: 0;
 }
 
-.desktop-game-header h1 {
-  overflow-wrap: anywhere;
-  font-size: clamp(1.55rem, 2.4vw, 2.25rem);
-}
-
-.desktop-game-header__context,
-.desktop-game-header__phase span,
-.desktop-game-header__summary span {
-  color: var(--color-text-muted);
-  font-size: .76rem;
-}
-
-.desktop-game-header__phase {
-  justify-items: start;
-  align-content: end;
-  border-left: 2px solid var(--color-accent-strong);
-  padding-left: var(--space-3);
-}
-
-.desktop-game-header__phase strong {
-  overflow-wrap: anywhere;
-  font-size: 1.05rem;
-}
-
-.desktop-game-header__summary {
-  display: grid;
-  grid-template-columns: repeat(3, auto);
-  align-items: end;
-  gap: var(--space-2);
-  color: var(--color-text-muted);
-  font-size: .72rem;
+  .desktop-game-header__phase :deep(.phase-label) {
+    min-width: 45px;
+    width: max-content;
+    min-height: 25px;
+    height: 25px;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--color-action-response);
+    border-radius: 8px;
+    padding: 0 10px;
+    color: #fff9ef;
+    background: var(--color-action-response);
+    font-size: .56rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
-.desktop-game-header__summary strong {
-  color: var(--color-accent-strong);
-  font-size: 1rem;
+.desktop-game-header__turn {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.desktop-game-header__turn h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-action-primary);
+  font-size: .92rem;
+  letter-spacing: .08em;
+}
+
+.desktop-game-header__turn span,
+.desktop-game-header__online,
+.desktop-game-header__version {
+  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.desktop-game-header__turn span {
+  display: none;
+}
+
+.desktop-game-header__online {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.desktop-game-header__online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent), transparent 82%);
+}
+
+.desktop-game-header__online-dot--offline {
+  background: var(--color-danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger), transparent 82%);
+}
+
+.desktop-game-header__version {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.desktop-game-header__version strong {
+  color: var(--color-text-primary);
+  font-size: .78rem;
 }
 
 @media (width <= 1023px) {
   .desktop-game-header {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: var(--space-3);
   }
 
-  .desktop-game-header__phase {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    border-left: 0;
-    border-top: 1px solid var(--color-line);
-    padding-top: var(--space-2);
-    padding-left: 0;
+  .desktop-game-header__finished-phase {
+    display: inline-flex;
+    align-items: center;
+    min-height: 25px;
+    border: 1px solid var(--color-action-response);
+    border-radius: 8px;
+    padding: 0 10px;
+    color: #fff9ef;
+    background: var(--color-action-response);
+    font-size: .56rem;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .desktop-game-header__phase :deep(.phase-label__dot) {
+    background: #fff9ef;
+  }
+
+  .desktop-game-header__version {
+    display: none;
   }
 }
 
 @media (width <= 599px) {
-  .desktop-game-header__summary {
-    grid-template-columns: 1fr;
-    justify-items: end;
-    gap: 0;
+  .desktop-game-header__online {
+    display: none;
   }
 }
 </style>

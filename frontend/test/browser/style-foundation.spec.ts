@@ -22,7 +22,7 @@ test("paper token foundation keeps the shell keyboard-safe at 360x640", async ({
   });
 
   expect(foundation.colorScheme).toContain("light");
-  expect(foundation.canvas).toBe("#f1eee5");
+  expect(foundation.canvas).toBe("#f6f3ec");
   expect(foundation.mobileBoundary).toBe("374px");
   expect(foundation.bodyMinHeight).toBeGreaterThanOrEqual(640);
   expect(foundation.rootFitsViewport).toBe(true);
@@ -75,7 +75,7 @@ test("game fixture inherits the paper foundation without document overflow", asy
   });
 
   expect(gameFoundation.colorScheme).toContain("light");
-  expect(gameFoundation.canvas).toBe("#f1eee5");
+  expect(gameFoundation.canvas).toBe("#f6f3ec");
   expect(gameFoundation.minWidth).toBe("0px");
   expect(gameFoundation.rootFitsViewport).toBe(true);
 });

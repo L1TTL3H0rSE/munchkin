@@ -18,7 +18,7 @@ resource "yandex_vpc_subnet" "production" {
 resource "yandex_vpc_security_group" "production" {
   folder_id   = local.folder_id
   name        = "munchkin-prod"
-  description = "Public HTTPS edge and owner-restricted SSH for the production host."
+  description = "Public HTTPS edge, owner-restricted SSH and deploy-only SSH for the production host."
   network_id  = yandex_vpc_network.production.id
   labels      = local.common_labels
 
@@ -27,6 +27,13 @@ resource "yandex_vpc_security_group" "production" {
     protocol       = "TCP"
     port           = 22
     v4_cidr_blocks = var.ssh_ingress_cidrs
+  }
+
+  ingress {
+    description    = "Deploy-only SSH"
+    protocol       = "TCP"
+    port           = 2222
+    v4_cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {

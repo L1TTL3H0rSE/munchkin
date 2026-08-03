@@ -8,6 +8,7 @@ defineProps<{
   <div class="card-art-placeholder" role="img" :aria-label="label">
     <span class="card-art-placeholder__diamond" aria-hidden="true" />
     <span class="card-art-placeholder__line" aria-hidden="true" />
+    <span class="card-art-placeholder__label" aria-hidden="true">ИЛЛЮСТРАЦИЯ КАРТЫ</span>
   </div>
 </template>
 
@@ -19,11 +20,11 @@ defineProps<{
   display: grid;
   place-items: center;
   overflow: hidden;
-  color: var(--card-accent, var(--color-accent-strong));
+  color: rgb(255 255 255 / 72%);
   background:
     radial-gradient(circle at 72% 22%, currentColor 0 4%, transparent 4.5%),
     linear-gradient(34deg, transparent 0 43%, currentColor 43.5% 45%, transparent 45.5%),
-    linear-gradient(145deg, var(--card-accent-deep, var(--color-board)), var(--color-board));
+    linear-gradient(112deg, #c8d7cf 2%, #879a92 102%);
 }
 
 .card-art-placeholder__diamond,
@@ -43,5 +44,14 @@ defineProps<{
   height: 22%;
   border-width: 0 0 2px;
   transform: rotate(-18deg);
+}
+
+.card-art-placeholder__label {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-meta);
+  font-size: .56rem;
+  font-weight: 700;
+  letter-spacing: .08em;
 }
 </style>

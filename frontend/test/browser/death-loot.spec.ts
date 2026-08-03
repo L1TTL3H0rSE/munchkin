@@ -143,5 +143,7 @@ test("death loot has a canonical Chromium visual baseline", async ({page}, testI
   await expect(page).toHaveScreenshot("death-loot/actor.png", {
     fullPage: true,
     animations: "disabled",
+    // The advisory response timer is live while the screenshot is captured.
+    maxDiffPixels: 256,
   });
 });

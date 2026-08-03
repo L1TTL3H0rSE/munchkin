@@ -1,6 +1,24 @@
 name: deploy-production
 
 on:
+  workflow_call:
+    inputs:
+      game_image:
+        description: Immutable game image reference
+        required: true
+        type: string
+      web_image:
+        description: Immutable web image reference
+        required: true
+        type: string
+      commit:
+        description: Full lowercase commit SHA represented by the images
+        required: true
+        type: string
+      release_run_id:
+        description: Successful CI run that produced the image, SBOM and attestation evidence
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       game_image:
@@ -41,6 +59,7 @@ jobs:
       RELEASE_RUN_ID: ${{ inputs.release_run_id }}
       DEPLOY_HOST: ${{ secrets.PRODUCTION_DEPLOY_HOST }}
       DEPLOY_USER: munchkin-deploy
+      DEPLOY_PORT: "2222"
     steps:
       - name: Checkout release verification contract
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
@@ -55,6 +74,12 @@ jobs:
           [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
           [[ "$RELEASE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ -n "$DEPLOY_HOST" && "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$DEPLOY_PORT" == "2222" ]]
+
+      - name: Install pinned Cosign verifier
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
+        with:
+          cosign-release: v3.0.6
 
       - name: Verify release SBOM and keyless attestation evidence
         shell: bash
@@ -73,7 +98,7 @@ jobs:
           security_evidence="$(find "$evidence_dir" -type f -name "security-evidence-${RELEASE_COMMIT}.json" -print -quit)"
           [[ -n "$manifest" && -n "$security_evidence" ]]
           jq -e --arg run "$RELEASE_RUN_ID" '.workflowRunId == $run' "$manifest" >/dev/null
-          scripts/production/verify-release-evidence.sh \
+          bash scripts/production/verify-release-evidence.sh \
             --game-image "$GAME_IMAGE" \
             --web-image "$WEB_IMAGE" \
             --commit "$RELEASE_COMMIT" \
@@ -108,9 +133,11 @@ jobs:
           set -Eeuo pipefail
           set +e
           ssh -i "$DEPLOY_SSH_KEY_PATH" \
+            -p "$DEPLOY_PORT" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
+            -o HostKeyAlias="$DEPLOY_HOST" \
             -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS_PATH" \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             deploy --game-image "$GAME_IMAGE" --web-image "$WEB_IMAGE" \
@@ -120,9 +147,11 @@ jobs:
           deploy_exit=$?
           set -e
           ssh -i "$DEPLOY_SSH_KEY_PATH" \
+            -p "$DEPLOY_PORT" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
+            -o HostKeyAlias="$DEPLOY_HOST" \
             -o UserKnownHostsFile="$DEPLOY_KNOWN_HOSTS_PATH" \
             "$DEPLOY_USER@$DEPLOY_HOST" status --evidence \
             >"$RUNNER_TEMP/production-release-evidence.json" || true

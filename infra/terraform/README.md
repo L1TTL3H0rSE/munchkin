@@ -250,9 +250,12 @@ VM фиксирует `ru-central1-d`, current family `ubuntu-2404-lts`,
 Data disk имеет `prevent_destroy`, подключается с
 `device_name = "munchkin-data"` и `auto_delete = false`.
 
-Security group публикует только TCP `80`/`443` в `0.0.0.0/0`; TCP `22`
-принимает required process-only IPv4 CIDR set. IPv6 ingress и остальные
-inbound ports отсутствуют, egress явно разрешён в `0.0.0.0/0`.
+Security group публикует TCP `80`/`443` и отдельный deploy-only TCP `2222` в
+`0.0.0.0/0`; owner/admin TCP `22` по-прежнему принимает только required
+process-local IPv4 CIDR set. На `2222` OpenSSH допускает только
+`munchkin-deploy` с public-key authentication и forced command. IPv6 ingress
+и остальные inbound ports отсутствуют, egress явно разрешён в
+`0.0.0.0/0`.
 
 Versioned cloud-init создаёт только trusted human user `munchkin-admin` с
 owner ED25519 key и sudo, но без membership в root-equivalent `docker` group.
@@ -272,6 +275,9 @@ data disk виден как `/dev/vdb`, смонтирован в `/srv/munchkin
 и direct root denial; отдельные attempts завершились exit `255`. Human admin
 не входит в `docker` group. Wildcard TCP listeners содержат только SSH
 `0.0.0.0:22`/`[::]:22`; остальные обнаруженные listeners loopback-only.
+Это историческое evidence исходного VM bootstrap. Deploy transport extension
+отдельно добавляет validated listener `2222`, UFW rate limit и сохраняет
+owner-only path на `22`; live convergence требует отдельного reviewed apply.
 
 ## Credential boundary
 

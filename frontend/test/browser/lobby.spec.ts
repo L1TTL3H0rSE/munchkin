@@ -23,6 +23,12 @@ async function openLobby(page: Page): Promise<void> {
   });
 }
 
+async function selectLobbyMode(page: Page, mode: "create" | "join"): Promise<void> {
+  const label = mode === "create" ? "Создать" : "Войти";
+  await page.locator(".lobby-entry__mode-switch").getByRole("button", {name: label, exact: true}).click();
+  await expect(page.locator(`.lobby-form--${mode}`)).toBeVisible();
+}
+
 async function routeLobbyAPI(
   page: Page,
   options: {
@@ -123,6 +129,7 @@ test("create pending state does not block join and success follows server result
 
   await expect(createForm).toHaveAttribute("data-state", "loading");
   await expect(createForm).toHaveAttribute("aria-busy", "true");
+  await selectLobbyMode(page, "join");
   await expect(joinForm).toHaveAttribute("data-state", "idle");
   await expect(joinForm.getByRole("button", {name: "Войти"})).toBeEnabled();
 
@@ -136,6 +143,7 @@ test("create pending state does not block join and success follows server result
 test("not-found join keeps safe input and focuses the linked field error", async ({page}) => {
   await routeLobbyAPI(page, {joinStatus: 404});
   await openLobby(page);
+  await selectLobbyMode(page, "join");
 
   const joinForm = page.locator(".lobby-form--join");
   const gameIDInput = joinForm.locator("input[inputmode='text']");
@@ -184,6 +192,21 @@ test("lobby stays within the viewport and keeps keyboard/media affordances", asy
   await expect(page.locator(".lobby-form--create input[autocomplete='nickname']")).toBeVisible();
 });
 
+test("selected lobby mode controls the compact entry form", async ({page}) => {
+  await page.setViewportSize({width: 360, height: 640});
+  await openLobby(page);
+
+  const entry = page.locator(".lobby-entry");
+  await expect(entry).toHaveAttribute("data-mode", "create");
+  await expect(page.locator(".lobby-form--create")).toBeVisible();
+  await expect(page.locator(".lobby-form--join")).toBeHidden();
+
+  await selectLobbyMode(page, "join");
+  await expect(entry).toHaveAttribute("data-mode", "join");
+  await expect(page.locator(".lobby-form--create")).toBeHidden();
+  await expect(page.locator(".lobby-form--join")).toBeVisible();
+});
+
 test("lobby has no serious or critical axe violations", async ({page}) => {
   await openLobby(page);
   const results = await new AxeBuilder({page})
@@ -209,6 +232,7 @@ test("join submits with Enter and keeps create independent", async ({page}) => {
   await createForm.getByRole("button", {name: "Создать"}).click();
   await expect(createForm).toHaveAttribute("data-state", "loading");
 
+  await selectLobbyMode(page, "join");
   await joinForm.locator("input[autocomplete='nickname']").fill("Борис");
   const gameIDInput = joinForm.locator("input[inputmode='text']");
   await gameIDInput.fill(fixtureID);

@@ -6,6 +6,7 @@ import type {
 } from "@munchkin/contracts";
 
 import type {GameConnectionState} from "../../../composables/useGameSessionController";
+import type {GameApiErrorKind} from "../../../composables/useGameApi";
 import type {
   ActionEntry,
   CardActionBinding,
@@ -23,10 +24,12 @@ import MobileGameHeader from "./MobileGameHeader.vue";
 import MobileOpponentSummary from "./MobileOpponentSummary.vue";
 import MobileOwnState from "./MobileOwnState.vue";
 import {hasActionableDeadline} from "./mobileGameModel";
+import SystemStateSurface from "../status/SystemStateSurface.vue";
 
 const props = defineProps<{
   projection: Projection;
   connectionState: GameConnectionState;
+  errorKind: GameApiErrorKind | null;
   errorMessage: string;
   actionBusy: boolean;
   isBusy: boolean;
@@ -81,71 +84,74 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
     :aria-busy="isBusy"
     aria-label="Игровой стол для телефона"
   >
-    <MobileGameHeader :projection="projection" />
+    <SystemStateSurface
+      v-if="projection.status === 'finished'"
+      kind="victory"
+      :projection="projection"
+    />
+    <template v-else>
+      <MobileGameHeader :projection="projection" />
 
-    <div class="mobile-game-table__status">
-      <GameConnectionStatus
-        :state="connectionState"
-        :error-message="errorMessage"
-        @retry="emit('retry')"
-      />
-    </div>
+      <div v-if="connectionState !== 'connected'" class="mobile-game-table__status">
+        <GameConnectionStatus
+          :state="connectionState"
+          :error-kind="errorKind"
+          :error-message="errorMessage"
+          :has-projection="true"
+          @retry="emit('retry')"
+        />
+      </div>
 
-    <MobileOpponentSummary :projection="projection" />
+      <MobileOpponentSummary :projection="projection" />
 
-    <div class="mobile-game-table__stage">
-      <MobileEncounterStage :projection="projection" />
-      <MobileOwnState
-        v-if="hasActionableHand || projection.you.equipped.length || projection.you.carried.length
-          || projection.you.traits.length || projection.you.attachments.length
-          || projection.you.persistent_curses.length"
-        :projection="projection"
-        :show-hand="hasActionableHand"
-        :has-interaction="Boolean(projection.interaction?.response_required_for_you)"
-        :has-actionable-deadline="hasActionableDeadline(projection)"
-        :bindings-for-card="bindingsForCard"
-        :state-for-card="stateForCard"
-        :confirmed-card-ids="confirmedCardIds"
-        @activate="emit('activate', $event)"
-      />
-    </div>
+      <div class="mobile-game-table__stage">
+        <MobileEncounterStage :projection="projection" />
+      </div>
 
-    <section
-      class="mobile-game-table__dock"
-      :class="{'mobile-game-table__dock--compact': compactActionDock}"
-      aria-label="Действия текущей проекции"
-    >
-      <EconomySurface
-        v-if="economyEntries.length"
-        :projection="projection"
-        :actions="economyEntries"
-        :busy="actionBusy"
-        @submit="emit('execute-economy', $event)"
-      />
-
-      <ActionPanel
-        :entries="actionPanelEntries"
-        :cards="visibleCards"
-        :player-names="playerNames"
-        :busy="actionBusy"
-        :context-card-name="contextCardName"
-        @close="emit('close')"
-        @execute="runAction"
-      />
-
-      <p
-        v-if="projection.status === 'active' && !actionPanelEntries.length && !economyEntries.length"
-        class="mobile-game-table__waiting"
-        role="status"
+      <section
+        class="mobile-game-table__dock"
+        :class="{'mobile-game-table__dock--compact': compactActionDock}"
+        aria-label="Действия текущей проекции"
       >
-        Ждём текущую проекцию от {{ projection.turn.player_id === projection.you.player_id
-          ? "сервера"
-          : "другого игрока" }}.
-      </p>
-      <strong v-if="projection.status === 'finished'" class="mobile-game-table__result">
-        Игра завершена: победитель подтверждён сервером.
-      </strong>
-    </section>
+        <MobileOwnState
+          :projection="projection"
+          :show-hand="hasActionableHand"
+          :has-interaction="Boolean(projection.interaction?.response_required_for_you)"
+          :has-actionable-deadline="hasActionableDeadline(projection)"
+          :bindings-for-card="bindingsForCard"
+          :state-for-card="stateForCard"
+          :confirmed-card-ids="confirmedCardIds"
+          @activate="emit('activate', $event)"
+        />
+
+        <EconomySurface
+          v-if="economyEntries.length"
+          :projection="projection"
+          :actions="economyEntries"
+          :busy="actionBusy"
+          @submit="emit('execute-economy', $event)"
+        />
+
+        <ActionPanel
+          v-if="actionPanelEntries.length || contextCardName"
+          :entries="actionPanelEntries"
+          :cards="visibleCards"
+          :player-names="playerNames"
+          :busy="actionBusy"
+          :context-card-name="contextCardName"
+          @close="emit('close')"
+          @execute="runAction"
+        />
+
+        <p
+          v-if="projection.status === 'active' && !actionPanelEntries.length && !economyEntries.length"
+          class="mobile-game-table__waiting"
+          role="status"
+        >
+          Ожидаем подтверждённый ход другого игрока.
+        </p>
+      </section>
+    </template>
   </section>
 </template>
 
@@ -165,14 +171,13 @@ function runAction(entry: ActionEntry, payload: CommandPayload) {
 }
 
 .mobile-game-table__stage {
-  display: grid;
-  align-content: start;
-  gap: var(--space-2);
+  min-height: 0;
 }
 
 .mobile-game-table__dock {
   display: grid;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .mobile-game-table__waiting,
