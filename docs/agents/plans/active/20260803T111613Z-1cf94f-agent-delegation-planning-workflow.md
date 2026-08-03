@@ -118,7 +118,8 @@ read-only agents исследуют и проверяют, а все repository 
   long-context results заметно слабее Terra; поэтому task context обязан быть
   bounded, а full-plan reviewer маршрутизируется на Terra.
 - `./leinoctl context` и `plan-lint` 2026-08-03 подтверждают registry без lint
-  issues; active in-progress dependency остаётся единственным execution blocker.
+  issues; dependency `20260802T164112Z-dfb164-production-live-wif-registry-evidence`
+  уже `completed` и находится в archive, поэтому execution blocker снят.
 - Другие active plans, включая frontend remediation draft, сохраняются без
   изменений.
 
@@ -203,7 +204,7 @@ read-only agents исследуют и проверяют, а все repository 
 
 | Ресурс | Другие plans | Владелец | Порядок/стратегия |
 |---|---|---|---|
-| `repository:harness-policy` | production live WIF plan | exclusive | дождаться archive/release dependency, затем новая trusted session |
+| `repository:harness-policy` | completed production live WIF plan | exclusive | dependency archived; повторить context и начать новую trusted session |
 | `repository:plan-authoring-contract` | все будущие plans | этот plan | применяется только после completion/new session |
 | `codex:project-agent-routing` | active Codex sessions | этот plan | current session не доказывает reload |
 
@@ -211,13 +212,13 @@ read-only agents исследуют и проверяют, а все repository 
 
 - **Проверены active plans:** `./leinoctl context --paths ...`, manifests,
   write sets, owner/session state и `./leinoctl preflight`, 2026-08-03.
-- **Обнаруженные пересечения:** in-progress exclusive plan
-  `20260802T164112Z-dfb164-production-live-wif-registry-evidence` также владеет
-  `docs/agents/HARNESS.md`. Frontend remediation draft
+- **Обнаруженные пересечения:** archived completed plan
+  `20260802T164112Z-dfb164-production-live-wif-registry-evidence` исторически
+  менял `docs/agents/HARNESS.md`, но больше не является eligible concurrent
+  owner. Frontend remediation draft
   `20260803T105519Z-a1d39d-...` не входит в source write set этого plan.
-- **Решение:** exact dependency на production-live plan; не select/implement,
-  пока dependency не completed/archive/released. После этого повторить
-  context/preflight; чужие active plans не изменять.
+- **Решение:** exact dependency удовлетворена; перед approval/select повторить
+  context/preflight и не изменять чужие active plans.
 
 ## Delegation strategy
 
