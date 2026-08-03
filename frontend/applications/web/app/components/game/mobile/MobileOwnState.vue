@@ -69,13 +69,12 @@ const emit = defineEmits<{
 
     <div class="mobile-own-state__controls">
       <button
-        v-if="publicCards.length"
         class="mobile-own-state__zones"
         type="button"
         :aria-expanded="zonesOpen"
         @click="zonesOpen = true"
       >
-        Открытые зоны
+        Персонаж
       </button>
       <HandTab
         v-if="showHand"
@@ -119,7 +118,10 @@ const emit = defineEmits<{
     description="Эти карты уже видны текущему игроку; скрытая рука остаётся в отдельной вкладке."
     @close="closeZones"
   >
-    <div class="mobile-own-sheet__grid" role="list">
+    <p v-if="!publicCards.length" class="mobile-own-sheet__empty" role="status">
+      Открытых карт пока нет.
+    </p>
+    <div v-else class="mobile-own-sheet__grid" role="list">
       <GameCard
         v-for="card in publicCards"
         :key="`mobile-zone-${card.instance_id}`"

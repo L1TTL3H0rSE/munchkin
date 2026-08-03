@@ -2,6 +2,8 @@ import {describe, expect, it} from "vitest";
 
 import {
   actionCoverage,
+  excludedFigmaSources,
+  figmaCompactHandoffs,
   figmaDesktopStateNames,
   figmaFlowModes,
   figmaStateDescriptors,
@@ -59,5 +61,17 @@ describe("Figma state matrix", () => {
     for (const mode of Object.values(figmaFlowModes)) {
       expect(fixtures.has(mode.fixtureID)).toBe(true);
     }
+  });
+
+  it("records the resolved compact and lobby source nodes without the excluded viewport", () => {
+    expect(figmaCompactHandoffs.integratedStates.nodeId).toBe("147:671");
+    expect(figmaCompactHandoffs.coreLoop.nodeId).toBe("160:1140");
+    expect(figmaCompactHandoffs.lobbySelectedB.nodeId).toBe("225:14");
+    expect(figmaCompactHandoffs.lobbyDesktopSelectedB.nodeId).toBe("240:50");
+    expect([...figmaCompactHandoffs.integratedStates.fixtureIDs]).toContain("mobile-combat-multiple");
+    expect(excludedFigmaSources).toEqual([
+      expect.objectContaining({nodeId: "122:3", viewport: "360x800"}),
+    ]);
+    expect(excludedFigmaSources[0]?.reason).toContain("excluded");
   });
 });
