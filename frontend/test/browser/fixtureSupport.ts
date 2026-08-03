@@ -186,9 +186,14 @@ export async function assertSkipLinkFocus(page: Page): Promise<void> {
 }
 
 export async function assertLabeledRails(page: Page): Promise<void> {
-  await expect(page.locator("header.topbar")).toHaveCount(1);
   await expect(page.locator("main#main-content")).toHaveCount(1);
   const presenter = await activePresenter(page);
+  const terminal = presenter.locator(
+    ".desktop-victory-result, .system-state-surface[data-state='victory']",
+  );
+  if (await terminal.count() === 0) {
+    await expect(presenter.locator("header.desktop-game-header, header.mobile-game-header")).toHaveCount(1);
+  }
   const actionDock = presenter.locator(".action-dock:visible");
   if (await actionDock.count()) {
     await expect(actionDock).toHaveAttribute("aria-labelledby", "action-dock-title");

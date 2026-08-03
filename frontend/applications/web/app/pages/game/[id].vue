@@ -9,6 +9,7 @@ import type {EconomySubmission} from "../../components/interaction/economyModel"
 import {
   buildRouteSystemState,
 } from "../../components/game/status/systemStateModel";
+import LoadingGameTable from "../../components/game/status/LoadingGameTable.vue";
 import SystemStateSurface from "../../components/game/status/SystemStateSurface.vue";
 import {useGameSessionController} from "../../composables/useGameSessionController";
 
@@ -68,9 +69,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section v-if="routeState.kind === 'loading'" class="center-state" aria-busy="true">
-    <SystemStateSurface kind="loading" />
-  </section>
+  <LoadingGameTable v-if="routeState.kind === 'loading'" />
   <section
     v-else-if="routeState.kind !== 'game' && routeState.kind !== 'victory'"
     class="center-state"
@@ -120,8 +119,8 @@ onMounted(() => {
   place-items: center;
   gap: 1rem;
   min-width: 0;
-  min-height: calc(100vh - 64px);
-  min-height: calc(100dvh - 64px);
+  min-height: 100vh;
+  min-height: 100dvh;
   padding: 1rem;
   color: var(--muted);
   text-align: center;

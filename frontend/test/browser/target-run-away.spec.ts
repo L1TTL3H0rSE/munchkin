@@ -134,5 +134,7 @@ test("Run Away has a canonical Chromium visual baseline", async ({page}, testInf
   await expect(page).toHaveScreenshot("target-run-away.png", {
     fullPage: true,
     animations: "disabled",
+    // The advisory response timer is live while the screenshot is captured.
+    maxDiffPixels: 256,
   });
 });

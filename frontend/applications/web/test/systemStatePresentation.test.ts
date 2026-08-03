@@ -64,7 +64,7 @@ describe("system state presentation", () => {
       .toBe(false);
     expect(buildConnectionPresentation("offline", "offline", true))
       .toMatchObject({
-        label: "Связь прервалась",
+        label: "Связь потеряна",
         canRetry: false,
         ariaBusy: true,
       });

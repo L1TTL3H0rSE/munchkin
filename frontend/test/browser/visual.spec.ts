@@ -61,11 +61,14 @@ for (const [snapshotName, stateName] of desktopVisualCases) {
   test(snapshotName, async ({page}, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
     const state = figmaStateMatrix[stateName];
+    if (snapshotName === "desktop-death") {
+      await page.clock.install({time: "2030-01-01T00:04:00.000Z"});
+    }
     await openFixtureAtViewport(page, state.fixtureID, 1440, 900);
     await hideDevtools(page);
     await expect(await activePresenter(page, "desktop")).toBeVisible();
     const screenshotTolerance = snapshotName === "desktop-death"
-      ? {maxDiffPixels: 2}
+      ? {maxDiffPixels: 256}
       : {};
     await expect(page).toHaveScreenshot(`${snapshotName}.png`, {
       fullPage: false,

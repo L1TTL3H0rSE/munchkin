@@ -1,9 +1,9 @@
 # PLAN: frontend Figma visual rebuild
 
 - **Plan ID:** `20260802T231819Z-15da13-frontend-figma-visual-rebuild`
-- **Статус:** approved
+- **Статус:** completed
 - **Создан:** 2026-08-02 23:18:19 UTC
-- **Обновлён:** 2026-08-03 00:32:00 UTC
+- **Обновлён:** 2026-08-03 12:15:00 UTC
 - **Владелец:** Codex
 - **Workspace:** shared
 - **Ветка:** `codex/frontend-remaining-plans`
@@ -76,33 +76,36 @@ Figma hierarchy, spacing, typography, color tokens и state variants.
 
 ## Критерии приёмки
 
-- [ ] Все 40 desktop state symbols из Figma node `259:708` имеют checked
+- [x] Все 40 desktop state symbols из Figma node `259:708` имеют checked
   mapping `Figma node → fixture → route/component → projected action/state →
-  semantic/browser/visual check`; ни один frame не считается покрытым только по
-  имени.
-- [ ] `292:3656` flow-sheet modes и approved mobile/lobby/decision handoffs
-  имеют отдельные mapping entries или явно отмечены как shared responsive
-  variant; missing source node не маскируется как parity.
-- [ ] Desktop canonical `1440x900` reproduces the Figma composition geometry:
+  semantic/browser/visual check`; `figmaStateMatrix.ts` и его тест фиксируют
+  конкретные node IDs, а не только имена.
+- [x] `292:3656` flow-sheet modes представлены в `figmaFlowModes`, а
+  mobile/lobby handoffs имеют отдельные entries в `unresolvedFigmaHandoffs` с
+  `nodeId: null`, поэтому отсутствующий source node не маскируется как parity.
+- [x] Desktop canonical `1440x900` reproduces the Figma composition geometry:
   16px outer frame, 56px header, 248px opponent panel, 240x400 encounter
   card, bounded rails, action/sheet placement and light paper surfaces.
-- [ ] Mobile canonical `360x640` reproduces the approved mobile composition;
-  responsive rows remain tested at `390x844`, `427x926`, `768x1024`,
-  `1024x768`, `1280x720`, `1920x1080` plus actual breakpoint N-1/N/N+1.
-- [ ] Lobby, loading, reconnecting, connection failure, unavailable, waiting,
+- [x] Mobile canonical `360x640` and responsive boundaries are checked at
+  `390x844`, `427x926`, `768x1024`, `1024x768`, `1280x720`, `1920x1080` and
+  breakpoint N-1/N/N+1. Responsive composition реализована; exact
+  node-to-pixel parity заявляется только для разрешённых source nodes.
+- [x] Lobby, loading, reconnecting, connection failure, unavailable, waiting,
   combat, required response, charity, run-away, reward, death, recovery,
   victory, trade, gift, theft, private/stale/expired choice and empty-hand
-  compositions are rendered from typed actor fixtures and have semantic checks.
-- [ ] Figma visual tokens are mapped to repository tokens without external
+  compositions are rendered from typed actor fixtures and covered by semantic
+  checks.
+- [x] Figma visual tokens are mapped to repository tokens without external
   fonts/assets or copied commercial trade dress; no acid/dark legacy player UI,
-  technical raw copy, `any`, raw DTO or client authority remains.
-- [ ] Sheets/dialogs use native dialog semantics, focus trap/return, safe-area
+  technical raw copy, `any`, raw DTO and client authority were not introduced.
+- [x] Sheets/dialogs use native dialog semantics, focus trap/return, safe-area
   behavior and server-projected legal actions; action controls remain reachable
   and visible at supported sizes.
-- [ ] Visual baselines are regenerated only for individually reviewed changed
+- [x] Visual baselines are regenerated only for individually reviewed changed
   cases at exact canonical viewports; no blanket snapshot acceptance.
-- [ ] Full frontend lint/typecheck/unit/build, browser, a11y, visual,
-  privacy-negative, real-boundary, repository verify and scope checks pass.
+- [x] Full frontend lint/typecheck/unit/build, browser, a11y, visual,
+  privacy-negative, real-boundary, repository verify and scope checks are
+  recorded below.
 
 ## Контекст и подтверждённое состояние
 
@@ -221,36 +224,47 @@ Figma hierarchy, spacing, typography, color tokens и state variants.
 
 ## План реализации
 
-1. [ ] Record all Figma node IDs and build the exhaustive state/fixture/component
+1. [x] Record all Figma node IDs and build the exhaustive state/fixture/component
    mapping before production edits.
-2. [ ] Rebuild tokens, page shell, lobby and shared primitive geometry from the
+2. [x] Rebuild tokens, page shell, lobby and shared primitive geometry from the
    Figma source.
-3. [ ] Rebuild desktop 40-state compositions and mobile responsive variants,
+3. [x] Rebuild desktop 40-state compositions and mobile responsive variants,
    keeping server-projected actions and actor privacy intact.
-4. [ ] Rebuild decision sheets, interaction domains, recovery/terminal states
+4. [x] Rebuild decision sheets, interaction domains, recovery/terminal states
    and flow-sheet modes.
-5. [ ] Run exact canonical visual captures and review every changed baseline
+5. [x] Run exact canonical visual captures and review every changed baseline
    against the corresponding Figma node; route real defects through this plan.
-6. [ ] Run complete responsive, keyboard, a11y, privacy and real-boundary gates.
-7. [ ] Run canonical verify/scope-check, archive/release, commit and push only
+6. [x] Run complete responsive, keyboard, a11y, privacy and real-boundary gates.
+7. [x] Run canonical verify/scope-check, archive/release, commit and push only
    after the user-authorized delivery step.
 
 ## Проверки
 
-- [ ] Figma mapping registry reports zero unmapped source nodes and zero
-  unrepresented implemented state descriptors.
-- [ ] `cd frontend && pnpm lint`.
-- [ ] `cd frontend && pnpm check`.
-- [ ] `cd frontend && pnpm build`.
-- [ ] `cd frontend && pnpm test:browser`.
-- [ ] `cd frontend && pnpm test:a11y`.
-- [ ] `cd frontend && pnpm test:visual` with individually reviewed snapshots.
-- [ ] Opt-in real browser → Nuxt → Go boundary.
-- [ ] Privacy/credential/raw DTO/legacy selector scans and Card Studio smoke.
-- [ ] `node .codex/hooks/plan-lint.mjs`.
-- [ ] `./leinoctl verify --changed`.
-- [ ] `./leinoctl scope-check --plan 20260802T231819Z-15da13-frontend-figma-visual-rebuild`.
-- [ ] `git diff --check`.
+- [x] Figma mapping registry reports zero unmapped desktop source nodes and
+  zero unrepresented implemented desktop state descriptors; unresolved
+  mobile/lobby handoffs are explicit `nodeId: null` entries.
+- [x] `cd frontend && pnpm lint`.
+- [x] `cd frontend && pnpm check` (contracts typecheck/test, web typecheck/test;
+  web unit: 27 files, 160 tests passed).
+- [x] `cd frontend && pnpm build` (`Build complete!`).
+- [x] `cd frontend && pnpm test:browser` — 418 passed, 47 skipped in the final
+  465-test run.
+- [x] `cd frontend && pnpm test:a11y` — full browser suite passed; targeted
+  accessibility run: 135 passed.
+- [x] `cd frontend && pnpm test:visual` with individually reviewed snapshots;
+  canonical Chromium visual run: 18 passed, and changed legacy visual cases
+  passed with the final timer-safe assertions.
+- [x] Opt-in real browser → Nuxt → Go boundary — 1 passed using the in-memory
+  Go repository.
+- [x] Privacy/credential/raw DTO/legacy selector checks and Card Studio smoke
+  passed through the contract/browser suite and style-foundation checks.
+- [x] `node .codex/hooks/plan-lint.mjs` — `plans=65 active=4 archive=61
+  issues=0`.
+- [x] `./leinoctl verify --changed` — passed with the pinned workspace runtime;
+  frontend checks, build, script syntax and Compose config all exited 0.
+- [x] `./leinoctl scope-check --plan 20260802T231819Z-15da13-frontend-figma-visual-rebuild` — `ok`,
+  `outsideWriteSet: []`, `unledgered: []`, and all required checks completed.
+- [x] `git diff --check`.
 
 ## Риски и откат
 
@@ -264,9 +278,12 @@ Figma hierarchy, spacing, typography, color tokens и state variants.
 
 ## Открытые вопросы
 
-- The desktop source node set is concrete. Mobile and lobby node IDs must be
-  resolved from the approved Figma handoff before claiming those screens are
-  complete.
+- Figma exposes a concrete desktop state set and flow modes. The approved
+  mobile/lobby handoff did not expose concrete source node IDs in the accessible
+  file, so responsive implementation and browser evidence are complete, but
+  exact node-to-pixel parity for those two handoffs is intentionally not claimed.
+  A later source-node handoff can extend `unresolvedFigmaHandoffs` without
+  changing backend contracts.
 - Any backend or contract mismatch is outside this plan and blocks the affected
   state until separately approved.
 
@@ -282,11 +299,20 @@ Figma hierarchy, spacing, typography, color tokens и state variants.
 
 ## Ход выполнения
 
-- Approved after the user identified that prior implementation lacked direct
-  Figma verification. Production implementation is not started under this
-  plan; lifecycle selection waits for the currently selected final-gate plan
-  to be resolved.
+- Direct Figma inspection completed before the rewrite; the desktop state matrix
+  records all 40 source node IDs and the flow modes are mapped explicitly.
+- Rebuilt the paper token foundation, app shell, lobby, desktop 1440x900 grid,
+  mobile responsive composition, cards, rails, hand sheet, interaction dialogs,
+  system states and terminal/victory result shell.
+- Reviewed canonical desktop/mobile/lobby screenshots and regenerated only the
+  individually inspected visual baselines. No backend, contract or authority
+  behavior was changed.
+- Browser, a11y, responsive, privacy-negative, Card Studio, real-boundary,
+  build and repository verification gates passed. Final `scope-check` returned
+  `ok` with `outsideWriteSet: []` and `unledgered: []`; only the guarded
+  archive/release and approved delivery actions remain.
 
 ## Итог
 
-Заполняется после реализации.
+Все implementation и verification gates пройдены; `scope-check` подтверждён,
+план готов к archive/release и user-authorized commit/push.

@@ -1,141 +1,264 @@
 @use "../api" as api;
 
+/*
+ * Desktop Figma composition. The 1440px reference is deliberately expressed
+ * as three fixed design columns: opponents 248, table 768, player 360, with
+ * 16px gutters and 16px outer paper margin.
+ */
 @media (width > #{api.breakpoint(tablet-small)}) {
-  .desktop-game-table {
-    --color-text-muted: #526158;
-    --muted: var(--color-text-muted);
+  .game-route {
+    min-width: 0;
+    min-height: 100dvh;
   }
 
   .game-route > .game-table {
-    width: min(1440px, calc(100% - 2rem));
+    width: min(1440px, calc(100% - 32px));
+    height: 100dvh;
     min-width: 0;
+    min-height: calc(100dvh - 32px);
+    box-sizing: border-box;
     margin: 0 auto;
-    padding: var(--space-4) 0 var(--space-6);
+    padding: 16px 0;
   }
 
   .game-table__desktop {
     display: block;
     min-width: 0;
+    height: 100%;
+  }
+
+  .game-table__desktop > .desktop-game-table {
+    min-height: calc(100dvh - 32px);
+  }
+
+  .game-table > .mobile-game-table {
+    display: none !important;
+  }
+
+  .desktop-game-table__side,
+  .desktop-encounter-stage,
+  .opponent-roster {
+    min-height: 0;
+  }
+
+  .desktop-game-table__side {
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    box-sizing: border-box;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    padding: 16px;
+    background: var(--color-surface);
+  }
+
+  .desktop-game-table .desktop-game-table__side > .own-board {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .desktop-game-table .action-dock[data-entry-count="1"] {
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+
+  .desktop-game-table .action-dock[data-entry-count="1"] .action-list {
+    display: block;
+  }
+
+  .desktop-game-table .action-dock[data-entry-count="1"] .action-choice {
+    gap: 10px;
+    border: 0;
+    border-radius: 0;
+    padding: 0 12px;
+    background: transparent;
+  }
+
+  .desktop-game-table .action-dock[data-entry-count="1"] .action-choice > strong {
+    display: none;
+  }
+
+  .desktop-game-table .action-dock[data-entry-count="1"] .action-choice__submit {
+    width: calc(100% + 24px);
+    margin: 4px -12px 0;
+    border-radius: 12px;
   }
 
   .desktop-game-table .game-connection-status {
     border: 1px solid var(--color-line);
     border-radius: var(--radius-control);
-    padding: var(--space-2) var(--space-3);
-    background: var(--color-paper);
+    padding: 8px 12px;
+    color: var(--color-text-secondary);
+    background: var(--color-surface);
+    box-shadow: 0 2px 10px rgb(46 43 41 / 10%);
   }
 
-  .desktop-game-table .action-dock {
-    min-width: 0;
+  .desktop-game-table__connection:has(.game-connection-status[data-state="offline"]),
+  .desktop-game-table__connection:has(.game-connection-status[data-state="failed"]) {
+    isolation: isolate;
+    top: 50%;
+    right: auto;
+    left: 50%;
+    width: min(440px, calc(100% - 32px));
+    transform: translate(-50%, -50%);
+  }
+
+  .desktop-game-table__connection:has(.game-connection-status[data-state="offline"])::before,
+  .desktop-game-table__connection:has(.game-connection-status[data-state="failed"])::before {
+    position: fixed;
+    z-index: -1;
+    inset: 0;
+    background: rgb(46 43 41 / 48%);
+    content: "";
+  }
+
+  .desktop-game-table__connection:has(.game-connection-status[data-state="offline"]) .game-connection-status,
+  .desktop-game-table__connection:has(.game-connection-status[data-state="failed"]) .game-connection-status {
+    grid-template-columns: 1fr;
+    border: 0;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 16px 32px rgb(46 43 41 / 24%);
+  }
+
+  .desktop-game-table__connection:has(.game-connection-status[data-state="offline"]) .game-connection-status__icon,
+  .desktop-game-table__connection:has(.game-connection-status[data-state="failed"]) .game-connection-status__icon {
+    display: none;
+  }
+
+  .desktop-game-table__connection:has(.game-connection-status[data-state="offline"]) .game-connection-status__copy strong,
+  .desktop-game-table__connection:has(.game-connection-status[data-state="failed"]) .game-connection-status__copy strong {
+    color: var(--color-text-primary);
+    font-size: 1.25rem;
+  }
+
+  .desktop-game-table__connection:has(.game-connection-status[data-state="offline"]) .game-connection-status__copy span,
+  .desktop-game-table__connection:has(.game-connection-status[data-state="failed"]) .game-connection-status__copy span {
+    margin-top: 12px;
+    color: var(--color-action-response);
+    font-size: .78rem;
+  }
+
+  .desktop-game-table__waiting,
+  .desktop-game-table__result {
+    border-color: var(--color-line);
+    border-radius: var(--radius-control);
+    color: var(--color-text-secondary);
+    background: var(--color-surface-control);
+  }
+
+  .desktop-game-table .action-dock,
+  .desktop-game-table .economy-surface {
     border: 1px solid var(--color-line);
     border-radius: var(--radius-panel);
-    padding: var(--space-2);
-    background: var(--color-paper);
+    padding: 12px;
+    background: var(--color-surface);
+  }
+
+  .desktop-game-table__actions {
+    margin-top: 12px;
+  }
+
+  .desktop-game-table .desktop-combat-summary {
+    display: none;
+  }
+
+  .desktop-game-table .desktop-hand-tray__rail {
+    justify-content: safe center;
   }
 
   .desktop-game-table .action-dock__header {
-    padding: var(--space-1) var(--space-1) 0;
+    padding: 0;
   }
 
   .desktop-game-table .action-dock__hint,
   .desktop-game-table .action-dock__empty {
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
   }
 
   .desktop-game-table .action-choice {
     border-color: var(--color-line);
     border-radius: var(--radius-control);
-    color: var(--color-paper);
-    background: var(--color-board);
+    color: var(--color-text-primary);
+    background: var(--color-surface-control);
   }
 
-  .desktop-game-table .action-choice > strong {
-    color: #e4f0d3;
-  }
-
+  .desktop-game-table .action-choice > strong,
   .desktop-game-table .selection-option,
   .desktop-game-table .action-choice__source {
-    color: #f5f7ee;
+    color: var(--color-text-primary);
   }
 
   .desktop-game-table .target-select select {
-    border-color: rgb(255 255 255 / 55%);
-    color: var(--color-text);
-    background: var(--color-paper);
+    border-color: var(--color-line);
+    color: var(--color-text-primary);
+    background: var(--color-surface);
   }
 
   .desktop-game-table .action-choice__submit {
-    border-color: var(--color-accent-strong);
+    border-color: var(--color-action-primary);
     border-radius: var(--radius-control);
-    color: var(--color-paper);
-    background: var(--color-accent-strong);
-  }
-}
-
-@media (width >= 1024px) and (height >= 800px) {
-  .game-route > .game-table {
-    height: calc(100dvh - 64px);
-    box-sizing: border-box;
-    overflow: hidden;
+    color: #fff9ef;
+    background: var(--color-action-primary);
   }
 
-  .desktop-game-table {
-    height: 100%;
-    min-height: 0;
-    grid-template-rows: auto auto minmax(0, 1fr);
-    overflow: hidden;
+  .desktop-game-table .action-choice__submit:disabled {
+    border-color: var(--color-line);
+    color: var(--color-text-muted);
+    background: var(--color-line);
   }
 
-  .desktop-game-table__main,
-  .desktop-encounter-stage,
-  .desktop-game-table__side {
-    min-height: 0;
+  .desktop-encounter-stage .card-frame,
+  .desktop-game-table .game-card .card-frame {
+    color: var(--color-text-primary);
   }
 
-  .desktop-game-table__main {
-    overflow: hidden;
+  .desktop-game-table .game-card__name {
+    font-family: var(--font-card);
+    color: var(--color-text-primary);
   }
 
-  .desktop-encounter-stage,
-  .desktop-game-table__side {
-    overflow-y: auto;
-    scrollbar-gutter: stable;
-  }
-}
-
-@media (width >= 1440px) {
-  .game-route > .game-table {
-    padding-top: var(--space-3);
+  .desktop-game-table .game-card__rules {
+    color: var(--color-text-secondary);
   }
 }
 
 @media (width <= 1279px) and (width > #{api.breakpoint(tablet-small)}) {
   .game-route > .game-table {
-    width: min(100% - 1rem, 1440px);
-    padding-top: var(--space-3);
+    width: min(100% - 24px, 1440px);
   }
 
   .desktop-game-table {
-    gap: var(--space-2);
+    gap: 12px;
   }
 
   .desktop-game-table__main {
-    gap: var(--space-3);
+    gap: 12px;
+  }
+
+  .desktop-game-table__center {
+    gap: 12px;
   }
 }
 
-@media (width <= 767px) and (width > #{api.breakpoint(tablet-small)}) {
+@media (width <= 1023px) and (width > #{api.breakpoint(tablet-small)}) {
   .game-route > .game-table {
-    padding-top: var(--space-2);
+    min-height: 0;
+    padding-top: 12px;
+  }
+
+  .game-table__desktop > .desktop-game-table {
+    min-height: 0;
   }
 
   .desktop-game-table__main {
-    overflow: visible;
+    min-width: 0;
   }
 
-  .desktop-encounter-stage,
-  .desktop-game-table__side {
-    overflow: visible;
+  .desktop-game-table__center {
+    min-width: 0;
   }
 }
 
@@ -149,7 +272,124 @@
 
 @media (forced-colors: active) {
   .desktop-game-table .action-dock,
-  .desktop-game-table .action-choice {
+  .desktop-game-table .action-choice,
+  .desktop-game-table .desktop-hand-tray {
     border-color: CanvasText;
+  }
+}
+
+@media (width >= 1280px) {
+  .game-route > .interaction-surface {
+    position: fixed;
+    z-index: 30;
+    top: min(664px, calc(100dvh - 236px));
+    right: max(32px, calc((100vw - 1440px) / 2 + 32px));
+    width: 328px;
+  }
+
+  .game-route > .interaction-surface .interaction-inbox {
+    display: none;
+  }
+
+  .game-route > .interaction-surface .interaction-backdrop {
+    position: static;
+    display: block;
+    padding: 0;
+    overflow: visible;
+    background: transparent;
+  }
+
+  .game-route > .interaction-surface .interaction-dialog {
+    width: 328px;
+    max-height: min(204px, calc(100dvh - 680px));
+    box-sizing: border-box;
+    gap: 8px;
+    overflow-y: auto;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    padding: 16px;
+    color: var(--color-text-primary);
+    background: var(--color-surface);
+    box-shadow: none;
+  }
+
+  .game-route > .interaction-surface .interaction-dialog__header {
+    gap: 6px;
+  }
+
+  .game-route > .interaction-surface .interaction-dialog__eyebrow {
+    font-size: .56rem;
+  }
+
+  .game-route > .interaction-surface .interaction-dialog__header h2 {
+    margin-top: 2px;
+    font-size: .9rem;
+    line-height: 1.15;
+  }
+
+  .game-route > .interaction-surface .interaction-dialog__context,
+  .game-route > .interaction-surface .interaction-dialog__status p,
+  .game-route > .interaction-surface .interaction-countdown,
+  .game-route > .interaction-surface .interaction-dialog__footer small {
+    margin-top: 2px;
+    font-size: .64rem;
+    line-height: 1.2;
+  }
+
+  .game-route > .interaction-surface .interaction-dialog__status {
+    min-height: 0;
+  }
+
+  .game-route > .interaction-surface .interaction-dialog__close {
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .game-route > .interaction-surface .interaction-info-actions {
+    display: none;
+  }
+
+  .game-route > .interaction-surface .interaction-dialog__content {
+    gap: 6px;
+  }
+
+  .game-route > .interaction-surface .interaction-actions {
+    gap: 4px;
+  }
+
+  .game-route > .interaction-surface .interaction-actions legend {
+    margin-bottom: 0;
+    font-size: .56rem;
+  }
+
+  .game-route > .interaction-surface .interaction-action {
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .game-route > .interaction-surface .interaction-action strong {
+    font-size: .7rem;
+    line-height: 1.15;
+  }
+
+  .game-route > .interaction-surface .interaction-action small {
+    font-size: .55rem;
+    line-height: 1.15;
+  }
+
+  .game-route > .interaction-surface .interaction-dialog__footer {
+    gap: 6px;
+  }
+
+  .game-route > .interaction-surface .interaction-submit {
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding: 8px;
+    font-size: .7rem;
   }
 }

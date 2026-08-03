@@ -23,10 +23,6 @@ useHead({
     <a class="skip-link" href="#main-content">
       Перейти к основному содержимому
     </a>
-    <header v-if="!isLobby" class="topbar" aria-label="Навигация игры">
-      <NuxtLink class="brand" to="/">MUNCHKIN CLONE // ORIGINAL DEMO</NuxtLink>
-      <span class="status-pill">Итоги подтверждает сервер</span>
-    </header>
     <main id="main-content" class="app-main" tabindex="-1">
       <NuxtPage />
     </main>

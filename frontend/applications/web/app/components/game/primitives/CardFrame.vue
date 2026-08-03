@@ -40,23 +40,23 @@ withDefaults(defineProps<{
 @use "../../../assets/scss/api" as api;
 
 .card-frame {
-  --card-accent: var(--color-rust);
-  --card-accent-deep: #6f3427;
+  --card-accent: var(--color-border-card);
+  --card-accent-deep: #6d4d43;
   position: relative;
   isolation: isolate;
   min-width: 0;
-  width: min(310px, 100%);
-  min-height: 430px;
+  width: min(240px, 100%);
+  min-height: 400px;
   display: grid;
   grid-template-rows: auto minmax(160px, 1fr) auto auto;
   gap: var(--space-2);
   overflow: hidden;
-  border: 2px solid var(--card-accent);
+  border: 1px solid var(--card-accent);
   border-radius: var(--radius-card);
   padding: var(--space-3);
   color: var(--color-text);
   background: var(--color-surface);
-  box-shadow: 0 12px 24px rgb(31 52 42 / 18%);
+  box-shadow: 0 3px 12px rgb(46 43 41 / 10%);
 }
 
 .card-frame::before {
@@ -72,13 +72,13 @@ withDefaults(defineProps<{
 }
 
 .card-frame[data-deck="door"] {
-  --card-accent: var(--color-accent-strong);
-  --card-accent-deep: #315e45;
+  --card-accent: var(--color-border-card);
+  --card-accent-deep: #6d4d43;
 }
 
 .card-frame[data-deck="treasure"] {
-  --card-accent: var(--color-rust);
-  --card-accent-deep: #74321d;
+  --card-accent: var(--color-action-response);
+  --card-accent-deep: #874d33;
 }
 
 .card-frame__header,
@@ -92,8 +92,8 @@ withDefaults(defineProps<{
   min-height: 0;
   aspect-ratio: 2 / 2.35;
   overflow: hidden;
-  border: 2px solid var(--card-accent);
-  background: var(--color-board);
+  border: 1px solid var(--card-accent);
+  background: #e6d8c7;
 }
 
 .card-frame__footer {
