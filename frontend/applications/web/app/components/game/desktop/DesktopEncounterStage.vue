@@ -1,85 +1,49 @@
 <script setup lang="ts">
 import type {Projection} from "@munchkin/contracts";
 import GameCard from "../../GameCard.vue";
-import PhaseLabel from "../../ui/PhaseLabel.vue";
-import StrengthIndicator from "../../ui/StrengthIndicator.vue";
-import SheetDialog from "../../ui/SheetDialog.vue";
 import CardRail from "../primitives/CardRail.vue";
 import DeckBack from "../primitives/DeckBack.vue";
 import RailPager from "../primitives/RailPager.vue";
-import {desktopEncounterCards} from "./desktopGameModel";
+import type {GamePresentationModel} from "../gamePresentationModel";
 
 const props = defineProps<{
   projection: Projection;
+  presentationModel: GamePresentationModel;
 }>();
 
 const activeCardIndex = ref(0);
-const strengthOpen = ref(false);
 const encounterStage = ref<HTMLElement>();
-const encounterCards = computed(() => desktopEncounterCards(props.projection));
-const combat = computed(() => props.projection.turn.combat);
+const encounterCards = computed(() => props.presentationModel.encounterCards);
+const primarySurface = computed(() => props.presentationModel.primary);
 const activeCard = computed(() => encounterCards.value[activeCardIndex.value]);
+const preparationCards = computed(() => [
+  ...props.projection.you.carried,
+  ...props.projection.you.equipped,
+  ...props.projection.you.hand,
+].slice(0, 3));
+const rewardCards = computed(() => props.projection.you.hand.slice(0, 2));
 const winner = computed(() => {
   const participants = [props.projection.you, ...props.projection.players];
   return participants.find((player) => player.player_id === props.projection.winner_player_id)
     ?? props.projection.you;
 });
 const viewerWon = computed(() => props.projection.winner_player_id === props.projection.you.player_id);
-const currentPlayerName = computed(() => {
-  if (props.projection.turn.player_id === props.projection.you.player_id) {
-    return props.projection.you.name;
-  }
-  return props.projection.players.find((player) =>
-    player.player_id === props.projection.turn.player_id,
-  )?.name ?? "другой игрок";
-});
-const activeMonsterName = computed(() => {
-  const instanceID = props.projection.turn.run_away?.current_monster_instance_id;
-  return encounterCards.value.find((card) => card.instance_id === instanceID)?.name
-    ?? activeCard.value?.name
-    ?? "текущий монстр";
-});
-const strengthRows = computed(() => {
-  if (!combat.value) {
-    return [];
-  }
-  return [
-    {label: "Сила игрока", value: combat.value.player_strength},
-    {label: "Сила монстров", value: combat.value.monster_strength},
-    ...combat.value.effects
-      .filter((effect) => effect.active && effect.amount)
-      .map((effect) => ({
-        label: effect.kind === "enhance_monster" ? "Подтверждённое усиление" : "Эффект боя",
-        value: effect.amount ?? 0,
-      })),
-  ];
-});
-
 watch(() => encounterCards.value.length, (length) => {
   activeCardIndex.value = Math.min(activeCardIndex.value, Math.max(0, length - 1));
 }, {immediate: true});
 
-function prepareCardScrollRegions() {
-  void nextTick(() => {
-    encounterStage.value?.querySelectorAll<HTMLElement>(
-      ".desktop-encounter-card .card-frame__content",
-    ).forEach((content) => {
-      const card = content.closest<HTMLElement>(".game-card");
-      const cardName = card?.getAttribute("aria-label") ?? "карты";
-      content.tabIndex = 0;
-      content.setAttribute("role", "region");
-      content.setAttribute("aria-label", `Текст ${cardName}, прокручиваемая область`);
-    });
-  });
-}
-
-onMounted(prepareCardScrollRegions);
-watch(encounterCards, prepareCardScrollRegions);
+watch(
+  () => props.presentationModel.activeEncounterIndex,
+  (index) => {
+    activeCardIndex.value = index;
+  },
+  {immediate: true},
+);
 
 function selectCard(index: number) {
   activeCardIndex.value = index;
   void nextTick(() => {
-    document.querySelector<HTMLElement>(
+    encounterStage.value?.querySelector<HTMLElement>(
       `.desktop-encounter-stage [data-card-index="${index}"]`,
     )?.scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"});
   });
@@ -90,28 +54,31 @@ function selectCard(index: number) {
   <section
     ref="encounterStage"
     class="desktop-encounter-stage"
+    :data-primary-surface="primarySurface.kind"
     aria-labelledby="desktop-encounter-title"
     :data-has-encounter="encounterCards.length > 0"
   >
     <header
+      v-if="projection.status === 'finished'"
       class="desktop-encounter-stage__heading"
-      :class="{'desktop-encounter-stage__heading--finished': projection.status === 'finished'}"
+      :class="{'desktop-encounter-stage__heading--finished': true}"
     >
       <div>
-        <p class="eyebrow">{{ projection.status === "finished" ? "ИТОГ ПАРТИИ" : "ЦЕНТР СТОЛА" }}</p>
+        <p class="eyebrow">ИТОГ ПАРТИИ</p>
         <h2 id="desktop-encounter-title">
-          {{ projection.status === "finished"
-            ? viewerWon ? "Победа!" : "Партия завершена"
-            : encounterCards.length ? "Открытая встреча" : "Состояние стола" }}
+          {{ viewerWon ? "Победа!" : "Партия завершена" }}
         </h2>
-        <p v-if="projection.status === 'finished'" class="desktop-encounter-stage__finished-context">
-          {{ viewerWon ? "Последний уровень получен за победу." : "Ты открыл уже завершённую игру." }}
+        <p class="desktop-encounter-stage__finished-context">
+          {{ viewerWon ? "Победа подтверждена сервером." : "Партия завершена." }}
         </p>
       </div>
-      <PhaseLabel v-if="projection.status !== 'finished'" :phase="projection.turn.phase" />
     </header>
 
-    <div v-if="encounterCards.length" class="desktop-encounter-pager" aria-live="polite">
+    <div
+      v-if="encounterCards.length && (primarySurface.kind === 'combat' || primarySurface.kind === 'waiting')"
+      class="desktop-encounter-pager"
+      aria-live="polite"
+    >
       {{ activeCardIndex + 1 }} / {{ encounterCards.length }} · {{ activeCard?.name }}
     </div>
 
@@ -124,7 +91,7 @@ function selectCard(index: number) {
       </strong>
       <p>
         {{ viewerWon
-          ? "Последний уровень получен за победу над Архивной пылью."
+          ? "Последний уровень получен за победу."
           : `Итоговый уровень ${winner.level}. Партия завершена сервером.` }}
       </p>
       <small>ИТОГ ПОДТВЕРЖДЁН СЕРВЕРОМ</small>
@@ -137,24 +104,9 @@ function selectCard(index: number) {
     </p>
 
     <div v-else class="desktop-encounter-stage__board">
-      <aside class="desktop-deck-rail" aria-label="Колоды и сбросы">
-        <div class="desktop-deck">
-          <DeckBack deck="door" label="Закрытая колода дверей" />
-          <strong>{{ projection.door_deck_count }}</strong>
-          <span>двери</span>
-          <small>сброс {{ projection.door_discard_count }}</small>
-        </div>
-        <div class="desktop-deck">
-          <DeckBack deck="treasure" label="Закрытая колода сокровищ" />
-          <strong>{{ projection.treasure_deck_count }}</strong>
-          <span>сокровища</span>
-          <small>сброс {{ projection.treasure_discard_count }}</small>
-        </div>
-      </aside>
-
       <div class="desktop-encounter-stage__content">
         <CardRail
-          v-if="encounterCards.length"
+          v-if="encounterCards.length && (primarySurface.kind === 'combat' || primarySurface.kind === 'waiting')"
           title="Карты встречи"
           :item-count="encounterCards.length"
           :page-count="1"
@@ -169,80 +121,168 @@ function selectCard(index: number) {
             role="listitem"
             :aria-label="`${index + 1}. ${card.name}`"
           >
-            <span class="desktop-encounter-card__index">
-              {{ index === 0 ? "Встреча" : `Монстр ${index + 1}` }}
-            </span>
             <GameCard
               :card="card"
               :content-set-id="projection.content_set_id"
+              encounter
             />
-            <span
-              v-if="card.combat_strength"
-              class="desktop-encounter-card__strength"
-              :aria-label="`Сила карты ${card.combat_strength}`"
-            >
-              {{ card.combat_strength }}
-            </span>
           </div>
         </CardRail>
-        <div v-else class="desktop-phase-card" role="status">
-          <span class="desktop-phase-card__mark" aria-hidden="true">+</span>
-          <PhaseLabel :phase="projection.turn.phase" />
-          <strong>Ждём следующую карту</strong>
-          <p>
-            {{ projection.turn.phase === "preparation"
-              ? "Подготовь ход, затем выбери действие рядом с затронутой зоной."
-              : "Серверная проекция определит следующую доступную фазу." }}
-          </p>
-        </div>
+        <section
+          v-else-if="primarySurface.kind === 'door-choice'"
+          class="desktop-flow-surface desktop-flow-surface--door"
+          aria-label="Открытие двери"
+        >
+          <header><div><h2>Дверь</h2><p>Открой верхнюю карту — результат определит продолжение хода.</p></div></header>
+          <div class="desktop-door-decision">
+            <div class="desktop-door-decision__deck">
+              <DeckBack deck="door" label="Верхняя карта колоды дверей" />
+            </div>
+            <span>{{ projection.door_deck_count }} КАРТЫ</span>
+            <strong>ОТКРЫТЬ</strong>
+          </div>
+          <small>НАЖМИ НА КОЛОДУ ИЛИ ИСПОЛЬЗУЙ ДЕЙСТВИЕ СПРАВА</small>
+        </section>
+        <section
+          v-else-if="primarySurface.kind === 'run-away'"
+          class="desktop-flow-surface desktop-flow-surface--run-away"
+          aria-label="Выбор монстра для побега"
+        >
+          <header>
+            <h2>Смыться</h2>
+            <p>Выбери монстра, от которого пытаешься сбежать первым.</p>
+          </header>
+          <div class="desktop-flow-surface__cards" role="list">
+            <GameCard
+              v-for="(card, index) in encounterCards"
+              :key="`run-away-choice-${card.instance_id}`"
+              :card="card"
+              :content-set-id="projection.content_set_id"
+              choice
+              :class="{'desktop-flow-card--selected': index === activeCardIndex}"
+              role="listitem"
+            />
+          </div>
+          <p class="desktop-flow-surface__pill">БОНУС К ПОБЕГУ {{ projection.you.escape_bonus >= 0 ? '+' : '' }}{{ projection.you.escape_bonus }}</p>
+          <small>ЦЕЛЬ БРОСКА: 5+ · РЕЗУЛЬТАТ И ПОСЛЕДСТВИЯ ОПРЕДЕЛИТ СЕРВЕР</small>
+        </section>
+
+        <section
+          v-else-if="primarySurface.kind === 'result' && primarySurface.source === 'reward'"
+          class="desktop-flow-surface desktop-flow-surface--reward"
+          aria-label="Полученная награда"
+        >
+          <header>
+            <div>
+              <h2>Награда получена</h2>
+              <p>Сервер уже добавил сокровища в руку и повысил уровень.</p>
+            </div>
+            <strong class="desktop-flow-surface__confirmed">ПОДТВЕРЖДЕНО</strong>
+          </header>
+          <div class="desktop-reward-content">
+            <div class="desktop-level-reward">
+              <strong>+{{ primarySurface.levels }}</strong>
+              <span>{{ primarySurface.levels === 1 ? "УРОВЕНЬ" : "УРОВНЯ" }}</span>
+              <small>Рука: {{ projection.you.hand.length }} / {{ projection.you.hand_limit }}</small>
+            </div>
+            <GameCard
+              v-for="card in rewardCards"
+              :key="`reward-${card.instance_id}`"
+              :card="card"
+              :content-set-id="projection.content_set_id"
+              choice
+            />
+          </div>
+          <p class="desktop-flow-surface__pill">{{ primarySurface.treasures }} СОКРОВИЩА</p>
+          <small>ДАЛЬШЕ: БЛАГОТВОРИТЕЛЬНОСТЬ, ЕСЛИ РУКА ПРЕВЫШАЕТ ЛИМИТ</small>
+        </section>
+
+        <section
+          v-else-if="primarySurface.kind === 'result' && primarySurface.source === 'run-away'"
+          class="desktop-flow-surface desktop-flow-surface--run-away-result"
+          aria-label="Результат побега"
+        >
+          <header>
+            <div>
+              <h2>{{ primarySurface.escaped ? "Ты смылся" : "Сбежать не удалось" }}</h2>
+              <p>Попытка побега завершилась {{ primarySurface.escaped ? "успешно" : "неудачно" }}.</p>
+            </div>
+          </header>
+          <div class="desktop-run-away-result" :data-result="primarySurface.escaped ? 'success' : 'failure'">
+            <strong>{{ primarySurface.escaped ? "УСПЕХ" : "НЕУДАЧА" }}</strong>
+            <h3>
+              Бросок {{ primarySurface.roll }} {{ primarySurface.modifier >= 0 ? "+" : "−" }} {{ Math.abs(primarySurface.modifier) }}
+            </h3>
+            <p>
+              Итог {{ primarySurface.total }} — {{ primarySurface.escaped
+                ? "побег успешен. Непотребство не применяется."
+                : "побег не удался. Последствия применяет сервер." }}
+            </p>
+            <span>{{ primarySurface.monsterName }} {{ primarySurface.escaped ? "пройдена" : "догнал тебя" }}</span>
+          </div>
+          <small>{{ primarySurface.escaped ? "ЭТОТ МОНСТР БОЛЬШЕ НЕ ПРЕСЛЕДУЕТ ТЕБЯ" : "РЕЗУЛЬТАТ И ПОСЛЕДСТВИЯ ПОДТВЕРЖДЕНЫ СЕРВЕРОМ" }}</small>
+        </section>
+
+        <section
+          v-else-if="primarySurface.kind === 'phase' && (primarySurface.family === 'setup' || primarySurface.family === 'preparation')"
+          class="desktop-flow-surface desktop-flow-surface--preparation"
+          aria-label="Подготовка персонажа"
+        >
+          <header>
+            <h2>Подготовка персонажа</h2>
+            <p>Выбери карты, которые хочешь экипировать перед открытием двери.</p>
+          </header>
+          <div class="desktop-flow-surface__cards" role="list">
+            <GameCard
+              v-for="card in preparationCards"
+              :key="`preparation-${card.instance_id}`"
+              :card="card"
+              :content-set-id="projection.content_set_id"
+              choice
+              role="listitem"
+            />
+          </div>
+          <small>КАРТЫ МОЖНО ЭКИПИРОВАТЬ, ПРОДАТЬ ИЛИ ОСТАВИТЬ В РУКЕ</small>
+        </section>
+
+        <section
+          v-else-if="primarySurface.kind === 'phase' && primarySurface.family === 'charity'"
+          class="desktop-flow-surface desktop-flow-surface--charity"
+          aria-label="Благотворительность"
+        >
+          <header><div><h2>Благотворительность</h2><p>Выбери карты для передачи или сброса в пределах серверного лимита.</p></div></header>
+          <div class="desktop-flow-surface__cards" role="list">
+            <GameCard v-for="card in projection.you.hand.slice(0, 3)" :key="`charity-${card.instance_id}`" :card="card" :content-set-id="projection.content_set_id" choice role="listitem" />
+          </div>
+          <small>РУКА · {{ projection.you.hand.length }} / {{ projection.you.hand_limit }}</small>
+        </section>
+
+        <section
+          v-else-if="primarySurface.kind === 'phase' && primarySurface.family === 'end-turn'"
+          class="desktop-flow-surface desktop-flow-surface--end-turn"
+          aria-label="Завершение хода"
+        >
+          <header><div><h2>Ход завершён</h2><p>Стол готов передать ход следующему игроку.</p></div></header>
+          <div class="desktop-end-turn-result"><strong>ГОТОВО</strong><p>Все обязательные решения текущего хода закрыты.</p></div>
+          <small>СЛЕДУЮЩИЙ ХОД ОПРЕДЕЛЯЕТ СЕРВЕР</small>
+        </section>
 
         <RailPager
-          v-if="encounterCards.length > 1"
+          v-if="encounterCards.length > 1 && (primarySurface.kind === 'combat' || primarySurface.kind === 'waiting')"
           :page="activeCardIndex"
           :page-count="encounterCards.length"
           label="Навигация по картам встречи"
           @select="selectCard"
         />
 
-        <section v-if="combat" class="desktop-combat-summary" aria-label="Подтверждённый счёт боя">
-          <div class="desktop-combat-summary__numbers">
-            <StrengthIndicator label="Твоя сила" :value="combat.player_strength" />
-            <span class="desktop-combat-summary__versus" aria-hidden="true">vs</span>
-            <StrengthIndicator label="Сила монстров" :value="combat.monster_strength" />
-          </div>
-          <div class="desktop-combat-summary__result" role="status">
-            {{ combat.combat_closed
-              ? "Бой закрыт сервером"
-              : combat.player_winning ? "Текущая проекция: победа" : "Текущая проекция: нужен ответ" }}
-          </div>
-          <button
-            class="desktop-combat-summary__details"
-            type="button"
-            aria-haspopup="dialog"
-            :aria-expanded="strengthOpen"
-            @click="strengthOpen = true"
-          >
-            Разбор силы
-          </button>
-        </section>
-
-        <section v-if="projection.turn.run_away" class="desktop-run-away" aria-label="Состояние побега">
-          <div>
-            <p class="eyebrow">ПОБЕГ</p>
-            <strong>{{ currentPlayerName }} · {{ activeMonsterName }}</strong>
-          </div>
-          <span>{{ projection.turn.run_away.attempts.length }} подтверждённых шагов</span>
-          <span>{{ projection.turn.run_away.completed ? "Последовательность завершена" : "Ожидаем server-owned шаг" }}</span>
-        </section>
-
-        <section v-if="projection.turn.pending_decision" class="desktop-pending-decision" aria-label="Ожидающее решение">
+        <section v-if="primarySurface.kind === 'required-decision' && projection.turn.pending_decision" class="desktop-pending-decision" aria-label="Ожидающее решение">
           <p class="eyebrow">ОЖИДАЮЩЕЕ РЕШЕНИЕ</p>
           <strong>Выбор из {{ projection.turn.pending_decision.options.length }} вариантов</strong>
           <span>Доступность и границы выбора пришли из server projection.</span>
         </section>
 
         <CardRail
-          v-if="projection.turn.resolving.length"
+          v-if="primarySurface.kind === 'resolving'"
           class="desktop-resolving-rail"
           title="Разрешаемые карты"
           :item-count="projection.turn.resolving.length"
@@ -256,27 +296,11 @@ function selectCard(index: number) {
             role="listitem"
           />
         </CardRail>
+
       </div>
     </div>
   </section>
 
-  <SheetDialog
-    :open="strengthOpen"
-    title="Разбор подтверждённой силы"
-    description="Числа ниже показывают только server-projected totals и видимые эффекты."
-      v-bind="{titleID: 'desktop-strength-title'}"
-    @close="strengthOpen = false"
-  >
-    <dl class="desktop-strength-breakdown">
-      <div v-for="row in strengthRows" :key="`${row.label}-${row.value}`">
-        <dt>{{ row.label }}</dt>
-        <dd>{{ row.value >= 0 ? "+" : "" }}{{ row.value }}</dd>
-      </div>
-    </dl>
-    <p v-if="combat" class="desktop-strength-total">
-      Итог игрока: {{ combat.player_strength }} · итог монстров: {{ combat.monster_strength }}.
-    </p>
-  </SheetDialog>
 </template>
 
 <style scoped lang="scss">
@@ -287,9 +311,7 @@ function selectCard(index: number) {
   gap: var(--space-3);
 }
 
-.desktop-encounter-stage__heading,
-.desktop-combat-summary,
-.desktop-run-away {
+.desktop-encounter-stage__heading {
   min-width: 0;
   display: flex;
   align-items: start;
@@ -454,85 +476,186 @@ function selectCard(index: number) {
   overflow: auto;
 }
 
-.desktop-phase-card {
-  min-height: 340px;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: var(--space-3);
-  border: 2px dashed var(--color-accent);
-  border-radius: var(--radius-panel);
-  padding: var(--space-6);
-  text-align: center;
-}
-
-.desktop-phase-card__mark {
-  width: 4rem;
-  height: 4rem;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--color-accent-strong);
-  border-radius: 50%;
-  color: var(--color-accent-strong);
-  font-size: 2rem;
-}
-
-.desktop-phase-card strong {
-  font-size: 1.45rem;
-}
-
-.desktop-phase-card p,
-.desktop-pending-decision span,
-.desktop-run-away span,
-.desktop-strength-total {
+.desktop-pending-decision span {
   margin: 0;
   color: var(--color-text-muted);
   line-height: 1.45;
 }
 
-.desktop-combat-summary {
-  align-items: center;
-  flex-wrap: wrap;
-  border-top: 1px solid var(--color-line);
-  padding-top: var(--space-3);
+.desktop-flow-surface {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 16px;
+  box-sizing: border-box;
+  padding: 16px;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
 }
 
-.desktop-combat-summary__numbers {
+.desktop-flow-surface header {
+  min-width: 0;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.desktop-flow-surface h2,
+.desktop-flow-surface p { margin: 0; }
+.desktop-flow-surface h2 { font-size: 18px; line-height: 24px; }
+.desktop-flow-surface header p { margin-top: 8px; color: var(--color-text-secondary); font-size: 11px; line-height: 14px; }
+.desktop-flow-surface__cards {
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  justify-content: center;
+  gap: 42px;
 }
-
-.desktop-combat-summary__versus {
-  color: var(--color-rust);
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-}
-
-.desktop-combat-summary__result {
-  flex: 1 1 12rem;
+.desktop-flow-surface__cards :deep(.choice-card-presentation) { box-shadow: 0 7px 18px rgb(59 46 40 / 14%); }
+.desktop-flow-surface__cards :deep(.desktop-flow-card--selected) { border-color: var(--color-action-primary); }
+.desktop-flow-surface > small {
   color: var(--color-text-muted);
-  font-size: .78rem;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 12px;
+  letter-spacing: .04em;
+}
+.desktop-flow-surface__pill {
+  justify-self: center;
+  min-width: 164px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+}
+.desktop-flow-surface--run-away { grid-template-rows: auto 1fr auto auto; }
+.desktop-flow-surface--reward { grid-template-rows: auto 1fr auto auto; }
+.desktop-flow-surface--door { grid-template-rows: auto 1fr auto; }
+.desktop-door-decision {
+  position: relative;
+  align-self: stretch;
+  justify-self: stretch;
+}
+.desktop-door-decision__deck {
+  position: absolute;
+  top: 30px;
+  left: calc(50% - 90px);
+  width: 180px;
+  height: 262px;
+}
+.desktop-door-decision__deck::before,
+.desktop-door-decision__deck::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 14px;
+  background: var(--color-surface-control);
+  box-shadow: 0 7px 18px rgb(59 46 40 / 14%);
+  content: "";
+}
+.desktop-door-decision__deck::before { transform: translateX(16px); opacity: .42; }
+.desktop-door-decision__deck::after { transform: translateX(8px); opacity: .72; }
+.desktop-door-decision__deck :deep(.deck-back) {
+  position: relative;
+  z-index: 1;
+  width: 180px;
+  height: 262px;
+  border-radius: 14px;
+}
+.desktop-door-decision > span {
+  position: absolute;
+  top: 270px;
+  left: calc(50% + 120px);
+  min-width: 112px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.desktop-door-decision > strong {
+  position: absolute;
+  top: 300px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--color-action-primary);
+  font-size: 12px;
+}
+.desktop-flow-surface__confirmed {
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: #fff;
+  background: var(--color-action-primary);
+  font-size: 9px;
+  letter-spacing: .06em;
+}
+.desktop-reward-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+}
+.desktop-level-reward {
+  width: 134px;
+  height: 218px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--color-surface-raised);
+}
+.desktop-level-reward strong { color: var(--color-action-primary); font-size: 42px; line-height: 48px; }
+.desktop-level-reward span { color: var(--color-text-secondary); font-size: 9px; }
+.desktop-level-reward small { color: var(--color-text-primary); font-size: 10px; }
+.desktop-flow-surface--run-away-result,
+.desktop-flow-surface--end-turn { grid-template-rows: auto 1fr auto; }
+.desktop-run-away-result,
+.desktop-end-turn-result {
+  align-self: center;
+  justify-self: center;
+  width: min(560px, 100%);
+  min-height: 250px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-line);
+  border-radius: 20px;
+  padding: 28px 32px 24px;
+  background: var(--color-surface-raised);
   text-align: center;
 }
-
-.desktop-combat-summary__details {
-  min-height: 2.75rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-control);
-  padding: .55rem .7rem;
-  color: var(--color-text);
-  background: transparent;
-  font: inherit;
-  cursor: pointer;
+.desktop-run-away-result > strong,
+.desktop-end-turn-result > strong {
+  min-width: 132px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--color-action-primary);
+  font-size: 11px;
 }
+.desktop-run-away-result[data-result="failure"] > strong { background: var(--color-danger); }
+.desktop-run-away-result h3 { margin: 0; font-size: 28px; line-height: 36px; }
+.desktop-run-away-result p,
+.desktop-end-turn-result p { color: var(--color-text-secondary); font-size: 14px; line-height: 20px; }
+.desktop-run-away-result span { color: var(--color-action-primary); font-size: 13px; }
+.desktop-flow-surface--waiting { place-content: center; text-align: center; }
 
-.desktop-combat-summary__details:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.desktop-run-away,
 .desktop-pending-decision {
   display: grid;
   gap: var(--space-1);
@@ -541,12 +664,10 @@ function selectCard(index: number) {
   background: color-mix(in srgb, var(--color-rust), transparent 94%);
 }
 
-.desktop-run-away strong,
 .desktop-pending-decision strong {
   overflow-wrap: anywhere;
 }
 
-.desktop-run-away .eyebrow,
 .desktop-pending-decision .eyebrow {
   margin: 0;
 }
@@ -559,35 +680,6 @@ function selectCard(index: number) {
 .desktop-resolving-rail :deep(.card-frame--compact) {
   flex-basis: 152px;
   width: 152px;
-}
-
-.desktop-strength-breakdown {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-}
-
-.desktop-strength-breakdown div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  border-bottom: 1px solid var(--color-line);
-  padding-bottom: var(--space-2);
-}
-
-.desktop-strength-breakdown dt {
-  color: var(--color-text-muted);
-}
-
-.desktop-strength-breakdown dd {
-  margin: 0;
-  color: var(--color-accent-strong);
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
-
-.desktop-strength-total {
-  margin-top: var(--space-3);
 }
 
 @media (width <= 1023px) {
@@ -609,8 +701,7 @@ function selectCard(index: number) {
     flex-basis: min(280px, 70%);
   }
 
-  .desktop-encounter-card :deep(.card-frame),
-  .desktop-phase-card {
+  .desktop-encounter-card :deep(.card-frame) {
     height: 340px;
     min-height: 340px;
   }
@@ -626,8 +717,6 @@ function selectCard(index: number) {
 @media (forced-colors: active) {
   .desktop-encounter-stage__board,
   .desktop-encounter-card,
-  .desktop-phase-card,
-  .desktop-run-away,
   .desktop-pending-decision {
     border-color: CanvasText;
   }
@@ -796,82 +885,6 @@ function selectCard(index: number) {
     background: transparent;
   }
 
-  .desktop-encounter-card__index {
-    position: absolute;
-    z-index: 2;
-    top: 10px;
-    left: 12px;
-    color: var(--color-text-secondary);
-    font-family: var(--font-meta);
-    font-size: .56rem;
-    letter-spacing: .08em;
-  }
-
-  .desktop-encounter-card :deep(.card-frame) {
-    width: 240px;
-    height: 400px;
-    min-height: 400px;
-    box-sizing: border-box;
-    grid-template-rows: 0 236px minmax(0, 1fr) auto;
-    gap: 0;
-    border: 1px solid var(--color-border-card);
-    border-radius: 16px;
-    padding: 0;
-    background: var(--color-surface);
-    box-shadow: 0 3px 12px rgb(46 43 41 / 10%);
-  }
-
-  .desktop-encounter-card :deep(.card-frame__art) {
-    aspect-ratio: auto;
-    border: 0;
-    border-bottom: 1px solid var(--color-line);
-  }
-
-  .desktop-encounter-card :deep(.card-frame__content) {
-    min-height: 0;
-    overflow: visible;
-    padding: 0;
-  }
-
-  .desktop-encounter-card :deep(.game-card__copy) {
-    position: relative;
-    gap: 8px;
-    padding: 14px 16px 12px;
-  }
-
-  .desktop-encounter-card :deep(.game-card__copy)::before {
-    position: absolute;
-    top: -56px;
-    right: 0;
-    left: 0;
-    height: 56px;
-    background: rgb(40 49 46 / 82%);
-    content: "";
-  }
-
-  .desktop-encounter-card :deep(.game-card__name) {
-    position: absolute;
-    z-index: 1;
-    top: -44px;
-    right: 16px;
-    left: 16px;
-    margin: 0;
-    font-family: var(--font-card);
-    color: #fff9ef;
-    font-size: 1.05rem;
-    line-height: 1.2;
-  }
-
-  .desktop-encounter-card :deep(.game-card__rules) {
-    color: var(--color-text-secondary);
-    font-size: .72rem;
-    line-height: 1.35;
-  }
-
-  .desktop-encounter-card :deep(.game-card__flavor) {
-    color: var(--color-text-muted);
-  }
-
   .desktop-encounter-card--active {
     flex-basis: 256px;
     width: 256px;
@@ -881,47 +894,6 @@ function selectCard(index: number) {
     border: 8px solid var(--color-action-response);
     padding: 0;
     background: var(--color-action-response);
-  }
-
-  .desktop-encounter-card--active :deep(.card-frame) {
-    width: 240px;
-    height: 400px;
-    min-height: 400px;
-    border-color: var(--color-action-response);
-    border-radius: 9px;
-  }
-
-  .desktop-encounter-card__strength {
-    position: absolute;
-    z-index: 3;
-    top: 14px;
-    left: 14px;
-    width: 46px;
-    height: 46px;
-    display: grid;
-    place-items: center;
-    border: 3px solid var(--color-border-card);
-    border-radius: 50%;
-    color: var(--color-action-response);
-    background: var(--color-surface);
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 800;
-  }
-
-  .desktop-encounter-card--active .desktop-encounter-card__strength {
-    top: 14px;
-    left: 14px;
-  }
-
-  .desktop-encounter-card :deep(.game-card__stats) {
-    display: none;
-  }
-
-  .desktop-encounter-card--active .desktop-encounter-card__index {
-    top: 6px;
-    left: 8px;
-    color: #fff9ef;
   }
 
   .desktop-encounter-stage__content :deep(.card-rail__pager) {
@@ -940,50 +912,6 @@ function selectCard(index: number) {
     font-size: .62rem;
   }
 
-  .desktop-phase-card {
-    min-height: 400px;
-    border-color: var(--color-line);
-    border-radius: 16px;
-    background: var(--color-surface-control);
-  }
-
-  .desktop-combat-summary {
-    position: absolute;
-    right: 16px;
-    bottom: 8px;
-    left: 16px;
-    z-index: 3;
-    display: flex;
-    align-items: center;
-    justify-content: end;
-    gap: 8px;
-    border-top: 0;
-    padding-top: 0;
-    pointer-events: none;
-  }
-
-  .desktop-combat-summary__numbers,
-  .desktop-combat-summary__result,
-  .desktop-combat-summary__details {
-    font-size: .6rem;
-  }
-
-  .desktop-combat-summary__numbers {
-    gap: 6px;
-  }
-
-  .desktop-combat-summary__result {
-    flex: 0 1 auto;
-    color: var(--color-text-muted);
-  }
-
-  .desktop-combat-summary__details {
-    min-height: 28px;
-    padding: 4px 8px;
-    pointer-events: auto;
-  }
-
-  .desktop-run-away,
   .desktop-pending-decision,
   .desktop-resolving-rail {
     position: absolute;

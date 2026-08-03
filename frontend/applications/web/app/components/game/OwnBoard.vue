@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import type {CardView, Projection} from "@munchkin/contracts";
-import type {
-  CardActionBinding,
-  CardActionState,
-} from "../actionModel";
+import type {CardActionBinding, CardActionState} from "../actionModel";
 import GameCard from "../GameCard.vue";
 import SheetDialog from "../ui/SheetDialog.vue";
-import {buildOwnZones, ownCarriedCards} from "./gameTableViewModel";
+import {uniqueCards} from "./gameTableViewModel";
+import type {GamePresentationModel} from "./gamePresentationModel";
 
 const props = defineProps<{
   projection: Projection;
+  presentationModel: GamePresentationModel;
   bindingsForCard: (cardID: string) => CardActionBinding[];
   stateForCard: (cardID: string) => CardActionState;
   confirmedCardIds: ReadonlySet<string>;
@@ -17,135 +16,145 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   activate: [binding: CardActionBinding];
+  "open-strength": [];
 }>();
-
-const open = ref(false);
-const zones = computed(() => buildOwnZones(props.projection));
+const characterOpen = ref(false);
 const combat = computed(() => props.projection.turn.combat);
-const carriedCards = computed(() => ownCarriedCards(props.projection));
-const ownZones = computed<Array<{key: string; title: string; cards: CardView[]}>>(() => [
-  {key: "hand", title: "Рука", cards: props.projection.you.hand},
-  {key: "equipped", title: "Экипировано", cards: zones.value.equipped},
-  {key: "carried", title: "Несёшь и черты", cards: carriedCards.value},
-]);
-const totalCards = computed(() => ownZones.value.reduce((total, zone) => total + zone.cards.length, 0));
+const result = computed(() => props.presentationModel.primary.kind === "result"
+  ? props.presentationModel.primary
+  : undefined,
+);
+const isPreparation = computed(() =>
+  props.presentationModel.primary.kind === "phase"
+  && ["setup", "preparation"].includes(props.presentationModel.primary.family),
+);
+const isDoorChoice = computed(() => props.presentationModel.primary.kind === "door-choice");
+const characterCards = computed<CardView[]>(() => uniqueCards([
+  ...props.projection.you.equipped,
+  ...props.projection.you.carried,
+  ...props.projection.you.traits,
+  ...props.projection.you.attachments,
+  ...props.projection.you.persistent_curses,
+]));
 
 function activate(binding: CardActionBinding) {
-  open.value = false;
+  characterOpen.value = false;
   emit("activate", binding);
 }
 </script>
 
 <template>
-  <section class="own-board" aria-labelledby="own-board-title">
-    <section v-if="combat" class="own-board__combat" aria-labelledby="own-combat-title">
-      <div class="own-board__combat-heading">
-        <p id="own-combat-title" class="eyebrow">РАСЧЁТ БОЯ</p>
-        <button
-          class="own-board__combat-open"
-          type="button"
-          :aria-expanded="open"
-          @click="open = true"
-        >
-          <strong aria-label="Сила игрока против силы монстров">
-            {{ combat.player_strength }} : {{ combat.monster_strength }}
-          </strong>
-          <span>ОТКРЫТЬ РАСЧЁТ</span>
-        </button>
-      </div>
-      <p class="own-board__combat-state" role="status">
-        {{ combat.combat_closed
-          ? "Бой завершён"
-          : combat.player_winning ? "Преимущество на твоей стороне" : "Нужен ответ" }}
-      </p>
-    </section>
-
-    <section v-if="combat" class="own-board__breakdown" aria-label="Подробный расчёт боя">
-      <div class="own-board__breakdown-side">
-        <p>ТЫ</p>
-        <strong>{{ combat.player_strength }}</strong>
-        <span>Уровень {{ projection.you.level }}</span>
-        <span>Сила персонажа подтверждена</span>
-      </div>
-      <div class="own-board__breakdown-side">
-        <p>МОНСТРЫ</p>
-        <strong>{{ combat.monster_strength }}</strong>
-        <span v-for="monster in combat.monsters" :key="`monster-${monster.instance_id}`">
-          {{ monster.name }} · {{ monster.combat_strength ?? 0 }}
-        </span>
-        <span v-for="effect in combat.effects" :key="effect.effect_id">
-          Эффект · +{{ effect.amount ?? 0 }}
-        </span>
-      </div>
-    </section>
-
-    <header class="own-board__header">
-      <div>
-        <p class="eyebrow">ТВОЯ СТОРОНА</p>
-        <h2 id="own-board-title">{{ projection.you.name }}</h2>
-        <p class="own-board__identity">
-          Уровень {{ projection.you.level }} · {{ projection.you.character_tags.join(" · ") || "персонаж" }}
+  <section
+    class="own-board"
+    data-figma-region="desktop-player-panel"
+    aria-labelledby="own-board-title"
+  >
+    <section v-if="result" class="own-board__result" aria-labelledby="own-result-title">
+      <p id="own-result-title">{{ result.source === "reward" ? "ИТОГ БОЯ" : "РЕЗУЛЬТАТ" }}</p>
+      <div class="own-board__result-summary">
+        <span>{{ result.source === "reward" ? "ПОЛУЧЕНО" : "РЕЗУЛЬТАТ" }}</span>
+        <strong v-if="result.source === 'reward'">+{{ result.levels }} уровень · {{ result.treasures }} карты</strong>
+        <strong v-else>{{ result.escaped ? "Успешный побег" : "Побег не удался" }}</strong>
+        <p v-if="result.source === 'reward'">
+          Сокровища уже находятся в руке.<br>Рука {{ projection.you.hand.length }} / {{ projection.you.hand_limit }}.
         </p>
-        <p class="own-board__privacy">Экипировка, класс и раса открываются отдельно.</p>
+        <p v-else>
+          Бросок: {{ result.roll }}<br>
+          Бонус: {{ result.modifier >= 0 ? "+" : "−" }}{{ Math.abs(result.modifier) }}<br>
+          Итог: {{ result.total }}
+        </p>
       </div>
-      <button
-        class="own-board__open"
-        type="button"
-        aria-haspopup="dialog"
-        :aria-expanded="open"
-        @click="open = true"
-      >
-        Открыть персонажа
+    </section>
+
+    <section v-else-if="isDoorChoice" class="own-board__result" aria-labelledby="own-door-title">
+      <p id="own-door-title">ТЕКУЩИЙ ШАГ</p>
+      <div class="own-board__result-summary">
+        <span>ШАГ 1 ИЗ 3</span>
+        <strong>Открыть дверь</strong>
+        <p>Верхняя карта определит продолжение: монстр — бой; проклятие — эффект; остальное — выбор пути.</p>
+      </div>
+    </section>
+
+    <section v-else-if="isPreparation" class="own-board__result" aria-labelledby="own-preparation-title">
+      <p id="own-preparation-title">ПОДГОТОВКА</p>
+      <div class="own-board__result-summary">
+        <span>ПЕРЕД ОТКРЫТИЕМ ДВЕРИ</span>
+        <strong>{{ projection.you.setup_done ? "Персонаж готов" : "Собери персонажа" }}</strong>
+        <p>Экипируй подходящие вещи, затем подтверди подготовку доступным действием.</p>
+      </div>
+    </section>
+
+    <section v-else-if="combat" class="own-board__combat" aria-labelledby="own-strength-title">
+      <p id="own-strength-title">РАСЧЁТ БОЯ</p>
+      <button class="own-board__strength-button" type="button" @click="emit('open-strength')">
+        <strong>{{ combat.player_strength }} : {{ combat.monster_strength }}</strong>
+        <span>ОТКРЫТЬ РАСЧЁТ</span>
       </button>
-    </header>
-
-    <div class="own-board__stats" aria-label="Сводка персонажа">
-      <span>Уровень {{ projection.you.level }}</span>
-      <strong>Сила {{ projection.you.combat_strength }}</strong>
-      <span>Побег {{ projection.you.escape_bonus >= 0 ? "+" : "" }}{{ projection.you.escape_bonus }}</span>
-      <span>Рука {{ projection.you.hand.length }}/{{ projection.you.hand_limit }}</span>
-    </div>
-
-    <div class="own-board__zones" aria-label="Количество собственных зон">
-      <span>Карты · {{ totalCards }}</span>
-      <span>Экипировано · {{ zones.equipped.length }}</span>
-      <span>Черты · {{ zones.traits.length }}</span>
-    </div>
-
-    <SheetDialog
-      :open="open"
-      title="Персонаж и собственные карты"
-      description="Карты доступны по запросу; действие всегда строится из текущей server projection."
-      v-bind="{titleID: 'own-board-sheet-title'}"
-      @close="open = false"
-    >
-      <div class="own-board__sheet-grid">
-        <section
-          v-for="zone in ownZones"
-          :key="zone.key"
-          class="own-board__sheet-zone"
-          :aria-labelledby="`own-zone-${zone.key}`"
-        >
-          <header>
-            <h3 :id="`own-zone-${zone.key}`">{{ zone.title }} · {{ zone.cards.length }}</h3>
-          </header>
-          <div v-if="zone.cards.length" class="own-board__cards" role="list">
-            <GameCard
-              v-for="card in zone.cards"
-              :key="`${zone.key}-${card.instance_id}`"
-              :card="card"
-              :content-set-id="projection.content_set_id"
-              compact
-              :action-bindings="bindingsForCard(card.instance_id)"
-              :action-state="stateForCard(card.instance_id)"
-              :motion-state="confirmedCardIds.has(card.instance_id) ? 'confirmed' : undefined"
-              role="listitem"
-              @activate="activate"
-            />
-          </div>
-          <p v-else class="own-board__empty" role="status">Пусто.</p>
+      <div class="own-board__calculation">
+        <section>
+          <p>ВЫ</p>
+          <strong>{{ combat.player_strength }}</strong>
+          <span>Уровень {{ projection.you.level }}</span>
+          <span>Экипировка и эффекты учтены сервером</span>
+        </section>
+        <section>
+          <p>МОНСТРЫ</p>
+          <strong>{{ combat.monster_strength }}</strong>
+          <span v-for="monster in combat.monsters" :key="monster.instance_id">
+            {{ monster.name }} · {{ monster.combat_strength ?? "—" }}
+          </span>
         </section>
       </div>
+    </section>
+
+    <section class="own-board__character">
+      <div>
+        <p>ТВОЙ ПЕРСОНАЖ</p>
+        <h2 id="own-board-title">{{ projection.you.name }} · {{ projection.you.level }} уровень</h2>
+        <span>{{ projection.you.character_tags.join(" · ") || "Без класса и расы" }}</span>
+      </div>
+      <p class="own-board__tags">Экипировка, класс и раса открываются отдельно.</p>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        :aria-expanded="characterOpen"
+        @click="characterOpen = true"
+      >
+        Персонаж
+      </button>
+    </section>
+
+    <SheetDialog
+      :open="characterOpen"
+      title="Персонаж"
+      :description="`${projection.you.name} · уровень ${projection.you.level}`"
+      v-bind="{titleID: 'character-info-title'}"
+      data-figma-node="271:791"
+      @close="characterOpen = false"
+    >
+      <dl class="character-info__stats">
+        <div><dt>Сила</dt><dd>{{ projection.you.combat_strength }}</dd></div>
+        <div><dt>Побег</dt><dd>{{ projection.you.escape_bonus >= 0 ? "+" : "" }}{{ projection.you.escape_bonus }}</dd></div>
+        <div><dt>Рука</dt><dd>{{ projection.you.hand.length }}/{{ projection.you.hand_limit }}</dd></div>
+      </dl>
+      <p v-if="projection.you.character_tags.length" class="character-info__tags">
+        {{ projection.you.character_tags.join(" · ") }}
+      </p>
+      <div v-if="characterCards.length" class="character-info__cards" role="list" aria-label="Карты персонажа">
+        <GameCard
+          v-for="card in characterCards"
+          :key="card.instance_id"
+          :card="card"
+          :content-set-id="projection.content_set_id"
+          compact
+          :action-bindings="bindingsForCard(card.instance_id)"
+          :action-state="stateForCard(card.instance_id)"
+          :motion-state="confirmedCardIds.has(card.instance_id) ? 'confirmed' : undefined"
+          role="listitem"
+          @activate="activate"
+        />
+      </div>
+      <p v-else class="character-info__empty" role="status">Нет открытых карт персонажа.</p>
     </SheetDialog>
   </section>
 </template>
@@ -154,326 +163,120 @@ function activate(binding: CardActionBinding) {
 .own-board {
   min-width: 0;
   display: grid;
-  gap: var(--space-2);
+  align-content: start;
+  gap: 16px;
+}
+
+.own-board__character,
+.own-board__calculation,
+.own-board__result-summary {
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-panel);
-  padding: var(--space-3);
-  background: var(--color-paper);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--color-surface-control);
 }
 
-.own-board__header {
-  min-width: 0;
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-2);
+.own-board__result { display: grid; gap: 14px; }
+.own-board__result > p { margin: 0; color: var(--color-text-muted); font-size: .58rem; font-weight: 800; letter-spacing: .1em; }
+.own-board__result-summary {
+  min-height: 236px;
+  box-sizing: border-box;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+.own-board__result-summary span { color: var(--color-text-muted); font-size: 11px; font-weight: 600; }
+.own-board__result-summary strong { font-size: 20px; line-height: 26px; }
+.own-board__result-summary p { margin: 0; color: var(--color-text-secondary); font-size: 14px; line-height: 20px; }
+
+.own-board__combat {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
 }
 
-.own-board__header h2,
-.own-board__header p {
-  margin: 0;
-}
+.own-board__combat > p,
+.own-board__character p,
+.own-board__character h2 { margin: 0; }
+.own-board__combat > p,
+.own-board__character > div > p { color: var(--color-text-muted); font-size: .58rem; font-weight: 800; letter-spacing: .1em; }
 
-.own-board__header h2 {
-  margin-top: var(--space-1);
-  overflow-wrap: anywhere;
-  font-size: 1.15rem;
-}
-
-.own-board__open {
-  min-height: 2.75rem;
-  flex: 0 0 auto;
-  border: 1px solid var(--color-accent-strong);
-  border-radius: var(--radius-control);
-  padding: .5rem .7rem;
-  color: var(--color-paper);
-  background: var(--color-accent-strong);
+.own-board__strength-button {
+  width: 160px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  border: 1px solid #162f31;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--color-info);
+  box-shadow: 0 3px 5px rgb(59 46 40 / 18%);
   font: inherit;
-  font-size: .72rem;
-  font-weight: 800;
   cursor: pointer;
 }
+.own-board__strength-button strong { font-size: 20px; line-height: 23px; }
+.own-board__strength-button span { font-size: 9px; font-weight: 700; letter-spacing: .08em; }
 
-.own-board__open:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.own-board__stats,
-.own-board__zones {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.own-board__stats span,
-.own-board__stats strong,
-.own-board__zones span {
-  border: 1px solid var(--color-line);
-  padding: .35rem .45rem;
-  font-size: .68rem;
-}
-
-.own-board__stats strong {
-  border-color: var(--color-accent-strong);
-  color: var(--color-accent-strong);
-}
-
-.own-board__zones {
-  color: var(--color-text-muted);
-}
-
-.own-board__sheet-grid {
+.own-board__calculation {
+  width: 100%;
+  min-height: 236px;
+  box-sizing: border-box;
   display: grid;
-  gap: var(--space-4);
+  align-content: start;
+  gap: 16px;
 }
-
-.own-board__sheet-zone {
+.own-board__calculation section {
   min-width: 0;
   display: grid;
-  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 8px;
 }
+.own-board__calculation section + section { border-top: 1px solid var(--color-line); padding-top: 16px; }
+.own-board__calculation p,
+.own-board__calculation strong,
+.own-board__calculation span { margin: 0; }
+.own-board__calculation p { color: var(--color-accent-strong); font-size: .58rem; font-weight: 800; letter-spacing: .08em; }
+.own-board__calculation strong { grid-column: 2; grid-row: 1 / span 2; color: var(--color-accent-strong); font-size: 1.1rem; }
+.own-board__calculation span { grid-column: 1 / -1; color: var(--color-text-secondary); font-size: .62rem; }
 
-.own-board__sheet-zone header {
-  border-bottom: 1px solid var(--color-line);
-  padding-bottom: var(--space-2);
-}
-
-.own-board__sheet-zone h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.own-board__cards {
+.own-board__character {
+  min-height: 188px;
+  box-sizing: border-box;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: start;
+  gap: 12px;
+  color: #fff9ef;
+  background: var(--color-surface-inverse);
 }
 
-.own-board__empty {
-  margin: 0;
-  color: var(--color-text-muted);
+.own-board__character h2 { margin-top: 4px; font-size: 1.05rem; }
+.own-board__character > div > span,
+.own-board__tags { color: #cfc2b1; font-size: .68rem; }
+.own-board__tags { grid-column: 1 / -1; }
+.own-board__character button {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  min-height: 44px;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 12px;
+  padding: 8px;
+  color: #fff9ef;
+  background: rgb(255 255 255 / 6%);
+  font: inherit;
+  font-size: .58rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
 }
-
-@media (width <= 767px) {
-  .own-board__header {
-    flex-direction: column;
-  }
-
-  .own-board__open {
-    width: 100%;
-  }
-}
-
-@media (forced-colors: active) {
-  .own-board,
-  .own-board__open,
-  .own-board__stats span,
-  .own-board__stats strong,
-  .own-board__zones span {
-    border-color: CanvasText;
-  }
-}
-
-@media (width >= 1024px) {
-  .own-board {
-    align-content: start;
-    gap: 12px;
-    box-sizing: border-box;
-    border-color: var(--color-line);
-    border-radius: var(--radius-panel);
-    padding: 16px;
-    background: var(--color-surface);
-  }
-
-  .own-board__combat {
-    display: grid;
-    gap: 8px;
-    border-bottom: 1px solid var(--color-line);
-    padding-bottom: 14px;
-  }
-
-  .own-board__combat-heading {
-    display: block;
-  }
-
-  .own-board__combat-heading .eyebrow {
-    margin: 0;
-    color: var(--color-text-muted);
-    font-size: .62rem;
-    letter-spacing: .1em;
-  }
-
-  .own-board__combat-heading strong {
-    display: block;
-    color: inherit;
-    font-size: 1.2rem;
-    letter-spacing: .04em;
-  }
-
-  .own-board__combat-state {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-
-  .own-board__breakdown {
-    display: grid;
-    gap: 10px;
-    min-height: 233px;
-    box-sizing: border-box;
-    border: 1px solid var(--color-line);
-    border-radius: 12px;
-    padding: 12px;
-    background: var(--color-surface-control);
-  }
-
-  .own-board__breakdown-side {
-    min-width: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 3px 8px;
-  }
-
-  .own-board__breakdown-side + .own-board__breakdown-side {
-    border-top: 1px solid var(--color-line);
-    padding-top: 10px;
-  }
-
-  .own-board__breakdown-side p,
-  .own-board__breakdown-side strong,
-  .own-board__breakdown-side span {
-    margin: 0;
-  }
-
-  .own-board__breakdown-side p {
-    grid-column: 1;
-    color: var(--color-text-muted);
-    font-size: .56rem;
-    font-weight: 800;
-    letter-spacing: .08em;
-  }
-
-  .own-board__breakdown-side strong {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    color: var(--color-text-primary);
-    font-size: 1.1rem;
-  }
-
-  .own-board__breakdown-side span {
-    grid-column: 1 / -1;
-    color: var(--color-text-secondary);
-    font-size: .62rem;
-  }
-
-  .own-board__combat-open {
-    width: 160px;
-    min-height: 47px;
-    display: grid;
-    place-items: center;
-    justify-self: center;
-    gap: 2px;
-    margin-top: 8px;
-    border: 1px solid var(--color-info);
-    border-radius: 999px;
-    padding: 4px 12px;
-    color: #fff9ef;
-    background: var(--color-info);
-    font: inherit;
-    font-weight: 800;
-    text-transform: uppercase;
-    cursor: pointer;
-  }
-
-  .own-board__combat-open span {
-    font-size: .52rem;
-    letter-spacing: .08em;
-  }
-
-  .own-board__header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 4px 8px;
-    min-height: 188px;
-    box-sizing: border-box;
-    border-radius: 12px;
-    padding: 14px;
-    color: #fff9ef;
-    background: var(--color-surface-inverse);
-  }
-
-  .own-board__header h2 {
-    margin-top: 0;
-    font-size: 1.05rem;
-  }
-
-  .own-board__identity {
-    margin: 4px 0 0;
-    color: #cfc2b1;
-    font-size: .68rem;
-  }
-
-  .own-board__header > div {
-    grid-column: 1;
-    min-width: 0;
-  }
-
-  .own-board__privacy {
-    margin: 22px 0 0;
-    color: #cfc2b1;
-    font-size: .62rem;
-    line-height: 1.4;
-  }
-
-  .own-board__header .eyebrow {
-    margin: 0;
-    color: #cfc2b1;
-    font-size: .58rem;
-  }
-
-  .own-board__open {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    align-self: start;
-    justify-self: start;
-    min-height: 32px;
-    border: 0;
-    padding: 0;
-    color: #b9d8cc;
-    background: transparent;
-    font-size: .64rem;
-  }
-
-  .own-board__stats,
-  .own-board__zones {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-
-  .own-board__stats span,
-  .own-board__stats strong,
-  .own-board__zones span {
-    border: 0;
-    padding: 0;
-    color: var(--color-text-secondary);
-    font-size: .66rem;
-  }
-
-  .own-board__stats strong {
-    color: var(--color-text-primary);
-  }
-
-  .own-board__zones {
-    border-top: 1px solid var(--color-line);
-    padding-top: 10px;
-  }
-}
+.character-info__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 16px; }
+.character-info__stats div { border: 1px solid var(--color-line); border-radius: 10px; padding: 10px; }
+.character-info__stats dt { color: var(--color-text-muted); font-size: .65rem; }
+.character-info__stats dd { margin: 3px 0 0; font-size: 1.1rem; font-weight: 800; }
+.character-info__tags { color: var(--color-text-secondary); }
+.character-info__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.character-info__empty { color: var(--color-text-muted); }
 </style>

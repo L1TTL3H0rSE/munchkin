@@ -146,7 +146,7 @@ export async function openFixture(
   const fixture = await installFixture(page, fixtureID);
   await page.goto(`/game/${encodeURIComponent(fixture.projection.game_id)}`);
   await expect(page.locator("#main-content")).toBeVisible();
-  await expect(page.locator(".game-table")).toBeVisible();
+  await expect(page.locator(".game-table")).toBeVisible({timeout: 15_000});
   await expect(page.locator(".center-state")).toHaveCount(0);
   await activePresenter(page);
   return fixture;

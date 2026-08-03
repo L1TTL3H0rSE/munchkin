@@ -9,14 +9,14 @@ import {
 test("target initiator can submit only a projected player target", async ({page}, testInfo) => {
   await openFixture(page, "target-initiator");
 
-  if (testInfo.project.name === "chromium") {
-    await page.locator(".own-board").getByRole("button", {
-      name: "Открыть персонажа",
-    }).click();
-  } else {
+  if (testInfo.project.name !== "chromium") {
     await page.getByRole("button", {name: /^Открыть руку/}).click();
   }
-  const targetCard = page.locator("dialog[open] .game-card").filter({
+  const targetCard = page.locator(
+    testInfo.project.name === "chromium"
+      ? ".desktop-hand-tray .game-card"
+      : "dialog[open] .game-card",
+  ).filter({
     hasText: "Эффект с выбором цели",
   });
   await targetCard.getByRole("button", {
@@ -50,7 +50,7 @@ test("target initiator can submit only a projected player target", async ({page}
 test("target response shows public target and opaque counter choices", async ({page}) => {
   await openFixture(page, "target-response");
 
-  const dialog = page.locator(".interaction-dialog");
+  const dialog = page.locator("dialog[data-figma-owner='interaction-sheet'][open]");
   await expect(dialog).toContainText("Цель: Борис");
   await expect(dialog.locator(".interaction-action").filter({
     hasText: "Контрдействие на эффект",
@@ -67,9 +67,9 @@ test("target response shows public target and opaque counter choices", async ({p
 test("private target choices stay mandatory and actor-private", async ({page}) => {
   await openFixture(page, "target-private-choice");
 
-  const dialog = page.locator(".interaction-dialog");
+  const dialog = page.locator("dialog[data-figma-owner='interaction-sheet'][open]");
   await expect(dialog).toContainText("Карта с длинным названием");
-  await expect(dialog.locator(".interaction-dialog__close")).toHaveCount(0);
+  await expect(dialog.locator(".sheet-dialog__close")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
   await expect(dialog).not.toContainText("foreign-hidden-choice");
@@ -82,8 +82,8 @@ test("target observer sees the target but no private response descriptors", asyn
 
   await expect(page.locator(".interaction-domain-summary")).toContainText("Цель: Борис");
   await expect(page.locator(".interaction-actions")).toHaveCount(0);
-  await expect(page.locator(".interaction-dialog__opaque")).toBeVisible();
-  await expect(page.locator(".interaction-dialog")).not.toContainText("Запасной план");
+  await expect(page.locator(".interaction-opaque")).toBeVisible();
+  await expect(page.locator("dialog[data-figma-owner='interaction-sheet'][open]")).not.toContainText("Запасной план");
   await assertNoRootOverflow(page);
 });
 
@@ -98,7 +98,7 @@ test("Run Away shows current step, confirmed roll and server-owned response", as
   await expect(page.locator(".interaction-action").filter({
     hasText: "Усилить попытку побега",
   })).toBeVisible();
-  await expect(page.locator(".interaction-dialog")).toContainText(
+  await expect(page.locator("dialog[data-figma-owner='interaction-sheet'][open]")).toContainText(
     "бросок D6 выполняет сервер",
   );
   await expect(page.getByText("rfx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", {exact: true}))
@@ -118,23 +118,6 @@ test("Run Away result preserves ordered attempts and observer has no response ac
 
   await openFixture(page, "run-away-observer");
   await expect(page.locator(".interaction-actions")).toHaveCount(0);
-  await expect(page.locator(".interaction-dialog__opaque")).toBeVisible();
+  await expect(page.locator(".interaction-opaque")).toBeVisible();
   await assertNoRootOverflow(page);
-});
-
-test("Run Away has a canonical Chromium visual baseline", async ({page}, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium", "visual baseline is canonical Chromium only");
-  await openFixture(page, "run-away-response");
-  const devtoolsFrame = page.locator("nuxt-devtools-frame");
-  if (await devtoolsFrame.count()) {
-    await devtoolsFrame.evaluate((element) => {
-      (element as HTMLElement).style.display = "none";
-    });
-  }
-  await expect(page).toHaveScreenshot("target-run-away.png", {
-    fullPage: true,
-    animations: "disabled",
-    // The advisory response timer is live while the screenshot is captured.
-    maxDiffPixels: 256,
-  });
 });

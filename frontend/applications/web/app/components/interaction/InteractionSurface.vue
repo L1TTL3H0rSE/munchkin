@@ -54,9 +54,6 @@ import {
   targetRunAwayActionLabel,
 } from "./targetRunAwayModel";
 import {isDeathLootInteraction} from "./deathLootModel";
-import CharacterSheet from "../game/sheets/CharacterSheet.vue";
-import HandSheet from "../game/sheets/HandSheet.vue";
-import StrengthSheet from "../game/sheets/StrengthSheet.vue";
 
 const props = defineProps<{
   projection: Projection;
@@ -319,7 +316,7 @@ watch(
 
 <template>
   <section
-    v-if="activeSurface"
+    v-if="activeSurface && !projection.you.dead"
     class="interaction-surface"
     data-testid="interaction-surface"
     :data-state="terminal ? 'terminal' : busy ? 'pending' : 'open'"
@@ -349,6 +346,7 @@ watch(
       :deadline-at="interaction?.deadline_at"
       :deadline-label="deadlineLabel"
       :eyebrow="dialogEyebrow"
+      :desktop-inline="Boolean(deathLootInteraction)"
       :inbox-label="economyOnly ? 'ДЕЙСТВИЯ ТЕКУЩЕГО ХОДА' : undefined"
       :inbox-status="economyOnly
         ? 'Доступны решения по картам и целям'
@@ -356,19 +354,6 @@ watch(
         ? 'Требуется решение'
         : 'Окно открыто для текущей проекции'"
     >
-      <div
-        v-if="interaction?.response_required_for_you"
-        class="interaction-info-actions"
-        aria-label="Информационные листы"
-      >
-        <HandSheet
-          :cards="projection.you.hand"
-          :content-set-id="projection.content_set_id"
-        />
-        <CharacterSheet :projection="projection" />
-        <StrengthSheet :projection="projection" />
-      </div>
-
       <AdvancedCombatSurface
         v-if="interaction?.public_kind === 'combat_response'"
         :projection="projection"
@@ -415,7 +400,7 @@ watch(
 
       <p
         v-if="interaction && !deathLootInteraction && !interaction.actions.length && !charityForm"
-        class="interaction-opaque interaction-dialog__opaque"
+        class="interaction-opaque"
         role="status"
       >
         Окно открыто. Сейчас нет действия для этого игрока.
@@ -424,7 +409,7 @@ watch(
       <p
         v-else-if="interaction && !deathLootInteraction && !selectableActions.length
           && !helperOfferMode && !invitedHelperOffer && !charityForm && !showEconomy"
-        class="interaction-opaque interaction-dialog__opaque"
+        class="interaction-opaque"
         role="status"
       >
         Это действие будет доступно в специализированном окне.

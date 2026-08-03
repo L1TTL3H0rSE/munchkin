@@ -2,17 +2,16 @@
 import type {Projection} from "@munchkin/contracts";
 import type {GameConnectionState} from "../../../composables/useGameSessionController";
 import {useInteractionCountdown} from "../../../composables/useInteractionCountdown";
-import PhaseLabel from "../../ui/PhaseLabel.vue";
-import {desktopStateFamily} from "./desktopGameModel";
+import type {GamePresentationModel} from "../gamePresentationModel";
 
 const props = defineProps<{
   projection: Projection;
+  presentationModel: GamePresentationModel;
   connectionState: GameConnectionState;
   finished?: boolean;
   victory?: boolean;
 }>();
 
-const stateFamily = computed(() => desktopStateFamily(props.projection));
 const isActorTurn = computed(() =>
   props.projection.turn.player_id === props.projection.you.player_id,
 );
@@ -37,7 +36,30 @@ const responseCopy = computed(() => {
   const seconds = (remainingSeconds % 60).toString().padStart(2, "0");
   return `ОТВЕТ · ${minutes}:${seconds}`;
 });
+const phaseBadge = computed(() => {
+  const primary = props.presentationModel.primary;
+  if (props.finished) {
+    return props.victory ? "ПОБЕДА" : "ИТОГ";
+  }
+  if (primary.kind === "result") {
+    return primary.source === "reward" ? "ИТОГ" : "ПОБЕГ";
+  }
+  if (primary.kind === "run-away") {
+    return "ПОБЕГ";
+  }
+  switch (props.presentationModel.family) {
+    case "setup":
+    case "preparation": return "ПОДГОТ.";
+    case "door-choice": return "ДВЕРЬ";
+    case "combat":
+    case "waiting": return "БОЙ";
+    case "charity": return "МИЛОСТЫНЯ";
+    case "end-turn": return "ИТОГ";
+    default: return "ХОД";
+  }
+});
 const headerTitle = computed(() => {
+  const primary = props.presentationModel.primary;
   if (props.finished) {
     return props.victory ? "ИГРА ОКОНЧЕНА" : "ПАРТИЯ ОКОНЧЕНА";
   }
@@ -53,6 +75,14 @@ const headerTitle = computed(() => {
   if (responseCopy.value) {
     return responseCopy.value;
   }
+  if (primary.kind === "result") {
+    return primary.source === "reward"
+      ? "РЕЗУЛЬТАТ"
+      : primary.escaped ? "УСПЕХ" : "НЕУДАЧА";
+  }
+  if (primary.kind === "run-away") {
+    return "ТВОЁ РЕШЕНИЕ";
+  }
   return isActorTurn.value ? "ТВОЙ ХОД" : `ХОД: ${currentPlayerName.value}`;
 });
 const connectionLabel = computed(() =>
@@ -63,15 +93,11 @@ const connectionLabel = computed(() =>
 <template>
   <header class="desktop-game-header" aria-label="Сводка игрового стола">
     <div class="desktop-game-header__phase" aria-label="Текущая фаза">
-      <span v-if="finished" class="desktop-game-header__finished-phase">
-        {{ victory ? "ПОБЕДА" : "ЗАВЕРШЕНО" }}
-      </span>
-      <PhaseLabel v-else :phase="projection.turn.phase" />
+      <span class="desktop-game-header__finished-phase">{{ phaseBadge }}</span>
     </div>
 
     <div class="desktop-game-header__turn">
       <h1>{{ headerTitle }}</h1>
-      <span>{{ stateFamily === "waiting" ? "ОЖИДАЕМ ПОДТВЕРЖДЕНИЕ" : "ПОДТВЕРЖДЕНО СЕРВЕРОМ" }}</span>
     </div>
 
     <div class="desktop-game-header__online" aria-label="Состояние соединения">
@@ -83,17 +109,13 @@ const connectionLabel = computed(() =>
       <span>{{ connectionLabel }}</span>
     </div>
 
-    <div class="desktop-game-header__version" aria-label="Версия проекции">
-      <span>ВЕРСИЯ</span>
-      <strong>{{ projection.version }}</strong>
-    </div>
   </header>
 </template>
 
 <style scoped lang="scss">
 .desktop-game-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-4);
   min-width: 0;
@@ -109,6 +131,21 @@ const connectionLabel = computed(() =>
   min-width: 0;
   display: flex;
   align-items: center;
+}
+
+.desktop-game-header__finished-phase {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #fff9ef;
+  background: var(--color-action-response);
+  font-size: .56rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .desktop-game-header h1,
@@ -154,8 +191,7 @@ const connectionLabel = computed(() =>
 }
 
 .desktop-game-header__turn span,
-.desktop-game-header__online,
-.desktop-game-header__version {
+.desktop-game-header__online {
   color: var(--color-text-secondary);
   color: var(--color-text-muted);
   font-size: .62rem;
@@ -172,6 +208,8 @@ const connectionLabel = computed(() =>
   display: flex;
   align-items: center;
   gap: 6px;
+  justify-self: end;
+  margin-left: 0;
   white-space: nowrap;
 }
 
@@ -188,22 +226,14 @@ const connectionLabel = computed(() =>
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger), transparent 82%);
 }
 
-.desktop-game-header__version {
-  display: grid;
-  justify-items: end;
-  gap: 1px;
-  white-space: nowrap;
-}
-
-.desktop-game-header__version strong {
-  color: var(--color-text-primary);
-  font-size: .78rem;
-}
-
 @media (width <= 1023px) {
   .desktop-game-header {
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: var(--space-3);
+  }
+
+  .desktop-game-header__online {
+    margin-left: 0;
   }
 
   .desktop-game-header__finished-phase {
@@ -226,9 +256,6 @@ const connectionLabel = computed(() =>
     background: #fff9ef;
   }
 
-  .desktop-game-header__version {
-    display: none;
-  }
 }
 
 @media (width <= 599px) {

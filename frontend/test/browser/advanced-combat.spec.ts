@@ -28,7 +28,7 @@ test("advanced combat renders projected monsters, effects and capabilities", asy
 test("forced helper remains mandatory and does not invent a reward", async ({page}) => {
   await openFixture(page, "advanced-forced-helper");
 
-  const dialog = page.locator(".interaction-dialog");
+  const dialog = page.locator("dialog[data-figma-owner='interaction-sheet'][open]");
   await expect(dialog.locator("#interaction-dialog-title"))
     .toHaveText("Ответ в бою");
   await expect(dialog.locator(".interaction-action").filter({
@@ -44,10 +44,10 @@ test("observer sees public combat state but no private intervention descriptors"
   await openFixture(page, "advanced-observer");
 
   await expect(page.locator(".desktop-encounter-card .game-card")).toHaveCount(2);
-  await expect(page.locator(".interaction-dialog__opaque")).toBeVisible();
+  await expect(page.locator(".interaction-opaque")).toBeVisible();
   await expect(page.locator(".interaction-actions")).toHaveCount(0);
-  await expect(page.locator(".interaction-dialog")).not.toContainText("Вызов дополнительного монстра");
-  await expect(page.locator(".interaction-dialog")).not.toContainText("Карта с длинным названием");
+  await expect(dialog).not.toContainText("Вызов дополнительного монстра");
+  await expect(dialog).not.toContainText("Карта с длинным названием");
   await assertNoRootOverflow(page);
 });
 

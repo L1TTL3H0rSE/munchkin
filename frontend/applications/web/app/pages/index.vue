@@ -62,8 +62,7 @@ function selectMode(mode: LobbyFormMode): void {
           <span class="lobby-page__mode-pill">ОНЛАЙН</span>
         </div>
         <div class="lobby-page__hero-copy">
-          <p class="lobby-page__eyebrow">ИГРА НАЧИНАЕТСЯ ЗА СТОЛОМ</p>
-          <h1 id="lobby-page-title">Собери друзей.<br><em>Начни игру.</em></h1>
+          <h1 id="lobby-page-title">Собери друзей.<br>Начни игру.</h1>
           <p class="lobby-page__lede">
             Создай комнату или войди по приглашению — без лишних экранов и настроек.
           </p>

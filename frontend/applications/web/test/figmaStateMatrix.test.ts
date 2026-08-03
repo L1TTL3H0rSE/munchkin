@@ -4,14 +4,15 @@ import {
   actionCoverage,
   excludedFigmaSources,
   figmaCompactHandoffs,
+  figmaAcceptanceReferences,
   figmaDesktopStateNames,
-  figmaFlowModes,
   figmaStateDescriptors,
   interactionCoverage,
   phaseCoverage,
   statusCoverage,
 } from "../../../test/browser/figmaStateMatrix.ts";
 import {fixtureAdapter} from "./fixtures/fixtureAdapter";
+import {buildGamePresentationModel} from "../app/components/game/gamePresentationModel";
 
 const fixtures = new Map(
   fixtureAdapter.list().map((fixture) => [fixture.id, fixture]),
@@ -32,6 +33,40 @@ describe("Figma state matrix", () => {
     }
 
     expect(figmaDesktopStateNames).toHaveLength(figmaStateDescriptors.length);
+  });
+
+  it("records every direct frame used for side-by-side acceptance", () => {
+    expect(figmaAcceptanceReferences.map((reference) => reference.nodeId)).toEqual([
+      "228:14",
+      "240:53",
+      "147:731",
+      "181:1634",
+      "248:5",
+      "253:96",
+      "254:221",
+      "258:2674",
+      "285:1566",
+    ]);
+  });
+
+  it.each([
+    ["full-roster-combat", "248:5", "147:731"],
+    ["single-door-choice", "285:1315", "181:1634"],
+    ["single-run-away", "285:1473", "183:1671"],
+    ["reward-received", "285:1566", "184:1687"],
+    ["single-setup", "293:1617", "147:731"],
+    ["run-away-success", "294:1998", "183:1671"],
+    ["stale-projection", "257:447", "147:1082"],
+  ])("maps runtime fixture %s to its desktop and compact Figma owners", (
+    fixtureID,
+    desktopNodeID,
+    mobileNodeID,
+  ) => {
+    const fixture = fixtures.get(fixtureID);
+    expect(fixture).toBeDefined();
+    const model = buildGamePresentationModel(fixture!.projection);
+    expect(model.desktopNodeID).toBe(desktopNodeID);
+    expect(model.mobileNodeID).toBe(mobileNodeID);
   });
 
   it("exhaustively maps every exported server action to a fixture descriptor", () => {
@@ -58,16 +93,13 @@ describe("Figma state matrix", () => {
     for (const fixtureID of Object.values(interactionCoverage)) {
       expect(fixtures.has(fixtureID)).toBe(true);
     }
-    for (const mode of Object.values(figmaFlowModes)) {
-      expect(fixtures.has(mode.fixtureID)).toBe(true);
-    }
   });
 
   it("records the resolved compact and lobby source nodes without the excluded viewport", () => {
-    expect(figmaCompactHandoffs.integratedStates.nodeId).toBe("147:671");
-    expect(figmaCompactHandoffs.coreLoop.nodeId).toBe("160:1140");
-    expect(figmaCompactHandoffs.lobbySelectedB.nodeId).toBe("225:14");
-    expect(figmaCompactHandoffs.lobbyDesktopSelectedB.nodeId).toBe("240:50");
+    expect(figmaCompactHandoffs.integratedStates.nodeId).toBe("147:731");
+    expect(figmaCompactHandoffs.coreLoop.nodeId).toBe("181:1634");
+    expect(figmaCompactHandoffs.lobbySelectedB.nodeId).toBe("228:14");
+    expect(figmaCompactHandoffs.lobbyDesktopSelectedB.nodeId).toBe("240:53");
     expect([...figmaCompactHandoffs.integratedStates.fixtureIDs]).toContain("mobile-combat-multiple");
     expect(excludedFigmaSources).toEqual([
       expect.objectContaining({nodeId: "122:3", viewport: "360x800"}),

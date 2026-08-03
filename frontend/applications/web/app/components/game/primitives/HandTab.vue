@@ -29,6 +29,9 @@ const emit = defineEmits<{
     :aria-label="`Открыть руку, ${count} карт${hasInteraction ? ', есть открытое взаимодействие' : ''}`"
     @click="emit('open')"
   >
+    <span class="hand-tab__icon" aria-hidden="true">
+      <i /><i /><i />
+    </span>
     <span
       v-if="hasActionableDeadline && deadlineAt && serverTime"
       class="hand-tab__timer"
@@ -54,9 +57,11 @@ const emit = defineEmits<{
 
 .hand-tab {
   @include api.touch-target;
+  position: relative;
   min-width: min(100%, 13rem);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
   gap: var(--space-2);
   border: 1px solid var(--color-accent-strong);
@@ -66,6 +71,23 @@ const emit = defineEmits<{
   background: var(--color-accent-strong);
   font: inherit;
   cursor: pointer;
+}
+
+.hand-tab__icon {
+  width: 34px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.hand-tab__icon i {
+  width: 8px;
+  height: 12px;
+  display: block;
+  border-radius: 2px;
+  background: var(--color-action-response);
 }
 
 .hand-tab:focus-visible {
@@ -78,13 +100,13 @@ const emit = defineEmits<{
 }
 
 .hand-tab__label {
-  justify-self: center;
   font-weight: 900;
   white-space: nowrap;
 }
 
 .hand-tab__timer {
-  justify-self: start;
+  position: absolute;
+  left: 8px;
   min-width: 0;
   color: var(--color-paper);
 }
@@ -98,7 +120,8 @@ const emit = defineEmits<{
 }
 
 .hand-tab__interaction {
-  justify-self: end;
+  position: absolute;
+  right: 8px;
   width: 1.5rem;
   height: 1.5rem;
   display: grid;

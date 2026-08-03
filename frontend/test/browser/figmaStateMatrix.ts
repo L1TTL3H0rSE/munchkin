@@ -194,7 +194,7 @@ export const figmaStateMatrix = {
   RewardReceived: {
     nodeId: "285:1566",
     name: "RewardReceived",
-    fixtureID: "run-away-result",
+    fixtureID: "reward-received",
     route: "/game/:id",
     component: "desktop",
     serverActions: [],
@@ -204,10 +204,10 @@ export const figmaStateMatrix = {
   Preparation: {
     nodeId: "293:1617",
     name: "Preparation",
-    fixtureID: "single-preparation",
+    fixtureID: "single-setup",
     route: "/game/:id",
     component: "desktop",
-    serverActions: ["open_door"],
+    serverActions: ["finish_setup"],
     semanticCheck: "preparation-actions",
     visualFamily: "preparation",
   },
@@ -264,7 +264,7 @@ export const figmaStateMatrix = {
   RunAwaySuccess: {
     nodeId: "294:1998",
     name: "RunAwaySuccess",
-    fixtureID: "run-away-result",
+    fixtureID: "run-away-success",
     route: "/game/:id",
     component: "desktop",
     serverActions: [],
@@ -467,6 +467,18 @@ export const figmaStateDescriptors = figmaDesktopStateNames.map(
   (name) => figmaStateMatrix[name],
 );
 
+export const figmaAcceptanceReferences = [
+  {nodeId: "228:14", viewport: "360x640", fixtureID: "lobby-state", region: "lobby"},
+  {nodeId: "240:53", viewport: "1440x900", fixtureID: "lobby-state", region: "lobby"},
+  {nodeId: "147:731", viewport: "360x640", fixtureID: "full-roster-combat", region: "mobile-active"},
+  {nodeId: "181:1634", viewport: "360x640", fixtureID: "single-door-choice", region: "door-sheet"},
+  {nodeId: "248:5", viewport: "1440x900", fixtureID: "full-roster-combat", region: "desktop-active"},
+  {nodeId: "253:96", viewport: "1440x900", fixtureID: "card-action-rail", region: "hand-sheet"},
+  {nodeId: "254:221", viewport: "1440x900", fixtureID: "interaction-material", region: "required-response"},
+  {nodeId: "258:2674", viewport: "1440x900", fixtureID: "offline-stale", region: "connection-failed"},
+  {nodeId: "285:1566", viewport: "1440x900", fixtureID: "reward-received", region: "reward-result"},
+] as const;
+
 export type ActionCoverage = {
   fixtureID: string;
   semanticCheck: string;
@@ -531,53 +543,25 @@ export const statusCoverage = {
   finished: "single-finished",
 } satisfies Record<Projection["status"], string>;
 
-export const figmaFlowModes = {
-  Cards3: {
-    nodeId: "291:1587",
-    fixtureID: "mobile-combat-multiple",
-    semanticCheck: "flow-cards-three",
-  },
-  Cards2Summary: {
-    nodeId: "291:3622",
-    fixtureID: "single-combat",
-    semanticCheck: "flow-cards-summary",
-  },
-  Result: {
-    nodeId: "291:3655",
-    fixtureID: "run-away-result",
-    semanticCheck: "flow-result",
-  },
-  System: {
-    nodeId: "291:3690",
-    fixtureID: "offline-stale",
-    semanticCheck: "flow-system",
-  },
-  Empty: {
-    nodeId: "292:1617",
-    fixtureID: "empty-hand",
-    semanticCheck: "flow-empty",
-  },
-} as const;
-
 export const figmaCompactHandoffs = {
   integratedStates: {
-    nodeId: "147:671",
+    nodeId: "147:731",
     route: "/game/:id",
     viewport: "360x640",
     component: "mobile-game-table",
-    source: "Integrated States / Compact Integrated States / Board · 360×640",
-    fixtureIDs: ["single-combat", "mobile-combat-multiple", "offline-stale"],
+    source: "Integrated States / Active · 360×640",
+    fixtureIDs: ["full-roster-combat", "mobile-combat-multiple", "offline-stale"],
   },
   coreLoop: {
-    nodeId: "160:1140",
+    nodeId: "181:1634",
     route: "/game/:id",
     viewport: "360x640",
     component: "mobile-game-table",
-    source: "Core Loop & Interactions / Board · 360×640",
-    fixtureIDs: ["single-setup", "single-door-choice", "single-run-away", "run-away-result"],
+    source: "Core Loop & Interactions / Door · 360×640",
+    fixtureIDs: ["single-door-choice", "single-run-away", "reward-received"],
   },
   lobbySelectedB: {
-    nodeId: "225:14",
+    nodeId: "228:14",
     route: "/",
     viewport: "360x640",
     component: "lobby-entry",
@@ -585,7 +569,7 @@ export const figmaCompactHandoffs = {
     fixtureIDs: ["lobby-state"],
   },
   lobbyDesktopSelectedB: {
-    nodeId: "240:50",
+    nodeId: "240:53",
     route: "/",
     viewport: "1440x900",
     component: "lobby-entry",

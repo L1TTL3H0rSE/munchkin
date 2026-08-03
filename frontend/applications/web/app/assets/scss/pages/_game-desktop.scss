@@ -1,9 +1,9 @@
 @use "../api" as api;
 
 /*
- * Desktop Figma composition. The 1440px reference is deliberately expressed
- * as three fixed design columns: opponents 248, table 768, player 360, with
- * 16px gutters and 16px outer paper margin.
+ * Desktop Figma composition. The 1440px reference reaches the canonical
+ * 248/768/360 proportions; smaller desktop viewports interpolate those tracks
+ * so every region remains available instead of being clipped.
  */
 @media (width > #{api.breakpoint(tablet-small)}) {
   .game-route {
@@ -13,7 +13,7 @@
 
   .game-route > .game-table {
     width: min(1440px, calc(100% - 32px));
-    height: 100dvh;
+    height: auto;
     min-width: 0;
     min-height: calc(100dvh - 32px);
     box-sizing: border-box;
@@ -24,7 +24,7 @@
   .game-table__desktop {
     display: block;
     min-width: 0;
-    height: 100%;
+    height: auto;
   }
 
   .game-table__desktop > .desktop-game-table {
@@ -42,9 +42,8 @@
   }
 
   .desktop-game-table__side {
-    height: 100%;
-    overflow-y: auto;
-    scrollbar-gutter: stable;
+    align-self: stretch;
+    overflow: visible;
     box-sizing: border-box;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-panel);
@@ -275,121 +274,5 @@
   .desktop-game-table .action-choice,
   .desktop-game-table .desktop-hand-tray {
     border-color: CanvasText;
-  }
-}
-
-@media (width >= 1280px) {
-  .game-route > .interaction-surface {
-    position: fixed;
-    z-index: 30;
-    top: min(664px, calc(100dvh - 236px));
-    right: max(32px, calc((100vw - 1440px) / 2 + 32px));
-    width: 328px;
-  }
-
-  .game-route > .interaction-surface .interaction-inbox {
-    display: none;
-  }
-
-  .game-route > .interaction-surface .interaction-backdrop {
-    position: static;
-    display: block;
-    padding: 0;
-    overflow: visible;
-    background: transparent;
-  }
-
-  .game-route > .interaction-surface .interaction-dialog {
-    width: 328px;
-    max-height: min(204px, calc(100dvh - 680px));
-    box-sizing: border-box;
-    gap: 8px;
-    overflow-y: auto;
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-panel);
-    padding: 16px;
-    color: var(--color-text-primary);
-    background: var(--color-surface);
-    box-shadow: none;
-  }
-
-  .game-route > .interaction-surface .interaction-dialog__header {
-    gap: 6px;
-  }
-
-  .game-route > .interaction-surface .interaction-dialog__eyebrow {
-    font-size: .56rem;
-  }
-
-  .game-route > .interaction-surface .interaction-dialog__header h2 {
-    margin-top: 2px;
-    font-size: .9rem;
-    line-height: 1.15;
-  }
-
-  .game-route > .interaction-surface .interaction-dialog__context,
-  .game-route > .interaction-surface .interaction-dialog__status p,
-  .game-route > .interaction-surface .interaction-countdown,
-  .game-route > .interaction-surface .interaction-dialog__footer small {
-    margin-top: 2px;
-    font-size: .64rem;
-    line-height: 1.2;
-  }
-
-  .game-route > .interaction-surface .interaction-dialog__status {
-    min-height: 0;
-  }
-
-  .game-route > .interaction-surface .interaction-dialog__close {
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .game-route > .interaction-surface .interaction-info-actions {
-    display: none;
-  }
-
-  .game-route > .interaction-surface .interaction-dialog__content {
-    gap: 6px;
-  }
-
-  .game-route > .interaction-surface .interaction-actions {
-    gap: 4px;
-  }
-
-  .game-route > .interaction-surface .interaction-actions legend {
-    margin-bottom: 0;
-    font-size: .56rem;
-  }
-
-  .game-route > .interaction-surface .interaction-action {
-    gap: 6px;
-    padding: 6px 8px;
-  }
-
-  .game-route > .interaction-surface .interaction-action strong {
-    font-size: .7rem;
-    line-height: 1.15;
-  }
-
-  .game-route > .interaction-surface .interaction-action small {
-    font-size: .55rem;
-    line-height: 1.15;
-  }
-
-  .game-route > .interaction-surface .interaction-dialog__footer {
-    gap: 6px;
-  }
-
-  .game-route > .interaction-surface .interaction-submit {
-    width: 100%;
-    min-width: 0;
-    min-height: 36px;
-    padding: 8px;
-    font-size: .7rem;
   }
 }

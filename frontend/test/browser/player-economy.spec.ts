@@ -38,7 +38,7 @@ test("trade and gift expose only actor-owned cards and legal recipients", async 
 test("charity requires exact allocation and uses typed recipient mappings", async ({page}) => {
   await openFixture(page, "charity-transfer");
 
-  const surface = page.locator(".interaction-dialog").getByTestId("economy-surface");
+  const surface = page.locator("dialog[data-figma-owner='interaction-sheet'][open]").getByTestId("economy-surface");
   await expect(surface).toBeVisible();
   const submit = surface.getByRole("button", {name: "Подтвердить распределение"});
   await expect(submit).toBeDisabled();
@@ -65,17 +65,17 @@ test("charity requires exact allocation and uses typed recipient mappings", asyn
 test("observer stays opaque while a victim can see only an own counter descriptor", async ({page}) => {
   await openFixture(page, "economy-observer");
   await expect(page.getByTestId("economy-surface")).toHaveCount(0);
-  await expect(page.locator(".interaction-dialog")).toContainText(
+  await expect(page.locator("dialog[data-figma-owner='interaction-sheet'][open]")).toContainText(
     "Детали предложения доступны только участникам",
   );
-  await expect(page.locator(".interaction-dialog")).not.toContainText("Предложенный предмет");
+  await expect(page.locator("dialog[data-figma-owner='interaction-sheet'][open]")).not.toContainText("Предложенный предмет");
 
   await openFixture(page, "theft-response");
   const counter = page.locator(".interaction-action");
   await expect(counter).toHaveCount(1);
   await expect(counter).toContainText("Выставить контрмеру");
   await expect(counter).toContainText("Собственная контркарта");
-  await expect(page.locator(".interaction-dialog")).not.toContainText("hidden candidates");
+  await expect(page.locator("dialog[data-figma-owner='interaction-sheet'][open]")).not.toContainText("hidden candidates");
   await assertMediaPreferences(page);
   await assertNoRootOverflow(page);
 });
@@ -84,7 +84,7 @@ test("charity deadline stays advisory and the surface survives 200 percent zoom"
   await page.clock.install({time: "2030-01-01T00:04:00.000Z"});
   await openFixture(page, "charity-transfer");
 
-  const dialog = page.locator(".interaction-dialog");
+  const dialog = page.locator("dialog[data-figma-owner='interaction-sheet'][open]");
   const surface = dialog.getByTestId("economy-surface");
   await expect(dialog).toContainText("Осталось примерно 60 сек.");
   await page.evaluate(() => {

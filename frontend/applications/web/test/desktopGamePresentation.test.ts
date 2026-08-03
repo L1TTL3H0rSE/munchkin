@@ -2,10 +2,10 @@ import {describe, expect, it} from "vitest";
 
 import {buildGamePresentation} from "../app/composables/useGamePresentation";
 import {
-  desktopEncounterCards,
-  desktopOpponentStatus,
-  desktopStateFamily,
-} from "../app/components/game/desktop/desktopGameModel";
+  encounterCards,
+  gameStateFamily,
+  opponentStatus,
+} from "../app/components/game/gamePresentationModel";
 import {fixtureAdapter} from "./fixtures/fixtureAdapter";
 
 describe("desktop game presentation", () => {
@@ -17,9 +17,9 @@ describe("desktop game presentation", () => {
     ["single-run-away", "run-away"],
     ["single-charity", "charity"],
     ["single-finished", "finished"],
-    ["stale-projection", "preparation"],
+    ["stale-projection", "combat"],
   ] as const)("maps %s to the named desktop state family", (fixtureID, family) => {
-    expect(desktopStateFamily(fixtureAdapter.getProjection(fixtureID))).toBe(family);
+    expect(gameStateFamily(fixtureAdapter.getProjection(fixtureID))).toBe(family);
   });
 
   it("keeps direct actions and server combat totals authoritative", () => {
@@ -39,7 +39,7 @@ describe("desktop game presentation", () => {
   it("keeps separate public monster cards and does not infer a total", () => {
     const projection = fixtureAdapter.getProjection("advanced-combat");
 
-    expect(desktopEncounterCards(projection).map((card) => card.instance_id)).toEqual([
+    expect(encounterCards(projection).map((card) => card.instance_id)).toEqual([
       "encounter-monster",
       "paperwork-hydra-1",
     ]);
@@ -53,6 +53,6 @@ describe("desktop game presentation", () => {
     expect(opponent).toBeDefined();
     expect(opponent?.hand_count).toBeGreaterThan(0);
     expect(Object.hasOwn(opponent ?? {}, "hand")).toBe(false);
-    expect(desktopOpponentStatus(projection, opponent!)).toBe("ready");
+    expect(opponentStatus(projection, opponent!)).toBe("ready");
   });
 });
