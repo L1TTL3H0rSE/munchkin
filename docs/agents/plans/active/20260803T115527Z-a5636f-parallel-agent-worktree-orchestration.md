@@ -3,12 +3,12 @@
 - **Plan ID:** `20260803T115527Z-a5636f-parallel-agent-worktree-orchestration`
 - **Статус:** awaiting_approval
 - **Создан:** 2026-08-03 11:55:27 UTC
-- **Обновлён:** 2026-08-03 15:02 MSK
+- **Обновлён:** 2026-08-04 17:20 MSK
 - **Владелец:** Codex
 - **Workspace:** controller checkout + isolated linked worktrees under `.leino/runtime/worktrees/`
 - **Ветка:** `codex/frontend-remaining-plans`
 - **Режим параллельности:** exclusive
-- **Зависит от:** plan `20260803T111613Z-1cf94f-agent-delegation-planning-workflow`.
+- **Зависит от:** plans `20260803T111613Z-1cf94f-agent-delegation-planning-workflow`, `20260804T134001Z-d7a194-agent-runtime-and-toolchain-hardening`.
 - **Блокирует:** безопасные parallel Luna writers и restart/recovery workflow
 - **Связанные ADR/handoff:** новый `docs/agents/decisions/0010-parallel-agent-worktree-orchestration.md`,
   `docs/agents/HARNESS.md`, `docs/agents/DELEGATION.md`
@@ -44,7 +44,6 @@
     "tools/leinoctl/src/index.mjs",
     "tools/leinoctl/src/profile.mjs",
     "tools/leinoctl/src/session.mjs",
-    "tools/leinoctl/src/toolchain.mjs",
     "tools/leinoctl/src/delegations.mjs",
     "tools/leinoctl/src/worktrees.mjs",
     "tools/leinoctl/src/workers.mjs",
@@ -53,7 +52,6 @@
     "tools/leinoctl/test/profile.test.mjs",
     "tools/leinoctl/test/schema.test.mjs",
     "tools/leinoctl/test/session.test.mjs",
-    "tools/leinoctl/test/toolchain.test.mjs",
     "tools/leinoctl/test/delegations.test.mjs",
     "tools/leinoctl/test/worktrees.test.mjs",
     "tools/leinoctl/test/workers.test.mjs",
@@ -71,10 +69,11 @@
     "codex:parallel-worktree-workers-v1",
     "leinoctl:delegation-registry-v1",
     "leinoctl:worker-recovery-v1",
-    "leinoctl:workspace-toolchain-binding-v1"
+    "leinoctl:transitive-toolchain-environment-v1"
   ],
   "dependsOn": [
-    "20260803T111613Z-1cf94f-agent-delegation-planning-workflow"
+    "20260803T111613Z-1cf94f-agent-delegation-planning-workflow",
+    "20260804T134001Z-d7a194-agent-runtime-and-toolchain-hardening"
   ],
   "sharedResources": [
     "repository:harness-policy",
@@ -99,9 +98,9 @@ Luna workers через сохраняемые `codex exec -C` sessions, доп�
 package contract, session ID, process state, diff/checkpoint и integration
 status восстанавливаются из Git и `.leino/runtime`.
 
-Root и workers также получают один version-aware toolchain binding: доступные
-Codex workspace dependencies обнаруживаются один раз, проверенные absolute
-paths сохраняются локально и используются leinoctl без ручной сборки `PATH`.
+Root toolchain binding и transitive environment создаёт prerequisite plan.
+Этот plan не реализует второй resolver: worker adapter потребляет тот же
+validated binding/fingerprint и передаёт готовый environment в каждый worktree.
 
 ## Критерии приёмки
 
@@ -123,22 +122,12 @@ paths сохраняются локально и используются leinoc
 - [ ] Repository-owned worker adapter запускает bounded `codex exec -C` с Luna,
       `workspace-write`, проверенными project hooks и сохранением session ID;
       raw model/tool JSONL и secrets не становятся durable registry content.
-- [ ] `leinoctl toolchain bind/status` сохраняет atomic ignored
-      `.leino/runtime/toolchain.json` с absolute executable paths, versions,
-      source (`codex-bundle|system|explicit`) и bundle/version fingerprint;
-      root verify и worker processes используют один проверенный binding.
-- [ ] Node/Git/Python могут автоматически браться из Codex workspace bundle;
-      Go ищется в explicit env/PATH и platform defaults вроде
-      `/usr/local/go/bin`, после чего проверяется minimum version. Ни один
-      versioned Codex cache path не hardcode в tracked config.
-- [ ] pnpm принимается только при точном совпадении authoritative
-      `frontend/package.json#packageManager` (`10.8.0`). Bundled pnpm `11.9.0`
-      не подменяет pin: используется explicit/cached pinned runner либо
-      bootstrap fail-closed сообщает точное требование без implicit install.
-- [ ] SessionStart требует dependency discovery/binding до canonical commands;
-      stale/missing executable либо изменившийся bundle fingerprint повторно
-      валидируется, а direct agent commands маршрутизируются через leinoctl
-      resolved runner вместо надежды на process-global `PATH`.
+- [ ] Worker adapter принимает только validated binding/environment contract
+      prerequisite plan и не выполняет собственный resolver, package-manager
+      pin discovery либо implicit install.
+- [ ] Каждый worker launch сверяет prerequisite binding fingerprint, наследует
+      его verified aliases для child/grandchild commands и fail-closed останавливается
+      при missing/stale binding до запуска Codex worker.
 - [ ] Worker hooks разрешают изменения только delegated subset и блокируют plan
       approval/select/status/archive/release, push, cloud mutations, dependency
       install, snapshot refresh и writes в controller/чужой worktree.
@@ -197,12 +186,12 @@ paths сохраняются локально и используются leinoc
 - `.leino/runtime` ignored и локален: он подходит для restart на том же диске,
   но не является cross-machine recovery. Temporary commits сохраняют файловый
   snapshot; remote backup требует отдельного явного push permission.
-- Current Codex bundle предоставляет Node `24.14.0`, Git/Python и pnpm `11.9.0`,
-  тогда как repository pin — pnpm `10.8.0`; установленный Go `1.26.5` находится
-  в `/usr/local/go/bin` вне текущего agent PATH. Поэтому blind bundle/PATH
-  inheritance неверна, нужен version-aware resolver.
-- Direct dependency plan вводит delegation map/model routing и оставляет writes
-  у root, поэтому этот plan не поддерживает две конкурирующие write policies.
+- Prerequisite runtime/toolchain plan вычисляет project requirements из profile-
+  declared authoritative sources, строит transitive environment и связывает его
+  fingerprint с verification ledger. Поэтому этот plan должен только подключить
+  готовый contract к worker launcher и проверить inheritance в worktrees.
+- Direct delegation dependency вводит delegation map/model routing и оставляет
+  writes у root, поэтому этот plan не поддерживает две конкурирующие write policies.
 
 ## Scope
 
@@ -214,8 +203,8 @@ paths сохраняются локально и используются leinoc
 - Package DAG, exact write-set/shared-resource partition и integration order.
 - `prepare`, `start`, `status`, `recover`, `resume`, `integrate`, `cleanup` CLI.
 - Atomic local registry, process/session metadata, checkpoint and crash recovery.
-- Workspace dependency discovery и durable local toolchain binding для root и
-  всех worktrees без tracked machine-specific absolute paths.
+- Consumption готового prerequisite toolchain binding/environment во всех
+  worktrees без второго resolver или tracked machine-specific absolute paths.
 - `codex exec -C` launch adapter с persisted sessions, bounded output и hooks.
 - Worker-specific Pre/Post/Stop policy и root-owned integration verification.
 - Temporary branches/checkpoint commits и safe cleanup semantics.
@@ -247,10 +236,10 @@ paths сохраняются локально и используются leinoc
   `codex exec -C <worktree> --model gpt-5.6-luna --sandbox workspace-write
   --json`; hooks trust bypass допускается только после проверки hook/config
   digest against pinned base, иначе launch останавливается.
-- **Toolchain boundary:** app-provided dependency discovery передаёт candidates
-  generic resolver; resolver проверяет repository versions, записывает local
-  binding и передаёт exact executable paths в verify/worker child processes.
-  Tracked profile содержит policy, но не machine-specific paths.
+- **Toolchain boundary:** prerequisite generic core уже проверяет repository-
+  declared requirements и создаёт local binding/environment. Worker adapter
+  принимает этот contract, проверяет fingerprint freshness и передаёт готовый
+  environment descendants; он не переопределяет discovery или version policy.
 - **Durable state:** registry source of truth — atomic JSON + Git inspection;
   PID/heartbeat и Codex session ID являются hints. При расхождении filesystem/
   branch/diff имеют приоритет, а automation не удаляет данные.
@@ -269,7 +258,7 @@ paths сохраняются локально и используются leinoc
 | Компонент | Изменение | Публичный контракт/данные |
 |---|---|---|
 | leinoctl generic core | worktree, package registry, process/recovery/integration commands | `leinoctl:delegation-registry-v1`, `leinoctl:worker-recovery-v1` |
-| toolchain binding | bundle/system/explicit discovery, version validation and worker inheritance | `leinoctl:workspace-toolchain-binding-v1` |
+| toolchain consumer | prerequisite binding freshness and worker inheritance | consumes `leinoctl:transitive-toolchain-environment-v1` |
 | Munchkin profile | concurrency/worktree root/launcher limits | additive profile schema |
 | Codex hooks | package-scoped worker authority | `codex:parallel-worktree-workers-v1` |
 | plan authoring | executable package DAG and recovery fields | template/docs; manifest v1 сохраняется |
@@ -295,9 +284,9 @@ paths сохраняются локально и используются leinoc
 | `.leino/profile.json` | write | Worktree root, concurrency and Codex launcher profile |
 | `.leino/components/repository-workflow.json` | write | New hook test registration/contracts |
 | `.agents/skills/{backend-game-change,content-pack-change,frontend-game-change,repository-workflow-change}/SKILL.md` | write | Domain package partition/recovery guidance |
-| `tools/leinoctl/src/{cli,git,index,profile,session,toolchain}.mjs` | write | Extend existing generic CLI/Git/profile/session/toolchain core |
+| `tools/leinoctl/src/{cli,git,index,profile,session}.mjs` | write | Extend generic delegation/Git/profile/session core and consume prerequisite environment |
 | `tools/leinoctl/src/{delegations,worktrees,workers}.mjs` | write | New registry/worktree/launcher modules |
-| `tools/leinoctl/test/{cli,git,profile,schema,session,toolchain}.test.mjs` | write | Existing contract regressions |
+| `tools/leinoctl/test/{cli,git,profile,schema,session}.test.mjs` | write | Existing contract and worker-environment consumption regressions |
 | `tools/leinoctl/test/{delegations,worktrees,workers}.test.mjs` | write | New lifecycle/recovery/integration tests |
 | `docs/agents/{README,HARNESS,DELEGATION}.md` | write | Durable operator workflow and boundaries |
 | `docs/agents/decisions/0010-parallel-agent-worktree-orchestration.md` | write | Cross-cutting decision and rejected alternatives |
@@ -331,6 +320,7 @@ paths сохраняются локально и используются leinoc
 - **Решение:** exact order
   `20260802T164112Z-dfb164-production-live-wif-registry-evidence` (`completed`) →
   `20260803T111613Z-1cf94f-agent-delegation-planning-workflow` →
+  `20260804T134001Z-d7a194-agent-runtime-and-toolchain-hardening` →
   `20260803T115527Z-a5636f-parallel-agent-worktree-orchestration`.
   Каждый plan проходит verify/scope-check/archive/release/local commit; новый
   select — только в fresh eligible session. Другие active plans не меняются.
@@ -353,9 +343,9 @@ paths сохраняются локально и используются leinoc
 
 1. [ ] Зафиксировать ADR-0010 и capability contract/probe для exact Codex CLI
        launch/resume/JSON events; неизвестную версию блокировать fail-closed.
-2. [ ] Реализовать `toolchain bind/status`: принять workspace dependency
-       candidates, проверить exact/minimum versions, сохранить atomic local
-       binding и использовать его в root/worker execution без hardcoded paths.
+2. [ ] Подключить prerequisite transitive-toolchain environment к worker
+       adapter: проверить fingerprint freshness и передать неизменный bounded env
+       в Codex process и его descendants без повторного version discovery.
 3. [ ] Расширить generic profile и CLI командами delegation lifecycle, сохранив
        repository-specific limits в `.leino/profile.json`.
 4. [ ] Реализовать atomic package registry, locks, state transitions,
@@ -377,8 +367,8 @@ paths сохраняются локально и используются leinoc
 
 ## Оценка времени
 
-- **Реалистично:** 50–78 инженерных часов, ориентировочно 8–13 рабочих дней.
-- **Разбивка:** capability/ADR/toolchain binding 1–2 дня; registry/worktrees 2–3 дня;
+- **Реалистично:** 44–68 инженерных часов, ориентировочно 7–11 рабочих дней.
+- **Разбивка:** capability/ADR/toolchain consumption 0.5–1 день; registry/worktrees 2–3 дня;
   launcher/recovery 2–3 дня; hooks/integration 1–2 дня; tests/docs/live smoke
   1.5–3 дня.
 - **Резерв:** ещё 2–4 дня, если alpha Codex JSON/session semantics окажутся
@@ -392,8 +382,8 @@ paths сохраняются локально и используются leinoc
 - [ ] `(cd tools/leinoctl && node --test)`
 - [ ] focused temporary-repository tests: prepare/start/orphan/recover/integrate/cleanup
 - [ ] fake-process tests for interrupt, stale PID, missing/invalid session ID and retry
-- [ ] toolchain tests: matching bundle, pnpm pin mismatch, system Go fallback,
-      stale bundle fingerprint, missing explicit runner and worker inheritance
+- [ ] worker-environment tests: prerequisite fingerprint accepted, stale/missing
+      binding rejected, and verified aliases inherited by child/grandchild commands
 - [ ] `node .codex/hooks/plan-lint.mjs`
 - [ ] `./leinoctl preflight`
 - [ ] `./leinoctl text-check --changed`
