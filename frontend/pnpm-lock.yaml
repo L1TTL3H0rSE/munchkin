@@ -49,8 +49,8 @@ catalogs:
       specifier: ^3.2.4
       version: 3.3.8
     zod:
-      specifier: ^3.25.76
-      version: 3.25.76
+      specifier: ^4.4.3
+      version: 4.4.3
 
 importers:
 
@@ -101,7 +101,7 @@ importers:
         version: 4.5.1(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7))(@parcel/watcher@2.6.0)(@types/node@25.9.5)(@vue/compiler-sfc@3.5.40)(db0@0.3.4)(esbuild@0.28.1)(eslint@9.39.5(jiti@2.7.0))(ioredis@5.11.1)(lightningcss@1.33.0)(magicast@0.5.3)(optionator@0.9.4)(oxc-parser@0.140.0)(pinia@3.0.4(typescript@6.0.3)(vue@3.5.40(typescript@6.0.3)))(rollup-plugin-visualizer@7.0.1(rolldown@1.2.0)(rollup@4.62.3))(rollup@4.62.3)(sass-embedded@1.100.0)(sass@1.100.0)(srvx@0.11.22)(terser@5.49.0)(typescript@6.0.3)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.49.0)(yaml@2.9.0))(vue-tsc@3.3.8(typescript@6.0.3))(yaml@2.9.0)
       openai:
         specifier: 7.1.0
-        version: 7.1.0(ws@8.21.1)(zod@3.25.76)
+        version: 7.1.0(ws@8.21.1)(zod@4.4.3)
       pinia:
         specifier: 'catalog:'
         version: 3.0.4(typescript@6.0.3)(vue@3.5.40(typescript@6.0.3))
@@ -113,7 +113,7 @@ importers:
         version: 3.5.40(typescript@6.0.3)
       zod:
         specifier: 'catalog:'
-        version: 3.25.76
+        version: 4.4.3
     devDependencies:
       '@nuxt/eslint':
         specifier: 'catalog:'
@@ -141,7 +141,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 3.25.76
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -5120,9 +5120,6 @@ packages:
     resolution: {integrity: sha512-zK7YHHz4ZXpW89AHXUPbQVGKI7uvkd3hzusTdotCg1UxyaVtg0zFJSTfW/Dq5f7OBBVnq6cZIaC8Ti4hb6dtCA==}
     engines: {node: '>= 14'}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
-
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
@@ -8965,10 +8962,10 @@ snapshots:
       powershell-utils: 0.1.0
       wsl-utils: 0.3.1
 
-  openai@7.1.0(ws@8.21.1)(zod@3.25.76):
+  openai@7.1.0(ws@8.21.1)(zod@4.4.3):
     optionalDependencies:
       ws: 8.21.1
-      zod: 3.25.76
+      zod: 4.4.3
 
   optionator@0.9.4:
     dependencies:
@@ -10449,7 +10446,5 @@ snapshots:
       archiver-utils: 5.0.2
       compress-commons: 6.0.2
       readable-stream: 4.7.0
-
-  zod@3.25.76: {}
 
   zod@4.4.3: {}
