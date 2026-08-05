@@ -204,8 +204,10 @@ function activate(binding: CardActionBinding) {
 .own-board__strength-button {
   width: 160px;
   height: 48px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-tiems: center;
+  justify-content: center;
+  flex-direction: column;
   gap: 1px;
   border: 1px solid #162f31;
   border-radius: 999px;
