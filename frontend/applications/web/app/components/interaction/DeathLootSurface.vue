@@ -17,6 +17,7 @@ import {
 const props = defineProps<{
   interaction: DeathLootInteraction;
   busy: boolean;
+  timerText: string;
 }>();
 
 const emit = defineEmits<{
@@ -38,25 +39,22 @@ watch(
     `${action.interaction_id}:${action.revision}:${action.action_id}`,
   ).join("|"),
   () => {
-    if (!options.value.some(({action}) => action.action_id === selectedActionID.value)) {
-      selectedActionID.value = options.value[0]?.action.action_id ?? null;
+    if (selectedActionID.value && !options.value.some(({action}) =>
+      action.action_id === selectedActionID.value,
+    )) {
+      selectedActionID.value = null;
     }
   },
-  {immediate: true},
 );
 
 function submitPick(): void {
   const action = selectedOption.value?.action;
-  if (!action || props.busy || terminal.value) {
-    return;
-  }
+  if (!action || props.busy || terminal.value) return;
   emit("submit", action);
 }
 
 function submitPass(): void {
-  if (!passAction.value || props.busy || terminal.value) {
-    return;
-  }
+  if (!passAction.value || props.busy || terminal.value) return;
   emit("submit", passAction.value);
 }
 </script>
@@ -67,12 +65,15 @@ function submitPass(): void {
     class="death-loot-surface"
     data-testid="death-loot-surface"
     :data-state="terminal ? 'terminal' : busy ? 'pending' : 'open'"
-    :data-priority="interaction.response_required_for_you ? 'actor' : 'observer'"
-    aria-labelledby="death-loot-surface-title"
+    data-priority="actor"
+    aria-label="Выбор добычи после смерти"
   >
     <header class="death-loot-surface__header">
-      <h3 id="death-loot-surface-title">Добыча погибшего игрока</h3>
-      <p>Выбери одну карту из доступного пула или откажись.</p>
+      <div>
+        <h3>Добыча после смерти</h3>
+        <p>Твой приоритет · осталось {{ interaction.death_loot.remaining_count }} · выбери 1 карту.</p>
+      </div>
+      <time :datetime="interaction.deadline_at">{{ timerText }}</time>
     </header>
 
     <p v-if="terminalMessage" class="death-loot-surface__result" role="status" aria-live="polite">
@@ -80,13 +81,14 @@ function submitPass(): void {
     </p>
 
     <form
-      v-if="options.length"
+      v-if="options.length || passAction"
       class="death-loot-form"
       novalidate
       @submit.prevent="submitPick"
     >
       <div class="death-loot-form__choices">
         <fieldset
+          v-if="options.length"
           :disabled="busy || terminal"
           role="listbox"
           aria-label="Доступные карты погибшего игрока"
@@ -102,180 +104,57 @@ function submitPass(): void {
             :class="{'death-loot-option--selected': option.action.action_id === selectedActionID}"
             @click="selectedActionID = option.action.action_id"
           >
-            <CardPresentation :card="option.card" variant="choice" />
+            <CardPresentation :card="option.card" variant="choice" choice-context="loot" />
           </button>
         </fieldset>
-        <button
-          v-if="passAction"
-          class="death-loot-submit death-loot-submit--secondary"
-          type="button"
-          :disabled="busy || terminal"
-          @click="submitPass"
-        >
-          <span>ПРОПУСТИТЬ</span>
-          <small>Не брать карту</small>
-        </button>
       </div>
+      <button
+        v-if="passAction"
+        class="death-loot-submit death-loot-submit--secondary"
+        type="button"
+        :disabled="busy || terminal"
+        @click="submitPass"
+      >
+        Пас
+      </button>
       <button
         class="death-loot-submit"
         type="submit"
         :disabled="busy || terminal || !selectedOption"
       >
-        {{ busy ? "Отправляем выбор…" : "Забрать карту" }}
+        {{ busy ? "Отправляем выбор…" : "Забрать выбранную карту" }}
       </button>
     </form>
 
     <p v-if="!options.length && !terminal" class="death-loot-surface__opaque" role="status">
       Доступных карт сейчас нет.
     </p>
-    <footer class="death-loot-surface__footer">
-      <small>ПОСЛЕ ОТВЕТА ПРИОРИТЕТ ПЕРЕЙДЁТ К СЛЕДУЮЩЕМУ ИГРОКУ</small>
-    </footer>
   </section>
 </template>
 
 <style scoped>
-.death-loot-surface {
-  position: relative;
-  display: grid;
-  min-width: 0;
-  color: var(--color-text);
-}
-
-.death-loot-surface__header,
-.death-loot-form,
+.death-loot-surface { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 16px; min-width: 0; box-sizing: border-box; color: var(--color-text-primary); }
+.death-loot-surface__header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.death-loot-surface__header > div { min-width: 0; }
 .death-loot-surface__header h3,
-.death-loot-surface__header p,
-.death-loot-surface__opaque,
-.death-loot-surface__result {
-  margin: 0;
-  overflow-wrap: anywhere;
-  line-height: 1.45;
-}
-
-.death-loot-surface__header p,
-.death-loot-surface__opaque {
-  color: var(--muted);
-}
-
-.death-loot-form fieldset {
-  min-width: 0;
-  margin: 0;
-  border: 0;
-  padding: 0;
-}
-
-.death-loot-option {
-  min-width: 0;
-  cursor: pointer;
-}
-
-.death-loot-surface__result {
-  color: var(--color-action-primary);
-}
-
-.death-loot-surface__opaque {
-  place-self: center;
-  text-align: center;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .death-loot-surface,
-  .death-loot-option {
-    scroll-behavior: auto;
-    transition: none;
-  }
-}
-
-@media (forced-colors: active) {
-  .death-loot-surface,
-  .death-loot-option,
-  .death-loot-surface__result,
-  .death-loot-surface__opaque {
-    border-color: CanvasText;
-    forced-color-adjust: none;
-  }
-}
-
-.death-loot-surface {
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 12px;
-  box-sizing: border-box;
-  border: 0;
-  padding: 0;
-  background: transparent;
-}
-.death-loot-surface__header { display: block; }
-.death-loot-surface__header h3 { margin: 0; color: var(--color-text-primary); font-size: 20px; line-height: 24px; }
-.death-loot-surface__header p { margin: 6px 0 0; color: var(--color-text-secondary); font-size: 12px; line-height: 16px; }
-.death-loot-form {
-  min-height: 0;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 12px;
-}
-.death-loot-form__choices {
-  display: flex;
-  align-items: center;
-  justify-content: start;
-  gap: 12px;
-  overflow-x: auto;
-  padding: 6px;
-  scroll-snap-type: x proximity;
-}
-.death-loot-form fieldset {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  overflow: visible;
-}
+.death-loot-surface__header p { margin: 0; }
+.death-loot-surface__header h3 { font-size: 20px; line-height: 24px; }
+.death-loot-surface__header p { margin-top: 12px; color: var(--color-text-muted); font-size: 11px; line-height: 14px; white-space: nowrap; }
+.death-loot-surface__header time { position: relative; z-index: 1; flex: 0 0 70px; min-height: 40px; display: grid; place-items: center; box-sizing: border-box; border: 1px solid var(--color-accent-strong); border-radius: 12px; font-weight: 700; }
+.death-loot-surface__result,
+.death-loot-surface__opaque { margin: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.death-loot-surface__result { color: var(--color-action-primary); }
+.death-loot-surface__opaque { place-self: center; color: var(--color-text-muted); text-align: center; }
+.death-loot-form { display: grid; grid-template-rows: 218px 44px 52px; gap: 4px; margin: 0; }
+.death-loot-form__choices { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.death-loot-form fieldset { min-width: max-content; display: grid; grid-auto-flow: column; grid-auto-columns: 150px; gap: 12px; margin: 0; border: 0; padding: 0; }
 .death-loot-form legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.death-loot-option {
-  position: relative;
-  flex: 0 0 auto;
-  display: block;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  scroll-snap-align: center;
-}
+.death-loot-option { min-width: 0; border: 0; padding: 0; background: transparent; cursor: pointer; }
 .death-loot-option--selected :deep(.choice-card-presentation) { border-color: var(--color-action-primary); }
-.death-loot-submit:not(.death-loot-submit--secondary) {
-  justify-self: end;
-  width: 180px;
-  min-height: 44px;
-}
-.death-loot-submit--secondary {
-  flex: 0 0 auto;
-  width: 150px;
-  height: 218px;
-  display: grid;
-  align-content: end;
-  justify-items: start;
-  gap: 8px;
-  border: 1px solid var(--color-line);
-  border-radius: 14px;
-  padding: 102px 10px 10px;
-  color: var(--color-text-primary);
-  background: linear-gradient(#aabdb5 0 92px, var(--color-surface-card) 92px);
-  box-shadow: 0 7px 18px rgb(59 46 40 / 14%);
-  text-align: start;
-  scroll-snap-align: center;
-}
-.death-loot-submit--secondary span { font-size: 11px; font-weight: 600; }
-.death-loot-submit--secondary small { color: var(--color-text-muted); font-size: 9px; }
-.death-loot-surface__footer {
-  align-self: end;
-  color: var(--color-text-muted);
-  font-size: 9px;
-  letter-spacing: .04em;
-}
-
-@media (width < 600px) {
-  .death-loot-submit:not(.death-loot-submit--secondary) {
-    width: 100%;
-  }
-}
+.death-loot-submit { width: 100%; min-height: 44px; border: 0; border-radius: 14px; color: #fff9ef; background: var(--color-accent-strong); font: inherit; font-weight: 800; }
+.death-loot-submit:disabled { opacity: .45; }
+.death-loot-submit--secondary { border: 1px solid var(--color-accent-strong); color: var(--color-action-primary); background: transparent; }
+@media (prefers-reduced-motion: reduce) { .death-loot-option { transition: none; } }
+@media (forced-colors: active) { .death-loot-option, .death-loot-submit { border-color: CanvasText; forced-color-adjust: none; } }
+@media (width < 380px) { .death-loot-surface__header p { white-space: normal; } }
 </style>

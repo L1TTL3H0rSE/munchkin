@@ -214,7 +214,7 @@ func beginEffectSequence(
 			}
 			if len(options) > required {
 				state.Turn.Pending = &PendingDecision{
-					Type:             "effect_choice",
+					Type:             PendingDecisionEffectChoice,
 					ActorID:          state.Players[playerIndex].ID,
 					SourceInstanceID: sourceInstanceID,
 					Options:          options,
@@ -293,7 +293,7 @@ func resolvePendingEffect(
 ) error {
 	decision := state.Turn.Pending
 	if decision == nil ||
-		decision.Type != "effect_choice" ||
+		decision.Type != PendingDecisionEffectChoice ||
 		decision.ActorID != state.Players[playerIndex].ID {
 		return fmt.Errorf("%w: no effect choice is pending", ErrIllegalCommand)
 	}
@@ -396,7 +396,7 @@ func queueLoadoutResolution(
 		return false, err
 	}
 	state.Turn.Pending = &PendingDecision{
-		Type:             "effect_choice",
+		Type:             PendingDecisionEffectChoice,
 		ActorID:          state.Players[playerIndex].ID,
 		SourceInstanceID: sourceInstanceID,
 		Options:          append([]string(nil), conflict.Options...),
@@ -569,6 +569,7 @@ func advanceRunAwaySequence(state *State, pack Pack) error {
 			ErrIllegalCommand,
 		)
 	}
+	previousParticipantIndex := sequence.ParticipantIndex
 	sequence.Effects = nil
 	sequence.MonsterIndex++
 	if sequence.MonsterIndex >= len(sequence.MonsterInstanceIDs) {
@@ -602,6 +603,20 @@ func advanceRunAwaySequence(state *State, pack Pack) error {
 		return nil
 	}
 	setTurnPhase(state, PhaseRunAway)
+	if sequence.ParticipantIndex == previousParticipantIndex &&
+		sequence.MonsterIndex > 0 &&
+		len(sequence.MonsterInstanceIDs)-sequence.MonsterIndex > 1 {
+		state.Turn.Pending = &PendingDecision{
+			Type:    PendingDecisionRunAwayMonster,
+			ActorID: sequence.ParticipantPlayerIDs[sequence.ParticipantIndex],
+			Options: append(
+				[]string(nil),
+				sequence.MonsterInstanceIDs[sequence.MonsterIndex:]...,
+			),
+			Minimum: 1,
+			Maximum: 1,
+		}
+	}
 	return nil
 }
 

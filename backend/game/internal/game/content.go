@@ -220,6 +220,7 @@ type MonsterSpec struct {
 	Strength                int        `json:"strength"`
 	Treasures               int        `json:"treasures"`
 	Levels                  int        `json:"levels"`
+	BadStuffText            string     `json:"bad_stuff_text,omitempty"`
 	PursuitMinLevel         int        `json:"pursuit_min_level,omitempty"`
 	Tags                    []string   `json:"tags,omitempty"`
 	Modifiers               []Modifier `json:"modifiers,omitempty"`
@@ -805,6 +806,11 @@ func validateMonster(cardID string, monster MonsterSpec) error {
 		monster.PursuitMinLevel > 9 ||
 		len(monster.BadStuff) == 0 {
 		return fmt.Errorf("%w: invalid monster %s", ErrInvalidContent, cardID)
+	}
+	if monster.BadStuffText != "" && (!utf8.ValidString(monster.BadStuffText) ||
+		strings.TrimSpace(monster.BadStuffText) == "" ||
+		utf8.RuneCountInString(monster.BadStuffText) > 400) {
+		return fmt.Errorf("%w: invalid monster bad_stuff_text on %s", ErrInvalidContent, cardID)
 	}
 	if err := validateTags(cardID, "monster tags", monster.Tags); err != nil {
 		return err

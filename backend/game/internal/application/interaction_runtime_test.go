@@ -1540,6 +1540,13 @@ func runAwayRuntimePack(t *testing.T) game.Pack {
 	return pack
 }
 
+func runAwayChoiceRuntimePack(t *testing.T) game.Pack {
+	t.Helper()
+	pack := runAwayRuntimePack(t)
+	pack.Source = "run-away-choice-runtime-test"
+	return pack
+}
+
 type twoPlayerRuntimeFixture struct {
 	service *Service
 	store   *memory.Store
@@ -1815,6 +1822,110 @@ func newTwoPlayerRuntimeFixture(
 				"runtime-theft-fixture",
 				[]game.DomainEvent{{
 					Type:    game.EventCardPlayed,
+					Payload: raw,
+				}},
+				start,
+			)
+		}
+		if pack.Source == "run-away-choice-runtime-test" {
+			base := candidate.Clone()
+			monsterIDs := make([]string, 0, 3)
+			for _, instanceID := range candidate.DoorDeck {
+				card, _, exists := pack.DefinitionForInstance(candidate, instanceID)
+				if exists && card.Monster != nil {
+					monsterIDs = append(monsterIDs, instanceID)
+					if len(monsterIDs) == 3 {
+						break
+					}
+				}
+			}
+			if len(monsterIDs) != 3 {
+				continue
+			}
+			for _, instanceID := range monsterIDs {
+				candidate.DoorDeck = slices.DeleteFunc(
+					candidate.DoorDeck,
+					func(value string) bool { return value == instanceID },
+				)
+			}
+			actorID := candidate.Turn.PlayerID
+			candidate.Turn.Encounter = &game.Encounter{
+				MonsterInstanceID: monsterIDs[0],
+				AdditionalMonsterInstanceIDs: []string{
+					monsterIDs[1],
+					monsterIDs[2],
+				},
+				CombatClosed: true,
+			}
+			candidate.Turn.Phase = game.PhaseRunAway
+			candidate.Turn.RunAway = &game.RunAwaySequence{
+				ParticipantPlayerIDs: []string{actorID},
+				MonsterInstanceIDs:   append([]string(nil), monsterIDs...),
+				MonsterIndex:         1,
+				Attempts: []game.RunAwayAttempt{{
+					PlayerID:          actorID,
+					MonsterInstanceID: monsterIDs[0],
+					Roll:              6,
+					Total:             6,
+					Escaped:           true,
+				}},
+			}
+			candidate.Turn.Pending = &game.PendingDecision{
+				Type:    game.PendingDecisionRunAwayMonster,
+				ActorID: actorID,
+				Options: append([]string(nil), monsterIDs[1:]...),
+				Minimum: 1,
+				Maximum: 1,
+			}
+			policy := game.AddressedInteractionDeadlinePolicy()
+			candidate.InteractionWindow = &game.InteractionWindow{
+				ID:   "runtime-run-away-monster-choice",
+				Kind: game.InteractionKindPrivateChoice,
+				Parent: game.InteractionParent{
+					Phase:       game.PhaseRunAway,
+					SubjectKind: game.InteractionSubjectTurn,
+					SubjectID:   actorID,
+				},
+				InitiatorActorID:  actorID,
+				EligibilityPolicy: game.InteractionEligibilityActorPrivate,
+				AllowedIntents: []game.InteractionIntent{
+					game.InteractionIntentRespond,
+					game.InteractionIntentAutoResolve,
+				},
+				EligibleActorIDs: []string{actorID},
+				OpenedAt:         start,
+				DeadlineAt:       start.Add(time.Duration(policy.BaseSeconds) * time.Second),
+				DeadlineRevision: 1,
+				DeadlinePolicy:   policy,
+				Responses: map[string]game.InteractionResponse{
+					actorID: {
+						Requirement:   game.InteractionResponseMandatory,
+						TimeoutIntent: game.InteractionIntentAutoResolve,
+						State:         game.InteractionResponsePending,
+					},
+				},
+				Status: game.InteractionWindowOpen,
+			}
+			if err := candidate.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := json.Marshal(struct {
+				Reason game.CommandType `json:"reason"`
+				State  game.State       `json:"state"`
+			}{
+				Reason: game.CommandResolveRunAwayStep,
+				State:  candidate,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			candidate, candidateEvents = applyRuntimeEvents(
+				t,
+				base,
+				candidateEvents,
+				"runtime-run-away-choice-fixture",
+				[]game.DomainEvent{{
+					Type:    game.EventRunAwayStepResolved,
 					Payload: raw,
 				}},
 				start,
@@ -2442,6 +2553,62 @@ func TestTargetEffectTimeoutRestoresSameDeadlineAndUsesStableDefault(
 		if instanceID == defaultChoiceID {
 			t.Fatalf("stable timeout choice remained owned: %s", instanceID)
 		}
+	}
+}
+
+func TestRunAwayMonsterChoiceAtomicallyOpensSelectedResponse(t *testing.T) {
+	ctx := context.Background()
+	fixture := newTwoPlayerRuntimeFixture(
+		t,
+		runAwayChoiceRuntimePack(t),
+		time.Date(2026, time.August, 8, 12, 0, 0, 0, time.UTC),
+	)
+	actorCredential := fixture.owner.Credential
+	if fixture.current.Projection.Turn.PlayerID == fixture.other.PlayerID {
+		actorCredential = fixture.other.Credential
+	}
+	projection, err := fixture.service.Get(
+		ctx,
+		fixture.owner.GameID,
+		actorCredential,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projection.Turn.PendingDecision == nil ||
+		projection.Turn.PendingDecision.Type !=
+			game.PendingDecisionRunAwayMonster ||
+		projection.Interaction == nil ||
+		projection.Interaction.PublicKind != "private_choice" ||
+		len(projection.Interaction.Actions) != 2 {
+		t.Fatalf("projected Run Away monster choice: %#v", projection)
+	}
+	selected := projection.Interaction.Actions[1]
+	if len(selected.ChoiceIDs) != 1 {
+		t.Fatalf("projected Run Away selection: %#v", selected)
+	}
+	fixture.clock.Set(projection.Interaction.DeadlineAt.Add(-time.Second))
+	result, err := fixture.service.ExecuteInteraction(
+		ctx,
+		fixture.owner.GameID,
+		actorCredential,
+		"runtime-run-away-monster-choice",
+		projection.Version,
+		projection.Interaction.InteractionID,
+		selected.ActionID,
+		selected.Type,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Projection.Turn.PendingDecision != nil ||
+		result.Projection.Turn.RunAway == nil ||
+		result.Projection.Turn.RunAway.CurrentMonsterInstanceID !=
+			selected.ChoiceIDs[0] ||
+		result.Projection.Interaction == nil ||
+		result.Projection.Interaction.PublicKind != "run_away_response" {
+		t.Fatalf("selected Run Away response was not opened atomically: %#v",
+			result.Projection)
 	}
 }
 

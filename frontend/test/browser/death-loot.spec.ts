@@ -120,7 +120,7 @@ test("all-pass terminal preserves the Figma result at 200 percent zoom", async (
 test("one-player death uses the Figma death composition instead of a loot fallback", async ({page}) => {
   const fixture = await installFixture(page, "death-loot-single");
   await page.goto(`/game/${encodeURIComponent(fixture.projection.game_id)}`);
-  await expect(page.getByRole("heading", {name: "Персонаж выбыл"})).toBeVisible();
+  await expect(page.getByRole("heading", {name: "Персонаж погиб"})).toBeVisible();
   await expect(page.getByTestId("death-loot-surface")).toHaveCount(0);
   await assertNoRootOverflow(page);
 });

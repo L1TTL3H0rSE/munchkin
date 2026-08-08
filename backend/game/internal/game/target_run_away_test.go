@@ -3,6 +3,7 @@ package game
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -511,6 +512,9 @@ func TestRunAwayUsesStableParticipantMonsterStepsAndPersistedRolls(
 	if err := initializeRunAwaySequence(&state); err != nil {
 		t.Fatal(err)
 	}
+	// This low-level sequence test continues after the actor kept the default
+	// encounter order. Choice handling and reordering are covered separately.
+	state.Turn.Pending = nil
 	if err := state.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -634,6 +638,194 @@ func TestRunAwayUsesStableParticipantMonsterStepsAndPersistedRolls(
 			attempt.Roll > 6 {
 			t.Fatalf("Run Away attempt %d: %#v", index, attempt)
 		}
+	}
+}
+
+func TestRunAwayRequiresFirstMonsterChoiceForMultipleMonsters(t *testing.T) {
+	state, pack := advancedCombatState(t)
+	if err := discardEncounterSet(&state, pack); err != nil {
+		t.Fatal(err)
+	}
+	firstMonster := addRunAwayMonster(&state, &pack, "test-first-choice-a")
+	secondMonster := addRunAwayMonster(&state, &pack, "test-first-choice-b")
+	state.Turn.Encounter = &Encounter{
+		MonsterInstanceID: firstMonster,
+		AdditionalMonsterInstanceIDs: []string{
+			secondMonster,
+		},
+		CombatClosed: true,
+	}
+	setTurnPhase(&state, PhaseRunAway)
+
+	if err := initializeRunAwaySequence(&state); err != nil {
+		t.Fatal(err)
+	}
+	decision := state.Turn.Pending
+	if decision == nil ||
+		decision.Type != PendingDecisionRunAwayMonster ||
+		decision.ActorID != "player-a" ||
+		!slices.Equal(decision.Options, []string{firstMonster, secondMonster}) ||
+		decision.Minimum != 1 ||
+		decision.Maximum != 1 {
+		t.Fatalf("initial Run Away monster choice: %#v", decision)
+	}
+	if err := state.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRunAwayNextMonsterChoiceIsProjectedAndReplayable(t *testing.T) {
+	state, pack := advancedCombatState(t)
+	if err := discardEncounterSet(&state, pack); err != nil {
+		t.Fatal(err)
+	}
+	firstMonster := addRunAwayMonster(&state, &pack, "test-choice-monster-a")
+	secondMonster := addRunAwayMonster(&state, &pack, "test-choice-monster-b")
+	thirdMonster := addRunAwayMonster(&state, &pack, "test-choice-monster-c")
+	state.Turn.Encounter = &Encounter{
+		MonsterInstanceID: firstMonster,
+		AdditionalMonsterInstanceIDs: []string{
+			secondMonster,
+			thirdMonster,
+		},
+		CombatClosed: true,
+	}
+	setTurnPhase(&state, PhaseRunAway)
+	if err := initializeRunAwaySequence(&state); err != nil {
+		t.Fatal(err)
+	}
+	state.Turn.RunAway.Attempts = append(state.Turn.RunAway.Attempts, RunAwayAttempt{
+		PlayerID:          "player-a",
+		MonsterInstanceID: firstMonster,
+		Roll:              6,
+		Total:             6,
+		Escaped:           true,
+	})
+	if err := advanceRunAwaySequence(&state, pack); err != nil {
+		t.Fatal(err)
+	}
+	decision := state.Turn.Pending
+	if decision == nil ||
+		decision.Type != PendingDecisionRunAwayMonster ||
+		!slices.Equal(decision.Options, []string{secondMonster, thirdMonster}) {
+		t.Fatalf("Run Away next-monster decision: %#v", decision)
+	}
+
+	openedAt := time.Date(2026, time.August, 8, 12, 0, 0, 0, time.UTC)
+	policy := AddressedInteractionDeadlinePolicy()
+	window := &InteractionWindow{
+		ID:   "interaction-run-away-choice",
+		Kind: InteractionKindPrivateChoice,
+		Parent: InteractionParent{
+			Phase:       PhaseRunAway,
+			SubjectKind: InteractionSubjectTurn,
+			SubjectID:   state.Turn.PlayerID,
+		},
+		InitiatorActorID:  "player-a",
+		EligibilityPolicy: InteractionEligibilityActorPrivate,
+		AllowedIntents: []InteractionIntent{
+			InteractionIntentRespond,
+			InteractionIntentAutoResolve,
+		},
+		EligibleActorIDs: []string{"player-a"},
+		OpenedAt:         openedAt,
+		DeadlineAt:       openedAt.Add(time.Duration(policy.BaseSeconds) * time.Second),
+		DeadlineRevision: 1,
+		DeadlinePolicy:   policy,
+		Responses: map[string]InteractionResponse{
+			"player-a": {
+				Requirement:   InteractionResponseMandatory,
+				TimeoutIntent: InteractionIntentAutoResolve,
+				State:         InteractionResponsePending,
+			},
+		},
+		Status: InteractionWindowOpen,
+	}
+	openEvents, err := Handle(state, Command{
+		Type:              CommandOpenInteractionWindow,
+		ActorID:           "player-a",
+		InteractionWindow: window,
+	}, pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, _ = applyForTest(t, state, openEvents)
+	actorProjection, err := ProjectForActor(state, "player-a", pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observerProjection, err := ProjectForActor(state, "player-b", pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actorProjection.Turn.PendingDecision == nil ||
+		len(actorProjection.Turn.AvailableActions) != 0 ||
+		actorProjection.Interaction == nil ||
+		len(actorProjection.Interaction.Actions) != 2 ||
+		observerProjection.Turn.PendingDecision != nil {
+		t.Fatalf("Run Away choice projections: actor=%#v observer=%#v",
+			actorProjection.Turn, observerProjection.Turn)
+	}
+
+	responseEvents, err := Handle(state, Command{
+		Type:                CommandRespondInteraction,
+		ActorID:             "player-a",
+		InteractionID:       window.ID,
+		InteractionIntent:   InteractionIntentRespond,
+		InteractionAt:       openedAt.Add(time.Second),
+		InteractionRevision: 1,
+	}, pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, _ = applyForTest(t, state, responseEvents)
+	closeEvents, err := Handle(state, Command{
+		Type:                   CommandCloseInteractionWindow,
+		ActorID:                "player-a",
+		InteractionID:          window.ID,
+		InteractionAt:          openedAt.Add(2 * time.Second),
+		InteractionCloseReason: InteractionCloseAllResponded,
+	}, pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, _ = applyForTest(t, state, closeEvents)
+	if _, err := Handle(state, Command{
+		Type:      CommandChooseRunAwayMonster,
+		ActorID:   "player-b",
+		ChoiceIDs: []string{thirdMonster},
+	}, pack); err == nil {
+		t.Fatal("another actor selected the next Run Away monster")
+	}
+	if _, err := Handle(state, Command{
+		Type:      CommandChooseRunAwayMonster,
+		ActorID:   "player-a",
+		ChoiceIDs: []string{firstMonster},
+	}, pack); err == nil {
+		t.Fatal("an attempted Run Away monster was selected again")
+	}
+	rngBefore := state.RNGState
+	choiceEvents, err := Handle(state, Command{
+		Type:      CommandChooseRunAwayMonster,
+		ActorID:   "player-a",
+		ChoiceIDs: []string{thirdMonster},
+	}, pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(choiceEvents) != 1 || choiceEvents[0].Type != EventRunAwayMonsterChosen {
+		t.Fatalf("Run Away monster choice events: %#v", choiceEvents)
+	}
+	replayed, err := Apply(state, choiceEvents[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replayed.Turn.Pending != nil ||
+		replayed.Turn.RunAway.MonsterInstanceIDs[0] != firstMonster ||
+		replayed.Turn.RunAway.MonsterInstanceIDs[1] != thirdMonster ||
+		replayed.Turn.RunAway.MonsterInstanceIDs[2] != secondMonster ||
+		replayed.RNGState != rngBefore {
+		t.Fatalf("replayed Run Away monster choice: %#v", replayed.Turn.RunAway)
 	}
 }
 

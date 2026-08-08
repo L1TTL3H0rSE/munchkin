@@ -399,6 +399,18 @@ func initializeRunAwaySequence(state *State) error {
 			*state.Turn.Encounter,
 		),
 	}
+	if len(state.Turn.RunAway.MonsterInstanceIDs) > 1 {
+		state.Turn.Pending = &PendingDecision{
+			Type:    PendingDecisionRunAwayMonster,
+			ActorID: participants[0],
+			Options: append(
+				[]string(nil),
+				state.Turn.RunAway.MonsterInstanceIDs...,
+			),
+			Minimum: 1,
+			Maximum: 1,
+		}
+	}
 	return nil
 }
 

@@ -97,6 +97,28 @@ func applicationPack(t *testing.T) game.Pack {
 	return pack
 }
 
+func TestDeterministicRandomForManagedBrowserRuntime(t *testing.T) {
+	pack := applicationPack(t)
+	first := NewService(memory.New(), pack, &fixedClock{value: 1}, NoopPublisher{})
+	second := NewService(memory.New(), pack, &fixedClock{value: 1}, NoopPublisher{})
+	first.SetDeterministicRandomForTesting(20260808)
+	second.SetDeterministicRandomForTesting(20260808)
+
+	firstLobby, err := first.CreateLobby(context.Background(), "Alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondLobby, err := second.CreateLobby(context.Background(), "Alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstLobby.GameID != secondLobby.GameID ||
+		firstLobby.PlayerID != secondLobby.PlayerID ||
+		firstLobby.Credential != secondLobby.Credential {
+		t.Fatalf("same managed-test seed produced different identities")
+	}
+}
+
 func testService(t *testing.T) (*Service, *capturePublisher) {
 	t.Helper()
 	publisher := &capturePublisher{}

@@ -27,7 +27,7 @@ const managedByRunner = process.env.MUNCHKIN_PLAYWRIGHT_MANAGED_SERVERS === "1";
 const baseURL = process.env.WEB_BASE_URL ?? `http://127.0.0.1:${port}`;
 const gameContentPath = process.env.GAME_CONTENT_PATH ?? (
   isRealE2E
-    ? "../../content/sets/moscow/v4/cards.json"
+    ? "../../content/sets/moscow/v5/cards.json"
     : "../../content/sets/demo/cards.json"
 );
 const nuxtCommand = `${nodeCommand} node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port ${port} --no-fork`;

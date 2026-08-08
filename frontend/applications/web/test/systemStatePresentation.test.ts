@@ -77,7 +77,7 @@ describe("system state presentation", () => {
       });
     expect(buildConnectionPresentation("failed", "transient", true))
       .toMatchObject({
-        label: "Не удалось восстановить связь",
+        label: "Не удалось подключиться",
         canRetry: true,
       });
   });
@@ -93,7 +93,7 @@ describe("system state presentation", () => {
       .not.toContain("Error");
   });
 
-  it("keeps the last projection and renders a server-confirmed winner", () => {
+  it("keeps the last projection and routes a server-confirmed winner to the game table", () => {
     expect(buildRouteSystemState({
       hydrated: true,
       loading: false,
@@ -112,10 +112,5 @@ describe("system state presentation", () => {
       projection: finished,
       errorKind: null,
     })).toMatchObject({kind: "victory"});
-    expect(buildSystemSurface("victory", finished)).toMatchObject({
-      title: "Победа подтверждена",
-      winnerName: "Алиса",
-      primaryAction: "lobby",
-    });
   });
 });

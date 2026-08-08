@@ -37,6 +37,10 @@ const presentation = computed(() => buildConnectionPresentation(
     class="game-connection-status"
     :class="`game-connection-status--${presentation.tone}`"
     :data-state="state"
+    data-figma-owner="game-connection-status"
+    :data-figma-desktop-node="errorKind === 'stale_version'
+      ? '296:2837'
+      : state === 'failed' ? '258:2674' : '258:2530'"
     :aria-busy="presentation.ariaBusy"
     :aria-live="presentation.ariaLive"
   >
@@ -60,16 +64,24 @@ const presentation = computed(() => buildConnectionPresentation(
 
 <style scoped lang="scss">
 .game-connection-status {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 80;
+  width: min(440px, calc(100% - 32px));
+  min-height: 132px;
+  transform: translate(-50%, -50%);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-control);
-  padding: var(--space-2) var(--space-3);
+  border-radius: 20px;
+  padding: 24px;
   color: var(--color-text);
   background: var(--color-surface);
+  box-shadow: 0 12px 48px rgb(38 34 31 / 24%);
 }
 
 .game-connection-status--warning {
@@ -112,12 +124,12 @@ const presentation = computed(() => buildConnectionPresentation(
 }
 
 .game-connection-status__copy strong {
-  font-size: .78rem;
+  font-size: 1.25rem;
 }
 
 .game-connection-status__copy span {
   color: var(--color-text-muted);
-  font-size: .72rem;
+  font-size: .875rem;
   line-height: 1.35;
 }
 
@@ -135,6 +147,8 @@ const presentation = computed(() => buildConnectionPresentation(
 @media (width <= 599px) {
   .game-connection-status {
     grid-template-columns: auto minmax(0, 1fr);
+    width: calc(100% - 24px);
+    padding: 20px;
   }
 
   .game-connection-status__retry {

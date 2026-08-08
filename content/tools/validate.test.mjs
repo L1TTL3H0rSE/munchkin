@@ -40,6 +40,13 @@ const moscowV4 = JSON.parse(
 const moscowV4Provenance = JSON.parse(
   fs.readFileSync(path.join(moscowV4Root, "provenance.json"), "utf8"),
 );
+const moscowV5Root = path.join(root, "sets", "moscow", "v5");
+const moscowV5 = JSON.parse(
+  fs.readFileSync(path.join(moscowV5Root, "cards.json"), "utf8"),
+);
+const moscowV5Provenance = JSON.parse(
+  fs.readFileSync(path.join(moscowV5Root, "provenance.json"), "utf8"),
+);
 const powershellProbe = spawnSync(
   "pwsh",
   ["-NoProfile", "-NonInteractive", "-Command", "exit 0"],
@@ -576,6 +583,55 @@ test("moscow-core v4 adds only closed contested-theft definitions", () => {
       ]),
     [["pocket-bell-counter", {kind: "counter_theft"}]],
   );
+});
+
+test("moscow-core v5 changes only bounded monster presentation copy", () => {
+  const result = validatePack(structuredClone(moscowV5));
+  assert.deepEqual(result, {
+    setID: "moscow-core",
+    version: 5,
+    digest: "sha256:f09447b79a112196ee5bd446648a922ad5b8b910b1b081c4ac65accf50ee2e49",
+    definitions: 170,
+    doors: 83,
+    treasures: 68,
+    deferred: 21,
+  });
+  assert.equal(moscowV5.source, "original-moscow-core-figma-presentation-2026");
+  assert.equal(moscowV5Provenance.status, "published");
+  assert.equal(moscowV5Provenance.source_version, 4);
+  assert.equal(moscowV5Provenance.source_digest, moscowV4.content_digest);
+  assert.equal(moscowV5Provenance.content_digest, moscowV5.content_digest);
+
+  assert.equal(moscowV5.cards.length, moscowV4.cards.length);
+  for (let index = 0; index < moscowV4.cards.length; index += 1) {
+    const previous = structuredClone(moscowV4.cards[index]);
+    const current = structuredClone(moscowV5.cards[index]);
+    assert.equal(current.id, previous.id);
+    if (current.monster) {
+      assert.match(current.monster.bad_stuff_text, /\S/u);
+      delete current.monster.bad_stuff_text;
+    }
+    current.rules_text = previous.rules_text;
+    if (previous.rules_text === undefined) delete current.rules_text;
+    assert.deepEqual(current, previous, `mechanics drift on ${previous.id}`);
+  }
+});
+
+test("moscow-core v5 rejects invalid Bad Stuff presentation placement and bounds", () => {
+  const monsterIndex = moscowV5.cards.findIndex((card) => card.kind === "monster");
+  const itemIndex = moscowV5.cards.findIndex((card) => card.kind === "item");
+
+  const whitespace = structuredClone(moscowV5);
+  whitespace.cards[monsterIndex].monster.bad_stuff_text = "   ";
+  assert.throws(() => validatePack(withDigest(whitespace)), /must be a non-empty string/);
+
+  const overLimit = structuredClone(moscowV5);
+  overLimit.cards[monsterIndex].monster.bad_stuff_text = "😀".repeat(401);
+  assert.throws(() => validatePack(withDigest(overLimit)), /exceeds 400 characters/);
+
+  const nonMonster = structuredClone(moscowV5);
+  nonMonster.cards[itemIndex].bad_stuff_text = "Скрытое последствие";
+  assert.throws(() => validatePack(withDigest(nonMonster)), /unknown field bad_stuff_text/);
 });
 
 test("theft registry rejects hidden targets, unknown kinds and loose costs", () => {
@@ -1134,6 +1190,20 @@ test("JSON Schema accepts committed moscow-core v4 and rejects theft targets", {
     (card) => card.id === "pocket-bell-counter",
   ).theft_capability.kind = "counter_anything";
   assert.equal(schemaAccepts(unknownCounter), false);
+});
+
+test("JSON Schema accepts committed moscow-core v5 and rejects invalid Bad Stuff", {
+  skip: powershellProbe.status === 0
+    ? false
+    : "PowerShell Test-Json is unavailable",
+}, () => {
+  assert.equal(schemaAccepts(moscowV5), true);
+  const nonMonster = structuredClone(moscowV5);
+  nonMonster.cards.find((card) => card.kind === "item").bad_stuff_text = "Нельзя";
+  assert.equal(schemaAccepts(nonMonster), false);
+  const blank = structuredClone(moscowV5);
+  blank.cards.find((card) => card.kind === "monster").monster.bad_stuff_text = "";
+  assert.equal(schemaAccepts(blank), false);
 });
 
 test("unknown fields, effects, selectors and conditions fail closed", () => {

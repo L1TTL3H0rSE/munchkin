@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, nextTick, ref, watch} from "vue";
+import {computed, ref, watch} from "vue";
 import type {
   CardView,
   InteractionView,
@@ -9,13 +9,11 @@ import type {
 import type {GameConnectionState} from "../../composables/useGameSessionController";
 import {useInteractionCountdown} from "../../composables/useInteractionCountdown";
 import AdvancedCombatSurface from "./domains/AdvancedCombatSurface.vue";
-import AcceptedHelperSummary from "./domains/AcceptedHelperSummary.vue";
 import EconomyOfferSummary from "./domains/EconomyOfferSummary.vue";
 import HelperOfferSurface from "./domains/HelperOfferSurface.vue";
-import TargetRunAwaySurface from "./domains/TargetRunAwaySurface.vue";
+import TargetInteractionSurface from "./domains/TargetInteractionSurface.vue";
 import InteractionActionList from "./core/InteractionActionList.vue";
 import InteractionDialog from "./core/InteractionDialog.vue";
-import DeathLootSurface from "./DeathLootSurface.vue";
 import {
   advancedCombatActionDetails,
   advancedCombatActionLabel,
@@ -38,18 +36,15 @@ import {
   type InteractionActionView,
 } from "./interactionModel";
 import {
-  acceptedCombatHelper,
   formatAbsoluteDeadline,
   isCombatantHelperOffer,
   isInvitedHelperOffer,
 } from "./helperOfferModel";
 import {
-  isRunAwayInteraction,
   isTargetInteraction,
   targetRunAwayActionDetails,
   targetRunAwayActionLabel,
 } from "./targetRunAwayModel";
-import {isDeathLootInteraction} from "./deathLootModel";
 
 const props = defineProps<{
   projection: Projection;
@@ -65,17 +60,11 @@ const emit = defineEmits<{
 const surfaceOpen = ref(false);
 const selectedActionID = ref<string | null>(null);
 const lastSurfaceKey = ref("");
-const deathLootClosureNotice = ref("");
-const deathLootClosureNoticeRef = ref<HTMLElement | null>(null);
 
 const interaction = computed<InteractionView | undefined>(() =>
   props.projection.interaction,
 );
-const acceptedHelper = computed(() => acceptedCombatHelper(props.projection));
-const activeSurface = computed(() => Boolean(
-  interaction.value || acceptedHelper.value || showRunAwaySummary.value
-    || deathLootClosureNotice.value,
-));
+const activeSurface = computed(() => Boolean(interaction.value));
 const ownCards = computed<CardView[]>(() => [
   ...props.projection.you.hand,
   ...props.projection.you.carried,
@@ -90,23 +79,9 @@ const selectableActions = computed(() =>
 const targetInteraction = computed(() => isTargetInteraction(interaction.value)
   ? interaction.value
   : undefined);
-const runAwayInteraction = computed(() => isRunAwayInteraction(interaction.value)
-  ? interaction.value
-  : undefined);
-const runAwayProjection = computed(() => props.projection.turn.run_away);
-const showRunAwaySummary = computed(() => Boolean(
-  runAwayProjection.value && (
-    runAwayProjection.value.attempts.length > 0 || runAwayProjection.value.completed
-  ),
-));
 const helperOfferMode = computed(() => isCombatantHelperOffer(interaction.value));
 const invitedHelperOffer = computed(() => isInvitedHelperOffer(interaction.value));
 const charityForm = computed(() => interactionHasCharityForm(interaction.value));
-const deathLootInteraction = computed(() =>
-  isDeathLootInteraction(interaction.value)
-    ? interaction.value
-    : undefined,
-);
 const selectedAction = computed(() => selectableActions.value.find((action) =>
   action.action_id === selectedActionID.value,
 ));
@@ -136,6 +111,15 @@ const dialogEyebrow = computed(() => {
     return "ОТВЕТ НА ВМЕШАТЕЛЬСТВО";
   }
   return "СЕРВЕРНОЕ ОКНО";
+});
+const figmaNode = computed(() => {
+  if (helperOfferMode.value) return "293:1780";
+  if (invitedHelperOffer.value) return "293:1866";
+  if (interaction.value?.public_kind === "economy_offer") return "295:2592";
+  if (interaction.value?.public_kind === "theft_response") return "295:2764";
+  if (interaction.value?.public_kind === "private_choice") return "296:2748";
+  if (interaction.value?.my_response_state === "timed_out") return "296:2911";
+  return "254:221";
 });
 const surfaceContext = computed(() => {
   if (helperOfferMode.value) {
@@ -183,10 +167,6 @@ const deadlineLabel = computed(() => interaction.value
   : "");
 const surfaceKey = computed(() => [
   interactionRevisionKey(interaction.value),
-  deathLootClosureNotice.value,
-  acceptedHelper.value
-    ? `${acceptedHelper.value.helperPlayerID}:${acceptedHelper.value.rewardTreasures}`
-    : "",
 ].join("::"));
 
 function selectAction(action: InteractionActionView): void {
@@ -220,14 +200,7 @@ function actionLabelFor(action: InteractionActionView, actionIndex: number): str
   if (action.theft_capability) {
     return "Выставить контрмеру";
   }
-  if (targetInteraction.value || runAwayInteraction.value) {
-    if (
-      runAwayInteraction.value &&
-      action.type === "pass" &&
-      props.projection.turn.run_away?.current_player_id === props.projection.you.player_id
-    ) {
-      return "Бросить на смывку";
-    }
+  if (targetInteraction.value) {
     return targetRunAwayActionLabel(action, actionIndex, ownCards.value);
   }
   if (isAdvancedCombatAction(action)) {
@@ -246,17 +219,7 @@ function actionDetailsFor(action: InteractionActionView): string[] {
       "Итог и скрытые варианты остаются на сервере.",
     ];
   }
-  if ((targetInteraction.value || runAwayInteraction.value) && interaction.value) {
-    if (
-      runAwayInteraction.value &&
-      action.type === "pass" &&
-      props.projection.turn.run_away?.current_player_id === props.projection.you.player_id
-    ) {
-      return [
-        "Закрыть окно ответов для себя.",
-        "После ответов остальных участников сервер сам бросит D6.",
-      ];
-    }
+  if (targetInteraction.value && interaction.value) {
     return targetRunAwayActionDetails(
       action,
       props.projection,
@@ -299,28 +262,6 @@ watch(
   },
 );
 
-watch(
-  [() => props.projection.version, () => interaction.value],
-  ([version, nextInteraction], [previousVersion, previousInteraction]) => {
-    if (nextInteraction) {
-      deathLootClosureNotice.value = "";
-      return;
-    }
-    if (
-      previousVersion === undefined ||
-      version <= previousVersion ||
-      !previousInteraction ||
-      previousInteraction.public_kind !== "death_loot_priority" ||
-      previousInteraction.death_loot === undefined
-    ) {
-      return;
-    }
-    deathLootClosureNotice.value =
-      "Окно приоритета добычи закрыто сервером. Подтверждённый итог находится в свежей projection; клиент не достраивает выбор.";
-    void nextTick(() => deathLootClosureNoticeRef.value?.focus());
-  },
-  {flush: "post"},
-);
 </script>
 
 <template>
@@ -329,18 +270,7 @@ watch(
     class="interaction-surface"
     data-testid="interaction-surface"
     :data-state="terminal ? 'terminal' : busy ? 'pending' : 'open'"
-    :tabindex="showRunAwaySummary && !interaction ? 0 : undefined"
   >
-    <AcceptedHelperSummary
-      v-if="acceptedHelper"
-      :projection="projection"
-    />
-
-    <TargetRunAwaySurface
-      v-if="showRunAwaySummary && !interaction"
-      :projection="projection"
-    />
-
     <InteractionDialog
       v-if="interaction"
       v-model:open="surfaceOpen"
@@ -355,18 +285,18 @@ watch(
       :deadline-at="interaction?.deadline_at"
       :deadline-label="deadlineLabel"
       :eyebrow="dialogEyebrow"
-      :desktop-inline="Boolean(deathLootInteraction)"
       :inbox-status="interaction?.response_required_for_you
         ? 'Требуется решение'
         : 'Окно открыто для текущей проекции'"
+      :figma-node="figmaNode"
     >
       <AdvancedCombatSurface
         v-if="interaction?.public_kind === 'combat_response'"
         :projection="projection"
       />
 
-      <TargetRunAwaySurface
-        v-if="(interaction && (targetInteraction || runAwayInteraction)) || showRunAwaySummary"
+      <TargetInteractionSurface
+        v-if="interaction && targetInteraction"
         :projection="projection"
         :interaction="interaction"
       />
@@ -386,15 +316,8 @@ watch(
         @submit="emit('submit', $event)"
       />
 
-      <DeathLootSurface
-        v-if="deathLootInteraction"
-        :interaction="deathLootInteraction"
-        :busy="busy"
-        @submit="emit('submit', $event)"
-      />
-
       <p
-        v-if="interaction && !deathLootInteraction && !interaction.actions.length && !charityForm"
+        v-if="interaction && !interaction.actions.length && !charityForm"
         class="interaction-opaque"
         role="status"
       >
@@ -402,7 +325,7 @@ watch(
       </p>
 
       <p
-        v-else-if="interaction && !deathLootInteraction && !selectableActions.length
+        v-else-if="interaction && !selectableActions.length
           && !helperOfferMode && !invitedHelperOffer && !charityForm"
         class="interaction-opaque"
         role="status"
@@ -411,7 +334,7 @@ watch(
       </p>
 
       <InteractionActionList
-        v-if="interaction && !deathLootInteraction && selectableActions.length"
+        v-if="interaction && selectableActions.length"
         :actions="selectableActions"
         :selected-action-id="selectedActionID"
         :busy="busy"
@@ -423,7 +346,7 @@ watch(
 
       <template #footer>
         <button
-          v-if="interaction && !deathLootInteraction && selectedAction"
+          v-if="interaction && selectedAction"
           class="interaction-submit"
           type="button"
           :disabled="busy || terminal"
@@ -432,7 +355,7 @@ watch(
           {{ busy ? "Отправляем…" : actionLabelFor(selectedAction, selectedActionIndex) }}
         </button>
         <span
-          v-else-if="interaction && !deathLootInteraction && !helperOfferMode && !charityForm"
+          v-else-if="interaction && !helperOfferMode && !charityForm"
           class="interaction-submit-placeholder"
         >
           Действие недоступно
@@ -441,17 +364,6 @@ watch(
       </template>
     </InteractionDialog>
 
-    <p
-      v-if="deathLootClosureNotice"
-      ref="deathLootClosureNoticeRef"
-      class="interaction-closure-notice"
-      data-testid="death-loot-closure-notice"
-      role="status"
-      aria-live="polite"
-      tabindex="-1"
-    >
-      {{ deathLootClosureNotice }}
-    </p>
   </section>
 </template>
 
@@ -474,8 +386,7 @@ watch(
   color: var(--color-text-muted, #9eaa8e);
 }
 
-.interaction-opaque,
-.interaction-closure-notice {
+.interaction-opaque {
   margin: 0;
   border: 1px dashed var(--color-line, #566044);
   padding: 1rem;
@@ -483,13 +394,4 @@ watch(
   line-height: 1.45;
 }
 
-.interaction-closure-notice {
-  border-color: var(--color-accent-strong);
-  color: var(--color-accent-strong);
-}
-
-.interaction-closure-notice:focus-visible {
-  outline: 2px solid var(--color-accent-strong);
-  outline-offset: 3px;
-}
 </style>

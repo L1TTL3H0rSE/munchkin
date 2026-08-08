@@ -5,7 +5,7 @@ import {fixtureIDs, installFixture, openFixture} from "./fixtureSupport.ts";
 
 for (const fixtureID of fixtureIDs()) {
   test(`axe serious and critical violations are absent: ${fixtureID}`, async ({page}) => {
-    if (fixtureID === "death-loot-single") {
+    if (fixtureID === "death-loot-single" || fixtureID === "death-loot-all-pass") {
       const fixture = await installFixture(page, fixtureID);
       await page.goto(`/game/${encodeURIComponent(fixture.projection.game_id)}`);
       await expect(page.locator("#main-content")).toBeVisible();

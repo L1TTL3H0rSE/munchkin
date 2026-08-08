@@ -65,6 +65,7 @@ func main() {
 		application.SystemClock{},
 		hub,
 	)
+	configureDeterministicTestRandom(service)
 	service.SetTelemetry(instrumentation)
 	server := &http.Server{
 		Addr: valueOrDefault("SERVER_ADDR", ":8080"),

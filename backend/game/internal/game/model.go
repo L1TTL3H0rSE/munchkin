@@ -570,6 +570,11 @@ type PendingDecision struct {
 	Finalize         PendingFinalize `json:"finalize"`
 }
 
+const (
+	PendingDecisionEffectChoice   = "effect_choice"
+	PendingDecisionRunAwayMonster = "run_away_monster"
+)
+
 func (decision *PendingDecision) clone() *PendingDecision {
 	if decision == nil {
 		return nil
@@ -867,6 +872,27 @@ func (state State) Validate() error {
 				state.Turn.Pending.ActorID != state.Turn.PlayerID &&
 					!profile.TargetAndRunAway) {
 			return fmt.Errorf("%w: invalid pending actor", ErrIllegalCommand)
+		}
+		if decision := state.Turn.Pending; decision != nil {
+			if len(decision.Options) == 0 ||
+				!uniqueStrings(decision.Options) ||
+				decision.Minimum < 0 ||
+				decision.Maximum < decision.Minimum ||
+				decision.Maximum > len(decision.Options) {
+				return fmt.Errorf("%w: invalid pending decision", ErrIllegalCommand)
+			}
+			switch decision.Type {
+			case PendingDecisionEffectChoice:
+				if state.Turn.Phase != PhaseResolveEffect {
+					return fmt.Errorf("%w: effect choice has invalid phase", ErrIllegalCommand)
+				}
+			case PendingDecisionRunAwayMonster:
+				if state.Turn.Phase != PhaseRunAway {
+					return fmt.Errorf("%w: Run Away choice has invalid phase", ErrIllegalCommand)
+				}
+			default:
+				return fmt.Errorf("%w: unknown pending decision", ErrIllegalCommand)
+			}
 		}
 		for _, player := range state.Players {
 			if player.SetupDiscardPending &&
@@ -1799,15 +1825,25 @@ func (state State) validateTargetAndRunAway() error {
 				)
 			}
 		} else {
+			encounterMonsters := []string(nil)
+			if state.Turn.Encounter != nil {
+				encounterMonsters = encounterMonsterInstanceIDs(*state.Turn.Encounter)
+			}
+			sameEncounterSet := len(sequence.MonsterInstanceIDs) == len(encounterMonsters)
+			if sameEncounterSet {
+				for _, instanceID := range sequence.MonsterInstanceIDs {
+					if !slices.Contains(encounterMonsters, instanceID) {
+						sameEncounterSet = false
+						break
+					}
+				}
+			}
 			if state.Turn.Encounter == nil ||
 				sequence.ParticipantIndex >= len(sequence.ParticipantPlayerIDs) ||
 				sequence.MonsterIndex >= len(sequence.MonsterInstanceIDs) ||
 				(state.Turn.Phase != PhaseRunAway &&
 					state.Turn.Phase != PhaseResolveEffect) ||
-				!slices.Equal(
-					sequence.MonsterInstanceIDs,
-					encounterMonsterInstanceIDs(*state.Turn.Encounter),
-				) {
+				!sameEncounterSet {
 				return fmt.Errorf(
 					"%w: active Run Away sequence differs from encounter",
 					ErrIllegalCommand,
@@ -1820,6 +1856,18 @@ func (state State) validateTargetAndRunAway() error {
 					"%w: Run Away choice belongs to another actor",
 					ErrIllegalCommand,
 				)
+			}
+			if decision := state.Turn.Pending; decision != nil && decision.Type == PendingDecisionRunAwayMonster {
+				expectedOptions := sequence.MonsterInstanceIDs[sequence.MonsterIndex:]
+				if decision.Minimum != 1 ||
+					decision.Maximum != 1 ||
+					len(expectedOptions) <= 1 ||
+					!slices.Equal(decision.Options, expectedOptions) {
+					return fmt.Errorf(
+						"%w: Run Away choice differs from remaining monsters",
+						ErrIllegalCommand,
+					)
+				}
 			}
 		}
 		if err := validateRunAwayEffects(sequence.Effects); err != nil {

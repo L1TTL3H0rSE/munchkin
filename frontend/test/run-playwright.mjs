@@ -213,6 +213,7 @@ function spawnManagedServer(
     stdio: ["ignore", "pipe", "pipe"],
     shell: false,
     windowsHide: true,
+    detached: process.platform !== "win32",
   });
   const server = {label, child, error: null, owned: true};
   child.stdout?.on("data", (chunk) => stdout.write(chunk));
@@ -317,13 +318,15 @@ async function startManagedServers(
       const gameServer = spawnManagedServer(
         "Go game server",
         "go",
-        ["run", "./cmd/server"],
+        ["run", "-tags=munchkin_e2e", "./cmd/server"],
         {
           cwd: path.join(repositoryRoot, "backend", "game"),
           env: {
             ...env,
             SERVER_ADDR: `127.0.0.1:${apiPort}`,
-            GAME_CONTENT_PATH: env.GAME_CONTENT_PATH ?? "../../content/sets/moscow/v4/cards.json",
+            GAME_CONTENT_PATH: env.GAME_CONTENT_PATH ?? "../../content/sets/moscow/v5/cards.json",
+            MUNCHKIN_TEST_MODE: "1",
+            MUNCHKIN_TEST_RANDOM_SEED: env.MUNCHKIN_TEST_RANDOM_SEED ?? "120",
             AUTO_MIGRATE: "false",
             CORS_ALLOWED_ORIGINS: baseURL,
           },

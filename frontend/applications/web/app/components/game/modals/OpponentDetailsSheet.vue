@@ -63,6 +63,7 @@ function exact(value: number | undefined): number | string {
     description="Публичное состояние соперника"
     :compact-title="player?.name ?? 'Соперник'"
     :compact-description="compactDescription"
+    desktop-width="940px"
     data-figma-desktop-node="271:3216"
     data-figma-compact-node="166:42"
     @close="emit('close')"
@@ -127,7 +128,7 @@ function exact(value: number | undefined): number | string {
 </template>
 
 <style scoped lang="scss">
-:deep(.opponent-details-dialog) { width: min(940px, calc(100% - 24px)); }
+:deep(.opponent-details-dialog) { --sheet-dialog-width: min(940px, calc(100% - 24px)); width: min(940px, calc(100% - 24px)); }
 :deep(.opponent-details-dialog .sheet-dialog__surface) { min-height: 620px; gap: 20px; box-sizing: border-box; padding: 24px; }
 .opponent-details { min-width: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; }
 .opponent-details__summary,

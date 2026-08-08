@@ -63,11 +63,12 @@ describe("Figma state matrix", () => {
 
   it.each([
     ["full-roster-combat", "248:5", "147:731"],
-    ["single-door-choice", "285:1315", "181:1634"],
+    ["single-door-choice", "285:1388", "181:1634"],
     ["single-run-away", "285:1473", "183:1671"],
+    ["run-away-next-monster", "294:2146", "unverified"],
     ["reward-received", "285:1566", "184:1687"],
     ["single-setup", "293:1617", "147:731"],
-    ["run-away-success", "294:1998", "183:1671"],
+    ["run-away-success", "294:1998", "unverified"],
     ["stale-projection", "257:447", "147:1082"],
   ])("maps runtime fixture %s to its desktop and compact Figma owners", (
     fixtureID,

@@ -24,13 +24,13 @@ export type SystemSurfaceKind =
   | "not-found"
   | "unavailable"
   | "protocol"
-  | "victory"
   | "death"
+  | "death-recovery"
   | "waiting";
 
 export type SystemSurfaceModel = {
   tone: "info" | "warning" | "danger" | "success";
-  icon: "loading" | "lock" | "search" | "offline" | "sync" | "trophy" | "skull" | "pause";
+  icon: "loading" | "lock" | "search" | "offline" | "sync" | "skull" | "pause";
   eyebrow: string;
   title: string;
   description: string;
@@ -46,6 +46,7 @@ export type RouteSystemState =
   | {kind: "unavailable"}
   | {kind: "protocol"}
   | {kind: "victory"; projection: Projection}
+  | {kind: "finished"; projection: Projection}
   | {kind: "game"; projection: Projection};
 
 export function buildConnectionPresentation(
@@ -53,6 +54,18 @@ export function buildConnectionPresentation(
   errorKind: GameApiErrorKind | null,
   hasProjection: boolean,
 ): ConnectionPresentation {
+  if (errorKind === "stale_version") {
+    return {
+      visible: hasProjection,
+      tone: "warning",
+      icon: "sync",
+      label: "Нужно обновить состояние",
+      description: "Предыдущее окно уже закрыто сервером. Проекция обновлена.",
+      canRetry: true,
+      ariaBusy: false,
+      ariaLive: "assertive",
+    };
+  }
   if (state === "connected") {
     return {
       visible: false,
@@ -84,8 +97,8 @@ export function buildConnectionPresentation(
       visible: hasProjection,
       tone: "info",
       icon: "sync",
-      label: "Синхронизируем игру",
-      description: "Проверяем свежую проекцию сервера перед продолжением.",
+      label: "Связь потеряна",
+      description: "Переподключаемся…",
       canRetry: false,
       ariaBusy: true,
       ariaLive: "polite",
@@ -129,7 +142,6 @@ export function buildConnectionPresentation(
         ariaLive: "assertive",
       };
     case "protocol":
-    case "stale_version":
       return {
         visible: hasProjection,
         tone: "warning",
@@ -146,8 +158,8 @@ export function buildConnectionPresentation(
         visible: hasProjection,
         tone: "warning",
         icon: "offline",
-        label: "Не удалось восстановить связь",
-        description: "Попробуйте снова, чтобы запросить свежую проекцию.",
+        label: "Не удалось подключиться",
+        description: "Автоматическое восстановление остановлено.",
         canRetry: true,
         ariaBusy: false,
         ariaLive: "assertive",
@@ -180,7 +192,9 @@ export function buildRouteSystemState(input: {
     return {kind: "loading"};
   }
   if (input.projection?.status === "finished") {
-    return {kind: "victory", projection: input.projection};
+    return input.projection.winner_player_id === input.projection.you.player_id
+      ? {kind: "victory", projection: input.projection}
+      : {kind: "finished", projection: input.projection};
   }
   if (input.projection) {
     return {kind: "game", projection: input.projection};
@@ -205,15 +219,6 @@ export function buildRouteSystemState(input: {
   }
 }
 
-function winnerName(projection: Projection): string {
-  if (projection.winner_player_id === projection.you.player_id) {
-    return projection.you.name;
-  }
-  return projection.players.find((player) =>
-    player.player_id === projection.winner_player_id,
-  )?.name ?? "Победитель подтверждён сервером";
-}
-
 export function buildSystemSurface(
   kind: SystemSurfaceKind,
   projection?: Projection,
@@ -235,8 +240,8 @@ export function buildSystemSurface(
         tone: "warning",
         icon: "lock",
         eyebrow: "СЕССИЯ",
-        title: "Сессия игры завершена",
-        description: "Вернитесь в лобби и войдите в комнату снова.",
+        title: "Сессия этой вкладки потеряна",
+        description: "Мы не можем подтвердить, за какого игрока нужно продолжить.",
         primaryAction: "lobby",
         primaryLabel: "Вернуться в лобби",
         winnerName: undefined,
@@ -246,8 +251,8 @@ export function buildSystemSurface(
         tone: "danger",
         icon: "search",
         eyebrow: "КОМНАТА",
-        title: "Игра не найдена",
-        description: "Проверьте код комнаты или создайте новую игру в лобби.",
+        title: "Игра недоступна",
+        description: "Комната не существует или у этой сессии нет доступа.",
         primaryAction: "lobby",
         primaryLabel: "Открыть лобби",
         winnerName: undefined,
@@ -257,8 +262,8 @@ export function buildSystemSurface(
         tone: "warning",
         icon: "offline",
         eyebrow: "СВЯЗЬ",
-        title: "Игра временно недоступна",
-        description: "Запросите свежую проекцию или вернитесь в лобби.",
+        title: "Игра недоступна",
+        description: "Комната не существует или у этой сессии нет доступа.",
         primaryAction: "retry",
         primaryLabel: "Попробовать снова",
         winnerName: undefined,
@@ -274,28 +279,26 @@ export function buildSystemSurface(
         primaryLabel: "Обновить состояние",
         winnerName: undefined,
       };
-    case "victory":
-      return {
-        tone: "success",
-        icon: "trophy",
-        eyebrow: "ФИНАЛ",
-        title: projection && projection.winner_player_id === projection.you.player_id
-          ? "Победа подтверждена"
-          : "Игра завершена",
-        description: "Итоговая проекция зафиксирована сервером. Новые действия закрыты.",
-        primaryAction: "lobby",
-        primaryLabel: "Вернуться в лобби",
-        winnerName: projection ? winnerName(projection) : undefined,
-      };
     case "death":
       return {
         tone: "danger",
         icon: "skull",
         eyebrow: "ПЕРСОНАЖ",
-        title: "Персонаж выбыл",
-        description: "Сервер готовит следующий подтверждённый шаг игры.",
-        primaryAction: undefined,
-        primaryLabel: undefined,
+        title: "Персонаж погиб",
+        description: "Непотребство монстра привело к смерти. Снаряжение потеряно.",
+        primaryAction: "retry",
+        primaryLabel: "Продолжить",
+        winnerName: undefined,
+      };
+    case "death-recovery":
+      return {
+        tone: "warning",
+        icon: "sync",
+        eyebrow: "НОВЫЙ ПЕРСОНАЖ",
+        title: "Персонаж восстановлен",
+        description: "Раздел добычи завершён, персонаж возвращается в игру.",
+        primaryAction: "retry",
+        primaryLabel: "Продолжить",
         winnerName: undefined,
       };
     case "waiting":

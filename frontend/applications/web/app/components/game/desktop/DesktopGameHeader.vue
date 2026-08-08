@@ -10,6 +10,8 @@ const props = defineProps<{
   connectionState: GameConnectionState;
   finished?: boolean;
   victory?: boolean;
+  phaseBadgeOverride?: string;
+  headerTitleOverride?: string;
 }>();
 
 const interactionCountdown = useInteractionCountdown(
@@ -26,12 +28,18 @@ const responseCopy = computed(() => {
   return `ОТВЕТ · ${minutes}:${seconds}`;
 });
 const phaseBadge = computed(() => {
+  if (props.phaseBadgeOverride) {
+    return props.phaseBadgeOverride;
+  }
   if (props.finished) {
-    return props.victory ? "ПОБЕДА" : "ИТОГ";
+    return props.victory ? "ПОБЕДА" : "ЗАВЕРШЕНО";
   }
   return props.presentationModel.phaseLabel;
 });
 const headerTitle = computed(() => {
+  if (props.headerTitleOverride) {
+    return props.headerTitleOverride;
+  }
   if (props.finished) {
     return props.victory ? "ИГРА ОКОНЧЕНА" : "ПАРТИЯ ОКОНЧЕНА";
   }
@@ -43,6 +51,19 @@ const headerTitle = computed(() => {
   }
   if (props.connectionState === "connecting" || props.connectionState === "resyncing") {
     return "ПОДКЛЮЧЕНИЕ";
+  }
+  if (props.projection.interaction?.public_kind === "death_loot_priority" &&
+    props.projection.interaction.response_required_for_you) {
+    return "ТВОЙ ВЫБОР";
+  }
+  if (props.projection.interaction?.public_kind === "run_away_response" &&
+    props.projection.interaction.response_required_for_you) {
+    return "ТВОЁ РЕШЕНИЕ";
+  }
+  if (props.projection.turn.pending_decision?.type === "run_away_monster" &&
+    props.projection.interaction?.public_kind === "private_choice" &&
+    props.projection.interaction.response_required_for_you) {
+    return "ВЫБЕРИ";
   }
   if (responseCopy.value) {
     return responseCopy.value;

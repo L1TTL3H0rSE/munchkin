@@ -8,10 +8,7 @@ import {
   type ActionEntry,
 } from "../../components/actionModel";
 import type {InteractionActionView} from "../../components/interaction/interactionModel";
-import {
-  isEconomyAction,
-  type EconomySubmission,
-} from "../../components/interaction/economyModel";
+import type {EconomySubmission} from "../../components/interaction/economyModel";
 import type {GameSheetRequest} from "../../components/game/gameSheetModel";
 import GameModalCoordinator from "../../components/game/modals/GameModalCoordinator.vue";
 import {
@@ -22,21 +19,16 @@ import SystemStateSurface from "../../components/game/status/SystemStateSurface.
 import {useGameSessionController} from "../../composables/useGameSessionController";
 
 const route = useRoute();
-const router = useRouter();
 const api = useGameApi();
 const session = useGameSession();
 const gameID = computed(() => String(route.params.id));
 const hydrated = ref(false);
 const requestedSheet = ref<GameSheetRequest>();
-const openingCharityVersion = ref<number>();
 const advancingDeadTurnVersion = ref<number>();
 const controller = useGameSessionController({
   gameID,
   api,
   credentials: session,
-  navigateToLobby: async () => {
-    await router.replace("/");
-  },
 });
 const {
   projection,
@@ -61,8 +53,28 @@ const showDeathState = computed(() => Boolean(
   routeState.value.projection.you.dead &&
   !routeState.value.projection.interaction?.response_required_for_you,
 ));
+const showDeathRecovery = computed(() => Boolean(
+  routeState.value.kind === "game" &&
+  routeState.value.projection.interaction?.public_kind === "death_loot_priority" &&
+  !routeState.value.projection.interaction.response_required_for_you &&
+  routeState.value.projection.interaction.death_loot?.remaining_count === 0,
+));
 
 function executeAction(entry: ActionEntry, payload: CommandPayload): void {
+  const state = routeState.value;
+  if (entry.action.type === "choose_effect" && state.kind === "game" &&
+    state.projection.interaction?.public_kind === "private_choice") {
+    const choiceIDs = payload.choice_ids ?? [];
+    const interactionAction = state.projection.interaction.actions.find((action) =>
+      action.type === "respond" &&
+      action.choice_ids?.length === choiceIDs.length &&
+      action.choice_ids.every((instanceID, index) => instanceID === choiceIDs[index]),
+    );
+    if (interactionAction) {
+      void controller.submitInteraction(interactionAction);
+      return;
+    }
+  }
   void controller.submitAction(entry.action, payload);
 }
 
@@ -85,27 +97,6 @@ watch(
       requestedSheet.value = undefined;
     }
   },
-);
-
-watch(
-  () => projection.value,
-  (current) => {
-    if (!current || actionBusy.value || current.interaction ||
-      current.turn.phase !== "charity" ||
-      current.turn.player_id !== current.you.player_id ||
-      openingCharityVersion.value === current.version) {
-      return;
-    }
-    const action = current.turn.available_actions.find((candidate) =>
-      candidate.type === "resolve_charity",
-    );
-    if (!action || !isEconomyAction(action)) {
-      return;
-    }
-    openingCharityVersion.value = current.version;
-    executeEconomy({kind: "charity", action, allocations: []});
-  },
-  {immediate: true},
 );
 
 watch(
@@ -137,8 +128,8 @@ onMounted(() => {
 <template>
   <LoadingGameTable v-if="routeState.kind === 'loading'" />
   <section
-    v-else-if="routeState.kind !== 'game' && routeState.kind !== 'victory'"
-    class="center-state"
+    v-else-if="routeState.kind !== 'game' && routeState.kind !== 'victory' && routeState.kind !== 'finished'"
+    class="game-route"
   >
     <SystemStateSurface
       :kind="routeState.kind"
@@ -151,6 +142,11 @@ onMounted(() => {
       kind="death"
       :projection="routeState.projection"
     />
+    <SystemStateSurface
+      v-else-if="showDeathRecovery"
+      kind="death-recovery"
+      :projection="routeState.projection"
+    />
     <template v-else>
       <GameTable
         :projection="routeState.projection"
@@ -161,6 +157,7 @@ onMounted(() => {
         :is-busy="isBusy"
         @retry="controller.retry"
         @execute="executeAction"
+        @submit-interaction="executeInteraction"
         @open-sheet="openSheet"
       />
       <GameModalCoordinator
@@ -181,22 +178,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.center-state {
-  display: grid;
-  place-items: center;
-  gap: 1rem;
-  min-width: 0;
-  min-height: 100vh;
-  min-height: 100dvh;
-  padding: 1rem;
-  color: var(--muted);
-  text-align: center;
-}
-
-.center-state > * {
-  max-width: min(100%, 42rem);
-}
-
 .game-route {
   min-width: 0;
 }

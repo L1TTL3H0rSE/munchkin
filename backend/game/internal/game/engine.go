@@ -26,6 +26,7 @@ const (
 	CommandRequestCombatResolution CommandType = "request_combat_resolution"
 	CommandRunAway                 CommandType = "run_away"
 	CommandChooseEffect            CommandType = "choose_effect"
+	CommandChooseRunAwayMonster    CommandType = "choose_run_away_monster"
 	CommandResolveCharity          CommandType = "resolve_charity"
 	CommandEndTurn                 CommandType = "end_turn"
 
@@ -90,7 +91,7 @@ type Command struct {
 
 func CreateLobby(gameID string, owner Player, pack Pack, seed uint64) (DomainEvent, error) {
 	profile := LobbyMultiplayerProfile()
-	if pack.SetID == "moscow-core" && pack.Version == 4 {
+	if pack.SetID == "moscow-core" && (pack.Version == 4 || pack.Version == 5) {
 		profile = DeathLootProfile()
 	} else if pack.SetID == "moscow-core" && pack.Version == 3 {
 		profile = AdvancedCombatProfile()
@@ -192,6 +193,8 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 		return handleRunAway(state, command, pack)
 	case CommandChooseEffect:
 		return handleChooseEffect(state, command, pack)
+	case CommandChooseRunAwayMonster:
+		return handleChooseRunAwayMonster(state, command)
 	case CommandResolveCharity:
 		return handleResolveCharity(state, command, pack)
 	case CommandEndTurn:
@@ -2785,6 +2788,58 @@ func handleChooseEffect(state State, command Command, pack Pack) ([]DomainEvent,
 		return nil, err
 	}
 	return transition(EventEffectResolved, command, next, outcomes)
+}
+
+func handleChooseRunAwayMonster(
+	state State,
+	command Command,
+) ([]DomainEvent, error) {
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	decision := state.Turn.Pending
+	sequence := state.Turn.RunAway
+	window := state.InteractionWindow
+	selected := command.ChoiceIDs
+	if len(selected) == 0 {
+		selected = command.InstanceIDs
+	}
+	if !profile.TargetAndRunAway ||
+		state.Status != StatusActive ||
+		state.Turn.Phase != PhaseRunAway ||
+		decision == nil ||
+		decision.Type != PendingDecisionRunAwayMonster ||
+		decision.ActorID != command.ActorID ||
+		sequence == nil ||
+		sequence.Completed ||
+		sequence.ParticipantPlayerIDs[sequence.ParticipantIndex] != command.ActorID ||
+		window == nil ||
+		window.Status != InteractionWindowClosed ||
+		window.Kind != InteractionKindPrivateChoice ||
+		len(selected) != 1 ||
+		!slices.Contains(decision.Options, selected[0]) {
+		return nil, fmt.Errorf(
+			"%w: Run Away monster choice is not available",
+			ErrIllegalCommand,
+		)
+	}
+	selectedIndex := slices.Index(sequence.MonsterInstanceIDs, selected[0])
+	if selectedIndex < sequence.MonsterIndex {
+		return nil, fmt.Errorf(
+			"%w: Run Away monster was already attempted",
+			ErrIllegalCommand,
+		)
+	}
+	next := state.Clone()
+	nextSequence := next.Turn.RunAway
+	nextSequence.MonsterInstanceIDs[nextSequence.MonsterIndex],
+		nextSequence.MonsterInstanceIDs[selectedIndex] =
+		nextSequence.MonsterInstanceIDs[selectedIndex],
+		nextSequence.MonsterInstanceIDs[nextSequence.MonsterIndex]
+	next.Turn.Pending = nil
+	setTurnPhase(&next, PhaseRunAway)
+	return transition(EventRunAwayMonsterChosen, command, next, nil)
 }
 
 func handleProposeEconomyOffer(

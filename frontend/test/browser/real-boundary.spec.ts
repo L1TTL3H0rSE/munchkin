@@ -43,6 +43,7 @@ test("two browser actors complete one authoritative turn through the Figma UI", 
     viewport: {width: 1280, height: 720},
   });
   const secondPage = await secondContext.newPage();
+  let runAwayMonsterChoiceSubmitted = false;
 
   async function projectionFor(actorPage: Page, gameID: string): Promise<Projection> {
     const credential = await actorPage.evaluate((id) =>
@@ -108,7 +109,11 @@ test("two browser actors complete one authoritative turn through the Figma UI", 
     const recipientIDs = transfer?.eligible_recipient_ids ?? action?.target_player_ids ?? [];
     const selected = projection.you.hand
       .filter((card) => instanceIDs.includes(card.instance_id))
-      .sort((left, right) => Number(left.kind === "monster") - Number(right.kind === "monster"))
+      .sort((left, right) => {
+        const rank = (kind: string) => kind === "item" ? 0 : kind === "trait" ? 1 :
+          kind === "monster" ? 3 : 2;
+        return rank(left.kind) - rank(right.kind);
+      })
       .slice(0, excess);
     const dialog = actorPage.locator("dialog[open]");
     await expect(dialog).toHaveAttribute("data-figma-desktop-node", "256:316");
@@ -132,14 +137,25 @@ test("two browser actors complete one authoritative turn through the Figma UI", 
       }
     }
     await clickAndWait(actorPage, gameID, async () => {
+      const responsePromise = actorPage.waitForResponse((response) =>
+        response.request().method() === "POST" && response.url().includes("/commands/resolve-charity"),
+      );
       await dialog.getByRole("button", {
         name: recipientIDs.length ? "Передать карты" : "Сбросить карты",
         exact: true,
       }).click();
+      const response = await responsePromise;
+      if (!response.ok()) {
+        throw new Error(`browser charity failed: ${response.status()} ${await response.text()}`);
+      }
     });
   }
 
-  async function resolveRequiredInteraction(actorPage: Page, gameID: string): Promise<boolean> {
+  async function resolveRequiredInteraction(
+    actorPage: Page,
+    gameID: string,
+    allPages: readonly Page[],
+  ): Promise<boolean> {
     const projection = await projectionFor(actorPage, gameID);
     const interaction = projection.interaction;
     if (!interaction?.response_required_for_you) return false;
@@ -150,23 +166,124 @@ test("two browser actors complete one authoritative turn through the Figma UI", 
     if (interaction.public_kind === "death_loot_priority") {
       const pass = interaction.actions.find((action) => action.type === "pass");
       if (!pass) throw new Error("death-loot actor has no projected pass action");
+      if ((actorPage.viewportSize()?.width ?? 0) < 1024) {
+        const dialog = actorPage.locator("dialog[open]");
+        await expect(dialog).toHaveAttribute("data-figma-compact-node", "177:130");
+        await clickAndWait(actorPage, gameID, async () => {
+          await dialog.getByRole("button", {name: "Пас", exact: true}).click();
+        });
+      } else {
+        const surface = actorPage.locator(".game-table__death-loot");
+        await expect(surface).toHaveAttribute("data-figma-desktop-node", "295:2355");
+        await surface.locator(".game-table__death-loot-pass").click();
+        await clickAndWait(actorPage, gameID, async () => {
+          await actorPage.locator(".game-table__action-panel")
+            .getByRole("button", {name: "Пас", exact: true})
+            .click();
+        });
+      }
+      return true;
+    }
+    if (projection.turn.pending_decision?.type === "run_away_monster" &&
+      interaction.public_kind === "private_choice") {
+      const optionIDs = projection.turn.pending_decision.options;
+      expect(optionIDs.length).toBeGreaterThan(1);
+      const selectedID = optionIDs.at(-1);
+      const selectedMonster = [
+        ...(projection.turn.combat?.monsters ?? []),
+        ...projection.turn.resolving,
+        ...(projection.turn.encounter ? [projection.turn.encounter] : []),
+      ].find((card) => card.instance_id === selectedID);
+      if (!selectedMonster) throw new Error("run-away monster choice is absent from actor projection");
+
+      for (const observerPage of allPages) {
+        if (observerPage === actorPage) continue;
+        const observerProjection = await projectionFor(observerPage, gameID);
+        expect(observerProjection.interaction?.response_required_for_you ?? false).toBe(false);
+        await expect(observerPage.locator(
+          ".game-table__run-away-next, dialog[data-figma-owner='game-modal:run-away-next']",
+        )).toHaveCount(0);
+      }
+
+      if ((actorPage.viewportSize()?.width ?? 0) < 1024) {
+        const dialog = actorPage.locator("dialog[open]");
+        await expect(dialog).toHaveAttribute("data-figma-owner", "game-modal:run-away-next");
+        await dialog.getByRole("button").filter({hasText: selectedMonster.name}).click();
+        await clickAndWait(actorPage, gameID, async () => {
+          await dialog.getByRole("button", {name: "Подтвердить", exact: true}).click();
+        });
+      } else {
+        const surface = actorPage.locator(".game-table__run-away-next");
+        await expect(surface).toHaveAttribute("data-figma-desktop-node", "294:2146");
+        await surface.getByRole("button").filter({hasText: selectedMonster.name}).click();
+        await clickAndWait(actorPage, gameID, async () => {
+          await actorPage.locator(".game-table__action-panel")
+            .getByRole("button", {name: "Подтвердить", exact: true})
+            .click();
+        });
+      }
+      runAwayMonsterChoiceSubmitted = true;
+      return true;
+    }
+    if (projection.turn.pending_decision?.type === "effect_choice" &&
+      interaction.public_kind === "private_choice") {
+      const action = projection.turn.available_actions.find((candidate) =>
+        candidate.type === "choose_effect");
+      if (!action) throw new Error("private effect choice has no projected choose_effect action");
       const dialog = actorPage.locator("dialog[open]");
-      await expect(dialog).toBeVisible();
+      await expect(dialog).toHaveAttribute("data-figma-owner", "game-modal:mandatory-effect");
+      const options = dialog.getByRole("option");
+      for (let index = 0; index < (action.minimum ?? 0); index += 1) {
+        await options.nth(index).click();
+      }
       await clickAndWait(actorPage, gameID, async () => {
-        await dialog.getByRole("button", {name: /ПРОПУСТИТЬ/}).click();
+        const responsePromise = actorPage.waitForResponse((response) =>
+          response.request().method() === "POST" &&
+            response.url().includes("/commands/respond-interaction"),
+        );
+        await dialog.getByRole("button", {name: "Подтвердить выбор", exact: true}).click();
+        const response = await responsePromise;
+        if (!response.ok()) {
+          throw new Error(`browser private choice failed: ${response.status()} ${await response.text()}`);
+        }
       });
       return true;
     }
+    if (interaction.public_kind === "run_away_response") {
+      if ((actorPage.viewportSize()?.width ?? 0) < 1024) {
+        const dialog = actorPage.locator("dialog[open]");
+        await expect(dialog).toHaveAttribute("data-figma-owner", "game-modal:run-away-response");
+        await clickAndWait(actorPage, gameID, async () => {
+          await dialog.getByRole("button", {name: "Бросить кубик", exact: true}).click();
+        });
+      } else {
+        const surface = actorPage.locator(".game-table__run-away");
+        await expect(surface).toHaveAttribute(
+          "data-figma-desktop-node",
+          /^(285:1473|293:2026)$/,
+        );
+        await clickAndWait(actorPage, gameID, async () => {
+          await actorPage.locator(".game-table__action-panel")
+            .getByRole("button", {name: "Бросить кубик", exact: true})
+            .click();
+        });
+      }
+      return true;
+    }
 
+    const addMonster = interaction.actions.find((action) =>
+      action.type === "respond" && action.combat_capability === "add_monster");
     const pass = interaction.actions.find((action) => action.type === "pass");
-    const choice = pass ?? interaction.actions.find((action) =>
+    const choice = addMonster ?? pass ?? interaction.actions.find((action) =>
       action.type === "respond" || action.type === "accept" || action.type === "decline");
     if (!choice) throw new Error(`${interaction.public_kind}: required actor has no executable response`);
     const dialog = actorPage.locator("dialog[open]");
     await expect(dialog).toBeVisible();
     const option = dialog.locator(".interaction-action").filter({
-      hasText: pass
-        ? /Пасовать|Бросить на смывку/
+      hasText: addMonster
+        ? /Добавить монстра/
+        : pass
+        ? /Пасовать/
         : interaction.public_kind === "private_choice"
           ? projection.you.hand.find((card) => choice.choice_ids?.includes(card.instance_id))?.name ?? /Ответить/
           : /Ответить|Принять|Отклонить/,
@@ -183,7 +300,7 @@ test("two browser actors complete one authoritative turn through the Figma UI", 
     for (let round = 0; round < 24; round += 1) {
       let progressed = false;
       for (const actorPage of pages) {
-        if (await resolveRequiredInteraction(actorPage, gameID)) progressed = true;
+        if (await resolveRequiredInteraction(actorPage, gameID, pages)) progressed = true;
       }
       const stillRequired = (await Promise.all(pages.map((actorPage) =>
         projectionFor(actorPage, gameID))))
@@ -206,10 +323,24 @@ test("two browser actors complete one authoritative turn through the Figma UI", 
       if (projection.turn.phase === "preparation" && projection.turn.player_id !== actorID) {
         return projection;
       }
+      if (projection.turn.phase === "resolve_effect") {
+        const action = projection.turn.available_actions.find((candidate) =>
+          candidate.type === "choose_effect",
+        );
+        if (!action) throw new Error("resolve_effect has no projected choose_effect action");
+        const dialog = actorPage.locator("dialog[open]");
+        await expect(dialog).toHaveAttribute("data-figma-owner", "game-modal:mandatory-effect");
+        const options = dialog.getByRole("option");
+        for (let index = 0; index < (action.minimum ?? 0); index += 1) {
+          await options.nth(index).click();
+        }
+        await clickAndWait(actorPage, gameID, async () => {
+          await dialog.getByRole("button", {name: "Подтвердить выбор", exact: true}).click();
+        });
+        continue;
+      }
       if (projection.turn.phase === "charity" && !projection.interaction) {
-        const version = projection.version;
-        await waitForProjection(actorPage, gameID, (next) => next.version > version,
-          "frontend did not open or resolve the charity phase");
+        await resolveCharitySheet(actorPage, gameID);
         continue;
       }
       if (projection.turn.phase === "end_turn") {
@@ -281,7 +412,7 @@ test("two browser actors complete one authoritative turn through the Figma UI", 
       activePage = await actorPageFor(pages, gameID, initialActorID);
       activeProjection = await projectionFor(activePage, gameID);
       await clickAndWait(activePage, gameID, async () => {
-        await activePage!.getByRole("button", {name: "Вышибить дверь", exact: true}).click();
+        await activePage!.getByRole("button", {name: "Открыть дверь", exact: true}).click();
       });
       await drainRequiredInteractions(pages, gameID);
 
@@ -301,7 +432,7 @@ test("two browser actors complete one authoritative turn through the Figma UI", 
           });
         } else {
           await clickAndWait(activePage, gameID, async () => {
-            await activePage!.getByRole("button", {name: "Обыскать комнату", exact: true}).click();
+            await activePage!.getByRole("button", {name: "Обчистить комнату", exact: true}).click();
           });
         }
       }
@@ -330,8 +461,9 @@ test("two browser actors complete one authoritative turn through the Figma UI", 
       "end turn did not transfer preparation to the next actor",
     );
     const nextPage = await actorPageFor(pages, gameID, nextProjection.turn.player_id);
-    await expect(nextPage.getByRole("button", {name: "Вышибить дверь", exact: true})).toBeVisible();
-    await expect(activePage.getByRole("button", {name: "Вышибить дверь", exact: true})).toHaveCount(0);
+    await expect(nextPage.getByRole("button", {name: "Открыть дверь", exact: true})).toBeVisible();
+    await expect(activePage.getByRole("button", {name: "Открыть дверь", exact: true})).toHaveCount(0);
+    expect(runAwayMonsterChoiceSubmitted).toBe(true);
   } finally {
     await secondContext.close();
   }
@@ -449,8 +581,8 @@ test("real browser covers multiplayer state and interaction boundaries", async (
     };
     let current = await postResult(game, owner, "start", version, {}, `${label}-start`);
     for (let step = 0; current.projection.turn.phase === "setup"; step += 1) {
-      if (step >= actors.length + 1) {
-        throw new Error(`${label}: setup did not finish after ${actors.length} actors`);
+      if (step >= actors.length * 4) {
+        throw new Error(`${label}: setup did not finish after bounded actor decisions`);
       }
       const actor = actors.find(
         (candidate) => candidate.player_id === current.projection.turn.player_id,
@@ -458,11 +590,46 @@ test("real browser covers multiplayer state and interaction boundaries", async (
       if (!actor) {
         throw new Error(`${label}: setup actor is not in the game`);
       }
+      const actorProjection = await getProjection(game, actor);
+      const discard = actorProjection.turn.available_actions.find((action) =>
+        action.type === "resolve_charity",
+      );
+      if (discard) {
+        const transfer = actorProjection.interaction?.charity_transfer;
+        const instanceIDs = transfer?.instance_ids ?? discard.instance_ids ?? [];
+        const excess = transfer?.excess ?? discard.minimum ?? 0;
+        const definitionByInstance = new Map(actorProjection.you.hand.map((card) => [
+          card.instance_id,
+          card.definition_id,
+        ]));
+        const allocations = [...instanceIDs]
+          .sort((left, right) =>
+            Number(
+              deathMonsterIDs.has(definitionByInstance.get(left) ?? "") ||
+              definitionByInstance.get(left) === "courtyard-sleight-class",
+            ) -
+            Number(
+              deathMonsterIDs.has(definitionByInstance.get(right) ?? "") ||
+              definitionByInstance.get(right) === "courtyard-sleight-class",
+            ),
+          )
+          .slice(0, excess)
+          .map((instance_id) => ({instance_id}));
+        current = await postResult(
+          game,
+          actor,
+          "resolve-charity",
+          actorProjection.version,
+          {allocations},
+          `${label}-setup-discard-submit-${step}`,
+        );
+        continue;
+      }
       current = await postResult(
         game,
         actor,
         "finish-setup",
-        current.version,
+        actorProjection.version,
         {},
         `${label}-finish-setup-${step}`,
       );
@@ -939,6 +1106,10 @@ test("real browser covers multiplayer state and interaction boundaries", async (
 
       let sawPrivateCurrentOptions = false;
       let sawHiddenOptions = false;
+      let priorityProjection: Projection | undefined;
+      let priorityAction: NonNullable<Projection["interaction"]>["actions"][number] | undefined;
+      let observerActor: Actor | undefined;
+      let observerProjection: Projection | undefined;
       for (const actor of game.actors) {
         const projection = await getProjection(game, actor);
         if (projection.interaction?.public_kind !== "death_loot_priority") {
@@ -948,13 +1119,37 @@ test("real browser covers multiplayer state and interaction boundaries", async (
         if (projection.interaction.response_required_for_you) {
           expect(options.length).toBeGreaterThan(0);
           sawPrivateCurrentOptions = true;
+          priorityProjection = projection;
+          priorityAction = projection.interaction.actions.find((action) => action.type === "pass");
         } else {
           expect(options).toHaveLength(0);
           sawHiddenOptions = true;
+          observerActor = actor;
+          observerProjection = projection;
         }
       }
       expect(sawPrivateCurrentOptions).toBe(true);
       expect(sawHiddenOptions).toBe(true);
+      if (!priorityProjection?.interaction || !priorityAction || !observerActor || !observerProjection) {
+        throw new Error("death loot privacy evidence is missing actor or observer data");
+      }
+      const forgedResponse = await request.post(
+        `${apiBase}/api/v1/games/${encodeURIComponent(game.game_id)}/commands/pass-interaction`,
+        {
+          headers: {
+            Authorization: `Bearer ${observerActor.credential}`,
+            "Idempotency-Key": key("death-loot-wrong-credential"),
+          },
+          data: {
+            expected_version: observerProjection.version,
+            interaction_id: priorityAction.interaction_id,
+            action_id: priorityAction.action_id,
+            intent: "pass",
+          },
+        },
+      );
+      expect(forgedResponse.ok()).toBe(false);
+      expect([400, 403, 409, 422]).toContain(forgedResponse.status());
       await drainDeathLoot(game);
       const afterLoot = await getProjection(game, game.owner);
       expect(afterLoot.you.dead).toBe(true);
@@ -988,6 +1183,9 @@ test("real browser covers multiplayer state and interaction boundaries", async (
   }, {gameID: deathGame.game_id, credential: deathGame.owner.credential});
   await page.goto(`/game/${encodeURIComponent(deathGame.game_id)}`);
   await expect(page.locator(".game-table, .center-state")).toBeVisible();
-  await expect(page.locator("code").first()).toContainText(deathGame.game_id);
+  const roomID = page.locator(".game-table__room button");
+  await expect(roomID).toHaveText("Показать ID комнаты");
+  await roomID.click();
+  await expect(roomID).toHaveText(deathGame.game_id);
   await runCombatHelpScenario();
 });

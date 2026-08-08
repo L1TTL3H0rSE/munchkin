@@ -21,9 +21,9 @@ export function actionLabel(action: ActionDescriptor) {
     unequip_item: "Снять предмет",
     discard_card: "Сбросить черту",
     sell_items: "Продать предметы",
-    open_door: "Вышибить дверь",
+    open_door: "Открыть дверь",
     look_for_trouble: "Искать неприятности",
-    loot_room: "Обыскать комнату",
+    loot_room: "Обчистить комнату",
     use_ability: "Использовать способность",
     request_combat_resolution: "Завершить бой",
     resolve_combat: "Завершить бой",
@@ -35,7 +35,7 @@ export function actionLabel(action: ActionDescriptor) {
     attempt_theft: "Начать кражу",
     end_turn: "Закончить ход",
     fight: "Завершить бой",
-    loot: "Обыскать комнату",
+    loot: "Обчистить комнату",
   };
   return labels[action.type];
 }

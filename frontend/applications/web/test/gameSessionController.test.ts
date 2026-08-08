@@ -188,11 +188,9 @@ function createHarness(options: {
     read: vi.fn(() => "credential-secret"),
     clearCurrentGame: vi.fn(),
   };
-  const navigateToLobby = vi.fn(async () => {});
   const controller = createGameSessionController({
     api: apiHarness.api,
     credentials,
-    navigateToLobby,
     scheduler,
     random: options.random ?? (() => 0.5),
     createCommandID: () => "stable-command-id",
@@ -207,7 +205,6 @@ function createHarness(options: {
     controller,
     scheduler,
     credentials,
-    navigateToLobby,
     ...apiHarness,
   };
 }
@@ -519,6 +516,41 @@ describe("game session controller", () => {
       .toBe(nextProjection.version);
   });
 
+  it("opens authoritative charity transfer before submitting the visible allocation", async () => {
+    const charityProjection = fixtureAdapter.getProjection("single-charity");
+    const begunProjection = {
+      ...charityProjection,
+      version: charityProjection.version + 1,
+    };
+    const completedProjection = {
+      ...charityProjection,
+      version: charityProjection.version + 2,
+      turn: {...charityProjection.turn, phase: "end_turn" as const},
+    };
+    const apiHarness = createAPI(charityProjection);
+    apiHarness.resolveCharity
+      .mockResolvedValueOnce(commandResult(begunProjection))
+      .mockResolvedValueOnce(commandResult(completedProjection));
+    const harness = createHarness({api: apiHarness});
+    await harness.controller.start(charityProjection.game_id);
+    const allocation = [{instance_id: charityProjection.you.hand[0]!.instance_id}];
+
+    await harness.controller.submitEconomy({kind: "charity", allocations: allocation});
+
+    expect(apiHarness.resolveCharity).toHaveBeenCalledTimes(2);
+    expect(apiHarness.resolveCharity.mock.calls[0]?.slice(2, 5)).toEqual([
+      charityProjection.version,
+      [],
+      expect.objectContaining({commandID: "stable-command-id"}),
+    ]);
+    expect(apiHarness.resolveCharity.mock.calls[1]?.slice(2, 5)).toEqual([
+      begunProjection.version,
+      allocation,
+      expect.objectContaining({commandID: "stable-command-id:complete"}),
+    ]);
+    expect(harness.controller.projection.value?.version).toBe(completedProjection.version);
+  });
+
   it("resyncs a stale interaction without silently replaying it", async () => {
     const apiHarness = createAPI();
     apiHarness.getGame
@@ -564,7 +596,7 @@ describe("game session controller", () => {
       .toBe(safeGameApiMessage("stale_version"));
   });
 
-  it("clears only the current credential on terminal auth", async () => {
+  it("clears only the current credential and preserves the terminal auth surface", async () => {
     const apiHarness = createAPI();
     apiHarness.getGame.mockRejectedValue(new GameApiError(
       "auth",
@@ -577,7 +609,7 @@ describe("game session controller", () => {
 
     expect(harness.credentials.clearCurrentGame)
       .toHaveBeenCalledExactlyOnceWith("game-a");
-    expect(harness.navigateToLobby).toHaveBeenCalledOnce();
+    expect(harness.controller.errorKind.value).toBe("auth");
     expect(harness.scheduler.size).toBe(0);
     expect(harness.stream).not.toHaveBeenCalled();
     expect(harness.controller.errorMessage.value)

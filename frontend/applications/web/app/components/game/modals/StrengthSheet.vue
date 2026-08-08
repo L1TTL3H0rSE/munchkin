@@ -43,6 +43,7 @@ function signed(value: number): string {
     description="Только подтверждённые сервером источники"
     compact-title="Сила"
     compact-description="Разбор текущего боя"
+    desktop-width="900px"
     data-figma-desktop-node="271:3010"
     data-figma-compact-node="164:42"
     @close="emit('close')"
@@ -103,7 +104,7 @@ function signed(value: number): string {
 </template>
 
 <style scoped lang="scss">
-:deep(.strength-breakdown-dialog) { width: min(900px, calc(100% - 24px)); }
+:deep(.strength-breakdown-dialog) { --sheet-dialog-width: min(900px, calc(100% - 24px)); width: min(900px, calc(100% - 24px)); }
 :deep(.strength-breakdown-dialog .sheet-dialog__surface) { min-height: 540px; gap: 20px; box-sizing: border-box; padding: 24px; }
 .strength-sheet__header-actions { display: flex; align-items: center; gap: 16px; }
 .strength-sheet__header-actions > strong { color: var(--color-accent-strong); font-size: 42px; line-height: 1; }

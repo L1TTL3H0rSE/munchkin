@@ -7,43 +7,29 @@ import {
 } from "../../actionModel";
 import SheetDialog from "../../ui/SheetDialog.vue";
 import CardPresentation from "../primitives/CardPresentation.vue";
-import type {EquipmentSlot, GameSheetRequest} from "../gameSheetModel";
+import type {GameSheetRequest} from "../gameSheetModel";
 
 const props = defineProps<{
   projection: Projection;
-  request: Extract<GameSheetRequest, {kind: "hand" | "equip-slot"}>;
+  request: Extract<GameSheetRequest, {kind: "hand"}>;
   busy: boolean;
 }>();
 const emit = defineEmits<{
   close: [];
   execute: [entry: ActionEntry, payload: CommandPayload];
   "open-action": [actionIndex: number];
+  "open-fast-equip": [cardID: string];
 }>();
 
 const selectedCardID = ref<string | undefined>(props.request.cardID);
-const handMode = ref(props.request.kind === "hand" ? props.request.mode : undefined);
 const selectedTargetID = ref<string>();
 const activeActionIndex = ref<number>();
-const slotLabels: Record<EquipmentSlot, string> = {
-  headgear: "Головняк",
-  armor: "Броня",
-  footgear: "Обувь",
-  hands: "Руки",
-};
 const allOwnedCards = computed(() => [
   ...props.projection.you.hand,
   ...props.projection.you.carried,
   ...props.projection.you.equipped,
 ]);
-const cards = computed(() => {
-  const request = props.request;
-  if (request.kind === "hand") {
-    return props.projection.you.hand;
-  }
-  return allOwnedCards.value.filter((card) =>
-    card.kind === "item" && card.item_slot === request.slot,
-  );
-});
+const cards = computed(() => props.projection.you.hand);
 const entries = computed<ActionEntry[]>(() =>
   props.projection.turn.available_actions.map((action, index) => ({action, index})),
 );
@@ -51,19 +37,13 @@ const selectedCard = computed(() => cards.value.find((card) =>
   card.instance_id === selectedCardID.value,
 ));
 const selectedActions = computed(() => entries.value.filter(({action}) =>
-  action.source_instance_id === selectedCardID.value && (
-    props.request.kind === "equip-slot"
-      ? action.type === "equip_item"
-      : handMode.value === "fast-equip"
-        ? action.type === "equip_item"
-      : [
-        "play_card",
-        "look_for_trouble",
-        "play_target_effect",
-        "discard_card",
-        "use_ability",
-      ].includes(action.type)
-  ),
+  action.source_instance_id === selectedCardID.value && [
+    "play_card",
+    "look_for_trouble",
+    "play_target_effect",
+    "discard_card",
+    "use_ability",
+  ].includes(action.type),
 ));
 const activeAction = computed(() => selectedActions.value.find(({index}) =>
   index === activeActionIndex.value,
@@ -75,37 +55,12 @@ const targetIDs = computed(() => [
   ...(contextualAction.value?.action.target_player_ids ?? []),
   ...(contextualAction.value?.action.target_instance_ids ?? []),
 ]);
-const currentItem = computed(() => {
-  const request = props.request;
-  return request.kind === "equip-slot"
-    ? props.projection.you.equipped.find((card) => card.item_slot === request.slot)
-    : undefined;
-});
-const currentUnequipEntry = computed(() => {
-  const current = currentItem.value;
-  return current
-    ? entries.value.find(({action}) =>
-      action.type === "unequip_item" && action.source_instance_id === current.instance_id,
-    )
-    : undefined;
-});
-const title = computed(() => props.request.kind === "hand"
-  ? `Рука · ${props.projection.you.hand.length}`
-  : "Выбор карты");
-const description = computed(() => {
-  const request = props.request;
-  if (request.kind === "hand") {
-    return selectedCard.value?.name ?? "Выбери карту из руки";
-  }
-  const current = currentItem.value;
-  return `${slotLabels[request.slot]} · ${current?.name ?? "пусто"} ${current?.bonus ? `+${current.bonus}` : ""}`;
-});
+const title = computed(() => `Рука · ${props.projection.you.hand.length}`);
+const description = computed(() => selectedCard.value?.name ?? "Выбери карту из руки");
 
 watch(cards, (nextCards) => {
   if (!nextCards.some((card) => card.instance_id === selectedCardID.value)) {
-    selectedCardID.value = props.request.kind === "equip-slot" || handMode.value === "fast-equip"
-      ? nextCards[0]?.instance_id
-      : undefined;
+    selectedCardID.value = undefined;
   }
 }, {immediate: true});
 
@@ -146,15 +101,13 @@ function handleAction(entry: ActionEntry): void {
 
 function selectCard(cardID: string): void {
   selectedCardID.value = cardID;
-  if (props.request.kind !== "hand") return;
-  handMode.value = entries.value.some(({action}) =>
+  const equipEntry = entries.value.find(({action}) =>
     action.type === "equip_item" && action.source_instance_id === cardID,
-  ) ? "fast-equip" : "expanded";
+  );
+  if (equipEntry) emit("open-fast-equip", cardID);
 }
 
 function label(action: ActionDescriptor): string {
-  if (action.type === "equip_item") return "Экипировать";
-  if (action.type === "unequip_item") return "Снять";
   return actionLabel(action);
 }
 
@@ -171,30 +124,17 @@ function actionNeedsTarget(action: ActionDescriptor): boolean {
 
 <template>
   <SheetDialog
-    class="game-choice-dialog"
-    :class="{
-      'game-choice-dialog--hand-expanded': request.kind === 'hand' && handMode === 'expanded',
-      'game-choice-dialog--fast-equip': request.kind === 'hand' && handMode === 'fast-equip',
-    }"
+    class="game-choice-dialog game-choice-dialog--hand-expanded"
     :open="true"
     :title="title"
     :description="description"
-    :data-figma-desktop-node="request.kind === 'hand' && handMode === 'expanded' ? '253:96' : '291:1587'"
-    :data-figma-compact-node="request.kind === 'hand' ? (handMode === 'fast-equip' ? '342:3574' : '181:1634') : '340:3475'"
+    desktop-width="768px"
+    :data-figma-desktop-node="cards.length ? '253:96' : '296:2985'"
+    data-figma-compact-node="181:1634"
     @close="emit('close')"
   >
     <template #header-action>
       <button
-        v-if="request.kind === 'equip-slot' && currentUnequipEntry"
-        class="game-choice-sheet__header-action"
-        type="button"
-        :disabled="busy"
-        @click="submit(currentUnequipEntry)"
-      >
-        {{ busy ? "Снимаем…" : "Снять" }}
-      </button>
-      <button
-        v-else
         class="game-choice-sheet__header-action game-choice-sheet__header-action--close"
         type="button"
         @click="emit('close')"
@@ -218,7 +158,7 @@ function actionNeedsTarget(action: ActionDescriptor): boolean {
             ВЫБРАНО
           </span>
         </button>
-        <p v-if="!cards.length">Для этого слота нет доступных предметов.</p>
+        <p v-if="!cards.length">В руке нет карт.</p>
       </div>
       <div v-if="contextualAction && targetIDs.length" class="game-choice-sheet__targets">
         <span>ВЫБЕРИ ЦЕЛЬ</span>
@@ -250,7 +190,7 @@ function actionNeedsTarget(action: ActionDescriptor): boolean {
 </template>
 
 <style scoped lang="scss">
-:deep(.game-choice-dialog) { width: min(768px, calc(100% - 24px)); }
+:deep(.game-choice-dialog) { --sheet-dialog-width: min(768px, calc(100% - 24px)); width: min(768px, calc(100% - 24px)); }
 :deep(.game-choice-dialog .sheet-dialog__surface) { min-height: 502px; box-sizing: border-box; }
 .game-choice-sheet { min-width: 0; min-height: 390px; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; gap: 16px; }
 .game-choice-sheet__rail { min-width: 0; min-height: 234px; display: flex; align-items: start; gap: 12px; overflow-x: auto; padding: 8px; }
@@ -275,15 +215,10 @@ function actionNeedsTarget(action: ActionDescriptor): boolean {
 @media (width < 1024px) {
   :deep(.game-choice-dialog) { width: min(560px, calc(100% - 24px)); max-height: min(470px, calc(100dvh - 24px)); }
   :deep(.game-choice-dialog .sheet-dialog__surface) { min-height: min(470px, calc(100dvh - 24px)); max-height: min(470px, calc(100dvh - 24px)); padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
-  :deep(.game-choice-dialog--fast-equip) { max-height: min(410px, calc(100dvh - 24px)); }
-  :deep(.game-choice-dialog--fast-equip .sheet-dialog__surface) { min-height: min(410px, calc(100dvh - 24px)); max-height: min(410px, calc(100dvh - 24px)); }
   .game-choice-sheet { min-height: 0; }
   .game-choice-sheet__rail { min-height: 218px; width: 100%; box-sizing: border-box; padding: 0; }
   .game-choice-sheet__actions { margin-top: auto; }
   .game-choice-sheet__actions button { width: 100%; }
-  :deep(.game-choice-dialog--fast-equip) .game-choice-sheet__rail { height: 218px; min-height: 218px; align-items: flex-start; overflow-y: hidden; padding-top: 20px; }
-  :deep(.game-choice-dialog--fast-equip) .game-choice-sheet__rail > button { margin-right: -59px; }
-  :deep(.game-choice-dialog--fast-equip) .game-choice-sheet__rail > button.game-choice-sheet__card--selected { z-index: 2; transform: translateY(-20px); }
 }
 
 @media (width < 600px) {

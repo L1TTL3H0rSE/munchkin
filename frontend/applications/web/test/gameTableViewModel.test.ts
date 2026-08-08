@@ -29,6 +29,15 @@ describe("game table view model", () => {
     });
 
     projection.turn.pending_decision = undefined;
+    projection.turn.run_away!.attempts = [{
+      player_id: projection.you.player_id,
+      monster_instance_id: projection.turn.encounter!.instance_id,
+      roll: 2,
+      modifier: 0,
+      total: 2,
+      escaped: false,
+      bad_stuff_applied: true,
+    }];
     projection.turn.run_away!.completed = true;
     expect(selectPrimarySurface(projection)).toMatchObject({
       kind: "result",

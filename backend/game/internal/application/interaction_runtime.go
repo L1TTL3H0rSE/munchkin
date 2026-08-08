@@ -574,10 +574,18 @@ func (service *Service) ExecuteInteraction(
 			if err != nil {
 				return err
 			}
+			if intermediate.Turn.Pending == nil {
+				return ErrInteractionAction
+			}
+			choiceCommandType := game.CommandChooseEffect
+			if intermediate.Turn.Pending.Type ==
+				game.PendingDecisionRunAwayMonster {
+				choiceCommandType = game.CommandChooseRunAwayMonster
+			}
 			choiceEvents, err := game.Handle(
 				intermediate,
 				game.Command{
-					Type:      game.CommandChooseEffect,
+					Type:      choiceCommandType,
 					ActorID:   actorID,
 					ChoiceIDs: append([]string(nil), action.ChoiceIDs...),
 				},
@@ -1504,10 +1512,16 @@ func (service *Service) appendFollowupInteraction(
 			[]string(nil),
 			decision.Options[:decision.Minimum]...,
 		)
+		choiceCommandType := game.CommandChooseEffect
+		if decision.Type == game.PendingDecisionRunAwayMonster {
+			choiceCommandType = game.CommandChooseRunAwayMonster
+		} else if decision.Type != game.PendingDecisionEffectChoice {
+			return nil, game.ErrIllegalCommand
+		}
 		defaultEvents, err := game.Handle(
 			next,
 			game.Command{
-				Type:      game.CommandChooseEffect,
+				Type:      choiceCommandType,
 				ActorID:   decision.ActorID,
 				ChoiceIDs: selected,
 			},

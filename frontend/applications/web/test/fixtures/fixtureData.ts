@@ -198,18 +198,21 @@ function configureFigmaBattle(projection: Projection): void {
     treasure_count: 1,
     levels_reward: 1,
     rules_text: "Бонус +2 против Воина.",
+    bad_stuff_text: "Сбрось одну карту с руки.",
   });
   const archiveDust = card("archive-dust", "Архивная пыль", "monster", "door", {
     combat_strength: 7,
     treasure_count: 2,
     levels_reward: 1,
     rules_text: "Курьера не преследует. При победе возьми 2 сокровища.",
+    bad_stuff_text: "Потеряй одну надетую вещь.",
   });
   const boneCourier = card("bone-courier", "Костяной курьер", "monster", "door", {
     combat_strength: 3,
     treasure_count: 1,
     levels_reward: 1,
     rules_text: "Не получает бонусов от класса.",
+    bad_stuff_text: "Потеряй 1 уровень.",
   });
   projection.you.name = "Макс";
   projection.you.level = 8;
@@ -430,8 +433,8 @@ function makeFixture(
 }
 
 function configureDeathLootRoster(projection: Projection): void {
+  configureFigmaBattle(projection);
   projection.you.dead = false;
-  projection.players = [0, 1, 2, 3, 4].map(player);
   const deadPlayer = projection.players.find((candidate) =>
     candidate.player_id === "player_2",
   );
@@ -521,6 +524,42 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     };
     projection.turn.available_actions = [];
   }),
+  makeFixture("run-away-next-monster", "Побег: следующий монстр", (projection) => {
+    configureFigmaBattle(projection);
+    projection.turn.phase = "run_away";
+    projection.turn.available_actions = [];
+    projection.turn.pending_decision = {
+      type: "run_away_monster",
+      options: ["sentry-slime", "bone-courier"],
+      minimum: 1,
+      maximum: 1,
+    };
+    projection.turn.run_away = {
+      current_player_id: "player_hero",
+      current_monster_instance_id: "sentry-slime",
+      effects: [],
+      attempts: [{
+        player_id: "player_hero",
+        monster_instance_id: "archive-dust",
+        roll: 6,
+        modifier: 1,
+        total: 7,
+        escaped: true,
+      }],
+      completed: false,
+    };
+    projection.interaction = interaction(
+      "private_choice",
+      [
+        interactionAction("respond", "9", {choice_ids: ["sentry-slime"]}),
+        interactionAction("respond", "8", {choice_ids: ["bone-courier"]}),
+      ],
+      {
+        parent_phase: "run_away",
+        server_time: "2030-01-01T00:04:40.000Z",
+      },
+    );
+  }),
   makeFixture("opponents-one", "Мобильный стол: один оппонент", (projection) => {
     projection.players = [player(0)];
     projection.turn.phase = "combat";
@@ -569,11 +608,44 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       attempts: [],
       completed: false,
     };
-    projection.turn.available_actions = [];
     projection.interaction = interaction(
       "run_away_response",
       [interactionAction("pass", "8")],
-      {parent_phase: "run_away"},
+      {parent_phase: "run_away", deadline_at: "2030-01-01T00:04:19.000Z"},
+    );
+  }),
+  makeFixture("mobile-run-away-choice", "Компактный побег: второй монстр", (projection) => {
+    configureFigmaBattle(projection);
+    const monsters = projection.turn.combat?.monsters;
+    if (!monsters || monsters.length < 3) {
+      throw new Error("Figma run-away fixture requires three encounter monsters");
+    }
+    monsters[2] = card("reference-hydra", "Гидра из справок", "monster", "door", {
+      combat_strength: 5,
+      treasure_count: 2,
+      levels_reward: 1,
+      bad_stuff_text: "Сбрось две карты с руки.",
+    });
+    projection.you.escape_bonus = 2;
+    projection.turn.phase = "run_away";
+    projection.turn.run_away = {
+      current_player_id: "player_hero",
+      current_monster_instance_id: "archive-dust",
+      effects: [],
+      attempts: [{
+        player_id: "player_hero",
+        monster_instance_id: monsters[0]!.instance_id,
+        roll: 5,
+        modifier: 0,
+        total: 5,
+        escaped: true,
+      }],
+      completed: false,
+    };
+    projection.interaction = interaction(
+      "run_away_response",
+      [interactionAction("pass", "8")],
+      {parent_phase: "run_away", deadline_at: "2030-01-01T00:04:19.000Z"},
     );
   }),
   makeFixture("reward-received", "Награда после закрытого боя", (projection) => {
@@ -604,6 +676,19 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     };
     projection.turn.available_actions = [action("end_turn")];
   }),
+  makeFixture("end-turn-ready", "Завершение хода без карточки награды", (projection) => {
+    configureFigmaBattle(projection);
+    projection.you.hand.push(card("figma-hand-final", "Последняя находка", "one_shot", "treasure", {value: 50}));
+    projection.turn.phase = "end_turn";
+    projection.turn.available_actions = [action("end_turn")];
+    projection.recent_combat_result = undefined;
+  }),
+  makeFixture("turn-passed", "Ход подтверждённо передан", (projection) => {
+    projection.players = [player(0)];
+    projection.turn.phase = "end_turn";
+    projection.turn.player_id = "player_1";
+    projection.turn.available_actions = [];
+  }),
   makeFixture("single-charity", "Один игрок: милостыня", (projection) => {
     projection.turn.phase = "charity";
     projection.you.hand = [
@@ -622,8 +707,10 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     }];
   }),
   makeFixture("single-finished", "Один игрок: победа", (projection) => {
+    configureFigmaBattle(projection);
+    projection.players[0] = {...projection.players[0]!, name: "Макс", level: 10};
     projection.status = "finished";
-    projection.winner_player_id = "player_hero";
+    projection.winner_player_id = "player_1";
     projection.turn.phase = "end_turn";
     projection.turn.available_actions = [];
   }),
@@ -652,6 +739,11 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     projection.version = 13;
     projection.turn.player_id = "player_2";
     projection.turn.available_actions = [];
+    if (projection.turn.combat) {
+      projection.turn.combat.player_strength = 5;
+      projection.turn.combat.monster_strength = 8;
+      projection.turn.combat.player_winning = false;
+    }
   }, "stale"),
   makeFixture("interaction-pass-only", "Окно: только pass", (projection) => {
     projection.turn.phase = "combat";
@@ -683,28 +775,13 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     );
   }),
   makeFixture("helper-offer", "Окно: помощь в бою", (projection) => {
-    projection.players = [player(0), player(1)];
-    projection.turn.phase = "combat";
-    projection.turn.player_id = "player_hero";
-    projection.turn.combat = {
-      player_strength: 5,
-      monster_strength: 8,
-      player_winning: false,
-      tie_wins: false,
-      combat_closed: false,
-      monsters: [encounter],
-      effects: [],
-    };
+    configureFigmaBattle(projection);
     projection.interaction = interaction(
       "combat_response",
       [
         interactionAction("offer_help", "d", {
           helper_player_id: "player_1",
           reward_treasures: 1,
-        }),
-        interactionAction("offer_help", "e", {
-          helper_player_id: "player_1",
-          reward_treasures: 2,
         }),
         interactionAction("offer_help", "f", {
           helper_player_id: "player_2",
@@ -714,18 +791,16 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     );
   }),
   makeFixture("helper-invite", "Окно: приглашение помощника", (projection) => {
-    projection.players = [player(0)];
+    configureFigmaBattle(projection);
+    projection.you.combat_strength = 14;
+    projection.you.strength_breakdown.total_strength = 14;
     projection.turn.phase = "combat";
     projection.turn.player_id = "player_1";
-    projection.turn.combat = {
-      player_strength: 5,
-      monster_strength: 8,
-      player_winning: false,
-      tie_wins: false,
-      combat_closed: false,
-      monsters: [encounter],
-      effects: [],
-    };
+    if (projection.turn.combat) {
+      projection.turn.combat.player_strength = 16;
+      projection.turn.combat.monster_strength = 15;
+      projection.turn.combat.player_winning = true;
+    }
     projection.interaction = interaction(
       "combat_help_offer",
       [
@@ -760,20 +835,14 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     );
   }),
   makeFixture("helper-accepted", "Бой с принятой помощью", (projection) => {
-    projection.players = [player(0)];
-    projection.turn.phase = "combat";
-    projection.turn.player_id = "player_1";
-    projection.turn.combat = {
-      player_strength: 7,
-      monster_strength: 8,
-      player_winning: false,
-      tie_wins: false,
-      combat_closed: false,
-      monsters: [encounter],
-      effects: [],
-      helper_player_id: "player_hero",
-      helper_reward_treasures: 2,
-    };
+    configureFigmaBattle(projection);
+    if (projection.turn.combat) {
+      projection.turn.combat.player_strength = 30;
+      projection.turn.combat.monster_strength = 15;
+      projection.turn.combat.player_winning = true;
+      projection.turn.combat.helper_player_id = "player_2";
+      projection.turn.combat.helper_reward_treasures = 1;
+    }
     projection.interaction = undefined;
   }),
   makeFixture("advanced-combat", "Бой: дополнительные монстры и эффекты", (projection) => {
@@ -882,6 +951,32 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       {public_subject: "current_effect"},
     );
   }),
+  makeFixture("curse-confirmed", "Проклятие: подтверждённый результат", (projection) => {
+    projection.turn.phase = "resolve_effect";
+    projection.turn.resolving = [card(
+      "confirmed-curse",
+      "Налог на храбрость",
+      "curse",
+      "door",
+      {rules_text: "Сбрось один разрешённый предмет."},
+    )];
+    projection.turn.pending_decision = undefined;
+    projection.turn.available_actions = [];
+    projection.interaction = undefined;
+  }),
+  makeFixture("interaction-private-choice", "Окно: приватный ответ без turn action", (projection) => {
+    projection.turn.phase = "resolve_effect";
+    projection.turn.pending_decision = undefined;
+    projection.turn.available_actions = [];
+    projection.interaction = interaction(
+      "private_choice",
+      [
+        interactionAction("respond", "a", {choice_ids: ["hero-card-1"]}),
+        interactionAction("respond", "b", {choice_ids: ["hero-card-2"]}),
+      ],
+      {public_subject: "current_effect"},
+    );
+  }),
   makeFixture("target-observer", "Окно: наблюдатель цели", (projection) => {
     projection.players = [player(0), player(1)];
     projection.turn.phase = "resolve_effect";
@@ -932,6 +1027,35 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       {public_subject: "current_encounter"},
     );
   }),
+  makeFixture("run-away-pending", "Побег: бросок отправлен серверу", (projection) => {
+    configureFigmaBattle(projection);
+    projection.turn.phase = "run_away";
+    projection.turn.run_away = {
+      current_player_id: "player_hero",
+      current_monster_instance_id: "archive-dust",
+      effects: [],
+      attempts: [{
+        player_id: "player_hero",
+        monster_instance_id: "sentry-slime",
+        roll: 5,
+        modifier: 1,
+        total: 6,
+        escaped: true,
+      }],
+      completed: false,
+    };
+    projection.turn.available_actions = [];
+    projection.interaction = interaction(
+      "run_away_response",
+      [],
+      {
+        parent_phase: "run_away",
+        public_subject: "current_encounter",
+        response_required_for_you: false,
+        my_response_state: "acted",
+      },
+    );
+  }),
   makeFixture("run-away-success", "Побег: успешный результат", (projection) => {
     configureFigmaBattle(projection);
     projection.turn.phase = "run_away";
@@ -952,6 +1076,26 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       completed: true,
     };
     projection.turn.available_actions = [action("end_turn")];
+  }),
+  makeFixture("run-away-failure", "Побег: неудачный результат", (projection) => {
+    configureFigmaBattle(projection);
+    projection.turn.phase = "run_away";
+    projection.turn.run_away = {
+      current_player_id: "player_hero",
+      current_monster_instance_id: "archive-dust",
+      effects: [],
+      attempts: [{
+        player_id: "player_hero",
+        monster_instance_id: "archive-dust",
+        roll: 2,
+        modifier: 1,
+        total: 3,
+        escaped: false,
+        bad_stuff_applied: true,
+      }],
+      completed: true,
+    };
+    projection.turn.available_actions = [];
   }),
   makeFixture("run-away-result", "Побег: подтверждённая последовательность", (projection) => {
     projection.players = [player(0), player(1)];
@@ -1208,15 +1352,16 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
         response_required_for_you: true,
         death_loot: {
           dead_player_id: "player_2",
-          initial_count: 3,
-          remaining_count: 2,
-          picked_count: 1,
+          initial_count: 5,
+          remaining_count: 5,
+          picked_count: 0,
           discarded_count: 0,
           options: [
-            card("loot-option-1", "Добыча из комнаты", "item", "treasure"),
-            card("loot-option-2", "Старый фонарь", "item", "treasure"),
+            card("loot-option-1", "Плащ обходчика", "item", "treasure", {item_slot: "armor", bonus: 2, value: undefined, rules_text: "Доступен для выбора."}),
+            card("loot-option-2", "Тяжёлый рюкзак", "item", "treasure", {item_size: "big", bonus: 2, value: undefined, rules_text: "Доступен для выбора."}),
           ],
         },
+        deadline_at: "2030-01-01T00:04:23.000Z",
       },
     );
   }),
@@ -1296,7 +1441,16 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     );
   }),
   makeFixture("victory-six-player", "Шесть игроков: финал", (projection) => {
-    projection.players = [0, 1, 2, 3, 4].map(player);
+    configureFigmaBattle(projection);
+    projection.you.name = "Макс";
+    projection.you.combat_strength = 21;
+    projection.you.strength_breakdown = {
+      ...projection.you.strength_breakdown,
+      base_strength: 8,
+      equipment_bonus: 11,
+      temporary_bonus: 2,
+      total_strength: 21,
+    };
     projection.status = "finished";
     projection.winner_player_id = "player_hero";
     projection.turn.phase = "end_turn";

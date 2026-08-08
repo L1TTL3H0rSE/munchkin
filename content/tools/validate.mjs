@@ -37,6 +37,7 @@ const MONSTER_KEYS = new Set([
   "strength",
   "treasures",
   "levels",
+  "bad_stuff_text",
   "pursuit_min_level",
   "tags",
   "modifiers",
@@ -450,6 +451,7 @@ function validateMonster(monster, label) {
   integer(monster.strength, `${label}.strength`, 1, 99);
   integer(monster.treasures, `${label}.treasures`, 1, 10);
   integer(monster.levels, `${label}.levels`, 1, 2);
+  boundedString(monster.bad_stuff_text, `${label}.bad_stuff_text`, 400, false);
   integer(monster.pursuit_min_level, `${label}.pursuit_min_level`, 1, 9, false);
   stringArray(monster.tags, `${label}.tags`);
   stringArray(monster.auto_defeat_character_tags, `${label}.auto_defeat_character_tags`);
@@ -788,8 +790,8 @@ export function validateFile(filePath) {
   return result;
 }
 
-const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
-if (invokedPath === fileURLToPath(import.meta.url)) {
+const invokedPath = process.argv[1] ? fs.realpathSync(process.argv[1]) : "";
+if (invokedPath === fs.realpathSync(fileURLToPath(import.meta.url))) {
   const filePath = process.argv[2];
   if (!filePath) {
     console.error("usage: node content/tools/validate.mjs <pack.json>");

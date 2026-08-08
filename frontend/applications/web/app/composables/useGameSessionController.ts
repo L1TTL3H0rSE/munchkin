@@ -126,7 +126,6 @@ export interface GameSessionScheduler {
 export interface GameSessionControllerOptions {
   api: GameSessionAPI;
   credentials: GameCredentialAdapter;
-  navigateToLobby: () => void | Promise<void>;
   scheduler?: GameSessionScheduler;
   random?: () => number;
   createCommandID?: () => string;
@@ -678,9 +677,10 @@ export function createGameSessionController(
     actionBusyState.value = true;
     clearConnectionError();
 
+    const charityCompletionCommandID = `${commandID}:complete`;
     const execute = () => withRequest(
       owner,
-      (signal) => {
+      async (signal) => {
         switch (request.kind) {
           case "offer":
             return options.api.economyOffer(
@@ -694,6 +694,23 @@ export function createGameSessionController(
               {commandID, signal},
             );
           case "charity":
+            if (current.turn.phase === "charity" && !current.interaction &&
+              request.allocations.length > 0) {
+              const begun = await options.api.resolveCharity(
+                currentGameID,
+                credential,
+                current.version,
+                [],
+                {commandID, signal},
+              );
+              return options.api.resolveCharity(
+                currentGameID,
+                credential,
+                begun.projection.version,
+                request.allocations,
+                {commandID: charityCompletionCommandID, signal},
+              );
+            }
             return options.api.resolveCharity(
               currentGameID,
               credential,
@@ -1024,9 +1041,6 @@ export function createGameSessionController(
       reportDiagnostic(normalizeGameApiError(error));
     }
     lifecycle++;
-    void Promise.resolve(options.navigateToLobby()).catch((error: unknown) => {
-      reportDiagnostic(normalizeGameApiError(error));
-    });
   }
 
   function finishTerminalFailure(

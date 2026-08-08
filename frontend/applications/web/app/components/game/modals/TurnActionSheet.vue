@@ -18,6 +18,7 @@ const props = defineProps<{
   projection: Projection;
   request: Extract<GameSheetRequest, {kind: "actions"}>;
   busy: boolean;
+  mandatory?: boolean;
 }>();
 const emit = defineEmits<{
   close: [];
@@ -32,6 +33,7 @@ const supportedTypes = new Set([
   "propose_trade",
   "propose_gift",
   "attempt_theft",
+  "choose_effect",
 ]);
 const entries = computed<ActionEntry[]>(() => props.projection.turn.available_actions
   .map((action, index) => ({action, index}))
@@ -112,6 +114,7 @@ const title = computed(() => {
   if (current.type === "propose_gift") return `Подарок для ${targetName}`;
   if (current.type === "propose_trade") return `Обмен с ${targetName}`;
   if (current.type === "attempt_theft") return `Кража у ${targetName}`;
+  if (current.type === "choose_effect") return "Выбери последствие";
   return actionLabel(current);
 });
 const description = computed(() => {
@@ -131,6 +134,7 @@ const description = computed(() => {
   }
   if (current.type === "propose_gift") return "Выбери вещи, которые передашь игроку.";
   if (current.type === "attempt_theft") return "Выбери одну карту из руки как стоимость попытки.";
+  if (current.type === "choose_effect") return "Выбери только разрешённые сервером карты и подтверди эффект.";
   return "Выбери только разрешённые сервером карты.";
 });
 const visibleCards = computed(() => isTrade.value && tradeStep.value === "requested"
@@ -150,6 +154,13 @@ const primaryDisabled = computed(() => {
   }
   return !canSubmit.value;
 });
+const desktopFigmaNode = computed(() => {
+  if (props.mandatory) return "296:2748";
+  if (action.value?.type === "propose_gift") return "295:2678";
+  if (action.value?.type === "propose_trade") return "295:2592";
+  return "291:1587";
+});
+const compactFigmaNode = computed(() => props.mandatory ? "188:1777" : "174:1735");
 
 watch(
   () => `${props.projection.version}:${props.request.actionIndex ?? ""}:${entries.value.map(({index}) => index).join("|")}`,
@@ -252,8 +263,11 @@ function continueOrSubmit(): void {
     :description="description"
     :compact-title="title"
     :compact-description="description"
-    data-figma-desktop-node="291:1587"
-    data-figma-compact-node="174:1735"
+    desktop-width="768px"
+    :dismissible="!mandatory"
+    :data-figma-owner="mandatory ? 'game-modal:mandatory-effect' : 'game-modal:turn-actions'"
+    :data-figma-desktop-node="desktopFigmaNode"
+    :data-figma-compact-node="compactFigmaNode"
     @close="emit('close')"
   >
     <div class="turn-action-sheet">
@@ -319,7 +333,7 @@ function continueOrSubmit(): void {
 </template>
 
 <style scoped lang="scss">
-:deep(.turn-action-dialog) { width: min(768px, calc(100% - 24px)); }
+:deep(.turn-action-dialog) { --sheet-dialog-width: min(768px, calc(100% - 24px)); width: min(768px, calc(100% - 24px)); }
 :deep(.turn-action-dialog .sheet-dialog__surface) { min-height: 502px; box-sizing: border-box; }
 .turn-action-sheet { min-width: 0; display: grid; align-content: start; gap: 12px; }
 .turn-action-sheet__tabs { min-width: 0; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }

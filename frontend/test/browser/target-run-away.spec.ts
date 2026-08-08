@@ -47,26 +47,31 @@ test("private choices stay mandatory and actor-private", async ({page}) => {
   await assertMediaPreferences(page);
   await dialog.getByRole("option").filter({hasText: "Карта с длинным названием"}).click();
   const requestPromise = page.waitForRequest((request) =>
-    request.method() === "POST" && request.url().includes("/commands/respond-interaction"),
+    request.method() === "POST" && request.url().includes("/commands/choose-effect"),
   );
-  await dialog.locator(".interaction-submit").click();
+  await dialog.getByRole("button", {name: "Подтвердить выбор", exact: true}).click();
   const request = await requestPromise;
-  expect(request.url()).not.toContain("choose-effect");
   expect(request.postDataJSON()).toMatchObject({
-    interaction_id: "interaction_fixture_0001",
-    action_id: "act_11111111111111111111111111111111",
-    intent: "respond",
+    choice_ids: ["hero-card-1"],
   });
 });
 
-test("Run Away shows current step, confirmed roll and server-owned response", async ({page}) => {
+test("Run Away uses only the dedicated actor owners and server-roll action", async ({page}) => {
   await openFixture(page, "run-away-response");
-  const summary = page.locator(".run-away-summary");
-  await expect(summary).toContainText("Участник: Борис");
-  await expect(summary).toContainText("Городской монстр с длинным русским описанием");
-  await expect(summary).toContainText("D6 2 +0 = 2");
-  await expect(summary).toContainText("Bad Stuff применён сервером");
-  await expect(page.locator(".interaction-action").filter({hasText: "Усилить попытку побега"})).toBeVisible();
+  const desktop = page.locator(".game-table__run-away");
+  await expect(desktop).toHaveAttribute("data-figma-owner", "game-board:run-away-wide");
+  await expect(desktop).toContainText("Городской монстр с длинным русским описанием");
+  await expect(desktop).toContainText("РЕЗУЛЬТАТ И ПОСЛЕДСТВИЯ ОПРЕДЕЛИТ СЕРВЕР");
+  await expect(desktop).not.toContainText("Bad Stuff применён сервером");
+  await expect(page.locator(".game-table__action-panel")
+    .getByRole("button", {name: "Бросить кубик", exact: true})).toBeVisible();
+  await expect(page.locator(".run-away-summary, .interaction-surface")).toHaveCount(0);
+
+  await page.setViewportSize({width: 360, height: 640});
+  await page.reload({waitUntil: "domcontentloaded"});
+  const compact = page.locator('dialog[data-figma-owner="game-modal:run-away-response"]');
+  await expect(compact).toBeVisible();
+  await expect(compact.getByRole("button", {name: "Бросить кубик", exact: true})).toBeVisible();
   await expect(page.getByText("rfx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", {exact: true})).toHaveCount(0);
 });
 
@@ -79,7 +84,11 @@ test("Run Away result uses the mapped result frame and observer has no response 
   await expect(page.getByRole("heading", {name: "Гидра из справок", exact: true})).toBeVisible();
 
   await openFixture(page, "run-away-observer");
-  await expect(page.locator(".interaction-actions")).toHaveCount(0);
-  await expect(page.locator(".interaction-opaque")).toBeVisible();
+  await expect(page.locator(".game-table__run-away, .run-away-summary, .interaction-surface"))
+    .toHaveCount(0);
+  await expect(page.locator('dialog[data-figma-owner="game-modal:run-away-response"]'))
+    .toHaveCount(0);
+  await expect(page.getByRole("button", {name: "Бросить кубик", exact: true}))
+    .toHaveCount(0);
   await assertNoRootOverflow(page);
 });

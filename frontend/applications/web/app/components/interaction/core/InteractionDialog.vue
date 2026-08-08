@@ -19,6 +19,7 @@ withDefaults(defineProps<{
   eyebrow?: string;
   dialogId?: string;
   desktopInline?: boolean;
+  figmaNode?: string;
 }>(), {
   countdownText: "",
   deadlineAt: "",
@@ -28,6 +29,7 @@ withDefaults(defineProps<{
   eyebrow: "РЕШЕНИЕ",
   dialogId: "interaction-dialog",
   desktopInline: false,
+  figmaNode: "254:221",
 });
 
 const emit = defineEmits<{
@@ -45,6 +47,7 @@ function close() {
   <section
     class="interaction-kernel"
     data-figma-owner="interaction-sheet"
+    :data-figma-desktop-node="figmaNode"
     :data-state="busy ? 'pending' : open ? 'open' : 'closed'"
     :data-connection-state="connectionState"
   >
@@ -64,6 +67,7 @@ function close() {
       :open="open"
       :class="{'interaction-flow-dialog--desktop-inline': desktopInline}"
       data-figma-owner="interaction-sheet"
+      :data-figma-desktop-node="figmaNode"
       :title="title"
       :description="context"
       :dismissible="dismissible"

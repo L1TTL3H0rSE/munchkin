@@ -85,7 +85,7 @@ describe("server-supplied action mapping", () => {
   });
 
   it("provides Russian labels for every core action", () => {
-    expect(actionLabel({type: "open_door"})).toBe("Вышибить дверь");
+    expect(actionLabel({type: "open_door"})).toBe("Открыть дверь");
     expect(actionLabel({type: "resolve_combat"})).toBe("Завершить бой");
     expect(actionLabel({type: "resolve_charity"})).toContain("благотворительность");
   });

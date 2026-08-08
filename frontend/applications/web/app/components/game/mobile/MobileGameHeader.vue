@@ -11,7 +11,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{"open-strength": []}>();
 
-const turnCopy = computed(() => props.presentationModel.turnHeadline);
+const turnCopy = computed(() => props.presentationModel.isActorTurn
+  ? props.presentationModel.turnHeadline
+  : "ЧУЖОЙ ХОД");
 
 const statusCopy = computed(() => {
   switch (props.projection.status) {
@@ -31,6 +33,7 @@ const statusCopy = computed(() => {
 const phaseCopy = computed(() => props.presentationModel.phaseLabel);
 
 const pagerCopy = computed(() => {
+  if (!props.presentationModel.isActorTurn) return "1 / 1";
   return `${props.presentationModel.encounterPage} / ${props.presentationModel.encounterPageCount}`;
 });
 

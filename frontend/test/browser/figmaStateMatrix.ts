@@ -100,7 +100,7 @@ export const figmaStateMatrix = {
     fixtureID: "single-setup",
     route: "/game/:id",
     component: "sheet",
-    serverActions: ["equip_item", "unequip_item"],
+    serverActions: ["equip_item"],
     semanticCheck: "equipment-slot-open",
     visualFamily: "equipment-choice",
   },
@@ -165,7 +165,7 @@ export const figmaStateMatrix = {
     visualFamily: "connection-recovery",
   },
   CharacterOpen: {
-    nodeId: "271:791",
+    nodeId: "267:708",
     name: "CharacterOpen",
     fixtureID: "single-combat",
     route: "/game/:id",
@@ -247,12 +247,12 @@ export const figmaStateMatrix = {
   CurseEffect: {
     nodeId: "293:1706",
     name: "CurseEffect",
-    fixtureID: "target-private-choice",
+    fixtureID: "curse-confirmed",
     route: "/game/:id",
-    component: "interaction",
+    component: "desktop",
     serverActions: [],
-    semanticCheck: "effect-choice-privacy",
-    visualFamily: "interaction-choice",
+    semanticCheck: "effect-confirmed-result",
+    visualFamily: "result",
   },
   HelpOffer: {
     nodeId: "293:1780",
@@ -287,7 +287,7 @@ export const figmaStateMatrix = {
   RunAwayPending: {
     nodeId: "293:2026",
     name: "RunAwayPending",
-    fixtureID: "run-away-response",
+    fixtureID: "run-away-pending",
     route: "/game/:id",
     component: "interaction",
     serverActions: [],
@@ -307,7 +307,7 @@ export const figmaStateMatrix = {
   RunAwayFailure: {
     nodeId: "294:2072",
     name: "RunAwayFailure",
-    fixtureID: "run-away-result",
+    fixtureID: "run-away-failure",
     route: "/game/:id",
     component: "desktop",
     serverActions: [],
@@ -317,17 +317,17 @@ export const figmaStateMatrix = {
   RunAwayNextMonster: {
     nodeId: "294:2146",
     name: "RunAwayNextMonster",
-    fixtureID: "mobile-combat-multiple",
+    fixtureID: "run-away-next-monster",
     route: "/game/:id",
     component: "desktop",
-    serverActions: ["request_combat_resolution"],
+    serverActions: [],
     semanticCheck: "multi-monster-order",
     visualFamily: "run-away",
   },
   EndTurnReady: {
     nodeId: "294:2235",
     name: "EndTurnReady",
-    fixtureID: "reward-received",
+    fixtureID: "end-turn-ready",
     route: "/game/:id",
     component: "desktop",
     serverActions: ["end_turn"],
@@ -337,7 +337,7 @@ export const figmaStateMatrix = {
   TurnPassed: {
     nodeId: "294:2309",
     name: "TurnPassed",
-    fixtureID: "stale-projection",
+    fixtureID: "turn-passed",
     route: "/game/:id",
     component: "system",
     serverActions: [],
@@ -417,7 +417,7 @@ export const figmaStateMatrix = {
   PrivateChoice: {
     nodeId: "296:2748",
     name: "PrivateChoice",
-    fixtureID: "target-private-choice",
+    fixtureID: "interaction-private-choice",
     route: "/game/:id",
     component: "interaction",
     serverActions: [],
@@ -427,7 +427,7 @@ export const figmaStateMatrix = {
   StaleChoice: {
     nodeId: "296:2837",
     name: "StaleChoice",
-    fixtureID: "stale-projection",
+    fixtureID: "single-preparation",
     route: "/game/:id",
     component: "system",
     serverActions: [],
@@ -499,6 +499,83 @@ export const figmaStateMatrix = {
 export const figmaStateDescriptors = figmaDesktopStateNames.map(
   (name) => figmaStateMatrix[name],
 );
+
+export type FigmaRuntimeSetup =
+  | "board"
+  | "hand"
+  | "fast-equip"
+  | "exact-equip"
+  | "character"
+  | "strength"
+  | "opponent"
+  | "gift"
+  | "loading"
+  | "auth"
+  | "unavailable"
+  | "reconnecting"
+  | "connection-failed"
+  | "stale-choice";
+
+export type FigmaStateRuntime = {
+  viewport: "desktop" | "compact";
+  setup: FigmaRuntimeSetup;
+  selector: string;
+  nodeAttribute: "data-figma-desktop-node" | "data-figma-compact-node" | "data-figma-node";
+  visibleCopy: string;
+  actionLabel?: RegExp;
+  actionRole?: "button" | "link";
+};
+
+const board = (visibleCopy: string, actionLabel?: RegExp): Omit<FigmaStateRuntime, "setup" | "selector" | "nodeAttribute" | "viewport"> => ({
+  visibleCopy,
+  ...(actionLabel ? {actionLabel} : {}),
+});
+
+export const figmaStateRuntime = {
+  ActiveTurn: {viewport: "desktop", setup: "board", selector: ".game-table", nodeAttribute: "data-figma-desktop-node", ...board("ТВОЙ ХОД", /Завершить бой/)},
+  HandExpanded: {viewport: "desktop", setup: "hand", selector: "dialog.game-choice-dialog", nodeAttribute: "data-figma-desktop-node", ...board("Рука ·")},
+  HandFastEquip: {viewport: "compact", setup: "fast-equip", selector: "dialog[data-figma-owner='game-modal:fast-equip']", nodeAttribute: "data-figma-compact-node", ...board("Экипировать", /Экипировать/)},
+  EquipmentSlotOpen: {viewport: "compact", setup: "exact-equip", selector: "dialog[data-figma-owner='game-modal:exact-equip']", nodeAttribute: "data-figma-compact-node", ...board("Головняк")},
+  RequiredResponse: {viewport: "desktop", setup: "board", selector: "dialog[data-figma-owner='interaction-sheet']", nodeAttribute: "data-figma-desktop-node", ...board("Ответ")},
+  Charity: {viewport: "desktop", setup: "board", selector: "dialog[data-figma-owner='game-modal:charity']", nodeAttribute: "data-figma-desktop-node", ...board("Благотворительность")},
+  CharityDiscard: {viewport: "desktop", setup: "board", selector: "dialog[data-figma-owner='game-modal:charity']", nodeAttribute: "data-figma-desktop-node", ...board("Сброс карт")},
+  Waiting: {viewport: "desktop", setup: "board", selector: ".game-table", nodeAttribute: "data-figma-desktop-node", ...board("ХОДИТ")},
+  Reconnecting: {viewport: "desktop", setup: "reconnecting", selector: ".game-connection-status", nodeAttribute: "data-figma-desktop-node", ...board("Связь потеряна.*Переподключаемся…")},
+  ConnectionFailed: {viewport: "desktop", setup: "connection-failed", selector: ".game-connection-status", nodeAttribute: "data-figma-desktop-node", ...board("Не удалось подключиться", /Попробовать снова/)},
+  CharacterOpen: {viewport: "desktop", setup: "character", selector: "dialog.character-equipment-dialog", nodeAttribute: "data-figma-desktop-node", ...board("Персонаж")},
+  StrengthOpen: {viewport: "desktop", setup: "strength", selector: "dialog.strength-breakdown-dialog", nodeAttribute: "data-figma-desktop-node", ...board("Подробный расчёт силы")},
+  OpponentOpen: {viewport: "desktop", setup: "opponent", selector: "dialog.opponent-details-dialog", nodeAttribute: "data-figma-desktop-node", ...board("Соперник")},
+  DoorReady: {viewport: "desktop", setup: "board", selector: ".game-table", nodeAttribute: "data-figma-desktop-node", ...board("Дверь", /Открыть дверь/)},
+  PostDoorChoice: {viewport: "desktop", setup: "board", selector: ".game-table", nodeAttribute: "data-figma-desktop-node", ...board("Что дальше?", /Искать неприятности|Обчистить комнату/)},
+  RunAwayChoice: {viewport: "desktop", setup: "board", selector: ".game-table__run-away", nodeAttribute: "data-figma-desktop-node", ...board("Смыться", /Бросить кубик/)},
+  RewardReceived: {viewport: "desktop", setup: "board", selector: ".game-table", nodeAttribute: "data-figma-desktop-node", ...board("РЕЗУЛЬТАТ")},
+  Preparation: {viewport: "desktop", setup: "board", selector: ".game-table", nodeAttribute: "data-figma-desktop-node", ...board("ПОДГОТ", /Закончить подготовку/)},
+  CurseEffect: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-board:curse-confirmed']", nodeAttribute: "data-figma-desktop-node", ...board("Проклятие!")},
+  HelpOffer: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-board:help-offer']", nodeAttribute: "data-figma-desktop-node", ...board("Позвать на помощь", /Предложить помощь/)},
+  HelpIncoming: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-board:help-invite']", nodeAttribute: "data-figma-desktop-node", ...board("просит помощи", /Подтвердить/)},
+  HelpAccepted: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-board:help-accepted']", nodeAttribute: "data-figma-desktop-node", ...board("Помощник присоединился")},
+  RunAwayPending: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-board:run-away-pending']", nodeAttribute: "data-figma-desktop-node", ...board("Бросок отправлен")},
+  RunAwaySuccess: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-board:run-away-success']", nodeAttribute: "data-figma-desktop-node", ...board("Ты смылся")},
+  RunAwayFailure: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-board:run-away-failure']", nodeAttribute: "data-figma-desktop-node", ...board("Побег не удался")},
+  RunAwayNextMonster: {viewport: "desktop", setup: "board", selector: ".game-table__run-away-next", nodeAttribute: "data-figma-desktop-node", ...board("Следующий монстр", /Подтвердить/)},
+  EndTurnReady: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-board:end-turn-ready']", nodeAttribute: "data-figma-desktop-node", ...board("Ход можно завершить", /Завершить ход/)},
+  TurnPassed: {viewport: "desktop", setup: "board", selector: ".game-table", nodeAttribute: "data-figma-desktop-node", ...board("ХОДИТ")},
+  Death: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-system:death']", nodeAttribute: "data-figma-desktop-node", ...board("Персонаж погиб", /Продолжить/)},
+  DeathLoot: {viewport: "desktop", setup: "board", selector: ".game-table__death-loot", nodeAttribute: "data-figma-desktop-node", ...board("Добыча погибшего игрока")},
+  DeathRecovery: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-system:death-recovery']", nodeAttribute: "data-figma-desktop-node", ...board("Персонаж восстановлен", /Продолжить/)},
+  Victory: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-board:victory']", nodeAttribute: "data-figma-desktop-node", ...board("Победа!", /Открыть итоги/)},
+  Trade: {viewport: "desktop", setup: "board", selector: "dialog[data-figma-owner='interaction-sheet']", nodeAttribute: "data-figma-desktop-node", ...board("Обмен")},
+  Gift: {viewport: "desktop", setup: "gift", selector: "dialog[data-figma-owner='game-modal:turn-actions']", nodeAttribute: "data-figma-desktop-node", ...board("Подарок", /Предложить подарок/)},
+  TheftResponse: {viewport: "desktop", setup: "board", selector: "dialog[data-figma-owner='interaction-sheet']", nodeAttribute: "data-figma-desktop-node", ...board("контр")},
+  PrivateChoice: {viewport: "desktop", setup: "board", selector: "dialog[data-figma-owner='interaction-sheet']", nodeAttribute: "data-figma-desktop-node", ...board("Карта с длинным названием")},
+  StaleChoice: {viewport: "desktop", setup: "stale-choice", selector: ".game-connection-status", nodeAttribute: "data-figma-desktop-node", ...board("Нужно обновить состояние", /Попробовать снова/)},
+  ExpiredChoice: {viewport: "desktop", setup: "board", selector: "dialog[data-figma-owner='interaction-sheet']", nodeAttribute: "data-figma-desktop-node", ...board("Окно ответа истекло")},
+  EmptyHand: {viewport: "desktop", setup: "hand", selector: "dialog.game-choice-dialog", nodeAttribute: "data-figma-desktop-node", ...board("В руке нет карт")},
+  InitialLoading: {viewport: "desktop", setup: "loading", selector: "[data-figma-owner='game-system:loading']", nodeAttribute: "data-figma-desktop-node", ...board("Подготавливаем стол")},
+  SessionLost: {viewport: "desktop", setup: "auth", selector: "[data-figma-owner='game-system:auth']", nodeAttribute: "data-figma-desktop-node", actionRole: "link", ...board("Сессия этой вкладки потеряна", /Вернуться в лобби/)},
+  GameUnavailable: {viewport: "desktop", setup: "unavailable", selector: "[data-figma-owner='game-system:unavailable']", nodeAttribute: "data-figma-desktop-node", ...board("Игра недоступна", /Попробовать снова/)},
+  GameFinished: {viewport: "desktop", setup: "board", selector: "[data-figma-owner='game-board:finished']", nodeAttribute: "data-figma-desktop-node", ...board("Партия завершена", /Открыть итоги/)},
+} satisfies Record<FigmaDesktopStateName, FigmaStateRuntime>;
 
 export const figmaAcceptanceReferences = [
   {nodeId: "228:14", viewport: "360x640", fixtureID: "lobby-state", region: "lobby"},

@@ -20,15 +20,15 @@ describe("death loot surface model", () => {
     const options = deathLootOptions(interaction);
 
     expect(options.map(({card}) => card.name)).toEqual([
-      "Добыча из комнаты",
-      "Старый фонарь",
+      "Плащ обходчика",
+      "Тяжёлый рюкзак",
     ]);
     expect(options.map(({action}) => action.choice_ids)).toEqual([
       ["loot-option-1"],
       ["loot-option-2"],
     ]);
     expect(deathLootPassAction(interaction)?.type).toBe("pass");
-    expect(deathLootParticipants(projection, interaction)).toHaveLength(5);
+    expect(deathLootParticipants(projection, interaction)).toHaveLength(3);
     expect(deathLootParticipants(projection, interaction)).not.toContainEqual(
       expect.objectContaining({playerID: "player_2"}),
     );

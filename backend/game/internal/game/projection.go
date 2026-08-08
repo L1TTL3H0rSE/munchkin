@@ -23,6 +23,7 @@ type CardView struct {
 	Value          int        `json:"value,omitempty"`
 	TraitGroup     TraitGroup `json:"trait_group,omitempty"`
 	RulesText      string     `json:"rules_text,omitempty"`
+	BadStuffText   string     `json:"bad_stuff_text,omitempty"`
 	FlavorText     string     `json:"flavor_text,omitempty"`
 	Image          string     `json:"image,omitempty"`
 	AltText        string     `json:"alt_text,omitempty"`
@@ -620,7 +621,7 @@ func projectInteraction(
 				state.CharityTransfer.StableHandOrder...,
 			),
 			EligibleRecipientIDs: append(
-				[]string(nil),
+				[]string{},
 				state.CharityTransfer.EligibleRecipientIDs...,
 			),
 		}
@@ -1472,6 +1473,9 @@ func projectActions(
 		return []ActionView{}, nil
 	}
 	if state.Turn.Pending != nil {
+		if state.Turn.Pending.Type == PendingDecisionRunAwayMonster {
+			return []ActionView{}, nil
+		}
 		return []ActionView{{
 			Type:        CommandChooseEffect,
 			InstanceIDs: append([]string(nil), state.Turn.Pending.Options...),
@@ -1923,6 +1927,7 @@ func cardViewForInstance(state State, instanceID string, pack Pack) (CardView, e
 		view.CombatStrength = card.Monster.Strength
 		view.TreasureCount = card.Monster.Treasures
 		view.LevelsReward = card.Monster.Levels
+		view.BadStuffText = card.Monster.BadStuffText
 	}
 	if card.Item != nil {
 		view.ItemSlot = card.Item.Slot

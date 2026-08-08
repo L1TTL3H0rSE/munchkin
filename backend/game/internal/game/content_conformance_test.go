@@ -2,11 +2,107 @@ package game
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestMoscowV5BadStuffPresentationProjectionAndProfile(t *testing.T) {
+	pack, err := LoadPack(moscowV5PackPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pack.Version != 5 || pack.ContentDigest != "sha256:f09447b79a112196ee5bd446648a922ad5b8b910b1b081c4ac65accf50ee2e49" {
+		t.Fatalf("unexpected v5 identity: %s@%d %s", pack.SetID, pack.Version, pack.ContentDigest)
+	}
+
+	created, err := CreateLobby("v5-profile", Player{
+		ID: "owner", Name: "Owner", Level: 1, CredentialHash: "hash",
+	}, pack, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := Apply(State{}, created)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.RulesProfileID != DeathLootProfileID ||
+		state.RulesProfileVersion != DeathLootProfileVersion {
+		t.Fatalf("v5 selected %s@%d", state.RulesProfileID, state.RulesProfileVersion)
+	}
+
+	instances, _, _, err := pack.Materialize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Instances = instances
+	var monsterInstanceID string
+	for instanceID, instance := range instances {
+		card, exists := pack.Card(instance.DefinitionID)
+		if exists && card.Kind == CardMonster && card.Monster != nil && card.Monster.BadStuffText != "" {
+			monsterInstanceID = instanceID
+			break
+		}
+	}
+	if monsterInstanceID == "" {
+		t.Fatal("v5 has no materialized monster with Bad Stuff presentation")
+	}
+	view, err := cardViewForInstance(state, monsterInstanceID, pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view.BadStuffText == "" {
+		t.Fatal("monster projection omitted Bad Stuff presentation")
+	}
+	raw, err := json.Marshal(view)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range [][]byte{
+		[]byte(`"bad_stuff":`),
+		[]byte(`"effects":`),
+		[]byte(`"selector":`),
+	} {
+		if bytes.Contains(raw, forbidden) {
+			t.Fatalf("projection leaked internal mechanics %q: %s", forbidden, raw)
+		}
+	}
+
+	for instanceID, instance := range instances {
+		card, exists := pack.Card(instance.DefinitionID)
+		if !exists || card.Kind == CardMonster {
+			continue
+		}
+		cardView, err := cardViewForInstance(state, instanceID, pack)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cardView.BadStuffText != "" {
+			t.Fatalf("non-monster %s has Bad Stuff presentation", card.ID)
+		}
+	}
+}
+
+func TestMoscowV5RejectsInvalidBadStuffUTF8(t *testing.T) {
+	pack, err := LoadPack(moscowV5PackPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := range pack.Cards {
+		if pack.Cards[index].Monster == nil {
+			continue
+		}
+		pack.Cards[index].Monster.BadStuffText = string([]byte{0xff})
+		pack.ContentDigest = CardsDigest(pack.Cards)
+		if err := pack.Validate(); !errors.Is(err, ErrInvalidContent) {
+			t.Fatalf("invalid UTF-8 Bad Stuff err=%v", err)
+		}
+		return
+	}
+	t.Fatal("v5 has no monster")
+}
 
 func TestCanonicalDigestMatchesNodeForUnicodeAndHTMLEdges(t *testing.T) {
 	card := Card{
@@ -380,6 +476,20 @@ func moscowPackPath() string {
 		"sets",
 		"moscow",
 		"v1",
+		"cards.json",
+	)
+}
+
+func moscowV5PackPath() string {
+	return filepath.Join(
+		"..",
+		"..",
+		"..",
+		"..",
+		"content",
+		"sets",
+		"moscow",
+		"v5",
 		"cards.json",
 	)
 }

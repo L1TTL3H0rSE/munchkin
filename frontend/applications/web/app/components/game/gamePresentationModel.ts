@@ -26,9 +26,9 @@ export type PrimarySurface =
     kind: "result";
     source: "run-away";
     escaped: boolean;
-    roll: number;
+    roll: number | null;
     modifier: number;
-    total: number;
+    total: number | null;
     monsterName: string;
   }
   | {kind: "combat"}
@@ -57,6 +57,9 @@ export type GamePresentationModel = {
 
 export function projectedTurnActions(projection: Projection): ActionDescriptor[] {
   const actions = [...projection.turn.available_actions];
+  if (actingPlayerID(projection) !== projection.you.player_id) {
+    return actions;
+  }
   const resolution = projection.turn.combat?.resolution_action;
   if (resolution && !actions.some((action) => action.type === resolution.type)) {
     actions.push({type: resolution.type});
@@ -82,12 +85,26 @@ function phaseLabel(primary: PrimarySurface, family: GameStateFamily): string {
   }
 }
 
+export function actingPlayerID(projection: Projection): string {
+  return projection.turn.phase === "run_away"
+    ? projection.turn.run_away?.current_player_id ?? projection.turn.player_id
+    : projection.turn.player_id;
+}
+
+function actorControlsTurn(projection: Projection): boolean {
+  return actingPlayerID(projection) === projection.you.player_id ||
+    (projection.status === "lobby" && projection.turn.available_actions.some((action) =>
+      action.type === "start",
+    ));
+}
+
 function playerNameForTurn(projection: Projection): string {
-  if (projection.turn.player_id === projection.you.player_id) {
+  const playerID = actingPlayerID(projection);
+  if (playerID === projection.you.player_id) {
     return projection.you.name;
   }
   return projection.players.find((player) =>
-    player.player_id === projection.turn.player_id,
+    player.player_id === playerID,
   )?.name ?? "другой игрок";
 }
 
@@ -100,24 +117,35 @@ function turnHeadline(
   if (primary.kind === "result") {
     return primary.source === "reward"
       ? "РЕЗУЛЬТАТ"
-      : primary.escaped ? "УСПЕХ" : "НЕУДАЧА";
+      : primary.escaped ? "УСПЕХ" : "ПРОВАЛ";
   }
+  if (projection.turn.pending_decision?.type === "run_away_monster") return "ВЫБЕРИ";
   if (primary.kind === "run-away") return "ТВОЁ РЕШЕНИЕ";
-  return projection.turn.player_id === projection.you.player_id
+  return actorControlsTurn(projection)
     ? "ТВОЙ ХОД"
     : `ХОДИТ ${currentPlayerName}`;
 }
 
-function desktopNodeID(primary: PrimarySurface): string {
+function desktopNodeID(projection: Projection, primary: PrimarySurface): string {
+  if (primary.kind === "run-away" && (projection.turn.run_away?.attempts.length ?? 0) > 0) {
+    return "294:2146";
+  }
+  if (primary.kind === "door-choice") return "285:1388";
+  if (primary.kind === "waiting" && projection.turn.phase === "end_turn") return "294:2309";
+  if (primary.kind === "phase" && primary.family === "preparation" &&
+    projection.turn.available_actions.some((action) => action.type === "open_door")) {
+    return "285:1315";
+  }
   switch (primary.kind) {
-    case "finished": return "295:2518";
+    case "finished": return projection.winner_player_id === projection.you.player_id
+      ? "295:2518"
+      : "297:3177";
     case "required-decision": return "296:2748";
     case "run-away": return "285:1473";
     case "result": return primary.source === "reward"
       ? "285:1566"
       : primary.escaped ? "294:1998" : "294:2072";
     case "combat": return "248:5";
-    case "door-choice": return "285:1315";
     case "resolving": return "293:1706";
     case "waiting": return "257:447";
     case "phase":
@@ -135,12 +163,17 @@ function desktopNodeID(primary: PrimarySurface): string {
   }
 }
 
-function mobileNodeID(primary: PrimarySurface): string {
+function mobileNodeID(projection: Projection, primary: PrimarySurface): string {
+  if (primary.kind === "run-away" &&
+    projection.turn.pending_decision?.type === "run_away_monster" &&
+    (projection.turn.run_away?.attempts.length ?? 0) > 0) {
+    return "unverified";
+  }
   switch (primary.kind) {
-    case "finished": return "184:1687";
+    case "finished": return "179:146";
     case "required-decision": return "188:1777";
     case "run-away": return "183:1671";
-    case "result": return primary.source === "reward" ? "184:1687" : "183:1671";
+    case "result": return primary.source === "reward" ? "184:1687" : "unverified";
     case "door-choice": return "181:1634";
     case "waiting": return "147:1082";
     case "phase": return primary.family === "charity" ? "147:978" : "147:731";
@@ -198,6 +231,12 @@ export function selectPrimarySurface(projection: Projection): PrimarySurface {
   if (projection.status === "finished") {
     return {kind: "finished"};
   }
+  if (projection.turn.pending_decision?.type === "run_away_monster" &&
+    projection.turn.run_away) {
+    return projection.turn.run_away.current_player_id === projection.you.player_id
+      ? {kind: "run-away", completed: false}
+      : {kind: "waiting"};
+  }
   if (projection.turn.pending_decision) {
     return {
       kind: "required-decision",
@@ -212,14 +251,17 @@ export function selectPrimarySurface(projection: Projection): PrimarySurface {
     const monster = encounterCards(projection).find((candidate) =>
       candidate.instance_id === (attempt?.monster_instance_id ?? runAway.current_monster_instance_id),
     );
+    if (!attempt || !monster) {
+      return {kind: "waiting"};
+    }
     return {
       kind: "result",
       source: "run-away",
-      escaped: attempt?.escaped ?? false,
-      roll: attempt?.roll ?? 0,
-      modifier: attempt?.modifier ?? 0,
-      total: attempt?.total ?? 0,
-      monsterName: monster?.name ?? "Монстр",
+      escaped: attempt.escaped,
+      roll: attempt.roll ?? null,
+      modifier: attempt.modifier,
+      total: attempt.total ?? null,
+      monsterName: monster.name,
     };
   }
   if (projection.recent_combat_result?.outcome === "victory") {
@@ -274,16 +316,23 @@ export function buildGamePresentationModel(
     : 0;
   const activeEncounterIndex = requestedIndex >= 0 ? requestedIndex : 0;
   const primary = selectPrimarySurface(projection);
+  const deathLootActor = projection.interaction?.public_kind === "death_loot_priority" &&
+    projection.interaction.response_required_for_you;
+  const runAwayChoiceActor = projection.turn.pending_decision?.type === "run_away_monster" &&
+    projection.interaction?.public_kind === "private_choice" &&
+    projection.interaction.response_required_for_you;
   const currentPlayerName = playerNameForTurn(projection);
   return {
     family: gameStateFamily(projection),
     primary,
-    desktopNodeID: desktopNodeID(primary),
-    mobileNodeID: mobileNodeID(primary),
-    phaseLabel: phaseLabel(primary, gameStateFamily(projection)),
-    turnHeadline: turnHeadline(projection, primary, currentPlayerName),
+    desktopNodeID: deathLootActor ? "295:2355" : desktopNodeID(projection, primary),
+    mobileNodeID: deathLootActor ? "177:130" : mobileNodeID(projection, primary),
+    phaseLabel: deathLootActor ? "ДОБЫЧА" : runAwayChoiceActor
+      ? "ПОБЕГ"
+      : phaseLabel(primary, gameStateFamily(projection)),
+    turnHeadline: deathLootActor ? "ТВОЙ ВЫБОР" : turnHeadline(projection, primary, currentPlayerName),
     currentPlayerName,
-    isActorTurn: projection.turn.player_id === projection.you.player_id,
+    isActorTurn: actorControlsTurn(projection),
     turnActions: projectedTurnActions(projection),
     encounterCards: cards,
     activeEncounterIndex,
@@ -299,7 +348,7 @@ export function opponentStatus(
   if (player.dead) {
     return "dead";
   }
-  if (projection.turn.player_id === player.player_id) {
+  if (actingPlayerID(projection) === player.player_id) {
     return "active";
   }
   if (projection.status === "active" && !player.setup_done) {

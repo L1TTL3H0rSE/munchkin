@@ -744,6 +744,11 @@
           "minimum": 1,
           "maximum": 2
         },
+        "bad_stuff_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        },
         "pursuit_min_level": {
           "type": "integer",
           "minimum": 1,

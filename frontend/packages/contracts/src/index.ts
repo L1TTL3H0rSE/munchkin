@@ -95,12 +95,24 @@ export const cardViewSchema = z.object({
   value: z.number().int().nonnegative().optional(),
   trait_group: z.enum(["class", "race"]).optional(),
   rules_text: z.string().max(800).optional(),
+  bad_stuff_text: z.string().trim().min(1).refine(
+    (value) => [...value].length <= 400,
+    "bad_stuff_text must contain at most 400 Unicode code points",
+  ).optional(),
   flavor_text: z.string().max(300).optional(),
   image: z.string()
     .regex(/^assets\/[A-Za-z0-9][A-Za-z0-9._/-]*\.(?:avif|jpe?g|png|webp)$/)
     .optional(),
   alt_text: z.string().min(1).max(200).optional(),
-}).strict();
+}).strict().superRefine((card, context) => {
+  if (card.bad_stuff_text !== undefined && card.kind !== "monster") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["bad_stuff_text"],
+      message: "bad_stuff_text is only valid for monster cards",
+    });
+  }
+});
 
 export const selfViewSchema = z.object({
   player_id: z.string().min(1),
@@ -175,7 +187,7 @@ export const combatViewSchema = z.object({
 }).strict();
 
 export const decisionViewSchema = z.object({
-  type: z.literal("effect_choice"),
+  type: z.enum(["effect_choice", "run_away_monster"]),
   source_instance_id: z.string().min(1).optional(),
   options: z.array(z.string().min(1)),
   minimum: z.number().int().nonnegative(),

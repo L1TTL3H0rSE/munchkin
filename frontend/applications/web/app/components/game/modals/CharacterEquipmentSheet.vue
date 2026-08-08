@@ -68,6 +68,11 @@ function slotBonus(slot: EquipmentSlot): number {
     compact-title="Персонаж"
     :compact-description="compactDescription"
     title-id="character-equipment-title"
+    desktop-width="940px"
+    desktop-height="608px"
+    desktop-padding="24px"
+    desktop-gap="10px"
+    compact-gap="13px"
     :close-label="projection.turn.phase === 'setup' ? 'Готово' : 'Закрыть'"
     data-figma-desktop-node="267:708"
     data-figma-compact-node="165:42"
@@ -151,7 +156,7 @@ function slotBonus(slot: EquipmentSlot): number {
 </template>
 
 <style scoped lang="scss">
-.character-equipment { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; min-width: 0; }
+.character-equipment { height: 100%; display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; min-width: 0; }
 .character-equipment__summary,
 .character-equipment__loadout { min-width: 0; border-radius: 16px; padding: 16px; }
 .character-equipment__summary { display: grid; align-content: start; gap: 16px; background: var(--color-surface-raised, #fffdf8); }
@@ -192,13 +197,12 @@ function slotBonus(slot: EquipmentSlot): number {
 .character-equipment__carried { min-height: 116px; display: grid; align-content: start; gap: 8px; border: 1px solid var(--color-line); border-radius: 12px; padding: 12px; color: inherit; background: var(--color-surface-raised, #fffdf8); text-align: left; font: inherit; }
 .character-equipment__carried p { margin: 0; overflow: hidden; color: var(--color-text); line-height: 1.45; }
 
-:deep(.character-equipment-dialog) { width: min(940px, calc(100% - 24px)); }
+:deep(.character-equipment-dialog) { --sheet-dialog-width: min(940px, calc(100% - 24px)); width: min(940px, calc(100% - 24px)); }
 :deep(.character-equipment-dialog .sheet-dialog__surface) { min-height: 620px; gap: 20px; box-sizing: border-box; padding: 24px; }
 
 @media (width < 1024px) {
   :deep(.character-equipment-dialog) { width: min(560px, calc(100% - 24px)); max-height: min(470px, calc(100dvh - 24px)); }
-  :deep(.character-equipment-dialog .sheet-dialog__surface) { min-height: min(470px, calc(100dvh - 24px)); max-height: min(470px, calc(100dvh - 24px)); padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
-  .character-equipment { grid-template-columns: 1fr; gap: 12px; }
+  .character-equipment { height: auto; grid-template-columns: 1fr; gap: 12px; }
   .character-equipment__summary { display: none; }
   .character-equipment__loadout { grid-template-rows: 32px 154px 88px auto; gap: 8px; border: 1px solid var(--color-line); padding: 12px; background: var(--color-surface-card); }
   .character-equipment__heading { display: none; }

@@ -7,8 +7,10 @@ const props = withDefaults(defineProps<{
   card: CardView;
   variant: "choice" | "encounter";
   imageUrl?: string;
+  choiceContext?: "default" | "loot";
 }>(), {
   imageUrl: "",
+  choiceContext: "default",
 });
 
 const encounterTitle = computed(() =>
@@ -20,7 +22,14 @@ const encounterTitle = computed(() =>
 const choiceKind = computed(() => {
   switch (props.card.kind) {
     case "one_shot": return "Одноразовая";
-    case "item": return props.card.item_size === "big" ? "Большая вещь" : "Вещь";
+    case "item":
+      if (props.choiceContext !== "loot") return props.card.item_size === "big" ? "Большая вещь" : "Вещь";
+      if (props.card.item_size === "big") return "Большая вещь";
+      if (props.card.item_slot === "armor") return "Броня";
+      if (props.card.item_slot === "headgear") return "Головняк";
+      if (props.card.item_slot === "footgear") return "Обувка";
+      if (props.card.item_slot === "hands") return "Оружие";
+      return "Вещь";
     case "monster": return "Монстр";
     case "curse": return "Проклятие";
     case "class": return "Класс";
@@ -37,7 +46,9 @@ const choiceKind = computed(() => {
 
 const choiceMeta = computed(() => [
   choiceKind.value,
-  props.card.value !== undefined ? String(props.card.value) : "",
+  props.card.value !== undefined && props.choiceContext !== "loot"
+    ? String(props.card.value)
+    : props.card.bonus !== undefined ? `+${props.card.bonus}` : "",
 ].filter(Boolean).join(" · "));
 </script>
 
@@ -76,6 +87,10 @@ const choiceMeta = computed(() => [
       <p v-if="card.rules_text" class="encounter-card-presentation__rules">
         {{ card.rules_text }}
       </p>
+      <div v-if="card.kind === 'monster' && card.bad_stuff_text" class="encounter-card-presentation__bad-stuff">
+        <span>НЕПОТРЕБСТВО</span>
+        <p>{{ card.bad_stuff_text }}</p>
+      </div>
       <div
         v-if="card.kind === 'monster' && (card.levels_reward !== undefined || card.treasure_count !== undefined)"
         class="encounter-card-presentation__rewards"
@@ -225,7 +240,35 @@ const choiceMeta = computed(() => [
   line-height: 16px;
   white-space: pre-line;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 6;
+  -webkit-line-clamp: 3;
+}
+
+.encounter-card-presentation__bad-stuff {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border-top: 1px solid var(--color-line);
+  padding-top: 7px;
+}
+
+.encounter-card-presentation__bad-stuff span {
+  color: var(--color-action-response);
+  font-family: var(--font-meta);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 12px;
+  letter-spacing: .04em;
+}
+
+.encounter-card-presentation__bad-stuff p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-card);
+  font-size: 11px;
+  line-height: 16px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .encounter-card-presentation__rewards {

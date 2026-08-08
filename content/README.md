@@ -116,6 +116,21 @@ node content/tools/digest.mjs content/sets/moscow/v4/cards.json
 node content/tools/validate.mjs content/sets/moscow/v4/cards.json
 ```
 
+### Figma presentation contract v5
+
+`sets/moscow/v5/cards.json` — следующий immutable pack поверх exact digest v4.
+Он не меняет mechanics, registered capabilities или deck composition, а
+разделяет у monster cards обычный `rules_text` и presentation-only
+`monster.bad_stuff_text`. Поле существует только у monster, содержит непустой
+UTF-8 текст максимум из 400 Unicode code points и попадает в actor projection
+без сериализации typed `bad_stuff` effects. Digest v5:
+`sha256:f09447b79a112196ee5bd446648a922ad5b8b910b1b081c4ac65accf50ee2e49`.
+
+```bash
+node content/tools/digest.mjs content/sets/moscow/v5/cards.json
+node content/tools/validate.mjs content/sets/moscow/v5/cards.json
+```
+
 ## Definitions и instances
 
 JSON pack хранит `CardDefinition`. Обязательные поля каждой definition:
@@ -147,6 +162,10 @@ capabilities.
 Новые lobby, pinned на `moscow-core@4`, используют
 `lobby-multiplayer-v3@1` и активируют closed theft registry. Prior packs и
 profiles не получают theft actions.
+
+Managed browser runtime, pinned на `moscow-core@5`, сохраняет тот же
+`lobby-multiplayer-v4@1` gameplay profile и добавляет только presentation-safe
+Bad Stuff copy. Production/demo defaults этим изменением не переключаются.
 
 ## Закрытая модель mechanics
 

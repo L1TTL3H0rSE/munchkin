@@ -14,6 +14,18 @@ const props = withDefaults(defineProps<{
   titleID?: string;
   dismissible?: boolean;
   closeLabel?: string;
+  desktopWidth?: string;
+  compactWidth?: string;
+  mobileWidth?: string;
+  desktopHeight?: string;
+  compactHeight?: string;
+  desktopPadding?: string;
+  desktopGap?: string;
+  compactGap?: string;
+  compactPadding?: string;
+  hideCompactDescription?: boolean;
+  hideHeader?: boolean;
+  ariaLabel?: string;
 }>(), {
   description: "",
   compactTitle: "",
@@ -21,6 +33,18 @@ const props = withDefaults(defineProps<{
   titleID: "",
   dismissible: true,
   closeLabel: "Закрыть",
+  desktopWidth: "42rem",
+  compactWidth: "560px",
+  mobileWidth: "100%",
+  desktopHeight: "",
+  compactHeight: "470px",
+  desktopPadding: "var(--space-4)",
+  desktopGap: "var(--space-4)",
+  compactGap: "var(--space-4)",
+  compactPadding: "16px 16px calc(36px + env(safe-area-inset-bottom, 0px))",
+  hideCompactDescription: false,
+  hideHeader: false,
+  ariaLabel: "",
 });
 
 const emit = defineEmits<{
@@ -31,6 +55,22 @@ const emit = defineEmits<{
 const dialog = ref<HTMLDialogElement | null>(null);
 const generatedTitleID = `sheet-dialog-title-${useId()}`;
 const resolvedTitleID = computed(() => props.titleID || generatedTitleID);
+const layoutTokens = computed<Record<string, string>>(() => {
+  const tokens: Record<string, string> = {
+    "--sheet-dialog-width": `min(${props.desktopWidth}, calc(100% - 24px))`,
+    "--sheet-dialog-compact-width": `min(${props.compactWidth}, calc(100% - 24px))`,
+    "--sheet-dialog-mobile-width": props.mobileWidth,
+    "--sheet-dialog-compact-height": props.compactHeight,
+    "--sheet-dialog-desktop-padding": props.desktopPadding,
+    "--sheet-dialog-desktop-gap": props.desktopGap,
+    "--sheet-dialog-compact-gap": props.compactGap,
+    "--sheet-dialog-compact-padding": props.compactPadding,
+  };
+  if (props.desktopHeight) {
+    tokens["--sheet-dialog-desktop-height"] = props.desktopHeight;
+  }
+  return tokens;
+});
 let opener: HTMLElement | null = null;
 let fallbackFocusTarget: HTMLElement | null = null;
 
@@ -117,16 +157,18 @@ onBeforeUnmount(() => {
   <dialog
     ref="dialog"
     class="sheet-dialog"
+    :style="layoutTokens"
     tabindex="0"
-    :aria-labelledby="resolvedTitleID"
-    :aria-describedby="description || compactDescription ? `${resolvedTitleID}-description` : undefined"
+    :aria-labelledby="hideHeader ? undefined : resolvedTitleID"
+    :aria-label="hideHeader ? ariaLabel || title : undefined"
+    :aria-describedby="!hideHeader && (description || compactDescription) ? `${resolvedTitleID}-description` : undefined"
     aria-modal="true"
     @cancel="handleCancel"
     @close="handleNativeClose"
     @click="handleBackdropClick"
   >
     <form class="sheet-dialog__surface" method="dialog" @click.stop>
-      <header class="sheet-dialog__header">
+      <header v-if="!hideHeader" class="sheet-dialog__header">
         <div>
           <h2 :id="resolvedTitleID" tabindex="-1" data-dialog-autofocus>
             <span class="sheet-dialog__desktop-copy">{{ title }}</span>
@@ -134,7 +176,7 @@ onBeforeUnmount(() => {
           </h2>
           <p v-if="description || compactDescription" :id="`${resolvedTitleID}-description`">
             <span class="sheet-dialog__desktop-copy">{{ description }}</span>
-            <span class="sheet-dialog__compact-copy">{{ compactDescription || description }}</span>
+            <span v-if="!hideCompactDescription" class="sheet-dialog__compact-copy">{{ compactDescription || description }}</span>
           </p>
         </div>
         <slot name="header-action">
@@ -163,7 +205,7 @@ onBeforeUnmount(() => {
 @use "../../assets/scss/api" as api;
 
 .sheet-dialog {
-  width: min(42rem, calc(100% - 1rem));
+  width: var(--sheet-dialog-width, min(var(--sheet-dialog-max-width, 42rem), calc(100% - 1rem)));
   max-width: none;
   max-height: min(90dvh, 52rem);
   border: 1px solid var(--color-line);
@@ -179,10 +221,13 @@ onBeforeUnmount(() => {
 
 .sheet-dialog__surface {
   display: grid;
-  gap: var(--space-4);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--sheet-dialog-desktop-gap, var(--space-4));
+  min-height: var(--sheet-dialog-desktop-height, auto);
+  box-sizing: border-box;
   max-height: min(90dvh, 52rem);
   overflow: auto;
-  padding: var(--space-4);
+  padding: var(--sheet-dialog-desktop-padding, var(--space-4));
 }
 
 .sheet-dialog__header {
@@ -199,28 +244,41 @@ onBeforeUnmount(() => {
 
 .sheet-dialog__header h2,
 .sheet-dialog__header p {
+  border: 0;
   margin: 0;
+  background: transparent;
+}
+
+.sheet-dialog__header h2 {
+  font-size: 20px;
+  line-height: 24px;
 }
 
 .sheet-dialog__compact-copy { display: none; }
 
-.sheet-dialog__header [data-dialog-autofocus]:focus {
-  outline: none;
+.sheet-dialog__header [data-dialog-autofocus]:focus,
+.sheet-dialog__header [data-dialog-autofocus]:focus-visible {
+  outline: none !important;
+  box-shadow: none;
 }
 
 .sheet-dialog__header p {
   max-width: 56ch;
   margin-top: var(--space-2);
   color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .sheet-dialog__close {
   @include api.touch-target;
   flex: 0 0 auto;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-control);
+  min-width: 110px;
+  min-height: 52px;
+  border: 1px solid var(--color-accent-strong);
+  border-radius: 14px;
   padding: .5rem .7rem;
-  color: var(--color-text);
+  color: var(--color-accent-strong);
   background: transparent;
   font: inherit;
   cursor: pointer;
@@ -243,17 +301,30 @@ onBeforeUnmount(() => {
 
 @media (width <= 1023px) {
   .sheet-dialog {
-    width: min(560px, calc(100% - 24px));
-    max-height: min(470px, calc(100dvh - 24px));
+    width: var(--sheet-dialog-compact-width, min(var(--sheet-dialog-compact-max-width, 560px), calc(100% - 24px)));
+    max-height: min(var(--sheet-dialog-compact-height, 470px), calc(100dvh - 24px));
     margin: auto auto max(12px, env(safe-area-inset-bottom, 0px));
     border-radius: 24px;
   }
 
   .sheet-dialog__surface {
-    min-height: min(470px, calc(100dvh - 24px));
-    max-height: min(470px, calc(100dvh - 24px));
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--sheet-dialog-compact-gap, var(--space-4));
+    min-height: min(var(--sheet-dialog-compact-height, 470px), calc(100dvh - 24px));
+    max-height: min(var(--sheet-dialog-compact-height, 470px), calc(100dvh - 24px));
     box-sizing: border-box;
-    padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    padding: var(--sheet-dialog-compact-padding, 16px 16px calc(36px + env(safe-area-inset-bottom, 0px)));
+  }
+
+  .sheet-dialog__header { padding-top: 4px; }
+
+  .sheet-dialog__close {
+    min-width: 70px;
+    min-height: 44px;
+    margin-top: -10px;
+    border-color: var(--color-status-warning);
+    color: var(--color-status-warning);
+    padding: 0;
   }
 
   .sheet-dialog__desktop-copy { display: none; }
@@ -264,7 +335,7 @@ onBeforeUnmount(() => {
 
 @media (width <= 599px) {
   .sheet-dialog {
-    width: 100%;
+    width: var(--sheet-dialog-mobile-width, 100%);
     margin: auto 0 0;
     border-right: 0;
     border-bottom: 0;

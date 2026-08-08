@@ -137,6 +137,9 @@ function continueFlow(): void {
     :description="description"
     :compact-description="description"
     :dismissible="false"
+    desktop-width="1120px"
+    compact-gap="2px"
+    data-figma-owner="game-modal:charity"
     data-figma-desktop-node="256:316"
     data-figma-compact-node="147:978"
     @close="emit('close')"
@@ -200,7 +203,7 @@ function continueFlow(): void {
 </template>
 
 <style scoped lang="scss">
-:deep(.charity-dialog) { width: min(768px, calc(100% - 24px)); }
+:deep(.charity-dialog) { --sheet-dialog-width: min(768px, calc(100% - 24px)); width: min(768px, calc(100% - 24px)); }
 :deep(.charity-dialog .sheet-dialog__surface) { min-height: 502px; box-sizing: border-box; }
 :deep(.charity-dialog .sheet-dialog__header p) { white-space: pre-line; }
 .charity-sheet { min-width: 0; display: grid; gap: 14px; }
@@ -220,12 +223,13 @@ function continueFlow(): void {
 
 @media (width < 1024px) {
   :deep(.charity-dialog) { width: min(560px, calc(100% - 24px)); max-height: min(470px, calc(100dvh - 24px)); }
-  :deep(.charity-dialog .sheet-dialog__surface) { min-height: min(470px, calc(100dvh - 24px)); max-height: min(470px, calc(100dvh - 24px)); padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .charity-sheet { height: 100%; }
   .charity-sheet__rail { width: 100%; min-height: 218px; justify-content: start; gap: 12px; box-sizing: border-box; padding: 0; }
   .charity-sheet__recipients { min-height: 218px; max-height: 218px; }
   .charity-sheet__recipients > div { align-items: start; flex-direction: column; }
   .charity-sheet__recipients > div > div { justify-content: start; }
   .charity-sheet__submit { width: 100%; margin-top: auto; }
+  .charity-sheet__timer { margin-top: -10px; }
 }
 
 @media (width < 600px) {

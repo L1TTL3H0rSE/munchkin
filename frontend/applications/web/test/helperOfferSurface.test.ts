@@ -25,15 +25,15 @@ describe("combat helper offer model", () => {
 
     expect(isCombatantHelperOffer(interaction)).toBe(true);
     expect(options).toEqual([
-      {helperPlayerID: "player_1", rewardTreasures: [1, 2]},
+      {helperPlayerID: "player_1", rewardTreasures: [1]},
       {helperPlayerID: "player_2", rewardTreasures: [1]},
     ]);
-    expect(helperRewardsFor(options, "player_1")).toEqual([1, 2]);
-    expect(helperOfferAction(interaction.actions, "player_1", 2)?.action_id)
-      .toBe("act_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+    expect(helperRewardsFor(options, "player_1")).toEqual([1]);
+    expect(helperOfferAction(interaction.actions, "player_1", 1)?.action_id)
+      .toBe("act_dddddddddddddddddddddddddddddddd");
     expect(helperOfferAction(interaction.actions, "player_1", 9))
       .toBeUndefined();
-    expect(projectedPlayerName(projection, "player_1")).toBe("Борис");
+    expect(projectedPlayerName(projection, "player_1")).toBe("Лена");
   });
 
   it("shows invited party terms only when the projection supplies them", () => {
@@ -48,7 +48,7 @@ describe("combat helper offer model", () => {
       helper_player_id: "player_hero",
       reward_treasures: 2,
     });
-    expect(projectedPlayerName(invited, invited.turn.player_id)).toBe("Борис");
+    expect(projectedPlayerName(invited, invited.turn.player_id)).toBe("Лена");
 
     const observer = fixtures.getProjection("helper-observer");
     expect(isInvitedHelperOffer(observer.interaction)).toBe(false);
@@ -60,8 +60,8 @@ describe("combat helper offer model", () => {
     const projection = fixtures.getProjection("helper-accepted");
 
     expect(acceptedCombatHelper(projection)).toEqual({
-      helperPlayerID: "player_hero",
-      rewardTreasures: 2,
+      helperPlayerID: "player_2",
+      rewardTreasures: 1,
     });
     expect(projection.interaction).toBeUndefined();
   });

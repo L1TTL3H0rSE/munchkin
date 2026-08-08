@@ -17,10 +17,6 @@ import SystemStateSurface from "./SystemStateSurface.vue";
 .loading-game-table {
   min-height: 100svh;
   min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  padding: 24px;
   background: var(--color-canvas);
 }
 </style>

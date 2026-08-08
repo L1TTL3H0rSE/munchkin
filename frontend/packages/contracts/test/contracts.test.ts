@@ -2,6 +2,7 @@ import {readFileSync} from "node:fs";
 import {describe, expect, it} from "vitest";
 import {
   actionViewSchema,
+  cardViewSchema,
   combatHelpRequestSchema,
   combatResolutionRequestSchema,
   economyOfferRequestSchema,
@@ -113,6 +114,30 @@ const projection = {
 };
 
 describe("wire contracts", () => {
+  it("keeps Bad Stuff as bounded monster-only presentation copy", () => {
+    const monster = {
+      instance_id: "monster-1",
+      definition_id: "monster",
+      name: "Монстр",
+      deck: "door",
+      kind: "monster",
+      bad_stuff_text: "Потеряй 1 уровень.",
+    };
+
+    expect(cardViewSchema.parse(monster).bad_stuff_text).toBe("Потеряй 1 уровень.");
+    expect(cardViewSchema.parse({...monster, bad_stuff_text: undefined}).bad_stuff_text)
+      .toBeUndefined();
+    expect(() => cardViewSchema.parse({...item, bad_stuff_text: "Сбрось карту."}))
+      .toThrow();
+    expect(() => cardViewSchema.parse({...monster, bad_stuff_text: "   "})).toThrow();
+    expect(() => cardViewSchema.parse({...monster, bad_stuff_text: "я".repeat(401)}))
+      .toThrow();
+    expect(cardViewSchema.parse({...monster, bad_stuff_text: "😀".repeat(400)}).bad_stuff_text)
+      .toHaveLength(800);
+    expect(() => cardViewSchema.parse({...monster, bad_stuff_text: "😀".repeat(401)}))
+      .toThrow();
+  });
+
   it("accepts the privacy-safe Go projection shape", () => {
     const parsed = projectionSchema.parse(projection);
     expect(parsed.you.hand).toHaveLength(1);

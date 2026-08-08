@@ -19,6 +19,14 @@ export const canonicalViewports = {
 } as const;
 
 export type PresenterKind = "mobile" | "desktop";
+export type FixtureTransportScenario =
+  | "healthy"
+  | "loading"
+  | "auth"
+  | "unavailable"
+  | "reconnecting"
+  | "connection-failed"
+  | "stale-choice";
 
 export async function activePresenter(
   page: Page,
@@ -39,6 +47,7 @@ export async function activePresenter(
 export async function installFixture(
   page: Page,
   fixtureID: string,
+  scenario: FixtureTransportScenario = "healthy",
 ): Promise<UiFixtureDefinition> {
   const fixture = fixtureAdapter.get(fixtureID);
   const projection = fixtureAdapter.getProjection(fixtureID);
@@ -50,7 +59,7 @@ export async function installFixture(
     reason: projection.turn.available_actions[0]?.type ?? "join",
   };
 
-  await page.addInitScript(({gameID, credential, invalidation: fixtureInvalidation}) => {
+  await page.addInitScript(({gameID, credential, invalidation: fixtureInvalidation, transportScenario}) => {
     sessionStorage.setItem(`munchkin:credential:${gameID}`, credential);
     const nativeFetch = window.fetch.bind(window);
     window.fetch = async (input, init) => {
@@ -63,6 +72,10 @@ export async function installFixture(
 
       const stream = new ReadableStream<Uint8Array>({
         start(controller) {
+          if (transportScenario === "reconnecting" || transportScenario === "connection-failed") {
+            window.setTimeout(() => controller.error(new TypeError("fixture disconnect")), 40);
+            return;
+          }
           controller.enqueue(new TextEncoder().encode(
             `data: ${JSON.stringify(fixtureInvalidation)}\n\n`,
           ));
@@ -76,9 +89,38 @@ export async function installFixture(
         headers: {"Content-Type": "text/event-stream"},
       });
     };
-  }, {gameID: projection.game_id, credential: fixtureCredential, invalidation});
+    Math.random = () => 0;
+  }, {
+    gameID: projection.game_id,
+    credential: fixtureCredential,
+    invalidation,
+    transportScenario: scenario,
+  });
 
+  let getCount = 0;
   await page.route("**/api/v1/games/**", async (route) => {
+    const request = route.request();
+    if (request.method() === "GET" && !new URL(request.url()).pathname.endsWith("/events")) {
+      getCount++;
+      if (scenario === "loading" && getCount === 1) return;
+      if (scenario === "auth" && getCount === 1) {
+        await route.fulfill({status: 401, contentType: "application/json", body: JSON.stringify({error: true, code: "unauthorized", message: "session lost"})});
+        return;
+      }
+      if (scenario === "unavailable") {
+        await route.fulfill({status: 500, contentType: "application/json", body: JSON.stringify({error: true, code: "temporary", message: "game unavailable"})});
+        return;
+      }
+      if (scenario === "reconnecting" && getCount > 1) return;
+      if (scenario === "connection-failed" && getCount > 1) {
+        await route.fulfill({status: 500, contentType: "application/json", body: JSON.stringify({error: true, code: "temporary", message: "offline"})});
+        return;
+      }
+    }
+    if (scenario === "stale-choice" && request.method() === "POST") {
+      await route.fulfill({status: 409, contentType: "application/json", body: JSON.stringify({error: true, code: "version_conflict", message: "choice is stale"})});
+      return;
+    }
     await fulfillGameRoute(route, projection);
   });
 
@@ -153,6 +195,17 @@ export async function openFixture(
   await expect(page.locator(".game-table")).toBeVisible({timeout: 15_000});
   await expect(page.locator(".center-state")).toHaveCount(0);
   await activePresenter(page);
+  return fixture;
+}
+
+export async function openTransportFixture(
+  page: Page,
+  fixtureID: string,
+  scenario: Exclude<FixtureTransportScenario, "healthy">,
+): Promise<UiFixtureDefinition> {
+  const fixture = await installFixture(page, fixtureID, scenario);
+  await page.goto(`/game/${encodeURIComponent(fixture.projection.game_id)}`);
+  await expect(page.locator("#main-content")).toBeVisible();
   return fixture;
 }
 

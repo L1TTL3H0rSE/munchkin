@@ -5,12 +5,14 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/leinodev/munchkin/backend/game/internal/game"
@@ -85,6 +87,26 @@ func (service *Service) SetTelemetry(recorder telemetry.Recorder) {
 		recorder = telemetry.Noop()
 	}
 	service.telemetry = recorder
+}
+
+// SetDeterministicRandomForTesting replaces entropy only for explicitly
+// test-owned server processes. Production callers must keep crypto/rand.
+func (service *Service) SetDeterministicRandomForTesting(seed uint64) {
+	var mutex sync.Mutex
+	var counter uint64
+	service.random = func(buffer []byte) error {
+		mutex.Lock()
+		defer mutex.Unlock()
+		for offset := 0; offset < len(buffer); {
+			var input [16]byte
+			binary.BigEndian.PutUint64(input[:8], seed)
+			binary.BigEndian.PutUint64(input[8:], counter)
+			counter++
+			digest := sha256.Sum256(input[:])
+			offset += copy(buffer[offset:], digest[:])
+		}
+		return nil
+	}
 }
 
 func (service *Service) observeInteraction(

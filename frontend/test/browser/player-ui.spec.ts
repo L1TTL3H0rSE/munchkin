@@ -94,6 +94,17 @@ const responsiveViewports = [
   {width: 1920, height: 1080},
 ] as const;
 
+const exactBoundaryWidths = [
+  373, 374, 375,
+  426, 427, 428,
+  598, 599, 600,
+  766, 767, 768,
+  1022, 1023, 1024,
+  1278, 1279, 1280,
+  1438, 1439, 1440,
+  1899, 1900, 1901,
+] as const;
+
 for (const viewport of responsiveViewports) {
   test(`${viewport.width}x${viewport.height} stays playable without horizontal escape`, async ({page}) => {
     await openFixtureAtViewport(page, "full-roster-combat", viewport.width, viewport.height);
@@ -135,6 +146,73 @@ for (const viewport of responsiveViewports) {
   });
 }
 
+for (const width of exactBoundaryWidths) {
+  test(`${width}px boundary keeps dense, multi-action, and open-sheet states contained`, async ({page}) => {
+    for (const fixtureID of ["full-roster-long-copy", "card-action-rail"] as const) {
+      await openFixtureAtViewport(page, fixtureID, width, 900);
+      await assertNoRootOverflow(page);
+      await assertNoDocumentVerticalOverflow(page);
+      await expectHorizontalContainment(page, await activePresenter(page, width < 1024 ? "mobile" : "desktop"));
+    }
+
+    await openFixtureAtViewport(page, "full-roster-combat", width, 900);
+    const opener = width < 1024
+      ? page.locator(".mobile-game-table__dock").getByRole("button", {name: "Персонаж", exact: true})
+      : page.locator(".game-table__character");
+    await opener.click();
+    const dialog = page.locator("dialog[open]");
+    await expect(dialog).toBeVisible();
+    await expectHorizontalContainment(page, dialog);
+    await assertNoRootOverflow(page);
+  });
+}
+
+for (const viewport of [
+  {width: 360, height: 640},
+  {width: 428, height: 926},
+  {width: 600, height: 900},
+  {width: 768, height: 1024},
+  {width: 1023, height: 768},
+  {width: 1024, height: 768},
+  {width: 1280, height: 720},
+  {width: 1400, height: 900},
+  {width: 1920, height: 1080},
+] as const) {
+  test(`next-monster choice stays selectable at ${viewport.width}x${viewport.height}`, async ({page}) => {
+    await openFixtureAtViewport(
+      page,
+      "run-away-next-monster",
+      viewport.width,
+      viewport.height,
+    );
+    await assertNoRootOverflow(page);
+    if (viewport.width < 1024) {
+      const dialog = page.locator("dialog[data-figma-owner='game-modal:run-away-next'][open]");
+      await expectHorizontalContainment(page, dialog);
+      const confirm = dialog.getByRole("button", {name: "Подтвердить", exact: true});
+      await expect(confirm).toBeDisabled();
+      await dialog.getByRole("button", {name: /Сторожевой слизень/}).click();
+      await expect(confirm).toBeEnabled();
+      const dock = page.locator(".mobile-game-table__dock");
+      await expect(dock).toBeVisible();
+      expect(await dock.evaluate((element) => getComputedStyle(element).position)).toBe("fixed");
+    } else {
+      const surface = page.locator(".game-table__run-away-next");
+      await expectHorizontalContainment(page, surface);
+      const confirm = page.locator(".game-table__action-panel")
+        .getByRole("button", {name: "Подтвердить", exact: true});
+      await expect(confirm).toBeDisabled();
+      await surface.getByRole("button", {name: /Костяной курьер/}).click();
+      await expect(confirm).toBeEnabled();
+      await expectNoIntersections([
+        page.locator(".game-table__opponents"),
+        page.locator(".game-table__stage"),
+        page.locator(".game-table__sidebar"),
+      ]);
+    }
+  });
+}
+
 test("360x640 keeps the canonical compact frame and bottom safe padding", async ({page}) => {
   await openFixtureAtViewport(page, "full-roster-combat", 360, 640);
   const presenter = await activePresenter(page, "mobile");
@@ -163,7 +241,7 @@ for (const [fixtureID, count] of [
 
 test("door choice exposes loot and the exact hand monster instead of open-door again", async ({page}) => {
   await openFixtureAtViewport(page, "single-door-choice", 360, 640);
-  await expect(page.getByRole("button", {name: "Обыскать комнату", exact: true})).toBeVisible();
+  await expect(page.getByRole("button", {name: "Обчистить комнату", exact: true})).toBeVisible();
   await page.getByRole("button", {name: /Рука ·/}).click();
   const dialog = page.locator("dialog[open]");
   await expect(dialog).toHaveCount(1);
@@ -171,16 +249,74 @@ test("door choice exposes loot and the exact hand monster instead of open-door a
   await expect(dialog).toContainText("Монстр из руки");
   await dialog.getByRole("option").filter({hasText: "Монстр из руки"}).click();
   await expect(dialog.getByRole("button", {name: "Искать неприятности", exact: true})).toBeVisible();
-  await expect(page.getByRole("button", {name: "Вышибить дверь", exact: true})).toHaveCount(0);
+  await expect(page.getByRole("button", {name: "Открыть дверь", exact: true})).toHaveCount(0);
 });
 
 test("run-away actor gets the explicit server-roll action", async ({page}) => {
   await openFixtureAtViewport(page, "single-run-away", 360, 640);
   const dialog = page.locator("dialog[open]");
   await expect(dialog).toHaveCount(1);
-  await expect(dialog.getByRole("button", {name: "Бросить на смывку", exact: true})).toBeVisible();
+  await expect(dialog.getByRole("button", {name: "Бросить кубик", exact: true})).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(1);
+});
+
+test("run-away sheet keeps its Figma width tokens across compact viewports", async ({page}) => {
+  for (const viewport of [
+    {width: 600, height: 900, expectedWidth: 560},
+    {width: 360, height: 640, expectedWidth: 360},
+  ]) {
+    await openFixtureAtViewport(page, "single-run-away", viewport.width, viewport.height);
+    const dialog = page.locator("dialog[open]");
+    const box = await visibleBox(dialog);
+    expect(box.width).toBe(viewport.expectedWidth);
+  }
+});
+
+test("run-away is an inline Figma board on desktop and not a modal overlay", async ({page}) => {
+  await openFixtureAtViewport(page, "single-run-away", 1440, 900);
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  const surface = page.locator(".game-table__run-away");
+  await expect(surface).toHaveAttribute("data-figma-desktop-node", "285:1473");
+  await expect(surface.getByText("Архивная пыль", {exact: true})).toBeVisible();
+  await expect(page.locator(".game-table__action-panel")
+    .getByRole("button", {name: "Бросить кубик", exact: true})).toBeVisible();
+});
+
+test("confirmed run-away results never remount the removed generic summary", async ({page}) => {
+  for (const state of [
+    {fixtureID: "run-away-success", desktopNode: "294:1998"},
+    {fixtureID: "run-away-result", desktopNode: "294:1998"},
+  ]) {
+    await openFixtureAtViewport(page, state.fixtureID, 1440, 900);
+    await expect(await activePresenter(page, "desktop"))
+      .toHaveAttribute("data-figma-desktop-node", state.desktopNode);
+    await expect(page.locator(".interaction-surface")).toHaveCount(0);
+    await expect(page.locator(".run-away-summary")).toHaveCount(0);
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+
+    await openFixtureAtViewport(page, state.fixtureID, 360, 640);
+    await expect(await activePresenter(page, "mobile"))
+      .toHaveAttribute("data-figma-compact-node", "unverified");
+    await expect(page.locator(".interaction-surface")).toHaveCount(0);
+    await expect(page.locator(".run-away-summary")).toHaveCount(0);
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+  }
+});
+
+test("finished-game results control reveals the authoritative player table", async ({page}) => {
+  await openFixtureAtViewport(page, "victory-six-player", 1440, 900);
+  const panel = page.locator(".game-table__action-panel");
+  const control = panel.locator("button.game-table__desktop-action");
+
+  await expect(page.locator("#desktop-final-results")).toHaveCount(0);
+  await expect(control).toHaveAccessibleName("Открыть итоги");
+  await control.click();
+  await expect(control).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("#desktop-final-results")).toBeVisible();
+  await expect(page.locator("#desktop-final-results li")).toHaveCount(4);
+  await expect(page.locator("#desktop-final-results")).toContainText("Победитель");
+  await expect(panel.getByRole("button", {name: "Скрыть итоги", exact: true})).toBeVisible();
 });
 
 test("character, opponent and strength sheets use their exact desktop and compact owners", async ({page}) => {
@@ -264,6 +400,40 @@ test("mandatory discard reuses charity sheet and has no recipient controls", asy
   await expect(dialog).toContainText("Рука 7 / 5");
   await expect(dialog.locator(".charity-sheet__recipients")).toHaveCount(0);
   await expect(dialog.locator("input, select")).toHaveCount(0);
+});
+
+test("resolve-effect choice is a non-dismissible Figma-owned server action", async ({page}) => {
+  await openFixtureAtViewport(page, "target-private-choice", 360, 640);
+  const dialog = page.locator("dialog[open]");
+  await expect(dialog).toHaveAttribute("data-figma-owner", "game-modal:mandatory-effect");
+  await expect(dialog).toHaveAttribute("data-figma-desktop-node", "296:2748");
+  await expect(dialog).toHaveAttribute("data-figma-compact-node", "188:1777");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(1);
+  await dialog.getByRole("option").first().click();
+  await expect(dialog.getByRole("button", {name: "Подтвердить выбор", exact: true})).toBeEnabled();
+});
+
+test("death loot is inline on desktop, a compact sheet on mobile, and opaque to observers", async ({page}) => {
+  await openFixtureAtViewport(page, "death-loot", 1440, 900);
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  const desktopSurface = page.locator(".game-table__death-loot");
+  await expect(desktopSurface).toHaveAttribute("data-figma-desktop-node", "295:2355");
+  await expect(desktopSurface.getByRole("option")).toHaveCount(3);
+  await expect(page.locator(".game-table__action-panel").getByRole("button", {name: "Забрать карту", exact: true})).toBeVisible();
+
+  await openFixtureAtViewport(page, "death-loot", 360, 640);
+  const compactDialog = page.locator("dialog[open]");
+  await expect(compactDialog).toHaveAttribute("data-figma-compact-node", "177:130");
+  await expect(compactDialog.getByRole("heading", {name: "Добыча после смерти", exact: true})).toBeVisible();
+  await expect(compactDialog.locator("time")).toHaveText(/\d{2}:\d{2}/);
+  await expect(compactDialog.getByRole("button", {name: "Пас", exact: true})).toBeVisible();
+  await expect(compactDialog.getByRole("button", {name: "Забрать выбранную карту", exact: true})).toBeDisabled();
+  await expect(compactDialog.locator("input[type=checkbox]")).toHaveCount(0);
+
+  await openFixtureAtViewport(page, "death-loot-observer", 1440, 900);
+  await expect(page.locator(".game-table__death-loot, dialog[open]")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText("Плащ обходчика");
 });
 
 test("forbidden legacy and machine copy is absent from desktop and compact trees", async ({page}) => {
