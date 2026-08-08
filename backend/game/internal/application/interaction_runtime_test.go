@@ -1650,6 +1650,44 @@ func newTwoPlayerRuntimeFixture(
 				domainEvents,
 				start,
 			)
+			if step.command.Type == game.CommandFinishSetup {
+				playerIndex := candidate.PlayerIndex(step.command.ActorID)
+				if playerIndex >= 0 &&
+					candidate.Players[playerIndex].SetupDiscardPending {
+					projection, err := game.ProjectForActor(
+						candidate,
+						step.command.ActorID,
+						pack,
+					)
+					if err != nil {
+						t.Fatal(err)
+					}
+					descriptor := projection.Turn.AvailableActions[0]
+					discardEvents, err := game.Handle(
+						candidate,
+						game.Command{
+							Type:    game.CommandResolveCharity,
+							ActorID: step.command.ActorID,
+							InstanceIDs: append(
+								[]string(nil),
+								descriptor.InstanceIDs[:descriptor.Minimum]...,
+							),
+						},
+						pack,
+					)
+					if err != nil {
+						t.Fatal(err)
+					}
+					candidate, candidateEvents = applyRuntimeEvents(
+						t,
+						candidate,
+						candidateEvents,
+						step.id+"-discard",
+						discardEvents,
+						start,
+					)
+				}
+			}
 		}
 		if pack.Source == "economy-runtime-test" ||
 			pack.Source == "charity-runtime-test" {
@@ -2210,9 +2248,12 @@ func TestCharityRuntimeManualAndTimeoutUseStableAllocation(t *testing.T) {
 			for index := range allocations {
 				allocations[index] = game.CharityAllocation{
 					InstanceID: view.CharityTransfer.InstanceIDs[index],
-					RecipientPlayerID: view.CharityTransfer.EligibleRecipientIDs[index%len(
-						view.CharityTransfer.EligibleRecipientIDs,
-					)],
+				}
+				if len(view.CharityTransfer.EligibleRecipientIDs) > 0 {
+					allocations[index].RecipientPlayerID =
+						view.CharityTransfer.EligibleRecipientIDs[index%len(
+							view.CharityTransfer.EligibleRecipientIDs,
+						)]
 				}
 			}
 			resolved, err := fixture.service.ResolveCharity(
@@ -2634,6 +2675,39 @@ func newDeathLootApplicationFixture(t *testing.T) deathLootApplicationFixture {
 			events,
 			start,
 		)
+		if step.command.Type == game.CommandFinishSetup {
+			playerIndex := state.PlayerIndex(step.command.ActorID)
+			if playerIndex >= 0 && state.Players[playerIndex].SetupDiscardPending {
+				projection, err := game.ProjectForActor(
+					state,
+					step.command.ActorID,
+					pack,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				descriptor := projection.Turn.AvailableActions[0]
+				events, err := game.Handle(state, game.Command{
+					Type:    game.CommandResolveCharity,
+					ActorID: step.command.ActorID,
+					InstanceIDs: append(
+						[]string(nil),
+						descriptor.InstanceIDs[:descriptor.Minimum]...,
+					),
+				}, pack)
+				if err != nil {
+					t.Fatal(err)
+				}
+				state, envelopes = applyRuntimeEvents(
+					t,
+					state,
+					envelopes,
+					step.id+"-discard",
+					events,
+					start,
+				)
+			}
+		}
 	}
 	deadIndex := state.PlayerIndex("player-b")
 	if deadIndex < 0 || len(state.Players[deadIndex].Hand) < 2 {

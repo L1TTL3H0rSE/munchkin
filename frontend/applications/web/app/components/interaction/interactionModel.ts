@@ -6,12 +6,6 @@ import type {
 
 export type InteractionActionView = InteractionView["actions"][number];
 
-const dismissingActionTypes = new Set<InteractionActionView["type"]>([
-  "pass",
-  "cancel_offer",
-  "cancel_help",
-]);
-
 const acceptedIntentTypes = new Set<InteractionActionView["type"]>([
   "pass",
   "respond",
@@ -94,9 +88,7 @@ export function interactionRevisionKey(
 export function interactionCanDismiss(
   interaction: InteractionView,
 ): boolean {
-  return !interaction.response_required_for_you ||
-    interaction.actions.length === 0 ||
-    interaction.actions.some((action) => dismissingActionTypes.has(action.type));
+  return !interaction.response_required_for_you || interaction.actions.length === 0;
 }
 
 export function interactionIsTerminal(

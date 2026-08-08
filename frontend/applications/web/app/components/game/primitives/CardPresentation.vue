@@ -1,25 +1,14 @@
 <script setup lang="ts">
 import type {CardView} from "@munchkin/contracts";
-import CardArtPlaceholder from "./CardArtPlaceholder.vue";
-import CardFrame from "./CardFrame.vue";
 
 defineOptions({inheritAttrs: false});
 
 const props = withDefaults(defineProps<{
   card: CardView;
-  choice?: boolean;
-  compact?: boolean;
-  encounter?: boolean;
-  encounterPeekSide?: "previous" | "next";
+  variant: "choice" | "encounter";
   imageUrl?: string;
-  showMeta?: boolean;
 }>(), {
-  choice: false,
-  compact: false,
-  encounter: false,
-  encounterPeekSide: undefined,
   imageUrl: "",
-  showMeta: false,
 });
 
 const encounterTitle = computed(() =>
@@ -29,19 +18,21 @@ const encounterTitle = computed(() =>
 );
 
 const choiceKind = computed(() => {
-  if (props.card.kind === "one_shot") {
-    return "Одноразовая";
+  switch (props.card.kind) {
+    case "one_shot": return "Одноразовая";
+    case "item": return props.card.item_size === "big" ? "Большая вещь" : "Вещь";
+    case "monster": return "Монстр";
+    case "curse": return "Проклятие";
+    case "class": return "Класс";
+    case "race": return "Раса";
+    case "trait_attachment": return "Усиление";
+    case "level_up": return "Новый уровень";
+    case "cheat": return "Исключение";
+    default: {
+      const exhaustive: never = props.card.kind;
+      return exhaustive;
+    }
   }
-  if (props.card.kind === "item") {
-    return props.card.item_size === "big" ? "Большая вещь" : "Вещь";
-  }
-  if (props.card.kind === "monster") {
-    return "Монстр";
-  }
-  if (props.card.kind === "curse") {
-    return "Проклятие";
-  }
-  return props.card.kind.replaceAll("_", " ");
 });
 
 const choiceMeta = computed(() => [
@@ -52,39 +43,9 @@ const choiceMeta = computed(() => [
 
 <template>
   <article
-    v-if="encounterPeekSide"
-    v-bind="$attrs"
-    class="card-presentation encounter-peek"
-    :data-side="encounterPeekSide"
-    :data-kind="card.kind"
-    data-figma-node="99:18"
-    :aria-label="card.name"
-  >
-    <div class="encounter-peek__art">
-      <img
-        v-if="imageUrl"
-        class="encounter-peek__image"
-        :src="imageUrl"
-        :alt="card.alt_text || card.name"
-      >
-      <span
-        v-if="card.kind === 'monster' && card.combat_strength !== undefined"
-        class="encounter-peek__level"
-      >
-        {{ card.combat_strength }}
-      </span>
-      <h3 class="encounter-peek__title">{{ encounterTitle }}</h3>
-    </div>
-    <div class="encounter-peek__body">
-      Открой карту, чтобы прочитать правила.
-    </div>
-  </article>
-
-  <article
-    v-else-if="encounter"
+    v-if="variant === 'encounter'"
     v-bind="$attrs"
     class="card-presentation encounter-card-presentation"
-    :class="{'card-frame--compact': compact}"
     :data-kind="card.kind"
     data-figma-node="96:30"
     :aria-label="card.name"
@@ -126,7 +87,7 @@ const choiceMeta = computed(() => [
   </article>
 
   <article
-    v-else-if="choice"
+    v-else
     v-bind="$attrs"
     class="card-presentation choice-card-presentation"
     :data-kind="card.kind"
@@ -147,127 +108,11 @@ const choiceMeta = computed(() => [
       <p class="choice-card-presentation__meta">{{ choiceMeta }}</p>
       <p v-if="card.rules_text">{{ card.rules_text }}</p>
     </div>
-    <slot name="actions" />
   </article>
 
-  <CardFrame
-    v-else
-    v-bind="$attrs"
-    class="card-presentation"
-    :deck="card.deck"
-    :kind="card.kind"
-    :compact="compact"
-    :aria-label="card.name"
-  >
-    <template v-if="showMeta || $slots.actions" #header>
-      <header class="card-presentation__header">
-        <div v-if="showMeta" class="card-presentation__meta">
-          <span>{{ card.deck === "door" ? "Дверь" : "Сокровище" }}</span>
-          <small>{{ card.kind.replaceAll("_", " ") }}</small>
-        </div>
-        <slot name="actions" />
-      </header>
-    </template>
-    <template #art>
-      <img v-if="imageUrl" class="card-presentation__image" :src="imageUrl" :alt="card.alt_text || card.name">
-      <CardArtPlaceholder v-else :label="`Иллюстрация для карты «${card.name}» пока не создана`" />
-    </template>
-    <div class="card-presentation__copy game-card__copy">
-      <h3 class="card-presentation__name game-card__name">{{ card.name }}</h3>
-      <div v-if="card.combat_strength || card.bonus || card.value !== undefined" class="card-presentation__stats game-card__stats">
-        <span v-if="card.combat_strength">Сила {{ card.combat_strength }}</span>
-        <span v-if="card.bonus">Бонус +{{ card.bonus }}</span>
-        <span v-if="card.value !== undefined">{{ card.value }} голдов</span>
-      </div>
-      <p v-if="card.rules_text" class="card-presentation__rules game-card__rules">{{ card.rules_text }}</p>
-    </div>
-  </CardFrame>
 </template>
 
 <style scoped lang="scss">
-.encounter-peek {
-  position: relative;
-  width: 208px;
-  height: 330px;
-  min-height: 330px;
-  overflow: hidden;
-  box-sizing: border-box;
-  border: 2px solid var(--color-border-card);
-  border-radius: 16px;
-  color: var(--color-text-primary);
-  background: var(--color-surface-card, #fff9ef);
-  box-shadow: 0 7px 18px rgb(59 46 40 / 14%);
-}
-
-.encounter-peek__art {
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  width: 208px;
-  height: 198px;
-  overflow: hidden;
-  background: linear-gradient(112.22deg, #c8d7cf 2%, #879a92 102%);
-}
-
-.encounter-peek__image { width: 100%; height: 100%; display: block; object-fit: cover; }
-.encounter-peek__level {
-  position: absolute;
-  z-index: 2;
-  top: 14px;
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  border: 2px solid var(--color-border-card);
-  border-radius: 999px;
-  color: var(--color-action-response);
-  background: var(--color-surface-card, #fff9ef);
-  font-family: var(--font-meta);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 24px;
-}
-.encounter-peek[data-side="previous"] .encounter-peek__level { left: 166px; }
-.encounter-peek[data-side="next"] .encounter-peek__level { left: 10px; }
-.encounter-peek__title {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  box-sizing: border-box;
-  margin: 0;
-  overflow: hidden;
-  padding: 0 14px;
-  color: #fff;
-  background: rgb(40 49 46 / 82%);
-  font-family: var(--font-card);
-  font-size: 19px;
-  font-weight: 600;
-  line-height: 24px;
-  white-space: nowrap;
-}
-.encounter-peek[data-kind="curse"] .encounter-peek__title { background: var(--color-danger, #9a463d); }
-.encounter-peek__body {
-  position: absolute;
-  top: 196px;
-  left: -2px;
-  width: 208px;
-  height: 132px;
-  box-sizing: border-box;
-  overflow: hidden;
-  padding: 14px;
-  color: var(--color-text-secondary);
-  background: var(--color-surface-card, #fff9ef);
-  font-family: var(--font-card);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 16px;
-}
-
 .encounter-card-presentation {
   position: relative;
   width: 240px;
@@ -347,6 +192,8 @@ const choiceMeta = computed(() => [
   font-size: 19px;
   font-weight: 600;
   line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .encounter-card-presentation[data-kind="curse"] .encounter-card-presentation__title {
@@ -469,38 +316,4 @@ const choiceMeta = computed(() => [
   text-transform: none;
   -webkit-line-clamp: 1;
 }
-.choice-card-presentation :deep(.game-card__actions) {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-}
-.choice-card-presentation :deep(.game-card__activate) {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  padding: 0;
-  opacity: 0;
-}
-.choice-card-presentation :deep(.game-card__action-state) { display: none; }
-.choice-card-presentation[data-action-state="available"] { border-color: var(--color-action-primary); }
-.choice-card-presentation[data-action-state="selected"] { outline: 3px solid var(--color-action-primary); outline-offset: -3px; }
-.choice-card-presentation[data-action-state="disabled"] { opacity: .58; }
-
-.card-presentation__header,
-.card-presentation__copy { min-width: 0; display: grid; gap: 8px; }
-.card-presentation__meta,
-.card-presentation__stats { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.card-presentation__meta { color: var(--color-text-muted); font-size: .64rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
-.card-presentation__image { width: 100%; height: 100%; display: block; object-fit: cover; }
-.card-presentation__name,
-.card-presentation__rules { margin: 0; overflow-wrap: anywhere; }
-.card-presentation__name { font-family: var(--font-card); font-size: 1.08rem; line-height: 1.2; }
-.card-presentation__stats { justify-content: start; flex-wrap: wrap; }
-.card-presentation__stats span { border: 1px solid var(--card-accent-deep); padding: .18rem .32rem; color: var(--card-accent-deep); font-size: .62rem; font-weight: 800; }
-.card-presentation__rules { display: -webkit-box; overflow: hidden; font-family: var(--font-card); font-size: .7rem; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
-.card-presentation.card-frame--compact .card-presentation__copy { gap: 4px; }
-.card-presentation.card-frame--compact .card-presentation__name { font-size: .78rem; }
-.card-presentation.card-frame--compact .card-presentation__rules { font-size: .58rem; line-height: 1.28; -webkit-line-clamp: 4; }
 </style>

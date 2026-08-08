@@ -6,14 +6,14 @@ test("combatant helper form exposes only descriptor-backed options", async ({pag
   await openFixture(page, "helper-offer");
 
   await expect(page.locator(".interaction-helper-form")).toBeVisible();
-  const helperSelect = page.getByLabel("Помощник", {exact: true});
-  const rewardInput = page.getByLabel("Награда помощнику, сокровищ", {exact: true});
-  await expect(helperSelect.locator("option")).toHaveCount(2);
-  await expect(helperSelect).toHaveValue("player_1");
-  await expect(rewardInput)
-    .toHaveAttribute("min", "1");
-  await expect(rewardInput)
-    .toHaveAttribute("max", "2");
+  const helperChoices = page.getByRole("listbox", {name: "Варианты помощи"});
+  await expect(helperChoices.getByRole("option")).toHaveCount(3);
+  await expect(helperChoices.getByRole("option").first()).toHaveAttribute("aria-selected", "true");
+  await expect(helperChoices).toContainText("Борис");
+  await expect(helperChoices).toContainText("Вера");
+  await expect(helperChoices).toContainText("1 сокровища");
+  await expect(helperChoices).toContainText("2 сокровища");
+  await expect(page.locator(".interaction-helper-form input, .interaction-helper-form select")).toHaveCount(0);
   await expect(page.getByRole("button", {name: "Предложить помощь"}))
     .toBeEnabled();
 });
@@ -42,8 +42,8 @@ test("invited helper sees party terms while observer sees an opaque window", asy
 test("accepted helper summary is rendered from combat projection", async ({page}) => {
   await openFixture(page, "helper-accepted");
 
-  const summary = page.locator(".combat-helper-summary");
+  const summary = page.locator(".game-table__strength-group--monsters");
   await expect(summary).toBeVisible();
   await expect(summary).toContainText("Алиса");
-  await expect(summary).toContainText("Награда помощника: 2 сокр.");
+  await expect(summary).toContainText("награда 2 сокр.");
 });

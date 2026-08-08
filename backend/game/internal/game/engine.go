@@ -165,7 +165,7 @@ func Handle(state State, command Command, pack Pack) ([]DomainEvent, error) {
 	case CommandStart:
 		return handleStart(state, command, pack)
 	case CommandFinishSetup:
-		return handleFinishSetup(state, command)
+		return handleFinishSetup(state, command, pack)
 	case CommandPlayCard:
 		return handlePlayCard(state, command, pack)
 	case CommandEquipItem:
@@ -1365,13 +1365,44 @@ func handleStart(state State, command Command, pack Pack) ([]DomainEvent, error)
 	return transition(EventGameStarted, command, next, outcomes)
 }
 
-func handleFinishSetup(state State, command Command) ([]DomainEvent, error) {
+func handleFinishSetup(
+	state State,
+	command Command,
+	pack Pack,
+) ([]DomainEvent, error) {
 	playerIndex, err := requirePhase(state, command, PhaseSetup)
 	if err != nil {
 		return nil, err
 	}
+	if state.Players[playerIndex].SetupDiscardPending {
+		return nil, fmt.Errorf(
+			"%w: setup discard must be resolved",
+			ErrIllegalCommand,
+		)
+	}
+	limit, err := handLimit(state, playerIndex, pack)
+	if err != nil {
+		return nil, err
+	}
 	next := state.Clone()
+	profile, err := state.Profile()
+	if err != nil {
+		return nil, err
+	}
+	if profile.DeathLoot && len(next.Players[playerIndex].Hand) > limit {
+		next.Players[playerIndex].SetupDiscardPending = true
+		return transition(EventSetupDiscardRequired, command, next, nil)
+	}
+	return finishSetupForPlayer(next, command, playerIndex)
+}
+
+func finishSetupForPlayer(
+	next State,
+	command Command,
+	playerIndex int,
+) ([]DomainEvent, error) {
 	next.Players[playerIndex].SetupDone = true
+	next.Players[playerIndex].SetupDiscardPending = false
 	nextPlayerIndex := -1
 	for offset := 1; offset <= len(next.Players); offset++ {
 		candidate := (playerIndex + offset) % len(next.Players)
@@ -1384,7 +1415,7 @@ func handleFinishSetup(state State, command Command) ([]DomainEvent, error) {
 		next.Turn = Turn{PlayerID: next.Players[nextPlayerIndex].ID}
 		setTurnPhase(&next, PhaseSetup)
 	} else {
-		next.Turn = Turn{PlayerID: next.Players[0].ID}
+		next.Turn = Turn{PlayerID: next.Players[0].ID, Number: 1}
 		setTurnPhase(&next, PhasePreparation)
 	}
 	return transition(EventSetupFinished, command, next, nil)
@@ -1571,6 +1602,7 @@ func handleEquipItem(state State, command Command, pack Pack) ([]DomainEvent, er
 	}
 	next := state.Clone()
 	player := &next.Players[playerIndex]
+	player.Hand, _ = removeString(player.Hand, command.InstanceID)
 	player.Carried, _ = removeString(player.Carried, command.InstanceID)
 	player.Equipped = append(player.Equipped, command.InstanceID)
 	if err := reconcileLoadout(&next, playerIndex, pack); err != nil {
@@ -1965,6 +1997,9 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 	monsterCard := monsterCards[0]
 	var outcomes []RandomOutcome
 	if totals.PlayerWins {
+		actorRewardIDs := []string{}
+		helperRewardIDs := []string{}
+		helperPlayerID := ""
 		rewardModifier, err := treasureRewardModifier(
 			next,
 			playerIndex,
@@ -2009,6 +2044,15 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 			if err != nil {
 				return nil, err
 			}
+			helperPlayerID = help.HelperPlayerID
+			helperRewardIDs = append(
+				[]string(nil),
+				rewards[:help.RewardTreasures]...,
+			)
+			actorRewardIDs = append(
+				[]string(nil),
+				rewards[help.RewardTreasures:]...,
+			)
 			outcomes = append(outcomes, RandomOutcome{
 				Kind:  "draw",
 				Deck:  DeckTreasure,
@@ -2044,6 +2088,7 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 			if err != nil {
 				return nil, err
 			}
+			actorRewardIDs = append([]string(nil), rewards...)
 			next.Players[playerIndex].Hand = append(
 				next.Players[playerIndex].Hand,
 				rewards...,
@@ -2053,10 +2098,28 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 		if err != nil {
 			return nil, err
 		}
+		previousLevel := next.Players[playerIndex].Level
 		next.Players[playerIndex].Level = min(
 			profile.WinningLevel,
 			next.Players[playerIndex].Level+levelReward,
 		)
+		next.RecentCombatResult = &CombatResult{
+			Outcome: "victory",
+			Rewards: []CombatReward{{
+				PlayerID:            next.Players[playerIndex].ID,
+				TreasureInstanceIDs: actorRewardIDs,
+				LevelsGained:        next.Players[playerIndex].Level - previousLevel,
+			}},
+		}
+		if helperPlayerID != "" {
+			next.RecentCombatResult.Rewards = append(
+				next.RecentCombatResult.Rewards,
+				CombatReward{
+					PlayerID:            helperPlayerID,
+					TreasureInstanceIDs: helperRewardIDs,
+				},
+			)
+		}
 		if err := discardEncounterSet(&next, pack); err != nil {
 			return nil, err
 		}
@@ -2080,6 +2143,7 @@ func resolveCombatNow(state State, command Command, pack Pack) ([]DomainEvent, e
 		return append(prefix, resolved...), nil
 	}
 	var prefix []DomainEvent
+	next.RecentCombatResult = &CombatResult{Outcome: "defeat"}
 	if help := next.Turn.Encounter.CombatHelp; help != nil &&
 		help.RewardStatus == CombatHelpRewardAccepted {
 		next.Turn.Encounter.CombatHelp.RewardStatus = CombatHelpRewardVoided
@@ -3027,6 +3091,10 @@ func handleBeginCharityTransfer(
 		return nil, err
 	}
 	next := state.Clone()
+	recipients, err := charityRecipientIDs(state, playerIndex, pack)
+	if err != nil {
+		return nil, err
+	}
 	next.CharityTransfer = (&CharityTransfer{
 		InteractionID:     command.InteractionID,
 		AllocatorPlayerID: command.ActorID,
@@ -3035,7 +3103,7 @@ func handleBeginCharityTransfer(
 			[]string(nil),
 			state.Players[playerIndex].Hand...,
 		),
-		EligibleRecipientIDs: charityRecipientIDs(state, playerIndex),
+		EligibleRecipientIDs: recipients,
 	}).clone()
 	next.InteractionWindow = window
 	return transition(EventCharityTransferStarted, command, next, nil)
@@ -3195,6 +3263,46 @@ func resolveCharityTransfer(
 }
 
 func handleResolveCharity(state State, command Command, pack Pack) ([]DomainEvent, error) {
+	if state.Turn.Phase == PhaseSetup {
+		playerIndex, err := requirePhase(state, command, PhaseSetup)
+		if err != nil {
+			return nil, err
+		}
+		if !state.Players[playerIndex].SetupDiscardPending {
+			return nil, fmt.Errorf(
+				"%w: setup discard is not pending",
+				ErrIllegalCommand,
+			)
+		}
+		limit, err := handLimit(state, playerIndex, pack)
+		if err != nil {
+			return nil, err
+		}
+		excess := max(0, len(state.Players[playerIndex].Hand)-limit)
+		selected := command.InstanceIDs
+		if len(selected) != excess ||
+			(!uniqueStrings(selected) && len(selected) > 0) {
+			return nil, fmt.Errorf(
+				"%w: setup requires exactly %d discarded cards",
+				ErrIllegalCommand,
+				excess,
+			)
+		}
+		next := state.Clone()
+		for _, instanceID := range selected {
+			if !slices.Contains(state.Players[playerIndex].Hand, instanceID) {
+				return nil, fmt.Errorf(
+					"%w: setup discard card is not in hand",
+					ErrIllegalCommand,
+				)
+			}
+			if err := discardOwnedInstance(&next, playerIndex, instanceID, pack); err != nil {
+				return nil, err
+			}
+		}
+		next.Players[playerIndex].SetupDiscardPending = false
+		return finishSetupForPlayer(next, command, playerIndex)
+	}
 	profile, err := state.Profile()
 	if err != nil {
 		return nil, err
@@ -3680,12 +3788,16 @@ func handleEndTurn(state State, command Command, pack Pack) ([]DomainEvent, erro
 		return nil, err
 	}
 	next := state.Clone()
+	next.RecentCombatResult = nil
 	if next.DeathLoot != nil && next.DeathLoot.Completed {
 		next.DeathLoot = nil
 	}
 	next.CharityTransfer = nil
 	nextPlayerIndex := (playerIndex + 1) % len(next.Players)
-	next.Turn = Turn{PlayerID: next.Players[nextPlayerIndex].ID}
+	next.Turn = Turn{
+		PlayerID: next.Players[nextPlayerIndex].ID,
+		Number:   state.Turn.Number + 1,
+	}
 	var outcomes []RandomOutcome
 	if next.Players[nextPlayerIndex].NeedsRedraw {
 		profile, err := next.Profile()

@@ -115,6 +115,13 @@ const baseProjection: Projection = {
     name: "Алиса",
     level: 2,
     combat_strength: 4,
+    strength_breakdown: {
+      base_strength: 2,
+      equipment_bonus: 0,
+      temporary_bonus: 2,
+      total_strength: 4,
+      hand_count: heroHand.length,
+    },
     escape_bonus: 1,
     hand_limit: 5,
     character_tags: ["городская", "смелая"],
@@ -148,14 +155,30 @@ const baseProjection: Projection = {
 const rosterNames = ["Борис", "Вера", "Глеб", "Даша", "Егор"] as const;
 
 function player(index: number): OtherPlayerView {
+  const level = Math.min(10, index + 1);
+  const equipmentBonus = index === 0 ? 1 : 0;
   return {
     player_id: `player_${index + 1}`,
     name: rosterNames[index] ?? `Игрок ${index + 2}`,
-    level: Math.min(10, index + 1),
+    level,
+    combat_strength: level + equipmentBonus,
+    strength_breakdown: {
+      base_strength: level,
+      equipment_bonus: equipmentBonus,
+      temporary_bonus: 0,
+      total_strength: level + equipmentBonus,
+      hand_count: index + 2,
+    },
+    escape_bonus: 0,
     hand_count: index + 2,
     carried: [],
     equipped: index === 0
-      ? [card("public-sword", "Публичный фонарь", "item", "treasure", {bonus: 1})]
+      ? [card("public-sword", "Публичный фонарь", "item", "treasure", {
+        item_slot: "hands",
+        item_size: "small",
+        hands: 1,
+        bonus: 1,
+      })]
       : [],
     traits: [],
     attachments: [],
@@ -191,7 +214,27 @@ function configureFigmaBattle(projection: Projection): void {
   projection.you.name = "Макс";
   projection.you.level = 8;
   projection.you.combat_strength = 16;
-  projection.you.character_tags = ["Воин", "Человек"];
+  projection.you.strength_breakdown = {
+    base_strength: 8,
+    equipment_bonus: 6,
+    temporary_bonus: 2,
+    total_strength: 16,
+    hand_count: 4,
+  };
+  projection.you.character_tags = [];
+  projection.you.traits = [
+    card("figma-class-warrior", "Воин", "class", "door", {trait_group: "class"}),
+    card("figma-race-human", "Человек", "race", "door", {trait_group: "race"}),
+  ];
+  projection.you.equipped = [
+    card("figma-equipped-helmet", "Шлем отваги", "item", "treasure", {item_slot: "headgear", item_size: "small", bonus: 2, value: 200}),
+    card("figma-equipped-armor", "Кольчуга архивариуса", "item", "treasure", {item_slot: "armor", item_size: "small", bonus: 3, value: 300}),
+    card("figma-equipped-boots", "Сапоги спешки", "item", "treasure", {item_slot: "footgear", item_size: "small", bonus: 1, value: 200}),
+  ];
+  projection.you.carried = [
+    card("figma-carried-courage", "Зелье смелости", "one_shot", "treasure", {value: 100, bonus: 2, rules_text: "+2 к следующему бою."}),
+    card("figma-carried-pack", "Тяжёлый рюкзак", "item", "treasure", {value: 400, item_size: "big"}),
+  ];
   projection.you.hand = [
     card("figma-hand-plan", "Запасной план", "one_shot", "treasure", {value: 200, bonus: 2, rules_text: "+2 к любой стороне в бою."}),
     card("figma-hand-smoke", "Дымовая завеса", "one_shot", "treasure", {value: 300, rules_text: "Монстр получает −3."}),
@@ -199,12 +242,60 @@ function configureFigmaBattle(projection: Projection): void {
     card("figma-hand-haste", "Зелье спешки", "one_shot", "treasure", {value: 100, rules_text: "+1 к броску побега."}),
   ];
   projection.players = [
-    {...player(0), name: "Лена", level: 6, hand_count: 4},
-    {...player(1), name: "Илья", level: 4, hand_count: 3},
-    {...player(2), name: "Саша", level: 7, hand_count: 4},
+    {
+      ...player(0),
+      name: "Лена",
+      level: 6,
+      combat_strength: 12,
+      strength_breakdown: {base_strength: 6, equipment_bonus: 6, temporary_bonus: 0, total_strength: 12, hand_count: 3},
+      hand_count: 3,
+      equipped: [
+        card("figma-lena-helmet", "Тихий шлем", "item", "treasure", {item_slot: "headgear", item_size: "small", bonus: 2}),
+        card("figma-lena-armor", "Куртка следопыта", "item", "treasure", {item_slot: "armor", item_size: "small", bonus: 2}),
+        card("figma-lena-sword", "Длинный меч", "item", "treasure", {item_slot: "hands", item_size: "small", hands: 1, bonus: 2}),
+      ],
+      traits: [card("figma-lena-race", "Эльф", "race", "door", {trait_group: "race"})],
+    },
+    {
+      ...player(1),
+      name: "Илья",
+      level: 4,
+      combat_strength: 9,
+      strength_breakdown: {base_strength: 4, equipment_bonus: 5, temporary_bonus: 0, total_strength: 9, hand_count: 5},
+      escape_bonus: 1,
+      hand_count: 5,
+      carried: [
+        card("figma-ilya-potion", "Зелье скорости", "one_shot", "treasure", {value: 100}),
+        card("figma-ilya-shield", "Запасной щит", "item", "treasure", {value: 200, item_size: "small"}),
+      ],
+      equipped: [
+        card("figma-ilya-helmet", "Шлем дозорного", "item", "treasure", {item_slot: "headgear", item_size: "small", bonus: 1}),
+        card("figma-ilya-armor", "Кожаная броня", "item", "treasure", {item_slot: "armor", item_size: "small", bonus: 2}),
+        card("figma-ilya-boots", "Сапоги разведчика", "item", "treasure", {item_slot: "footgear", item_size: "small", bonus: 1}),
+        card("figma-ilya-sword", "Короткий меч", "item", "treasure", {item_slot: "hands", item_size: "small", hands: 1, bonus: 1}),
+      ],
+      traits: [
+        card("figma-ilya-class", "Воин", "class", "door", {trait_group: "class"}),
+        card("figma-ilya-race", "Дварф", "race", "door", {trait_group: "race"}),
+      ],
+    },
+    {
+      ...player(2),
+      name: "Саша",
+      level: 7,
+      combat_strength: 14,
+      strength_breakdown: {base_strength: 7, equipment_bonus: 7, temporary_bonus: 0, total_strength: 14, hand_count: 2},
+      hand_count: 2,
+      equipped: [
+        card("figma-sasha-armor", "Мантия заклинателя", "item", "treasure", {item_slot: "armor", item_size: "small", bonus: 3}),
+        card("figma-sasha-staff", "Посох архивов", "item", "treasure", {item_slot: "hands", item_size: "big", hands: 2, bonus: 4}),
+      ],
+      traits: [card("figma-sasha-class", "Волшебник", "class", "door", {trait_group: "class"})],
+    },
   ];
   projection.turn.phase = "combat";
   projection.turn.player_id = "player_hero";
+  projection.turn.number = 4;
   projection.turn.encounter = archiveDust;
   projection.turn.combat = {
     player_strength: 16,
@@ -213,10 +304,16 @@ function configureFigmaBattle(projection: Projection): void {
     tie_wins: true,
     combat_closed: false,
     monsters: [sentry, archiveDust, boneCourier],
-    effects: [],
+    effects: [{
+      effect_id: "fx_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      kind: "enhance_monster",
+      target_monster_instance_id: archiveDust.instance_id,
+      amount: 1,
+      active: true,
+    }],
+    resolution_action: {type: "request_combat_resolution"},
   };
   projection.turn.available_actions = [
-    action("resolve_combat"),
     {...action("play_card"), source_instance_id: "figma-hand-plan"},
     {...action("play_card"), source_instance_id: "figma-hand-smoke"},
   ];
@@ -289,6 +386,30 @@ function configureAdvancedCombat(
   projection.interaction = interaction("combat_response", actions, fields);
 }
 
+function normalizePublicRoster(projection: Projection): void {
+  if (projection.players.some((candidate) =>
+    candidate.player_id === projection.you.player_id,
+  )) {
+    return;
+  }
+  projection.players = [{
+    player_id: projection.you.player_id,
+    name: projection.you.name,
+    level: projection.you.level,
+    combat_strength: projection.you.combat_strength,
+    strength_breakdown: structuredClone(projection.you.strength_breakdown),
+    escape_bonus: projection.you.escape_bonus,
+    hand_count: projection.you.hand.length,
+    carried: structuredClone(projection.you.carried),
+    equipped: structuredClone(projection.you.equipped),
+    traits: structuredClone(projection.you.traits),
+    attachments: structuredClone(projection.you.attachments),
+    persistent_curses: structuredClone(projection.you.persistent_curses),
+    setup_done: projection.you.setup_done,
+    dead: projection.you.dead,
+  }, ...projection.players];
+}
+
 function makeFixture(
   id: string,
   label: string,
@@ -298,6 +419,8 @@ function makeFixture(
   const projection = structuredClone(baseProjection);
   projection.game_id = `fixture-${id}`;
   configure(projection);
+  projection.you.strength_breakdown.hand_count = projection.you.hand.length;
+  normalizePublicRoster(projection);
   return {
     id,
     label,
@@ -324,12 +447,29 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     projection.turn.phase = "setup";
     projection.turn.encounter = undefined;
     projection.turn.combat = undefined;
-    projection.you.carried = [
-      card("prep-pack", "Тяжёлый рюкзак", "item", "treasure", {item_size: "big", bonus: 2, rules_text: "Занимает две руки. Можно надеть сейчас."}),
-      card("prep-cloak", "Плащ обходчика", "item", "treasure", {item_slot: "armor", bonus: 2, rules_text: "Свободный слот брони."}),
-      card("prep-cauldron", "Котелок мудреца", "item", "treasure", {bonus: 1, rules_text: "Конфликтов экипировки нет."}),
+    projection.you.hand = [
+      card("setup-door-1", "Класс следопыта", "class", "door", {trait_group: "class"}),
+      card("setup-door-2", "Раса путника", "race", "door", {trait_group: "race"}),
+      card("setup-door-3", "Осторожный монстр", "monster", "door", {combat_strength: 2}),
+      card("setup-door-4", "Лёгкое проклятие", "curse", "door"),
+      card("setup-treasure-1", "Учебный шлем", "item", "treasure", {item_slot: "headgear", item_size: "small", bonus: 1}),
+      card("setup-treasure-2", "Учебная броня", "item", "treasure", {item_slot: "armor", item_size: "small", bonus: 1}),
+      card("setup-treasure-3", "Учебные ботинки", "item", "treasure", {item_slot: "footgear", item_size: "small", bonus: 1}),
+      card("setup-treasure-4", "Учебный меч", "item", "treasure", {item_slot: "hands", item_size: "small", hands: 1, bonus: 1}),
     ];
-    projection.turn.available_actions = [action("finish_setup")];
+    projection.you.carried = [];
+    projection.you.equipped = [];
+    projection.you.traits = [];
+    projection.you.attachments = [];
+    projection.turn.available_actions = [
+      {...action("play_card"), source_instance_id: "setup-door-1"},
+      {...action("play_card"), source_instance_id: "setup-door-2"},
+      {...action("equip_item"), source_instance_id: "setup-treasure-1"},
+      {...action("equip_item"), source_instance_id: "setup-treasure-2"},
+      {...action("equip_item"), source_instance_id: "setup-treasure-3"},
+      {...action("equip_item"), source_instance_id: "setup-treasure-4"},
+      action("finish_setup"),
+    ];
   }),
   makeFixture("single-preparation", "Один игрок: подготовка хода", (projection) => {
     projection.turn.phase = "preparation";
@@ -338,7 +478,17 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
   makeFixture("single-door-choice", "Один игрок: дверь", (projection) => {
     configureFigmaBattle(projection);
     projection.turn.phase = "door_choice";
-    projection.turn.available_actions = [action("open_door")];
+    projection.turn.combat = undefined;
+    const trouble = card("door-choice-monster", "Монстр из руки", "monster", "door", {
+      combat_strength: 3,
+      treasure_count: 1,
+      levels_reward: 1,
+    });
+    projection.you.hand = [...projection.you.hand, trouble];
+    projection.turn.available_actions = [
+      {...action("look_for_trouble"), source_instance_id: trouble.instance_id},
+      action("loot_room"),
+    ];
   }),
   makeFixture("single-combat", "Один игрок: бой", (projection) => {
     projection.turn.phase = "combat";
@@ -353,7 +503,7 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       effects: [],
       resolution_action: {type: "request_combat_resolution"},
     };
-    projection.turn.available_actions = [action("resolve_combat")];
+    projection.turn.available_actions = [];
   }),
   makeFixture("mobile-combat-multiple", "Мобильный бой: несколько карт", (projection) => {
     projection.players = [player(0), player(1)];
@@ -367,8 +517,9 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       combat_closed: false,
       monsters: [encounter, additionalMonster],
       effects: [],
+      resolution_action: {type: "request_combat_resolution"},
     };
-    projection.turn.available_actions = [action("resolve_combat")];
+    projection.turn.available_actions = [];
   }),
   makeFixture("opponents-one", "Мобильный стол: один оппонент", (projection) => {
     projection.players = [player(0)];
@@ -382,8 +533,9 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       combat_closed: false,
       monsters: [encounter],
       effects: [],
+      resolution_action: {type: "request_combat_resolution"},
     };
-    projection.turn.available_actions = [action("resolve_combat")];
+    projection.turn.available_actions = [];
   }),
   makeFixture("opponents-three", "Мобильный стол: три оппонента", (projection) => {
     projection.players = [player(0), player(1), player(2)];
@@ -397,16 +549,14 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       combat_closed: false,
       monsters: [encounter],
       effects: [],
+      resolution_action: {type: "request_combat_resolution"},
     };
-    projection.turn.available_actions = [action("resolve_combat")];
+    projection.turn.available_actions = [];
   }),
   makeFixture("card-action-rail", "Карточное действие с contextual rail", (projection) => {
     projection.turn.available_actions = [{
       ...action("play_card"),
       source_instance_id: "hero-card-3",
-      instance_ids: ["hero-card-3"],
-      minimum: 1,
-      maximum: 1,
     }];
   }),
   makeFixture("single-run-away", "Один игрок: побег", (projection) => {
@@ -419,7 +569,12 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
       attempts: [],
       completed: false,
     };
-    projection.turn.available_actions = [action("run_away")];
+    projection.turn.available_actions = [];
+    projection.interaction = interaction(
+      "run_away_response",
+      [interactionAction("pass", "8")],
+      {parent_phase: "run_away"},
+    );
   }),
   makeFixture("reward-received", "Награда после закрытого боя", (projection) => {
     configureFigmaBattle(projection);
@@ -427,20 +582,44 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     if (!rewardedMonster || !projection.turn.combat) {
       throw new Error("Figma reward fixture requires the archive monster");
     }
-    projection.turn.encounter = rewardedMonster;
-    projection.turn.combat.monsters = [rewardedMonster];
-    projection.turn.combat.monster_strength = rewardedMonster.combat_strength ?? 0;
-    projection.turn.combat.player_winning = true;
-    projection.turn.combat.combat_closed = true;
+    const treasures = [
+      card("reward-boots", "Быстрые ботинки", "item", "treasure", {item_slot: "footgear", bonus: 2, value: 400}),
+      card("reward-potion", "Зелье уверенности", "one_shot", "treasure", {bonus: 3, value: 300}),
+    ];
+    projection.turn.phase = "end_turn";
+    projection.turn.encounter = undefined;
+    projection.turn.combat = undefined;
+    projection.recent_combat_result = {
+      outcome: "victory",
+      public_rewards: [{
+        player_id: projection.you.player_id,
+        treasure_count: treasures.length,
+        levels_gained: rewardedMonster.levels_reward ?? 0,
+      }],
+      viewer_reward: {
+        player_id: projection.you.player_id,
+        treasures,
+        levels_gained: rewardedMonster.levels_reward ?? 0,
+      },
+    };
     projection.turn.available_actions = [action("end_turn")];
   }),
   makeFixture("single-charity", "Один игрок: милостыня", (projection) => {
     projection.turn.phase = "charity";
     projection.you.hand = [
       ...structuredClone(heroHand),
-      card("extra-card", "Лишний фонарь", "item", "treasure", {value: 30}),
+      card("extra-card-1", "Лишний фонарь", "item", "treasure", {value: 30}),
+      card("extra-card-2", "Лишняя броня", "item", "treasure", {value: 40}),
+      card("extra-card-3", "Лишнее зелье", "one_shot", "treasure", {value: 50}),
+      card("extra-card-4", "Лишний шлем", "item", "treasure", {value: 60}),
     ];
-    projection.turn.available_actions = [action("resolve_charity")];
+    const excess = projection.you.hand.length - projection.you.hand_limit;
+    projection.turn.available_actions = [{
+      type: "resolve_charity",
+      instance_ids: projection.you.hand.map((item) => item.instance_id),
+      minimum: excess,
+      maximum: excess,
+    }];
   }),
   makeFixture("single-finished", "Один игрок: победа", (projection) => {
     projection.status = "finished";
@@ -682,6 +861,18 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
   }),
   makeFixture("target-private-choice", "Окно: приватный выбор эффекта", (projection) => {
     projection.turn.phase = "resolve_effect";
+    projection.turn.pending_decision = {
+      type: "effect_choice",
+      options: ["hero-card-1", "hero-card-2"],
+      minimum: 1,
+      maximum: 1,
+    };
+    projection.turn.available_actions = [{
+      type: "choose_effect",
+      instance_ids: ["hero-card-1", "hero-card-2"],
+      minimum: 1,
+      maximum: 1,
+    }];
     projection.interaction = interaction(
       "private_choice",
       [
@@ -860,9 +1051,19 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
         bonus: 2,
       }),
     ];
-    projection.players = [player(0), player(1), player(2)];
+    const requestedCards = [
+      card("opaque-recipient-card-1", "Запасной щит", "item", "treasure", {item_slot: "hands", item_size: "small", bonus: 1}),
+      card("opaque-recipient-card-2", "Зелье скорости", "one_shot", "treasure"),
+    ];
+    projection.players = [player(0), {...player(1), carried: requestedCards}, player(2)];
     projection.you.hand = [structuredClone(heroHand[0]!), structuredClone(heroHand[2]!)];
     projection.you.carried = carriedCards;
+    projection.you.equipped = [card("equipped-sale-item", "Старый шлем", "item", "treasure", {
+      item_slot: "headgear",
+      item_size: "small",
+      bonus: 1,
+      value: 200,
+    })];
     projection.you.traits = [card(
       "theft-trait",
       "Оригинальная способность кражи",
@@ -872,6 +1073,26 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
     )];
     projection.turn.phase = "preparation";
     projection.turn.available_actions = [
+      {
+        type: "discard_card",
+        source_instance_id: "theft-trait",
+      },
+      {
+        type: "unequip_item",
+        source_instance_id: "equipped-sale-item",
+      },
+      {
+        type: "sell_items",
+        instance_ids: ["transfer-card-1", "transfer-card-2", "equipped-sale-item"],
+        minimum: 1,
+        maximum: 3,
+        minimum_total: 300,
+        instance_values: {
+          "transfer-card-1": 100,
+          "transfer-card-2": 100,
+          "equipped-sale-item": 200,
+        },
+      },
       {
         type: "propose_gift",
         instance_ids: carriedCards.map((item) => item.instance_id),
@@ -896,7 +1117,32 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
         maximum: 1,
         ability_index: 0,
       },
+      action("open_door"),
     ];
+  }),
+  makeFixture("ability-combat", "Бой: способность со стоимостью", (projection) => {
+    projection.turn.phase = "combat";
+    projection.turn.encounter = encounter;
+    projection.turn.combat = {
+      player_strength: 4,
+      monster_strength: 6,
+      player_winning: false,
+      tie_wins: false,
+      combat_closed: false,
+      monsters: [encounter],
+      effects: [],
+      resolution_action: {type: "request_combat_resolution"},
+    };
+    const source = card("ability-source", "Воинская ярость", "class", "door", {trait_group: "class"});
+    projection.you.traits = [source];
+    projection.turn.available_actions = [{
+      type: "use_ability",
+      source_instance_id: source.instance_id,
+      instance_ids: projection.you.hand.map((item) => item.instance_id),
+      minimum: 1,
+      maximum: 1,
+      ability_index: 0,
+    }];
   }),
   makeFixture("economy-observer", "Окно: observer без карт предложения", (projection) => {
     projection.players = [player(0), player(1), player(2)];
@@ -1048,33 +1294,6 @@ export const fixtureDefinitions: readonly UiFixtureDefinition[] = [
         my_response_state: "timed_out",
       },
     );
-  }),
-  makeFixture("action-coverage", "Полный набор server action descriptors", (projection) => {
-    projection.turn.phase = "preparation";
-    projection.turn.available_actions = [
-      "start",
-      "finish_setup",
-      "play_card",
-      "play_target_effect",
-      "equip_item",
-      "unequip_item",
-      "discard_card",
-      "sell_items",
-      "open_door",
-      "look_for_trouble",
-      "loot_room",
-      "use_ability",
-      "resolve_combat",
-      "run_away",
-      "choose_effect",
-      "resolve_charity",
-      "propose_trade",
-      "propose_gift",
-      "attempt_theft",
-      "end_turn",
-      "fight",
-      "loot",
-    ].map((type) => action(type as Projection["turn"]["available_actions"][number]["type"]));
   }),
   makeFixture("victory-six-player", "Шесть игроков: финал", (projection) => {
     projection.players = [0, 1, 2, 3, 4].map(player);

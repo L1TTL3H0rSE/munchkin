@@ -24,11 +24,15 @@ export async function activePresenter(
   page: Page,
   expectedKind?: PresenterKind,
 ): Promise<Locator> {
-  const selector = expectedKind
-    ? `.${expectedKind}-game-table:visible`
-    : ".mobile-game-table:visible, .desktop-game-table:visible";
-  const presenter = page.locator(selector);
+  const presenter = page.locator(".game-table:visible");
   await expect(presenter).toHaveCount(1);
+  if (expectedKind === "desktop") {
+    await expect(presenter.locator(".desktop-game-header")).toBeVisible();
+    await expect(presenter.locator(".mobile-game-header")).toBeHidden();
+  } else if (expectedKind === "mobile") {
+    await expect(presenter.locator(".mobile-game-header")).toBeVisible();
+    await expect(presenter.locator(".desktop-game-header")).toBeHidden();
+  }
   return presenter;
 }
 
@@ -189,15 +193,10 @@ export async function assertLabeledRails(page: Page): Promise<void> {
   await expect(page.locator("main#main-content")).toHaveCount(1);
   const presenter = await activePresenter(page);
   const terminal = presenter.locator(
-    ".desktop-victory-result, .system-state-surface[data-state='victory']",
+    ".system-state-surface[data-state='victory']",
   );
   if (await terminal.count() === 0) {
-    await expect(presenter.locator("header.desktop-game-header, header.mobile-game-header")).toHaveCount(1);
-  }
-  const actionDock = presenter.locator(".action-dock:visible");
-  if (await actionDock.count()) {
-    await expect(actionDock).toHaveAttribute("aria-labelledby", "action-dock-title");
-    await expect(presenter.locator("#action-dock-title:visible")).toHaveCount(1);
+    await expect(presenter.locator("header.desktop-game-header:visible, header.mobile-game-header:visible")).toHaveCount(1);
   }
 }
 

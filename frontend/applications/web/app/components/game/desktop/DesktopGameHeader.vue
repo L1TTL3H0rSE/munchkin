@@ -12,17 +12,6 @@ const props = defineProps<{
   victory?: boolean;
 }>();
 
-const isActorTurn = computed(() =>
-  props.projection.turn.player_id === props.projection.you.player_id,
-);
-const currentPlayerName = computed(() => {
-  if (props.projection.turn.player_id === props.projection.you.player_id) {
-    return props.projection.you.name;
-  }
-  return props.projection.players.find((player) =>
-    player.player_id === props.projection.turn.player_id,
-  )?.name ?? "другой игрок";
-});
 const interactionCountdown = useInteractionCountdown(
   () => props.projection.interaction?.deadline_at,
   () => props.projection.interaction?.server_time,
@@ -37,29 +26,12 @@ const responseCopy = computed(() => {
   return `ОТВЕТ · ${minutes}:${seconds}`;
 });
 const phaseBadge = computed(() => {
-  const primary = props.presentationModel.primary;
   if (props.finished) {
     return props.victory ? "ПОБЕДА" : "ИТОГ";
   }
-  if (primary.kind === "result") {
-    return primary.source === "reward" ? "ИТОГ" : "ПОБЕГ";
-  }
-  if (primary.kind === "run-away") {
-    return "ПОБЕГ";
-  }
-  switch (props.presentationModel.family) {
-    case "setup":
-    case "preparation": return "ПОДГОТ.";
-    case "door-choice": return "ДВЕРЬ";
-    case "combat":
-    case "waiting": return "БОЙ";
-    case "charity": return "МИЛОСТЫНЯ";
-    case "end-turn": return "ИТОГ";
-    default: return "ХОД";
-  }
+  return props.presentationModel.phaseLabel;
 });
 const headerTitle = computed(() => {
-  const primary = props.presentationModel.primary;
   if (props.finished) {
     return props.victory ? "ИГРА ОКОНЧЕНА" : "ПАРТИЯ ОКОНЧЕНА";
   }
@@ -75,15 +47,7 @@ const headerTitle = computed(() => {
   if (responseCopy.value) {
     return responseCopy.value;
   }
-  if (primary.kind === "result") {
-    return primary.source === "reward"
-      ? "РЕЗУЛЬТАТ"
-      : primary.escaped ? "УСПЕХ" : "НЕУДАЧА";
-  }
-  if (primary.kind === "run-away") {
-    return "ТВОЁ РЕШЕНИЕ";
-  }
-  return isActorTurn.value ? "ТВОЙ ХОД" : `ХОД: ${currentPlayerName.value}`;
+  return props.presentationModel.turnHeadline;
 });
 const connectionLabel = computed(() =>
   props.connectionState === "connected" ? "В СЕТИ" : "НЕТ СВЯЗИ",
@@ -100,13 +64,18 @@ const connectionLabel = computed(() =>
       <h1>{{ headerTitle }}</h1>
     </div>
 
-    <div class="desktop-game-header__online" aria-label="Состояние соединения">
-      <span
-        class="desktop-game-header__online-dot"
-        :class="{'desktop-game-header__online-dot--offline': connectionState !== 'connected'}"
-        aria-hidden="true"
-      />
-      <span>{{ connectionLabel }}</span>
+    <div class="desktop-game-header__status">
+      <div class="desktop-game-header__online" aria-label="Состояние соединения">
+        <span
+          class="desktop-game-header__online-dot"
+          :class="{'desktop-game-header__online-dot--offline': connectionState !== 'connected'}"
+          aria-hidden="true"
+        />
+        <span>{{ connectionLabel }}</span>
+      </div>
+      <span v-if="projection.turn.number" class="desktop-game-header__turn-number">
+        ХОД {{ projection.turn.number }}
+      </span>
     </div>
 
   </header>
@@ -191,7 +160,8 @@ const connectionLabel = computed(() =>
 }
 
 .desktop-game-header__turn span,
-.desktop-game-header__online {
+.desktop-game-header__online,
+.desktop-game-header__turn-number {
   color: var(--color-text-secondary);
   color: var(--color-text-muted);
   font-size: .62rem;
@@ -208,10 +178,11 @@ const connectionLabel = computed(() =>
   display: flex;
   align-items: center;
   gap: 6px;
-  justify-self: end;
   margin-left: 0;
   white-space: nowrap;
 }
+.desktop-game-header__status { display: flex; align-items: center; justify-self: end; gap: 32px; }
+.desktop-game-header__turn-number { white-space: nowrap; }
 
 .desktop-game-header__online-dot {
   width: 8px;

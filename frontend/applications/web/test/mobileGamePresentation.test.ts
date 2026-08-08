@@ -1,11 +1,12 @@
 import {describe, expect, it} from "vitest";
 
-import {buildGamePresentation} from "../app/composables/useGamePresentation";
 import {
+  buildGamePresentationModel,
   encounterCards,
   gameStateFamily,
   hasActionableDeadline,
   opponentStatus,
+  projectedTurnActions,
 } from "../app/components/game/gamePresentationModel";
 import {fixtureAdapter} from "./fixtures/fixtureAdapter";
 
@@ -27,19 +28,17 @@ describe("mobile game presentation", () => {
 
   it("keeps authoritative actions and combat totals from the projection", () => {
     const projection = fixtureAdapter.getProjection("single-combat");
-    const presentation = buildGamePresentation(projection);
+    const presentation = buildGamePresentationModel(projection);
 
-    expect(presentation.turnActions.map(({action}) => action.type)).toEqual([
-      "resolve_combat",
+    expect(projectedTurnActions(projection).map((action) => action.type)).toEqual([
+      "request_combat_resolution",
     ]);
-    expect(presentation.combat).toMatchObject({
-      kind: "active",
-      combat: {
-        player_strength: 4,
-        monster_strength: 6,
-        player_winning: false,
-      },
+    expect(projection.turn.combat).toMatchObject({
+      player_strength: 4,
+      monster_strength: 6,
+      player_winning: false,
     });
+    expect(presentation.primary.kind).toBe("combat");
   });
 
   it("shows every public combat card without inventing a second total", () => {
@@ -55,7 +54,9 @@ describe("mobile game presentation", () => {
 
   it("exposes opponents as public summaries only", () => {
     const projection = fixtureAdapter.getProjection("full-roster-long-copy");
-    const opponent = projection.players[0];
+    const opponent = projection.players.find((player) =>
+      player.player_id !== projection.you.player_id,
+    );
 
     expect(opponent).toBeDefined();
     expect(opponent?.hand_count).toBeGreaterThan(0);

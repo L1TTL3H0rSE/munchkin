@@ -279,6 +279,37 @@ func beginCharityForTest(
 	openedAt time.Time,
 ) State {
 	t.Helper()
+	playerIndex := state.PlayerIndex(state.Turn.PlayerID)
+	for index := range state.Players {
+		if index == playerIndex {
+			continue
+		}
+		recipientLimit, err := handLimit(state, index, pack)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for len(state.Players[index].Hand) > recipientLimit {
+			instanceID := state.Players[index].Hand[len(state.Players[index].Hand)-1]
+			if err := discardOwnedInstance(&state, index, instanceID, pack); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	limit, err := handLimit(state, playerIndex, pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for len(state.Players[playerIndex].Hand) <= limit+1 {
+		if len(state.DoorDeck) == 0 {
+			t.Fatal("charity fixture exhausted the Door deck")
+		}
+		instanceID := state.DoorDeck[0]
+		state.DoorDeck = state.DoorDeck[1:]
+		state.Players[playerIndex].Hand = append(
+			state.Players[playerIndex].Hand,
+			instanceID,
+		)
+	}
 	setTurnPhase(&state, PhaseCharity)
 	events, err := Handle(state, Command{
 		Type:          CommandBeginCharityTransfer,

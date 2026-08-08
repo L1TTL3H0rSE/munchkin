@@ -11,15 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{"open-strength": []}>();
 
-const turnCopy = computed(() => {
-  const isActorTurn = props.projection.turn.player_id === props.projection.you.player_id;
-  const currentPlayerName = props.projection.players.find((player) =>
-    player.player_id === props.projection.turn.player_id,
-  )?.name ?? "другой игрок";
-  return isActorTurn
-    ? "ТВОЙ ХОД"
-    : `ХОДИТ ${currentPlayerName}`;
-});
+const turnCopy = computed(() => props.presentationModel.turnHeadline);
 
 const statusCopy = computed(() => {
   switch (props.projection.status) {
@@ -36,38 +28,7 @@ const statusCopy = computed(() => {
   }
 });
 
-const phaseCopy = computed(() => {
-  const primary = props.presentationModel.primary;
-  if (primary.kind === "result") {
-    return primary.source === "reward" ? "Лут" : "Побег";
-  }
-  if (primary.kind === "run-away") {
-    return "Побег";
-  }
-  switch (props.projection.turn.phase) {
-    case "setup":
-    case "preparation":
-      return "Сборы";
-    case "door_choice":
-      return "Дверь";
-    case "combat":
-      return "Бой";
-    case "run_away":
-      return "Побег";
-    case "resolve_effect":
-      return "Эффект";
-    case "charity":
-      return "Награда";
-    case "end_turn":
-      return "Итог";
-    case "":
-      return "Ждём";
-    default: {
-      const exhaustive: never = props.projection.turn.phase;
-      return exhaustive;
-    }
-  }
-});
+const phaseCopy = computed(() => props.presentationModel.phaseLabel);
 
 const pagerCopy = computed(() => {
   return `${props.presentationModel.encounterPage} / ${props.presentationModel.encounterPageCount}`;
@@ -80,12 +41,12 @@ const scoreCopy = computed(() => {
     return `ПБ ${bonus >= 0 ? "+" : "−"}${Math.abs(bonus)}`;
   }
   if (primary.kind === "result" && primary.source === "reward") {
-    return String(props.projection.you.combat_strength);
+    return String(props.projection.you.strength_breakdown.total_strength);
   }
   const combat = props.projection.turn.combat;
   return combat
     ? `${combat.player_strength} : ${combat.monster_strength}`
-    : String(props.projection.you.combat_strength);
+    : String(props.projection.you.strength_breakdown.total_strength);
 });
 const strengthDisabled = computed(() => ["door-choice", "run-away", "result", "required-decision"].includes(
   props.presentationModel.primary.kind,
@@ -134,7 +95,7 @@ const strengthDisabled = computed(() => ["door-choice", "run-away", "result", "r
   min-width: 0;
   height: 32px;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
 }
@@ -147,6 +108,7 @@ const strengthDisabled = computed(() => ["door-choice", "run-away", "result", "r
 }
 
 .mobile-game-header__phase {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   overflow: hidden;
@@ -168,6 +130,7 @@ const strengthDisabled = computed(() => ["door-choice", "run-away", "result", "r
 
 .mobile-game-header__pager,
 .mobile-game-header__strength {
+  box-sizing: border-box;
   height: 25px;
   display: inline-flex;
   align-items: center;
@@ -194,6 +157,7 @@ const strengthDisabled = computed(() => ["door-choice", "run-away", "result", "r
   font-size: 14px;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
+  justify-self: center;
 }
 
 .mobile-game-header__turn {
@@ -206,6 +170,7 @@ const strengthDisabled = computed(() => ["door-choice", "run-away", "result", "r
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+  justify-self: end;
 }
 
 .mobile-game-details {

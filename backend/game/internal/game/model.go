@@ -156,22 +156,52 @@ type CardInstance struct {
 }
 
 type Player struct {
-	ID               string            `json:"id"`
-	Name             string            `json:"name"`
-	Level            int               `json:"level"`
-	CharacterTags    []string          `json:"character_tags,omitempty"`
-	SuppressedTags   []string          `json:"suppressed_tags,omitempty"`
-	Hand             []string          `json:"hand,omitempty"`
-	Carried          []string          `json:"carried,omitempty"`
-	Equipped         []string          `json:"equipped,omitempty"`
-	Traits           []string          `json:"traits,omitempty"`
-	Attachments      []string          `json:"attachments,omitempty"`
-	PersistentCurses []string          `json:"persistent_curses,omitempty"`
-	CheatTargets     map[string]string `json:"cheat_targets,omitempty"`
-	SetupDone        bool              `json:"setup_done"`
-	Dead             bool              `json:"dead"`
-	NeedsRedraw      bool              `json:"needs_redraw"`
-	CredentialHash   string            `json:"credential_hash"`
+	ID                  string            `json:"id"`
+	Name                string            `json:"name"`
+	Level               int               `json:"level"`
+	CharacterTags       []string          `json:"character_tags,omitempty"`
+	SuppressedTags      []string          `json:"suppressed_tags,omitempty"`
+	Hand                []string          `json:"hand,omitempty"`
+	Carried             []string          `json:"carried,omitempty"`
+	Equipped            []string          `json:"equipped,omitempty"`
+	Traits              []string          `json:"traits,omitempty"`
+	Attachments         []string          `json:"attachments,omitempty"`
+	PersistentCurses    []string          `json:"persistent_curses,omitempty"`
+	CheatTargets        map[string]string `json:"cheat_targets,omitempty"`
+	SetupDone           bool              `json:"setup_done"`
+	SetupDiscardPending bool              `json:"setup_discard_pending,omitempty"`
+	Dead                bool              `json:"dead"`
+	NeedsRedraw         bool              `json:"needs_redraw"`
+	CredentialHash      string            `json:"credential_hash"`
+}
+
+type CombatReward struct {
+	PlayerID            string   `json:"player_id"`
+	TreasureInstanceIDs []string `json:"treasure_instance_ids,omitempty"`
+	LevelsGained        int      `json:"levels_gained"`
+}
+
+func (reward CombatReward) clone() CombatReward {
+	clone := reward
+	clone.TreasureInstanceIDs = append(
+		[]string(nil),
+		reward.TreasureInstanceIDs...,
+	)
+	return clone
+}
+
+type CombatResult struct {
+	Outcome string         `json:"outcome"`
+	Rewards []CombatReward `json:"rewards,omitempty"`
+}
+
+func (result CombatResult) clone() *CombatResult {
+	clone := result
+	clone.Rewards = make([]CombatReward, len(result.Rewards))
+	for index, reward := range result.Rewards {
+		clone.Rewards[index] = reward.clone()
+	}
+	return &clone
 }
 
 func (player Player) clone() Player {
@@ -552,6 +582,7 @@ func (decision *PendingDecision) clone() *PendingDecision {
 
 type Turn struct {
 	PlayerID     string             `json:"player_id"`
+	Number       uint32             `json:"number,omitempty"`
 	Phase        Phase              `json:"phase"`
 	Encounter    *Encounter         `json:"encounter,omitempty"`
 	Resolving    []string           `json:"resolving,omitempty"`
@@ -654,6 +685,7 @@ type State struct {
 	RulesProfileID             string                  `json:"rules_profile_id"`
 	RulesProfileVersion        int                     `json:"rules_profile_version"`
 	WinnerPlayerID             string                  `json:"winner_player_id,omitempty"`
+	RecentCombatResult         *CombatResult           `json:"recent_combat_result,omitempty"`
 	InteractionWindow          *InteractionWindow      `json:"interaction_window,omitempty"`
 	SuspendedInteractionWindow *InteractionWindow      `json:"suspended_interaction_window,omitempty"`
 	CombatHelpOffer            *CombatHelpOffer        `json:"combat_help_offer,omitempty"`
@@ -726,6 +758,9 @@ func (state State) Clone() State {
 	if state.DeathLoot != nil {
 		clone.DeathLoot = state.DeathLoot.clone()
 	}
+	if state.RecentCombatResult != nil {
+		clone.RecentCombatResult = state.RecentCombatResult.clone()
+	}
 	return clone
 }
 
@@ -796,6 +831,12 @@ func (state State) Validate() error {
 		if player.Dead && !player.NeedsRedraw {
 			return fmt.Errorf("%w: dead player must await redraw", ErrIllegalCommand)
 		}
+		if player.SetupDone && player.SetupDiscardPending {
+			return fmt.Errorf(
+				"%w: completed setup cannot require discard",
+				ErrIllegalCommand,
+			)
+		}
 		for attachmentID, targetID := range player.CheatTargets {
 			if !slices.Contains(player.Attachments, attachmentID) ||
 				(!slices.Contains(player.Carried, targetID) &&
@@ -826,6 +867,16 @@ func (state State) Validate() error {
 				state.Turn.Pending.ActorID != state.Turn.PlayerID &&
 					!profile.TargetAndRunAway) {
 			return fmt.Errorf("%w: invalid pending actor", ErrIllegalCommand)
+		}
+		for _, player := range state.Players {
+			if player.SetupDiscardPending &&
+				(state.Turn.Phase != PhaseSetup ||
+					state.Turn.PlayerID != player.ID) {
+				return fmt.Errorf(
+					"%w: setup discard belongs to inactive player",
+					ErrIllegalCommand,
+				)
+			}
 		}
 	case StatusFinished:
 		if state.PlayerIndex(state.WinnerPlayerID) < 0 {

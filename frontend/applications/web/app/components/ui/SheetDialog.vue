@@ -9,11 +9,15 @@ const props = withDefaults(defineProps<{
   open: boolean;
   title: string;
   description?: string;
+  compactTitle?: string;
+  compactDescription?: string;
   titleID?: string;
   dismissible?: boolean;
   closeLabel?: string;
 }>(), {
   description: "",
+  compactTitle: "",
+  compactDescription: "",
   titleID: "",
   dismissible: true,
   closeLabel: "Закрыть",
@@ -113,8 +117,9 @@ onBeforeUnmount(() => {
   <dialog
     ref="dialog"
     class="sheet-dialog"
+    tabindex="0"
     :aria-labelledby="resolvedTitleID"
-    :aria-describedby="description ? `${resolvedTitleID}-description` : undefined"
+    :aria-describedby="description || compactDescription ? `${resolvedTitleID}-description` : undefined"
     aria-modal="true"
     @cancel="handleCancel"
     @close="handleNativeClose"
@@ -123,20 +128,26 @@ onBeforeUnmount(() => {
     <form class="sheet-dialog__surface" method="dialog" @click.stop>
       <header class="sheet-dialog__header">
         <div>
-          <h2 :id="resolvedTitleID" tabindex="-1" data-dialog-autofocus>{{ title }}</h2>
-          <p v-if="description" :id="`${resolvedTitleID}-description`">
-            {{ description }}
+          <h2 :id="resolvedTitleID" tabindex="-1" data-dialog-autofocus>
+            <span class="sheet-dialog__desktop-copy">{{ title }}</span>
+            <span class="sheet-dialog__compact-copy">{{ compactTitle || title }}</span>
+          </h2>
+          <p v-if="description || compactDescription" :id="`${resolvedTitleID}-description`">
+            <span class="sheet-dialog__desktop-copy">{{ description }}</span>
+            <span class="sheet-dialog__compact-copy">{{ compactDescription || description }}</span>
           </p>
         </div>
-        <button
-          v-if="dismissible"
-          class="sheet-dialog__close"
-          type="button"
-          :aria-label="closeLabel"
-          @click="requestClose"
-        >
-          {{ closeLabel }}
-        </button>
+        <slot name="header-action">
+          <button
+            v-if="dismissible"
+            class="sheet-dialog__close"
+            type="button"
+            :aria-label="closeLabel"
+            @click="requestClose"
+          >
+            {{ closeLabel }}
+          </button>
+        </slot>
       </header>
       <div class="sheet-dialog__content">
         <slot />
@@ -191,6 +202,8 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
+.sheet-dialog__compact-copy { display: none; }
+
 .sheet-dialog__header [data-dialog-autofocus]:focus {
   outline: none;
 }
@@ -228,26 +241,35 @@ onBeforeUnmount(() => {
   gap: var(--space-2);
 }
 
+@media (width <= 1023px) {
+  .sheet-dialog {
+    width: min(560px, calc(100% - 24px));
+    max-height: min(470px, calc(100dvh - 24px));
+    margin: auto auto max(12px, env(safe-area-inset-bottom, 0px));
+    border-radius: 24px;
+  }
+
+  .sheet-dialog__surface {
+    min-height: min(470px, calc(100dvh - 24px));
+    max-height: min(470px, calc(100dvh - 24px));
+    box-sizing: border-box;
+    padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .sheet-dialog__desktop-copy { display: none; }
+  .sheet-dialog__compact-copy { display: inline; }
+
+  .sheet-dialog__footer { margin-top: auto; }
+}
+
 @media (width <= 599px) {
   .sheet-dialog {
     width: 100%;
-    max-height: calc(100dvh - 170px);
     margin: auto 0 0;
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
     border-radius: 24px 24px 0 0;
-  }
-
-  .sheet-dialog__surface {
-    min-height: min(470px, calc(100dvh - 170px));
-    max-height: calc(100dvh - 170px);
-    box-sizing: border-box;
-    padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .sheet-dialog__footer {
-    margin-top: auto;
   }
 
   .sheet-dialog.mobile-door-decision .sheet-dialog__surface {

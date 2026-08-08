@@ -15,7 +15,7 @@ import {createFixtureAdapter} from "./fixtures/fixtureAdapter";
 const fixtures = createFixtureAdapter();
 
 describe("generic interaction surface model", () => {
-  it("keeps a pass-only interaction visible and dismissible", () => {
+  it("keeps a required pass-only interaction visible and non-dismissible", () => {
     const projection = fixtures.getProjection("interaction-pass-only");
     const interaction = projection.interaction;
     if (!interaction) {
@@ -24,7 +24,7 @@ describe("generic interaction surface model", () => {
     const action = interaction.actions[0];
 
     expect(interactionTitle(interaction)).toBe("Открытое решение");
-    expect(interactionCanDismiss(interaction)).toBe(true);
+    expect(interactionCanDismiss(interaction)).toBe(false);
     expect(action && actionIsSelectable(action)).toBe(true);
     expect(action && interactionActionIntent(action)).toBe("pass");
   });

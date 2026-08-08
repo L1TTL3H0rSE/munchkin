@@ -7,6 +7,7 @@ import type {
 } from "@munchkin/contracts";
 import StudioCardList from "./StudioCardList.vue";
 import StudioJobHistory from "./StudioJobHistory.vue";
+import CardPresentation from "../game/primitives/CardPresentation.vue";
 import {createCardStudioAPI} from "./useCardStudioApi";
 
 const token = ref("");
@@ -438,10 +439,10 @@ function delay(milliseconds: number) {
             <h2>Preview & approve</h2>
           </div>
           <div class="studio-preview-grid">
-            <GameCard
+            <CardPresentation
               v-if="previewCard"
               :card="previewCard"
-              content-set-id="moscow-core"
+              :variant="previewCard.kind === 'monster' || previewCard.kind === 'curse' ? 'encounter' : 'choice'"
               :image-url="previewURL"
             />
             <div class="studio-preview-meta">

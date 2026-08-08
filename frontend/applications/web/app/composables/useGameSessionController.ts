@@ -56,6 +56,11 @@ export interface GameSessionAPI {
     payload?: CommandPayload,
     options?: GameCommandOptions,
   ) => Promise<CommandResult>;
+  requestCombatResolution: (
+    gameID: string,
+    credential: string,
+    expectedVersion: number,
+  ) => Promise<CommandResult>;
   interaction: (
     gameID: string,
     credential: string,
@@ -554,14 +559,20 @@ export function createGameSessionController(
 
     const execute = () => withRequest(
       owner,
-      (signal) => options.api.command(
-        currentGameID,
-        credential,
-        action.type,
-        current.version,
-        payload,
-        {commandID, signal},
-      ),
+      (signal) => action.type === "request_combat_resolution"
+        ? options.api.requestCombatResolution(
+          currentGameID,
+          credential,
+          current.version,
+        )
+        : options.api.command(
+          currentGameID,
+          credential,
+          action.type,
+          current.version,
+          payload,
+          {commandID, signal},
+        ),
     );
 
     try {

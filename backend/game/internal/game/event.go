@@ -9,22 +9,23 @@ import (
 )
 
 const (
-	EventLobbyCreated     = "game.v1.lobby_created"
-	EventPlayerJoined     = "game.v2.player_joined"
-	EventGameStarted      = "game.v2.game_started"
-	EventSetupFinished    = "game.v2.setup_finished"
-	EventCardPlayed       = "game.v2.card_played"
-	EventEquipmentChanged = "game.v2.equipment_changed"
-	EventItemsSold        = "game.v2.items_sold"
-	EventDoorOpened       = "game.v2.door_opened"
-	EventTroubleSought    = "game.v2.trouble_sought"
-	EventRoomLooted       = "game.v2.room_looted"
-	EventCombatAction     = "game.v2.combat_action"
-	EventCombatResolved   = "game.v2.combat_resolved"
-	EventRunAwayResolved  = "game.v2.run_away_resolved"
-	EventEffectResolved   = "game.v2.effect_resolved"
-	EventCharityResolved  = "game.v2.charity_resolved"
-	EventTurnAdvanced     = "game.v2.turn_advanced"
+	EventLobbyCreated         = "game.v1.lobby_created"
+	EventPlayerJoined         = "game.v2.player_joined"
+	EventGameStarted          = "game.v2.game_started"
+	EventSetupFinished        = "game.v2.setup_finished"
+	EventSetupDiscardRequired = "game.v1.setup_discard_required"
+	EventCardPlayed           = "game.v2.card_played"
+	EventEquipmentChanged     = "game.v2.equipment_changed"
+	EventItemsSold            = "game.v2.items_sold"
+	EventDoorOpened           = "game.v2.door_opened"
+	EventTroubleSought        = "game.v2.trouble_sought"
+	EventRoomLooted           = "game.v2.room_looted"
+	EventCombatAction         = "game.v2.combat_action"
+	EventCombatResolved       = "game.v2.combat_resolved"
+	EventRunAwayResolved      = "game.v2.run_away_resolved"
+	EventEffectResolved       = "game.v2.effect_resolved"
+	EventCharityResolved      = "game.v2.charity_resolved"
+	EventTurnAdvanced         = "game.v2.turn_advanced"
 
 	EventInteractionWindowOpened     = "game.v1.interaction_window_opened"
 	EventInteractionResponseRecorded = "game.v1.interaction_response_recorded"
@@ -224,6 +225,7 @@ func Apply(state State, event DomainEvent) (State, error) {
 	case EventPlayerJoined,
 		EventGameStarted,
 		EventSetupFinished,
+		EventSetupDiscardRequired,
 		EventCardPlayed,
 		EventEquipmentChanged,
 		EventItemsSold,

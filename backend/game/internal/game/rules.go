@@ -109,28 +109,39 @@ func economyOfferWindow(
 	}, nil
 }
 
-func charityRecipientIDs(state State, allocatorIndex int) []string {
+func charityRecipientIDs(
+	state State,
+	allocatorIndex int,
+	pack Pack,
+) ([]string, error) {
 	minimumLevel := 0
-	for index, player := range state.Players {
-		if index == allocatorIndex || player.Dead {
+	for _, player := range state.Players {
+		if player.Dead {
 			continue
 		}
 		if minimumLevel == 0 || player.Level < minimumLevel {
 			minimumLevel = player.Level
 		}
 	}
-	if minimumLevel == 0 {
-		return nil
+	if minimumLevel == 0 || state.Players[allocatorIndex].Level == minimumLevel {
+		return nil, nil
 	}
 	recipients := make([]string, 0, len(state.Players)-1)
 	for offset := 1; offset < len(state.Players); offset++ {
 		index := (allocatorIndex + offset) % len(state.Players)
 		player := state.Players[index]
-		if !player.Dead && player.Level == minimumLevel {
+		if player.Dead || player.Level != minimumLevel {
+			continue
+		}
+		limit, err := handLimit(state, index, pack)
+		if err != nil {
+			return nil, err
+		}
+		if len(player.Hand) <= limit {
 			recipients = append(recipients, player.ID)
 		}
 	}
-	return recipients
+	return recipients, nil
 }
 
 func charityTransferWindow(
@@ -1635,8 +1646,9 @@ func canCarryItem(state State, playerIndex int, instanceID string, pack Pack) er
 
 func canEquip(state State, playerIndex int, instanceID string, pack Pack) error {
 	player := state.Players[playerIndex]
-	if !slices.Contains(player.Carried, instanceID) {
-		return fmt.Errorf("%w: item is not carried", ErrIllegalCommand)
+	fromHand := slices.Contains(player.Hand, instanceID)
+	if !fromHand && !slices.Contains(player.Carried, instanceID) {
+		return fmt.Errorf("%w: item is not actor-owned", ErrIllegalCommand)
 	}
 	card, _, exists := pack.DefinitionForInstance(state, instanceID)
 	if !exists || card.Item == nil {
@@ -1678,6 +1690,9 @@ func canEquip(state State, playerIndex int, instanceID string, pack Pack) error 
 			bigItems++
 		}
 	}
+	if fromHand && card.Item.Size == SizeBig && !isCheated(player, instanceID) {
+		bigItems++
+	}
 	if card.Item.Slot == SlotHands && handsUsed+card.Item.Hands > 2 {
 		return fmt.Errorf("%w: not enough free hands", ErrIllegalCommand)
 	}
@@ -1694,6 +1709,60 @@ func canEquip(state State, playerIndex int, instanceID string, pack Pack) error 
 		return fmt.Errorf("%w: too many big items", ErrIllegalCommand)
 	}
 	return nil
+}
+
+type PersonalStrengthBreakdown struct {
+	BaseStrength   int
+	EquipmentBonus int
+	TemporaryBonus int
+	TotalStrength  int
+}
+
+func personalStrengthBreakdown(
+	state State,
+	playerIndex int,
+	pack Pack,
+) (PersonalStrengthBreakdown, error) {
+	player := state.Players[playerIndex]
+	breakdown := PersonalStrengthBreakdown{BaseStrength: player.Level}
+	cards, err := playerDefinitions(state, player, pack, player.Equipped)
+	if err != nil {
+		return PersonalStrengthBreakdown{}, err
+	}
+	for _, card := range cards {
+		if card.Item != nil {
+			breakdown.EquipmentBonus += card.Item.Bonus
+		}
+	}
+	var monsterTags []string
+	if state.Turn.Encounter != nil && state.Turn.PlayerID == player.ID {
+		monster, _, exists := pack.DefinitionForInstance(
+			state,
+			state.Turn.Encounter.MonsterInstanceID,
+		)
+		if !exists || monster.Monster == nil {
+			return PersonalStrengthBreakdown{}, fmt.Errorf(
+				"%w: invalid monster encounter",
+				ErrInvalidContent,
+			)
+		}
+		monsterTags = monster.Monster.Tags
+		breakdown.TemporaryBonus += state.Turn.Encounter.PlayerCombatModifier
+	}
+	modifier, err := activePlayerModifiers(
+		state,
+		player,
+		pack,
+		ModifierPlayerCombat,
+		monsterTags,
+	)
+	if err != nil {
+		return PersonalStrengthBreakdown{}, err
+	}
+	breakdown.TemporaryBonus += modifier
+	breakdown.TotalStrength = breakdown.BaseStrength +
+		breakdown.EquipmentBonus + breakdown.TemporaryBonus
+	return breakdown, nil
 }
 
 func traitCapacity(

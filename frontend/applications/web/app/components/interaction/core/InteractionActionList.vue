@@ -29,42 +29,48 @@ function selectAction(action: InteractionActionView): void {
   <fieldset
     v-if="actions.length"
     class="interaction-actions"
+    role="listbox"
+    aria-label="Доступные действия текущего окна"
     :disabled="busy || terminal"
   >
     <legend>Доступные действия текущего окна</legend>
-    <label
+    <button
       v-for="(action, actionIndex) in actions"
       :key="interactionActionKey(action)"
+      type="button"
+      role="option"
+      :aria-selected="action.action_id === selectedActionId"
       class="interaction-action"
       :class="{
         'interaction-action--selected': action.action_id === selectedActionId,
       }"
       :data-state="action.action_id === selectedActionId ? 'selected' : 'available'"
+      :disabled="busy || terminal"
+      @click="selectAction(action)"
     >
-      <input
-        type="radio"
-        name="interaction-action"
-        :value="action.action_id"
-        :checked="action.action_id === selectedActionId"
-        :disabled="busy || terminal"
-        @change="selectAction(action)"
-      >
-      <span>
+      <span class="interaction-action__illustration" aria-hidden="true">
+        <i />
+        <i />
+      </span>
+      <span class="interaction-action__copy">
         <strong>{{ labelFor(action, actionIndex) }}</strong>
         <small>{{ detailsFor(action).join(" · ") }}</small>
       </span>
-    </label>
+    </button>
   </fieldset>
 </template>
 
 <style scoped>
 .interaction-actions {
-  display: grid;
-  gap: .65rem;
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
   min-width: 0;
   margin: 0;
   border: 0;
   padding: 0;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
 }
 
 .interaction-actions legend {
@@ -75,30 +81,55 @@ function selectAction(action: InteractionActionView): void {
 }
 
 .interaction-action {
+  flex: 0 0 150px;
+  min-width: 150px;
+  height: 218px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: .75rem;
-  min-width: 0;
+  grid-template-rows: 92px minmax(0, 1fr);
+  overflow: hidden;
   border: 1px solid var(--color-line, #566044);
-  padding: .8rem;
+  border-radius: 14px;
+  padding: 0;
+  color: var(--color-text-primary);
+  background: var(--color-surface-card);
+  box-shadow: 0 7px 18px rgb(59 46 40 / 14%);
+  font: inherit;
+  text-align: start;
   cursor: pointer;
+  scroll-snap-align: center;
 }
 
 .interaction-action--selected {
-  border-color: var(--color-accent-strong);
-  color: var(--color-text);
-  background: var(--color-paper);
+  border: 3px solid var(--color-accent-strong);
 }
 
-.interaction-action input {
-  margin-top: .25rem;
+.interaction-action__illustration {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: #aabdb5;
 }
 
-.interaction-action span {
+.interaction-action__illustration::before,
+.interaction-action__illustration::after,
+.interaction-action__illustration i {
+  position: absolute;
+  display: block;
+  content: "";
+  border: 2px solid rgb(255 249 239 / 82%);
+  transform: rotate(45deg);
+}
+.interaction-action__illustration::before { width: 44px; height: 44px; top: 24px; left: 52px; }
+.interaction-action__illustration::after { width: 84px; top: 53px; left: 34px; border-width: 1px 0 0; transform: rotate(-18deg); }
+.interaction-action__illustration i:first-child { width: 9px; height: 9px; top: 16px; right: 18px; border-radius: 50%; background: rgb(255 249 239 / 82%); transform: none; }
+.interaction-action__illustration i:last-child { width: 120px; top: 42px; left: -10px; border-width: 1px 0 0; transform: rotate(34deg); }
+
+.interaction-action__copy {
   display: grid;
-  gap: .25rem;
+  align-content: start;
+  gap: 8px;
   min-width: 0;
+  padding: 12px 10px;
 }
 
 .interaction-action strong,
@@ -109,7 +140,10 @@ function selectAction(action: InteractionActionView): void {
 
 .interaction-action small {
   color: var(--color-text-muted, #9eaa8e);
+  font-size: 9px;
 }
+
+.interaction-action strong { font-size: 11px; }
 
 @media (forced-colors: active) {
   .interaction-action {

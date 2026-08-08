@@ -16,6 +16,13 @@ const projection = {
     name: "Алиса",
     level: 2,
     combat_strength: 4,
+    strength_breakdown: {
+      base_strength: 2,
+      equipment_bonus: 0,
+      temporary_bonus: 2,
+      total_strength: 4,
+      hand_count: 0,
+    },
     escape_bonus: 1,
     hand_limit: 5,
     character_tags: [],

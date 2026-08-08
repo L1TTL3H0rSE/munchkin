@@ -1,9 +1,10 @@
 import {describe, expect, it} from "vitest";
 
 import {
-  buildGamePresentation,
-  useGamePresentation,
-} from "../app/composables/useGamePresentation";
+  buildGamePresentationModel,
+  hasActionableDeadline,
+  projectedTurnActions,
+} from "../app/components/game/gamePresentationModel";
 import {
   advisoryRemainingMilliseconds,
   formatAdvisoryTime,
@@ -14,55 +15,36 @@ import {fixtureAdapter} from "./fixtures/fixtureAdapter";
 describe("game presentation model", () => {
   it("maps every actor-safe fixture into explicit state families", () => {
     for (const fixture of fixtureAdapter.list()) {
-      const presentation = buildGamePresentation(fixture.projection);
-
-      expect(presentation.status.kind).toBeDefined();
-      expect(presentation.phase.kind).toBeDefined();
-      expect(presentation.encounter.kind).toBeDefined();
-      expect(presentation.combat.kind).toBeDefined();
-      expect(presentation.runAway.kind).toBeDefined();
-      expect(presentation.decision.kind).toBeDefined();
+      const presentation = buildGamePresentationModel(fixture.projection);
+      expect(presentation.family).toBeDefined();
+      expect(presentation.primary.kind).toBeDefined();
+      expect(presentation.desktopNodeID).toBeTruthy();
+      expect(presentation.mobileNodeID).toBeTruthy();
     }
   });
 
   it("keeps authoritative combat and multiple monsters separate", () => {
     const projection = fixtureAdapter.getProjection("advanced-combat");
-    const presentation = buildGamePresentation(projection);
+    const presentation = buildGamePresentationModel(projection);
 
-    expect(presentation.phase.kind).toBe("combat");
-    expect(presentation.encounter.kind).toBe("card");
-    expect(presentation.combat.kind).toBe("active");
-    if (presentation.combat.kind !== "active") {
-      throw new Error("expected active combat");
-    }
-    expect(presentation.combat.combat.monsters).toHaveLength(2);
-    expect(presentation.interactionActions).toHaveLength(5);
+    expect(presentation.family).toBe("combat");
+    expect(presentation.primary.kind).toBe("combat");
+    expect(presentation.encounterCards).toHaveLength(2);
+    expect(projection.interaction?.actions).toHaveLength(5);
   });
 
   it("does not enable interaction actions for an observer projection", () => {
     const projection = fixtureAdapter.getProjection("advanced-observer");
-    const presentation = buildGamePresentation(projection);
-
-    expect(presentation.interactionActions).toHaveLength(0);
-    expect(presentation.hasActionableInteraction).toBe(false);
+    expect(projection.interaction?.actions ?? []).toHaveLength(0);
+    expect(hasActionableDeadline(projection)).toBe(false);
   });
 
   it("retains server actions without inferring them from the phase", () => {
     const projection = fixtureAdapter.getProjection("single-preparation");
     const before = JSON.stringify(projection);
-    const presentation = buildGamePresentation(projection);
-
-    expect(presentation.turnActions.map((entry) => entry.action.type))
+    expect(projectedTurnActions(projection).map((action) => action.type))
       .toEqual(["open_door"]);
     expect(JSON.stringify(projection)).toBe(before);
-  });
-
-  it("exposes the same pure model through the composable", () => {
-    const projection = fixtureAdapter.getProjection("single-finished");
-    const presentation = useGamePresentation(projection);
-
-    expect(presentation.value?.status.kind).toBe("finished");
-    expect(presentation.value?.status.isFinished).toBe(true);
   });
 
   it("keeps timer presentation advisory and deterministic", () => {

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {computed, ref, watch} from "vue";
-import type {Projection} from "@munchkin/contracts";
-import GameCard from "../GameCard.vue";
+import CardPresentation from "../game/primitives/CardPresentation.vue";
 
 import {
   interactionIsTerminal,
@@ -16,7 +15,6 @@ import {
 } from "./deathLootModel";
 
 const props = defineProps<{
-  projection: Projection;
   interaction: DeathLootInteraction;
   busy: boolean;
 }>();
@@ -87,23 +85,37 @@ function submitPass(): void {
       novalidate
       @submit.prevent="submitPick"
     >
-      <fieldset :disabled="busy || terminal">
-        <legend>Доступные карты</legend>
-        <label
-          v-for="option in options"
-          :key="option.action.action_id"
-          class="death-loot-option"
-          :class="{'death-loot-option--selected': option.action.action_id === selectedActionID}"
+      <div class="death-loot-form__choices">
+        <fieldset
+          :disabled="busy || terminal"
+          role="listbox"
+          aria-label="Доступные карты погибшего игрока"
         >
-          <input
-            v-model="selectedActionID"
-            type="radio"
-            name="death-loot-option"
-            :value="option.action.action_id"
+          <legend>Доступные карты</legend>
+          <button
+            v-for="option in options"
+            :key="option.action.action_id"
+            type="button"
+            role="option"
+            :aria-selected="option.action.action_id === selectedActionID"
+            class="death-loot-option"
+            :class="{'death-loot-option--selected': option.action.action_id === selectedActionID}"
+            @click="selectedActionID = option.action.action_id"
           >
-          <GameCard :card="option.card" :content-set-id="projection.content_set_id" choice />
-        </label>
-      </fieldset>
+            <CardPresentation :card="option.card" variant="choice" />
+          </button>
+        </fieldset>
+        <button
+          v-if="passAction"
+          class="death-loot-submit death-loot-submit--secondary"
+          type="button"
+          :disabled="busy || terminal"
+          @click="submitPass"
+        >
+          <span>ПРОПУСТИТЬ</span>
+          <small>Не брать карту</small>
+        </button>
+      </div>
       <button
         class="death-loot-submit"
         type="submit"
@@ -112,18 +124,6 @@ function submitPass(): void {
         {{ busy ? "Отправляем выбор…" : "Забрать карту" }}
       </button>
     </form>
-
-    <div v-if="passAction" class="death-loot-pass">
-      <button
-        class="death-loot-submit death-loot-submit--secondary"
-        type="button"
-        :disabled="busy || terminal"
-        @click="submitPass"
-      >
-        <span>ПРОПУСТИТЬ</span>
-        <small>Не брать карту</small>
-      </button>
-    </div>
 
     <p v-if="!options.length && !terminal" class="death-loot-surface__opaque" role="status">
       Доступных карт сейчас нет.
@@ -144,13 +144,8 @@ function submitPass(): void {
 
 .death-loot-surface__header,
 .death-loot-form,
-.death-loot-pass {
-  min-width: 0;
-}
-
 .death-loot-surface__header h3,
 .death-loot-surface__header p,
-.death-loot-pass small,
 .death-loot-surface__opaque,
 .death-loot-surface__result {
   margin: 0;
@@ -159,7 +154,6 @@ function submitPass(): void {
 }
 
 .death-loot-surface__header p,
-.death-loot-pass small,
 .death-loot-surface__opaque {
   color: var(--muted);
 }
@@ -204,8 +198,8 @@ function submitPass(): void {
 }
 
 .death-loot-surface {
-  height: 410px;
-  grid-template-rows: auto 1fr auto;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
   box-sizing: border-box;
   border: 0;
@@ -215,36 +209,46 @@ function submitPass(): void {
 .death-loot-surface__header { display: block; }
 .death-loot-surface__header h3 { margin: 0; color: var(--color-text-primary); font-size: 20px; line-height: 24px; }
 .death-loot-surface__header p { margin: 6px 0 0; color: var(--color-text-secondary); font-size: 12px; line-height: 16px; }
-.death-loot-form { align-self: stretch; display: contents; }
-.death-loot-form fieldset {
+.death-loot-form {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+.death-loot-form__choices {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 42px;
-  overflow: hidden;
+  justify-content: start;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 6px;
+  scroll-snap-type: x proximity;
+}
+.death-loot-form fieldset {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: visible;
 }
 .death-loot-form legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .death-loot-option {
   position: relative;
+  flex: 0 0 auto;
   display: block;
   border: 0;
   padding: 0;
+  background: transparent;
+  scroll-snap-align: center;
 }
-.death-loot-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .death-loot-option--selected :deep(.choice-card-presentation) { border-color: var(--color-action-primary); }
 .death-loot-submit:not(.death-loot-submit--secondary) {
-  position: absolute;
-  right: 16px;
-  bottom: 14px;
+  justify-self: end;
   width: 180px;
   min-height: 44px;
 }
-.death-loot-pass {
-  position: absolute;
-  top: 126px;
-  right: 42px;
-}
 .death-loot-submit--secondary {
+  flex: 0 0 auto;
   width: 150px;
   height: 218px;
   display: grid;
@@ -258,6 +262,7 @@ function submitPass(): void {
   background: linear-gradient(#aabdb5 0 92px, var(--color-surface-card) 92px);
   box-shadow: 0 7px 18px rgb(59 46 40 / 14%);
   text-align: start;
+  scroll-snap-align: center;
 }
 .death-loot-submit--secondary span { font-size: 11px; font-weight: 600; }
 .death-loot-submit--secondary small { color: var(--color-text-muted); font-size: 9px; }
@@ -266,5 +271,11 @@ function submitPass(): void {
   color: var(--color-text-muted);
   font-size: 9px;
   letter-spacing: .04em;
+}
+
+@media (width < 600px) {
+  .death-loot-submit:not(.death-loot-submit--secondary) {
+    width: 100%;
+  }
 }
 </style>

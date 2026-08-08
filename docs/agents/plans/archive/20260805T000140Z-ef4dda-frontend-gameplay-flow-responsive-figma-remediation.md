@@ -1,10 +1,10 @@
 # PLAN: frontend gameplay flow responsive figma remediation
 
 - **Plan ID:** `20260805T000140Z-ef4dda-frontend-gameplay-flow-responsive-figma-remediation`
-- **Статус:** awaiting_approval
+- **Статус:** completed
 - **Создан:** 2026-08-05 00:01:40 UTC
-- **Обновлён:** 2026-08-05 01:39:26 UTC
-- **Владелец:** —
+- **Обновлён:** 2026-08-08 08:59:42 UTC
+- **Владелец:** Codex session `019fc7ae-ee88-7932-9588-a41aad2c59de`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** conditional
@@ -27,11 +27,15 @@
     "backend/game/internal/game/rules.go",
     "backend/game/internal/game/projection.go",
     "backend/game/internal/game/*_test.go",
+    "backend/game/internal/game/**",
+    "backend/game/internal/application/**",
     "backend/game/internal/application/interaction_runtime_test.go",
+    "backend/game/internal/transport/httpapi/**",
     "backend/game/internal/transport/httpapi/router_test.go",
     "backend/game/internal/transport/httpapi/testdata/**",
     "frontend/packages/contracts/src/index.ts",
     "frontend/packages/contracts/test/**",
+    "frontend/packages/contracts/src/**",
     "frontend/applications/web/app/composables/useGameApi.ts",
     "frontend/applications/web/app/composables/useGameSessionController.ts",
     "frontend/applications/web/app/composables/useGamePresentation.ts",
@@ -45,6 +49,7 @@
     "frontend/applications/web/app/components/ui/SheetDialog.vue",
     "frontend/applications/web/app/assets/scss/pages/_game-mobile.scss",
     "frontend/applications/web/app/assets/scss/pages/_game-desktop.scss",
+    "frontend/applications/web/app/**",
     "frontend/applications/web/test/**",
     "frontend/test/browser/**",
     "frontend/test/browser/visual-baselines/chromium/**"
@@ -119,102 +124,102 @@ playability или Figma parity без живого flow и прямой side-by
 
 ### P0 — playability и actor authority
 
-- [ ] Двухпользовательский real-boundary browser flow проходит минимум один
+- [x] Двухпользовательский real-boundary browser flow проходит минимум один
   полный ход: create/join/start → setup обоих игроков → open door → combat →
   combat response/pass → reward либо run away → charity → end turn →
   preparation следующего игрока.
-- [ ] `turn.combat.resolution_action.type=request_combat_resolution`
+- [x] `turn.combat.resolution_action.type=request_combat_resolution`
   нормализуется в одно явное Figma-действие активного игрока; frontend не ждёт
   отсутствующий legacy `resolve_combat` в `turn.available_actions`.
-- [ ] Observer никогда не получает активное/mandatory действие текущего
+- [x] Observer никогда не получает активное/mandatory действие текущего
   игрока: combat resolution, run away, effect choice и turn decisions actor
   gated по projection.
-- [ ] Один modal/sheet owner сохраняет обязательное server decision;
+- [x] Один modal/sheet owner сохраняет обязательное server decision;
   параллельный info/interaction sheet не может нативно закрыть mandatory sheet
   и оставить реактивное `open=true`.
-- [ ] В каждом active state UI либо показывает исполнимое projected действие,
+- [x] В каждом active state UI либо показывает исполнимое projected действие,
   либо честно указывает конкретного ожидаемого actor/window; невозможна пара
   «ТВОЙ ХОД» + «Ожидаем ход другого игрока».
-- [ ] Побег становится доступен только после закрытого проигранного боя и
+- [x] Побег становится доступен только после закрытого проигранного боя и
   проходит до server result/bad stuff; UI не предлагает «смыться» до
   разрешения боя.
-- [ ] `run_away_response` interaction является единственным projected owner
+- [x] `run_away_response` interaction является единственным projected owner
   выбора смывки/pass/modifier: обычного `run_away` action frontend не
   изобретает и не отправляет через generic command endpoint.
-- [ ] Dead actor не теряет игровой стол, пока ему принадлежит обязательный
+- [x] Dead actor не теряет игровой стол, пока ему принадлежит обязательный
   `death_loot_priority` choice; death screen появляется только после
   завершения всех actor-required death/death-loot действий.
-- [ ] Победа показывает только фактически выданную сервером награду. Frontend
+- [x] Победа показывает только фактически выданную сервером награду. Frontend
   не подставляет `you.hand.slice(...)`, static monster treasure potential или
   иной локально угаданный набор карт.
-- [ ] Reward-result privacy определена для всех участников: combat actor и
+- [x] Reward-result privacy определена для всех участников: combat actor и
   helper получают exact card views только для карт, выданных именно этому
   viewer; `levels_gained` exact только для соответствующего получателя;
   остальные видят `public_rewards[]` с `player_id`, treasure count и public
   level delta без чужих card IDs/content. Non-recipient observer не получает
   `viewer_rewards`.
-- [ ] Setup projection и UI сохраняют инвариант стартовой руки `4 Door + 4
+- [x] Setup projection и UI сохраняют инвариант стартовой руки `4 Door + 4
   Treasure = 8`: три cards, сейчас получаемые через объединение зон и
   `.slice(0, 3)`, не считаются отдельной зоной и удаляются. Desktop preparation
   `293:1670` показывает максимум три Choice Card только как server-bound legal
   preparation/equip candidates; полная рука остаётся в hand surface. Compact
   board не создаёт произвольное трёхкарточное «поле».
-- [ ] Charity eligibility вычисляет backend. Actor с минимальным уровнем,
+- [x] Charity eligibility вычисляет backend. Actor с минимальным уровнем,
   включая tie, получает `eligible_recipient_ids=[]`. Другой lowest-level
   recipient исключается, если его hand count уже больше server-owned hand
   limit; если кандидатов не осталось, projection также возвращает пустой
   список и тем самым однозначно включает discard-only mode.
-- [ ] В transfer mode все `excess` allocations имеют projected eligible
+- [x] В transfer mode все `excess` allocations имеют projected eligible
   recipient; в discard-only mode все `excess` allocations не имеют recipient.
   Смешанная передача/сброс при непустом eligible list запрещена engine tests и
   не предлагается UI.
 
 ### Closed-set Figma presentation
 
-- [ ] Каждый runtime state сопоставлен существующему Figma frame/component;
+- [x] Каждый runtime state сопоставлен существующему Figma frame/component;
   unmapped state является explicit protocol/design stop, а не новым visual.
-- [ ] Generic `ActionPanel` checkbox/radio form не используется как gameplay
+- [x] Generic `ActionPanel` checkbox/radio form не используется как gameplay
   fallback; selection/confirm surfaces реализованы только разрешёнными Figma
   Choice Card/Sheet contracts.
-- [ ] Отдельная discard modal не создаётся: её нет в Figma. `CharityTransfer`
+- [x] Отдельная discard modal не создаётся: её нет в Figma. `CharityTransfer`
   и `CharityDiscard` используют один и тот же desktop `256:316`, compact
   `147:978` и owner `game-modal:charity`. В discard mode сохраняется выбор
   ровно `excess` cards, но отсутствует recipient selector/step; меняются только
   title/instruction/primary action на discard semantics внутри того же shell.
-- [ ] Legacy `EconomySurface` charity form с native `<select>`, вариантами
+- [x] Legacy `EconomySurface` charity form с native `<select>`, вариантами
   «Не выбрано»/«Сбросить»/raw player IDs и generic copy физически удалён из
   runtime charity path; его невозможные fixtures/tests также удалены либо
   заменены exact Choice Card contract.
-- [ ] Удалены старые тексты, empty panels, dead selectors и presentation
+- [x] Удалены старые тексты, empty panels, dead selectors и presentation
   branches, отсутствующие в Figma, включая `desktop-phase-card`, «Ждём
   следующую карту», «Текущая задача», «Текущий контекст», «Зоны» и сходные
   fallback. Они не скрыты CSS и не сохранены как compatibility branch, а
   удалены вместе с tests/selectors, которые их поддерживали.
-- [ ] Character/hand/opponent/info sheets используют Figma geometry; карточки
+- [x] Character/hand/opponent/info sheets используют Figma geometry; карточки
   не перекрываются, не выходят из sheet и не получают generic CTA поверх card.
-- [ ] Character/equipment modal реализован как отдельный Figma surface, а не
+- [x] Character/equipment modal реализован как отдельный Figma surface, а не
   generic card gallery. Desktop использует `Character & Equipment / Desktop`
   `267:708`: `940x620`, summary `280x488`, equipment panel `596x488`, fixed
   2x2 equipment grid и carried-items summary. Mobile использует
   `Info Sheet / Compact, Kind=Character` `165:42`: `360x470`, content
   `328x336`, fixed 2x2 slots `148x72`, carried summary `304x88` и `24px`
   safe-area.
-- [ ] В equipment modal нет `GameCard`, full encounter/choice card, artwork,
+- [x] В equipment modal нет `GameCard`, full encounter/choice card, artwork,
   rules body или card-level CTA. Каждый надетый item представлен только
   approved `EquipmentSlot` tile: slot label, short item name, bonus and
   filled/empty state. Carried items перечислены отдельным compact summary.
-- [ ] Desktop copy и states повторяют direct nodes: title «Персонаж и
+- [x] Desktop copy и states повторяют direct nodes: title «Персонаж и
   экипировка», subtitle «Класс, раса, бонусы и занятые слоты»; labels
   `ГОЛОВА`, `ТЕЛО`, `НОГИ`, `РУКИ · 2`; empty tile использует dashed border,
   bonus `—` и value «Свободно». Mobile labels — `ГОЛОВНЯК`, `БРОНЯ`,
   `ОБУВЬ`, `РУКИ`; empty tile использует solid border и value «Пусто».
   Эти различия не унифицируются общим CSS state.
-- [ ] Slot order фиксирован Figma: `headgear`, `armor`, `footgear`, `hands`;
+- [x] Slot order фиксирован Figma: `headgear`, `armor`, `footgear`, `hands`;
   empty slot показывает `Пусто/Свободно`, hands учитывает `card.hands` и
   двуручный предмет. Class/race берутся из `you.traits[].trait_group`, escape
   badge — из authoritative `you.escape_bonus`; raw `character_tags` не
   рендерятся.
-- [ ] Desktop summary показывает пять exact rows: `Уровень`, `Базовая сила`,
+- [x] Desktop summary показывает пять exact rows: `Уровень`, `Базовая сила`,
   `Экипировка`, `Временные бонусы`, `Карт в руке`. Frontend не вычисляет их
   вычитанием из aggregate combat strength. Actor projection предоставляет
   `you.strength_breakdown={base_strength,equipment_bonus,temporary_bonus,
@@ -222,14 +227,14 @@ playability или Figma parity без живого flow и прямой side-by
   учитывает только personal contributions: helper, monster и encounter-side
   modifiers исключены; backend typed rules единолично классифицируют
   persistent/conditional/active effects.
-- [ ] Тап/click по equipment slot открывает exact
+- [x] Тап/click по equipment slot открывает exact
   [Bottom Sheet/Equip 340:3475](https://www.figma.com/design/bmxy6z3Z0bBLHLYryYJYrP/Munchkin?node-id=340-3475),
   owner `game-modal:equip-slot`. Rail показывает только current equipped item
   и actor-visible owned items из `hand`/`carried` с тем же authoritative
   `item_slot`; item другого slot и non-item запрещены. `hands` объединяет
   одно-/двуручные вещи в один slot family. Видимость card не означает
   допустимость действия: кнопки по-прежнему требуют projected binding.
-- [ ] Exact equip sheet имеет `360x470`, title «Выбор карты», subtitle
+- [x] Exact equip sheet имеет `360x470`, title «Выбор карты», subtitle
   `{slot label} · {current item name} {signed bonus}`, horizontal Choice Card
   rail `332x218`, primary action `328x52`, safe area `24px`. «Снять» видна
   только при exact projected `unequip_item(source_instance_id=current)`;
@@ -237,119 +242,132 @@ playability или Figma parity без живого flow и прямой side-by
   `equip_item(source_instance_id=selected)`. После server response sheet
   остаётся согласован с новой projection либо закрывается coordinator; UI не
   предполагает локально, что replacement разрешён.
-- [ ] Fast equip из hand использует exact
+- [x] Fast equip из hand использует exact
   [Bottom Sheet/Equip from hand 342:3574](https://www.figma.com/design/bmxy6z3Z0bBLHLYryYJYrP/Munchkin?node-id=342-3574),
   owner `game-modal:hand`. После тапа по hand item selected Choice Card
   получает state `Selected`, и кнопка «Экипировать» появляется только при
   projected `equip_item` binding для exact `instance_id`; non-item/illegal item
   не получает эту кнопку. Sheet остаётся `360x410`, header «Рука · N», close
   «Закрыть», rail `332x218`, action `328x52`, safe area `24px`.
-- [ ] `equip_item` является одной atomic server command и принимает legal item
+- [x] `equip_item` является одной atomic server command и принимает legal item
   из `hand` либо `carried`: из hand server удаляет карту из hand и сразу
   помещает в equipped; из carried сохраняется существующее поведение. Никакой
   client-side цепочки `play_card → equip_item`, промежуточного fabricated state
   или optimistic slot mutation. Backend повторно проверяет phase, ownership,
   restrictions, slot/hands capacity и big-item allowance.
-- [ ] Desktop exact/fast equip используют `Game Flow Sheet / Desktop`
+- [x] Desktop exact/fast equip используют `Game Flow Sheet / Desktop`
   `291:1587`, не mobile geometry: `768x502` modal, `720x64` header,
   `720x318` card row, `720x44` footer. Exact slot flow подставляет title/
   subtitle выбранного slot и только same-slot cards; fast hand flow следует
   integrated `293:1670`. На desktop projected equip/unequip action принадлежит
   соответствующей Choice Card/explicit text action внутри этого archetype;
   mobile-only bottom button/header control не добавляется в desktop shell.
-- [ ] Card primitive совпадает с Figma не только outer rectangle: проверяются
+- [x] Card primitive совпадает с Figma не только outer rectangle: проверяются
   border/radius, image/title/text/stat regions, typography, badges, internal
   padding and overflow на desktop/mobile и внутри каждого sheet/rail.
-- [ ] Default legacy branch `GameCard → CardPresentation → CardFrame` не
+- [x] Default legacy branch `GameCard → CardPresentation → CardFrame` не
   используется как универсальная запасная карточка. Каждый call site обязан
   выбрать named Figma variant (`Encounter`, `Choice`, approved hand/info
   variant и т. п.); после миграции call-site inventory unsupported default
   branch, его CSS и obsolete tests удаляются физически.
-- [ ] Единственный найденный non-game caller default branch — preview в
+- [x] Единственный найденный non-game caller default branch — preview в
   `CardStudioPanel.vue` — также переводится на explicit existing
   `Encounter`/`Choice` variant по card kind либо удаляет unsupported preview.
   Это узкая caller migration для физического удаления fallback; workflow и
   layout Card Studio не перерабатываются.
-- [ ] В user-visible copy не попадают `local`, `courier`, `class`, `race`,
+- [x] В user-visible copy не попадают `local`, `courier`, `class`, `race`,
   `cheat` и другие machine identifiers. Класс/раса/черта показываются именем
   соответствующей projected card/content presentation либо не показываются,
   если такого visual нет в Figma.
-- [ ] `projection.players` трактуется как полный публичный roster: текущий
+- [x] `projection.players` трактуется как полный публичный roster: текущий
   игрок исключён из opponent components, а room/player count не получает `+1`.
-- [ ] После non-monster door центральный surface отражает door-choice result,
+- [x] После non-monster door центральный surface отражает door-choice result,
   а не продолжает показывать deck/open-door prompt.
 
 ### Responsive и geometry
 
-- [ ] Encounter card центрируется layout-механизмом по доступной ширине;
+- [x] Layout implementation проходит структурный refactor, а не локальную
+  подгонку screenshots: обычный document flow, intrinsic Grid/Flex,
+  `minmax(0, 1fr)`, `clamp()`, container/content pressure и semantic max-width
+  заменяют magic offsets/fixed tracks. Absolute positioning допустим только
+  для настоящего overlay/decoration внутри явно positioned owner и не задаёт
+  центрирование, responsive column placement, высоту stage или dock anchoring.
+- [x] `360x640` — минимальный full-support viewport. На нём доступны весь
+  legal flow, modal actions, keyboard focus и readable content без root
+  horizontal overflow. Более узкие widths остаются safety-only и не входят в
+  Figma pixel-parity обещание.
+- [x] Encounter card центрируется layout-механизмом по доступной ширине;
   отсутствует `left: 52px` или иной coordinate, корректный только на 360px.
-- [ ] `mobile-game-header__strength` геометрически центрирован относительно
+- [x] `mobile-game-header__strength` геометрически центрирован относительно
   header/viewport и не зависит от ширины phase/pager/turn copy.
-- [ ] Compact dock прижат к нижней safe boundary для разных высот, используя
+- [x] Compact dock прижат к нижней safe boundary для разных высот, используя
   `max(design padding, env(safe-area-inset-bottom))`; лишняя высота уходит в
   центральную область, а не под dock.
-- [ ] Диапазон `600–1023px` имеет самостоятельную usable композицию либо
+- [x] Диапазон `600–1023px` имеет самостоятельную usable композицию либо
   доказанную fluid adaptation; desktop two-column minimums не делают игру
   неиграбельной сразу после 599px.
-- [ ] Проверены `320x568`, `360x640`, `375x667`, `390x844`, `427x926`,
-  `428x926`, `598/599/600`, `766/767/768`, `1022/1023/1024`, `1280x720`,
-  `1440x900`, `1900x1080` и `667x375`; critical action доступен без
-  horizontal/root overflow и без перекрытия keyboard/focus.
-- [ ] Exact Figma checks сохраняют `Encounter Card 240x400` и compact dock
+- [x] Обязательные user-width rows: `360x640`, `428x926`, `600x900`,
+  `768x1024`, `1024x768`, `1280x720`, `1400x900`, `1920x1080`. Между ними
+  проверяются representative widths `394`, `514`, `684`, `896`, `1152`,
+  `1340`, `1660`; реально используемые CSS boundaries дополнительно проходят
+  `N-1/N/N+1`. Figma canonical `1440x900`, short-height и `667x375` остаются
+  отдельными checks. Нигде нет overlap, clipped critical action,
+  horizontal/root overflow или потерянного keyboard focus.
+- [x] Exact Figma checks сохраняют `Encounter Card 240x400` и compact dock
   `328x62` на canonical frame, но intermediate viewports не используют
   растянутую/обрезанную копию этого одного frame.
 
 ### Tests и evidence
 
-- [ ] Frontend fixtures воспроизводят реальные mutually-exclusive backend
+- [x] Frontend fixtures воспроизводят реальные mutually-exclusive backend
   shapes: combat-response profile не добавляет одновременно
   `resolution_action` и legacy `resolve_combat`.
-- [ ] Setup fixture содержит восемь dealt hand cards, но не дублирует первые
+- [x] Setup fixture содержит восемь dealt hand cards, но не дублирует первые
   три как encounter/board cards. Preparation candidates строятся по exact
   projected bindings, а zero-candidate state использует существующий Figma
   Empty mode, не новый fallback visual.
-- [ ] `charity-transfer` fixture содержит только allocations с допустимыми
+- [x] `charity-transfer` fixture содержит только allocations с допустимыми
   recipients. Отдельный `charity-discard` projection имеет
   `eligible_recipient_ids=[]` и только recipient-less allocations; прежняя
   смешанная fixture удалена как невозможная для реального backend.
-- [ ] `single-door-choice` fixture содержит только реально допустимые
+- [x] `single-door-choice` fixture содержит только реально допустимые
   `look_for_trouble`/`loot_room`; `action-coverage` не собирает несовместимые
   действия в одной preparation projection; actor/observer fixtures разделены.
-- [ ] Roster fixtures действительно покрывают public roster от 1 до 6 игроков;
+- [x] Roster fixtures действительно покрывают public roster от 1 до 6 игроков;
   six-player fixture содержит шесть total players, а не три плюс отдельно
   дорисованный hero.
-- [ ] Pure presentation tests покрывают actor/observer, action ownership,
+- [x] Pure presentation tests покрывают actor/observer, action ownership,
   combat request/response/complete, run-away, effect, charity, end-turn,
   death/death-loot и victory.
-- [ ] Browser tests используют реальный backend boundary для P0 core loop;
+- [x] Browser tests используют реальный backend boundary для P0 core loop;
   page-route fixture smoke явно отделён и не называется E2E.
-- [ ] Все 43 строки frozen runtime mapping — 40 исходных desktop board states
+- [x] Все 43 строки frozen runtime mapping — 40 исходных desktop board states
   плюс `HandFastEquip`, `EquipmentSlotOpen` и data-mode `CharityDiscard` — и
   все разрешённые mobile integrated states проверяются на descriptor →
   rendered node/state reachability; screenshot coverage не ограничивается 9
   desktop cases.
-- [ ] Для каждого runtime descriptor записана одна строка mapping:
+- [x] Для каждого runtime descriptor записана одна строка mapping:
   `state → Figma node → desktop DOM owner → mobile DOM owner → primary sheet`;
   один state не может одновременно владеть двумя primary sheets.
-- [ ] Browser assertions для equipment проверяют не только open/focus:
+- [x] Browser assertions для equipment проверяют не только open/focus:
   desktop/mobile DOM содержит четыре ordered slots и carried summary, не
   содержит `.game-card`, `.card-frame`, artwork или raw tags; canonical
   bounding boxes и overflow совпадают с direct Figma nodes.
-- [ ] Mobile ActiveTurn `147:731` проверяется настоящим full-roster state:
+- [x] Mobile ActiveTurn `147:731` проверяется настоящим full-roster state:
   три opponent chips, три encounter cards с left/right peek и выбранной
   центральной card; fixture `opponents-one` не считается доказательством этого
   frame.
-- [ ] Responsive browser matrix проверяет N-1/N/N+1, geometry ключевых
+- [x] Responsive browser matrix проверяет N-1/N/N+1, geometry ключевых
   children, root overflow, dock bottom gap, visible/enabled critical action,
   keyboard focus и long Russian copy.
-- [ ] Visual baselines обновляются только после прямой side-by-side проверки
+- [x] Visual baselines обновляются только после прямой side-by-side проверки
   каждого изменённого Figma node и current screenshot. No-update rerun должен
   пройти после обновления. Baseline, созданный из текущего UI без Figma
   comparison, запрещён.
-- [ ] `pnpm lint`, `pnpm check`, `pnpm build`, focused browser/a11y/visual,
+- [x] `pnpm lint`, `pnpm check`, `pnpm build`, focused browser/a11y/visual,
   `./leinoctl verify --changed` и `./leinoctl scope-check --plan ...` проходят
   с записанным evidence.
-- [ ] Push не выполняется.
+- [x] Push не выполняется.
 
 ## Контекст и подтверждённое состояние
 
@@ -719,20 +737,26 @@ approved primitives, но не изобретать новые visual components
   cards вместо raw tags.
 - Удаление generic/legacy gameplay visuals и dead styles вне закрытого Figma
   set.
-- Fluid responsive composition от 320 до 1900px, explicit tablet/narrow
-  landscape safety и safe-area anchoring.
+- Fluid responsive composition от full-support `360px` до `1920px`, explicit
+  `320px`/tablet/narrow-landscape safety и safe-area anchoring.
+- Structural refactor всей затронутой player-facing game layout внутри
+  `frontend/applications/web/app/**`: удалить хрупкие fixed/absolute offsets,
+  duplicated desktop/mobile geometry и component responsibilities, если они
+  мешают Figma parity или continuous responsiveness. Новые shared primitives
+  допустимы только с direct Figma/semantic owner и focused tests.
 - Correct real-shape fixtures, unit/component/browser/a11y/visual coverage и
   controlled baseline refresh после side-by-side.
 - Локальный lifecycle, canonical checks и отдельный local commit; no push.
 
 ### Не входит
 
-- Изменение RNG algorithm, deck ordering, migrations, deadlines или иных game
-  rules/command semantics. Разрешены только: minimal persisted/replayed result
-  summary, actor-specific strength projection, atomic `equip_item` из
-  hand/carried с неизменным wire payload и описанная setup/end-turn charity
-  eligibility/continuation semantics. Иной backend expansion является
-  material stop/re-approval.
+- Изменение RNG algorithm, deck ordering, migrations или content semantics.
+  Внутри `backend/game/internal/{game,application,transport/httpapi}/**`
+  заранее разрешены только изменения, непосредственно необходимые для полного
+  playable Figma flow: projection/action authority, deterministic replay,
+  setup/charity continuation, reward/strength/equip contracts и их tests.
+  Persistence schema/migration, content, dependency, infrastructure или иной
+  продуктовый game-rule expansion остаются material stop/re-approval.
 - Изменение content packs/card mechanics, перевод/переименование самих
   machine tags в backend либо создание новых card images.
 - Card Studio workflow/layout, telemetry, infrastructure, deployment,
@@ -821,7 +845,11 @@ approved primitives, но не изобретать новые visual components
    stage занимает remaining block space, dock выравнивается по safe bottom.
    Tablet range использует те же approved primitives с content-pressure
    switching, а desktop 3-column layout включается только когда реальные
-   minimums помещаются.
+   minimums помещаются. Pixel coordinates из canonical frames не становятся
+   layout authority: absolute/fixed positioning проходит inventory и либо
+   подтверждается как true overlay, либо заменяется normal-flow Grid/Flex.
+   Verification widths `360/428/600/768/1024/1280/1400/1920` и midpoints
+   подтверждают continuous behavior, не только отдельные screenshots.
 14. **Closed-set deletion.** После переноса каждого mapped state удаляются
    old fallback branches, labels, selectors и tests. Неиспользуемый код не
    сохраняется как compatibility path.
@@ -940,9 +968,11 @@ change is a material scope change and requires repeated approval.
 |---|---|---|
 | `docs/agents/plans/{active,archive}/20260805T000140Z-ef4dda-frontend-gameplay-flow-responsive-figma-remediation.md` | write | Lifecycle/evidence |
 | `backend/game/internal/game/{model.go,event.go,engine.go,rules.go,projection.go,*_test.go}` | write | Event-applied recent result, authoritative strength, atomic hand/carried equip, setup overflow continuation, charity eligibility and privacy-safe action projection |
-| `backend/game/internal/application/interaction_runtime_test.go` | write | Manual/timeout charity transfer/discard, setup continuation, privacy/idempotency regression tests; runtime production boundary unchanged unless focused evidence proves it necessary and triggers re-approval |
-| `backend/game/internal/transport/httpapi/{router_test.go,testdata/**}` | write | Strict HTTP contract and canonical real projection shapes |
+| `backend/game/internal/game/**` | write | Approved bounded expansion for pure authoritative gameplay fixes directly required by playable Figma flow; no content/persistence/infrastructure |
+| `backend/game/internal/application/**` | write | Actor/version/idempotency/runtime continuation and focused tests when required by the approved flow |
+| `backend/game/internal/transport/httpapi/**` | write | Strict HTTP contract, handler wiring and canonical real projection shapes when required |
 | `frontend/packages/contracts/{src/index.ts,test/**}` | write | Zod result/nested-action DTO contract |
+| `frontend/packages/contracts/src/**` | write | Bounded schema/type refactor required by authoritative projection changes; no package/dependency change |
 | `frontend/applications/web/app/composables/{useGameApi,useGameSessionController}.ts` | write | Typed combat/action dispatch |
 | `frontend/applications/web/app/composables/useGamePresentation.ts` | write | Authoritative action/state normalization |
 | `frontend/applications/web/app/pages/game/[id].vue` | write | Single presentation/sheet owner and death continuity |
@@ -959,6 +989,7 @@ change is a material scope change and requires repeated approval.
 | `frontend/applications/web/app/components/interaction/**` | write | Coordinated mandatory sheet owner; replace/delete generic run-away, death-loot and EconomySurface charity radio/select/form fallbacks |
 | `frontend/applications/web/app/components/ui/SheetDialog.vue` | write | Native dialog synchronization if required; no unrelated UI-kit refactor |
 | `frontend/applications/web/app/assets/scss/pages/_game-{mobile,desktop}.scss` | write | Fluid responsive migration and legacy selector deletion |
+| `frontend/applications/web/app/**` | write | Approved structural player-facing refactor: shared presentation/layout owners, lobby/game route consumers, components, composables and styles necessary for full parity/playability |
 | `frontend/applications/web/test/**` | write | Pure model/component/real-shape regression tests |
 | `frontend/test/browser/**` | write | Core-loop, responsive, a11y, Figma reachability tests |
 | `frontend/test/browser/visual-baselines/chromium/**` | write | Conditional generated output only after approved side-by-side baseline review |
@@ -1072,97 +1103,104 @@ flex и содержит `align-tiems` (невалидное имя property). �
 
 ## Проверки
 
-- [ ] Unit: server action normalization and exhaustive presentation state
+- [x] Unit: server action normalization and exhaustive presentation state
   matrix with correct live projection shapes.
-- [ ] Go engine/projection: recent result survives event replay, clears at the
+- [x] Go engine/projection: recent result survives event replay, clears at the
   defined boundary, reports exact reward to actor and never leaks private card
   identities between combat actor, helper and observers; nested combat/
   run-away/death-loot actor gating.
-- [ ] Go projection strength: no-combat/equipped, persistent/conditional and
+- [x] Go projection strength: no-combat/equipped, persistent/conditional and
   active personal modifiers classify consistently; helper affects combat total
   but not personal breakdown; actor/observer privacy and HTTP golden fixtures
   freeze the DTO without exposing internal effect state.
-- [ ] Go equip authority: `equip_item` projects and succeeds atomically for a
+- [x] Go equip authority: `equip_item` projects and succeeds atomically for a
   legal hand item and a legal carried item; rejects occupied slot, insufficient
   hands, restrictions, big-item overflow, wrong phase, foreign/forged instance
   and stale credential/version/idempotency violations. `unequip_item` targets
   only exact own equipped instance. Observer projection never exposes another
   player's hand candidates/actions.
-- [ ] Go setup overflow: exact 8-card deal is preserved; `finish_setup` at
+- [x] Go setup overflow: exact 8-card deal is preserved; `finish_setup` at
   limit continues normally, while 6/7/8-card hands open discard-only exact
   excess and cannot reach preparation early. After resolution the next pending
   setup actor (or first preparation actor) is deterministic and replay-safe;
   wrong actor/card/count, stale version and duplicate command are rejected.
-- [ ] Go charity eligibility: actor strictly/tied global-lowest, all others
+- [x] Go charity eligibility: actor strictly/tied global-lowest, all others
   dead, and all otherwise-lowest recipients already over their calculated hand
   limit each produce empty eligible IDs and discard-only allocations. A valid
   non-lowest actor transfers every excess card only to eligible lowest players;
   mixed/invalid recipient allocations fail. Actor/observer privacy, manual and
   timeout branches are covered in engine/application/HTTP tests.
-- [ ] Contracts: Zod schema parses active resolution, recent reward,
+- [x] Contracts: Zod schema parses active resolution, recent reward,
   `strength_breakdown`, open response, observer, run-away, effect, charity,
   death and victory projections; no private/internal fields.
-- [ ] Component: exact Figma surface, actor gating, modal priority/focus,
+- [x] Component: exact Figma surface, actor gating, modal priority/focus,
   card grid containment, no raw machine copy.
-- [ ] Charity component: transfer and setup/end-turn discard render the same
+- [x] Charity component: transfer and setup/end-turn discard render the same
   `game-modal:charity` node/geometry. Discard has no recipient control or raw
   IDs, requires exactly excess selected Choice Cards and exposes one discard
   action; transfer exposes only eligible recipient choices. At most one
   Charity dialog exists in DOM.
-- [ ] Character/equipment unit/component: fixed slot derivation and order,
+- [x] Character/equipment unit/component: fixed slot derivation and order,
   empty/filled/two-handed states, traits from card names, carried summary,
   exact five desktop strength rows from projection, no client recomputation,
   same-slot candidate filtering across hand/carried/equipped, projected action
   binding by exact item ID,
   no attachment/curse leakage into slots and no `GameCard` subtree.
-- [ ] Compact modal family component tests freeze page `110:2` bindings and
+- [x] Compact modal family component tests freeze page `110:2` bindings and
   exact labels/actions: Hand/Mandatory, Card/Strength/Character/Opponent,
   Door/PostDoor/RunAway/Reward, Help/Economy/Theft/DeathLoot and Death/Victory.
   Generic checkbox/radio body cannot satisfy these tests.
-- [ ] Compact StrengthOpen отдельно проверяет owner `game-modal:strength`,
+- [x] Compact StrengthOpen отдельно проверяет owner `game-modal:strength`,
   node `164:42`, title «Сила», close copy «Закрыть», content `328x336`, summary
   `304x62`, personal rows и monster-side rows. Character `165:42` не может
   использоваться как fallback для strength state.
-- [ ] Character/equipment browser desktop `1440x900`: modal `940x620`, body
+- [x] Character/equipment browser desktop `1440x900`: modal `940x620`, body
   columns `280/596`, four `276x112` slot tiles and carried block; mobile
   `360x640`: sheet `360x470`, content `328x336`, four `148x72` tiles, carried
   `304x88`, bottom safe-area `24`. Both assert no root/dialog overflow, long
   copy containment, exact desktop/mobile empty-slot copy/border differences,
   keyboard focus restore and zero generic card nodes.
-- [ ] Exact-equip browser: desktop uses `291:1587` `768x502` shell and mobile
+- [x] Exact-equip browser: desktop uses `291:1587` `768x502` shell and mobile
   uses `340:3475` `360x470`; opening headgear never displays armor/footgear/
   non-item cards; `Снять` updates projection/version before a replacement can
   be equipped; illegal card has no action. Fast-equip: desktop integrated
   structure matches `293:1670`, mobile matches `342:3574` `360x410`, and one
   click/tap issues a single `equip_item` for the selected hand instance and
   results directly in `you.equipped` with no intermediate carried UI.
-- [ ] Setup/charity browser real-boundary: actor starts with eight cards,
+- [x] Setup/charity browser real-boundary: actor starts with eight cards,
   equips/plays legal cards, cannot silently complete setup with six remaining,
   resolves mandatory discard in the same Charity Figma shell, then continues
   setup/preparation. Separate end-turn cases verify transfer and discard-only
   modes with no generic select/checkbox UI or arbitrary first-three board rail.
-- [ ] Legacy-card deletion test inventories every `GameCard` caller, includes
+- [x] Legacy-card deletion test inventories every `GameCard` caller, includes
   the narrow Studio preview caller, requires an explicit named variant and
   proves unsupported `CardFrame` default markup/selectors are absent.
-- [ ] Browser real-boundary: two separate actor credentials complete full core
+- [x] Browser real-boundary: two separate actor credentials complete full core
   loop and next-player handoff; no browser interception of gameplay API.
-- [ ] Browser responsive: canonical matrix plus N-1/N/N+1, short/long height,
+- [x] Browser responsive: canonical matrix plus N-1/N/N+1, short/long height,
   landscape, 200% zoom, touch-sized actions, root overflow and dock anchoring.
-- [ ] A11y: keyboard-only core action, focus-visible, mandatory dialog trap and
+  Mandatory rows are `360/428/600/768/1024/1280/1400/1920` plus the recorded
+  midpoints; tests assert sibling/dialog/card intersections, not only document
+  `scrollWidth`, so visually overlapping regions fail even without overflow.
+- [x] Layout architecture test/source audit rejects unexplained absolute
+  positioning/magic inline offsets in primary responsive owners and freezes
+  centered header/card, fluid stage, capped desktop canvas and safe-bottom dock
+  geometry across short and tall heights.
+- [x] A11y: keyboard-only core action, focus-visible, mandatory dialog trap and
   return focus, status text not contradictory, reduced-motion equivalent.
-- [ ] Visual: direct Figma/current side-by-side log; targeted snapshot update;
+- [x] Visual: direct Figma/current side-by-side log; targeted snapshot update;
   clean no-update rerun across all reachable desktop/mobile states.
-- [ ] Evidence ledger is complete for every refreshed baseline:
+- [x] Evidence ledger is complete for every refreshed baseline:
 
   | Figma node | Viewport | Fixture/real-flow step | Current screenshot | Figma screenshot/link | Reviewer result | Baseline file |
   |---|---:|---|---|---|---|---|
   | _fill during implementation_ | _exact_ | _state/actor_ | _artifact path_ | _direct node_ | pass/fail + note | _generated file_ |
-- [ ] `pnpm lint` from `frontend/` using pinned pnpm 10.8.0.
-- [ ] `pnpm check` from `frontend/`.
-- [ ] `pnpm build` from `frontend/`.
-- [ ] `./leinoctl verify --changed`.
-- [ ] `./leinoctl scope-check --plan 20260805T000140Z-ef4dda-frontend-gameplay-flow-responsive-figma-remediation`.
-- [ ] `node .codex/hooks/plan-lint.mjs` and final diff review.
+- [x] `pnpm lint` from `frontend/` using pinned pnpm 10.8.0.
+- [x] `pnpm check` from `frontend/`.
+- [x] `pnpm build` from `frontend/`.
+- [x] `./leinoctl verify --changed`.
+- [x] `./leinoctl scope-check --plan 20260805T000140Z-ef4dda-frontend-gameplay-flow-responsive-figma-remediation`.
+- [x] `node .codex/hooks/plan-lint.mjs` and final diff review.
 
 ## Риски и откат
 
@@ -1223,15 +1261,19 @@ flex и содержит `align-tiems` (невалидное имя property). �
   не может определить, какие карты сбросить.
 - Material backend consequence explicit: fast hand equip расширяет existing
   `equip_item` source с carried-only до legal hand-or-carried, не меняя
-  action type/payload/endpoint. Это включено в approval scope; более широкий
-  wire/backend change либо runtime state без Figma owner остаётся material
-  stop/re-approval.
+  action type/payload/endpoint. Это и дополнительные engine/application/HTTP
+  изменения, прямо необходимые полному playable flow, включены в расширенный
+  approval и broad bounded manifest roots. Runtime visual без Figma owner,
+  persistence/content/dependency/infra change остаётся material stop.
 
 ## Согласование
 
-- **Статус:** awaiting explicit approval after material setup/charity rule update
+- **Статус:** approved
 - **Запрошено:** 2026-08-05 01:39:26 UTC
-- **Подтверждено:** —
+- **Подтверждено:** 2026-08-05 02:00:49 UTC; пользователь явно согласовал exact
+  current frontend plan, необходимые расширения его scope/write set и backend,
+  physical legacy deletion, structural responsive refactor и завершение только
+  при полном Figma parity плюс живой playability.
 - **Формулировка/ограничения пользователя:** «в план себе это все запиши»;
   exact equip: «когда нажимаешь на слот и отображаются шмотки только из этого
   слота» (`340:3475`); fast equip: «из руки — когда тапаешь на экипировку
@@ -1240,7 +1282,11 @@ flex и содержит `align-tiems` (невалидное имя property). �
   обязательный discard использует ту же charity modal, а отдельной discard
   modal в Figma нет. Prior constraints retained: Figma is exhaustive, legacy
   visuals are deleted, visual baselines only after side-by-side, bounded
-  read-only agents, no delegated writes, no push.
+  read-only agents, no delegated writes, no push. Дополнительное approval:
+  «Даю аппрув на текущий фронтенд план, также, на возможное расширение его
+  скоупа и врайтсета»; minimum full-support `360x640`; обязательные widths
+  `428/600/768/1024/1280/1400/1920` и промежутки; refactor неверного
+  центрирования, absolute positioning и pixel-frame layout разрешён.
 
 ## Ход выполнения
 
@@ -1276,9 +1322,74 @@ flex и содержит `align-tiems` (невалидное имя property). �
   global minimum/recipient hand limit, а EconomySurface/fixture не соответствуют
   live engine. Draft расширен server-owned setup continuation и единым
   CharityTransfer/CharityDiscard owner; implementation не начата.
+- 2026-08-05: пользователь согласовал exact plan и заранее разрешил bounded
+  expansion внутри frontend player UI/contracts и backend game/application/
+  HTTP authority, legacy deletion и structural responsive refactor. Manifest,
+  write set, risks и matrix расширены до full-support `360–1920` с exact
+  user-width rows и midpoint/overlap assertions. Plan готов к select; push
+  остаётся запрещён.
+- 2026-08-05 02:03:04 UTC: plan selected в session
+  `019fc7ae-ee88-7932-9588-a41aad2c59de`; status `in_progress`.
+- 2026-08-08: production implementation завершена root в одном lifecycle.
+  Backend получил обязательный setup discard, authoritative charity/equip,
+  turn number, strength/reward projection и playable combat/run-away
+  continuation. Frontend сведён к одному responsive Figma presentation owner;
+  legacy desktop/mobile tables, generic card/action/economy surfaces и dead
+  composables physically удалены. Exact/fast equip, character, strength,
+  opponent, charity и interaction sheets используют frozen direct nodes.
+- 2026-08-08: ручной browser smoke через UI подтвердил 8 карт setup, отсутствие
+  трёх случайных карт на столе, обязательный discard ровно 3 в Charity shell и
+  переход в `ХОД 1` с пятью картами. Двухбраузерный real HTTP flow затем
+  обнаружил и исправил death-turn deadlock: Figma death frame теперь
+  автоматически отправляет единственный projected `end_turn`, не добавляя
+  отсутствующую в дизайне кнопку.
+- 2026-08-08: bounded read-only Terra review завершён без оставшихся P0/P1.
+  Первичные подозрения по supplemental actions/private choice сняты после
+  трассировки Character → actions sheet и server interaction → choose_effect.
+  Reviewer также получил green focused Go tests и `git diff --check`.
+- 2026-08-08: side-by-side выполнен по сохранённым live Figma direct-node
+  screenshots/geometry и текущим browser captures до разрешённого обновления.
+  Изменены только gameplay baselines; немедленный no-update rerun: 18/18.
+  Повторный no-update после accessibility/death-flow исправлений: 18/18.
 
 ## Итог
 
-Заполняется после реализации. Completion requires actual live core-loop,
-Figma comparison and canonical lifecycle evidence; green snapshots alone are
-insufficient.
+Реализация готова к canonical lifecycle closure. Фактические evidence до
+`verify/scope-check`:
+
+- Backend: `go test ./...` — green; turn-number replay/rotation assertions
+  включены в engine tests.
+- Frontend: `pnpm lint`, `pnpm check`, `pnpm build` — green; contracts 18/18,
+  web unit/component 160/160.
+- Browser geometry: required `360/428/600/768/1024/1280/1400/1920`, boundary
+  `N-1/N/N+1`, landscape/short-height, centered strength/card and safe-bottom
+  dock checks — green.
+- Accessibility: canonical Chromium serious/critical Axe matrix 48/48 green.
+- Visual: no-update Chromium matrix 18/18 green after approved side-by-side.
+- Playability: real two-context browser → Nuxt → HTTP Go backend flow green
+  (`two browser actors complete one authoritative turn through the Figma UI`,
+  6.0 s), including setup overflow, required interactions, combat/run-away,
+  death continuation and next-player handoff.
+- Figma integration: live direct-node evidence recorded above was used for
+  implementation and side-by-side. A final repeat fetch required connector
+  reauthentication; it did not replace or invalidate the recorded successful
+  node requests.
+
+### Visual evidence ledger
+
+| Figma node/family | Viewport | Fixture/step | Current evidence | Direct source | Result | Baseline |
+|---|---:|---|---|---|---|---|
+| `293:1617`, `285:1315`, `248:5` | `1280x720` | preparation/door/combat | Playwright actual + manual browser | live links in frozen mapping | pass | `desktop-preparation`, `desktop-door`, `desktop-combat-*` |
+| `285:1566`, `285:1473`, `257:447` | `1280x720` | reward/run-away/waiting | Playwright actual + manual browser | live links in frozen mapping | pass | `desktop-reward`, `desktop-run-away`, `desktop-waiting` |
+| `294:2384`, `295:2518`, `295:2355` | `1280x720` | death/victory/death-loot | Playwright actual + retained real-flow capture | live links in frozen mapping | pass | `desktop-death`, `desktop-victory`, `death-loot-actor` |
+| `147:731`, `181:1634`, `183:1671`, `184:1687` | `360x640` | setup/door/combat/run-away/reward/waiting | Playwright actual + responsive capture | live links in frozen mapping | pass | `mobile-*` gameplay baselines |
+
+Canonical `./leinoctl verify --changed`, scope-check, plan-lint and final diff
+review are recorded by the closing lifecycle commands below before archive.
+
+### Canonical closure
+
+- `LEINO_PNPM_EXECUTABLE=/Users/kolyalis/.nvm/versions/node/v24.18.0/bin/pnpm ./leinoctl verify --changed` — `ok`; resolver matched declared `pnpm@10.8.0`.
+- `./leinoctl scope-check --plan 20260805T000140Z-ef4dda-frontend-gameplay-flow-responsive-figma-remediation` — `ok`; `outsideWriteSet=[]`, `unledgered=[]`, `missingRequiredChecks=[]`.
+- `node .codex/hooks/plan-lint.mjs` — `plans=73 active=5 archive=68 issues=0` inside canonical verify.
+- Final `git diff --check` and independent Terra review — green; push remains forbidden and was not performed.

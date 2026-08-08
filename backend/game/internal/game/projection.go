@@ -29,36 +29,48 @@ type CardView struct {
 }
 
 type SelfView struct {
-	PlayerID         string     `json:"player_id"`
-	Name             string     `json:"name"`
-	Level            int        `json:"level"`
-	CombatStrength   int        `json:"combat_strength"`
-	EscapeBonus      int        `json:"escape_bonus"`
-	HandLimit        int        `json:"hand_limit"`
-	CharacterTags    []string   `json:"character_tags"`
-	Hand             []CardView `json:"hand"`
-	Carried          []CardView `json:"carried"`
-	Equipped         []CardView `json:"equipped"`
-	Traits           []CardView `json:"traits"`
-	Attachments      []CardView `json:"attachments"`
-	PersistentCurses []CardView `json:"persistent_curses"`
-	SetupDone        bool       `json:"setup_done"`
-	Dead             bool       `json:"dead"`
-	NeedsRedraw      bool       `json:"needs_redraw"`
+	PlayerID          string                `json:"player_id"`
+	Name              string                `json:"name"`
+	Level             int                   `json:"level"`
+	CombatStrength    int                   `json:"combat_strength"`
+	StrengthBreakdown StrengthBreakdownView `json:"strength_breakdown"`
+	EscapeBonus       int                   `json:"escape_bonus"`
+	HandLimit         int                   `json:"hand_limit"`
+	CharacterTags     []string              `json:"character_tags"`
+	Hand              []CardView            `json:"hand"`
+	Carried           []CardView            `json:"carried"`
+	Equipped          []CardView            `json:"equipped"`
+	Traits            []CardView            `json:"traits"`
+	Attachments       []CardView            `json:"attachments"`
+	PersistentCurses  []CardView            `json:"persistent_curses"`
+	SetupDone         bool                  `json:"setup_done"`
+	Dead              bool                  `json:"dead"`
+	NeedsRedraw       bool                  `json:"needs_redraw"`
+}
+
+type StrengthBreakdownView struct {
+	BaseStrength   int `json:"base_strength"`
+	EquipmentBonus int `json:"equipment_bonus"`
+	TemporaryBonus int `json:"temporary_bonus"`
+	TotalStrength  int `json:"total_strength"`
+	HandCount      int `json:"hand_count"`
 }
 
 type OtherPlayerView struct {
-	PlayerID         string     `json:"player_id"`
-	Name             string     `json:"name"`
-	Level            int        `json:"level"`
-	HandCount        int        `json:"hand_count"`
-	Carried          []CardView `json:"carried"`
-	Equipped         []CardView `json:"equipped"`
-	Traits           []CardView `json:"traits"`
-	Attachments      []CardView `json:"attachments"`
-	PersistentCurses []CardView `json:"persistent_curses"`
-	SetupDone        bool       `json:"setup_done"`
-	Dead             bool       `json:"dead"`
+	PlayerID          string                `json:"player_id"`
+	Name              string                `json:"name"`
+	Level             int                   `json:"level"`
+	CombatStrength    int                   `json:"combat_strength"`
+	StrengthBreakdown StrengthBreakdownView `json:"strength_breakdown"`
+	EscapeBonus       int                   `json:"escape_bonus"`
+	HandCount         int                   `json:"hand_count"`
+	Carried           []CardView            `json:"carried"`
+	Equipped          []CardView            `json:"equipped"`
+	Traits            []CardView            `json:"traits"`
+	Attachments       []CardView            `json:"attachments"`
+	PersistentCurses  []CardView            `json:"persistent_curses"`
+	SetupDone         bool                  `json:"setup_done"`
+	Dead              bool                  `json:"dead"`
 }
 
 type CombatView struct {
@@ -112,6 +124,7 @@ type ActionView struct {
 
 type TurnView struct {
 	PlayerID         string        `json:"player_id"`
+	Number           uint32        `json:"number,omitempty"`
 	Phase            Phase         `json:"phase"`
 	Encounter        *CardView     `json:"encounter,omitempty"`
 	Resolving        []CardView    `json:"resolving"`
@@ -225,11 +238,30 @@ type Projection struct {
 	TreasureDeckCount    int               `json:"treasure_deck_count"`
 	TreasureDiscardCount int               `json:"treasure_discard_count"`
 	WinnerPlayerID       string            `json:"winner_player_id,omitempty"`
+	RecentCombatResult   *CombatResultView `json:"recent_combat_result,omitempty"`
 	ContentSetID         string            `json:"content_set_id"`
 	ContentVersion       int               `json:"content_version"`
 	RulesProfileID       string            `json:"rules_profile_id"`
 	RulesProfileVersion  int               `json:"rules_profile_version"`
 	Interaction          *InteractionView  `json:"interaction,omitempty"`
+}
+
+type PublicCombatRewardView struct {
+	PlayerID      string `json:"player_id"`
+	TreasureCount int    `json:"treasure_count"`
+	LevelsGained  int    `json:"levels_gained"`
+}
+
+type ViewerCombatRewardView struct {
+	PlayerID     string     `json:"player_id"`
+	Treasures    []CardView `json:"treasures"`
+	LevelsGained int        `json:"levels_gained"`
+}
+
+type CombatResultView struct {
+	Outcome       string                   `json:"outcome"`
+	PublicRewards []PublicCombatRewardView `json:"public_rewards"`
+	ViewerReward  *ViewerCombatRewardView  `json:"viewer_reward,omitempty"`
 }
 
 func ProjectForActor(state State, actorID string, pack Pack) (Projection, error) {
@@ -261,8 +293,34 @@ func ProjectForActor(state State, actorID string, pack Pack) (Projection, error)
 		RulesProfileVersion:  state.RulesProfileVersion,
 		Turn: TurnView{
 			PlayerID: state.Turn.PlayerID,
+			Number:   state.Turn.Number,
 			Phase:    state.Turn.Phase,
 		},
+	}
+	if state.RecentCombatResult != nil {
+		result := &CombatResultView{
+			Outcome:       state.RecentCombatResult.Outcome,
+			PublicRewards: []PublicCombatRewardView{},
+		}
+		for _, reward := range state.RecentCombatResult.Rewards {
+			result.PublicRewards = append(result.PublicRewards, PublicCombatRewardView{
+				PlayerID:      reward.PlayerID,
+				TreasureCount: len(reward.TreasureInstanceIDs),
+				LevelsGained:  reward.LevelsGained,
+			})
+			if reward.PlayerID == actorID {
+				treasures, err := cardViews(state, reward.TreasureInstanceIDs, pack)
+				if err != nil {
+					return Projection{}, err
+				}
+				result.ViewerReward = &ViewerCombatRewardView{
+					PlayerID:     reward.PlayerID,
+					Treasures:    treasures,
+					LevelsGained: reward.LevelsGained,
+				}
+			}
+		}
+		projection.RecentCombatResult = result
 	}
 	for index, player := range state.Players {
 		view, err := otherPlayerView(state, index, player, pack)
@@ -1215,6 +1273,10 @@ func selfView(state State, playerIndex int, pack Pack) (SelfView, error) {
 	if err != nil {
 		return SelfView{}, err
 	}
+	breakdown, err := personalStrengthBreakdown(state, playerIndex, pack)
+	if err != nil {
+		return SelfView{}, err
+	}
 	hand, err := cardViews(state, player.Hand, pack)
 	if err != nil {
 		return SelfView{}, err
@@ -1240,10 +1302,17 @@ func selfView(state State, playerIndex int, pack Pack) (SelfView, error) {
 		return SelfView{}, err
 	}
 	return SelfView{
-		PlayerID:         player.ID,
-		Name:             player.Name,
-		Level:            player.Level,
-		CombatStrength:   strength,
+		PlayerID:       player.ID,
+		Name:           player.Name,
+		Level:          player.Level,
+		CombatStrength: strength,
+		StrengthBreakdown: StrengthBreakdownView{
+			BaseStrength:   breakdown.BaseStrength,
+			EquipmentBonus: breakdown.EquipmentBonus,
+			TemporaryBonus: breakdown.TemporaryBonus,
+			TotalStrength:  breakdown.TotalStrength,
+			HandCount:      len(player.Hand),
+		},
 		EscapeBonus:      escape,
 		HandLimit:        limit,
 		CharacterTags:    tags,
@@ -1261,10 +1330,22 @@ func selfView(state State, playerIndex int, pack Pack) (SelfView, error) {
 
 func otherPlayerView(
 	state State,
-	_ int,
+	playerIndex int,
 	player Player,
 	pack Pack,
 ) (OtherPlayerView, error) {
+	strength, err := projectedCombatStrength(state, playerIndex, pack)
+	if err != nil {
+		return OtherPlayerView{}, err
+	}
+	breakdown, err := personalStrengthBreakdown(state, playerIndex, pack)
+	if err != nil {
+		return OtherPlayerView{}, err
+	}
+	escape, err := projectedEscapeBonus(state, playerIndex, pack)
+	if err != nil {
+		return OtherPlayerView{}, err
+	}
 	carried, err := cardViews(state, player.Carried, pack)
 	if err != nil {
 		return OtherPlayerView{}, err
@@ -1286,9 +1367,18 @@ func otherPlayerView(
 		return OtherPlayerView{}, err
 	}
 	return OtherPlayerView{
-		PlayerID:         player.ID,
-		Name:             player.Name,
-		Level:            player.Level,
+		PlayerID:       player.ID,
+		Name:           player.Name,
+		Level:          player.Level,
+		CombatStrength: strength,
+		StrengthBreakdown: StrengthBreakdownView{
+			BaseStrength:   breakdown.BaseStrength,
+			EquipmentBonus: breakdown.EquipmentBonus,
+			TemporaryBonus: breakdown.TemporaryBonus,
+			TotalStrength:  breakdown.TotalStrength,
+			HandCount:      len(player.Hand),
+		},
+		EscapeBonus:      escape,
 		HandCount:        len(player.Hand),
 		Carried:          carried,
 		Equipped:         equipped,
@@ -1425,6 +1515,16 @@ func projectActions(
 					})
 				}
 				continue
+			}
+			if commandIsLegal(state, pack, Command{
+				Type:       CommandEquipItem,
+				ActorID:    actorID,
+				InstanceID: instanceID,
+			}) {
+				actions = append(actions, ActionView{
+					Type:             CommandEquipItem,
+					SourceInstanceID: instanceID,
+				})
 			}
 			if playableInPhase(card, state.Turn.Phase) {
 				action := ActionView{
@@ -1600,6 +1700,19 @@ func projectActions(
 	}
 	switch state.Turn.Phase {
 	case PhaseSetup:
+		if player.SetupDiscardPending {
+			limit, err := handLimit(state, playerIndex, pack)
+			if err != nil {
+				return nil, err
+			}
+			excess := max(0, len(player.Hand)-limit)
+			return []ActionView{{
+				Type:        CommandResolveCharity,
+				InstanceIDs: append([]string(nil), player.Hand...),
+				Minimum:     excess,
+				Maximum:     excess,
+			}}, nil
+		}
 		if err := addManagementActions(false); err != nil {
 			return nil, err
 		}
@@ -1739,10 +1852,15 @@ func projectActions(
 			Maximum:     excess,
 		}
 		if profile.PlayerEconomy {
-			charityAction.TargetPlayerIDs = charityRecipientIDs(
+			recipients, err := charityRecipientIDs(
 				state,
 				playerIndex,
+				pack,
 			)
+			if err != nil {
+				return nil, err
+			}
+			charityAction.TargetPlayerIDs = recipients
 		}
 		actions = append(actions, charityAction)
 	case PhaseEndTurn:

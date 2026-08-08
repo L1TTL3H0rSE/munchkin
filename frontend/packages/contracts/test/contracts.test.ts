@@ -42,6 +42,13 @@ const projection = {
     name: "Alice",
     level: 1,
     combat_strength: 1,
+    strength_breakdown: {
+      base_strength: 1,
+      equipment_bonus: 0,
+      temporary_bonus: 0,
+      total_strength: 1,
+      hand_count: 1,
+    },
     escape_bonus: 0,
     hand_limit: 5,
     character_tags: null,

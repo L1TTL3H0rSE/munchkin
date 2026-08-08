@@ -1,4 +1,4 @@
-import {expect, test} from "@playwright/test";
+import {expect, test, type Page} from "@playwright/test";
 
 import {
   commandResultSchema,
@@ -24,6 +24,318 @@ type RealGame = {
   owner: Actor;
   actors: Actor[];
 };
+
+test("two browser actors complete one authoritative turn through the Figma UI", async ({
+  page,
+  browser,
+  request,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "real browser lifecycle is canonical Chromium only");
+  testInfo.setTimeout(240_000);
+
+  const apiBase = process.env.PLAYWRIGHT_API_BASE ??
+    `http://127.0.0.1:${process.env.PLAYWRIGHT_API_PORT ?? "18080"}`;
+  await page.goto("/");
+  const origin = new URL(page.url()).origin;
+  const secondContext = await browser.newContext({
+    locale: "ru-RU",
+    colorScheme: "dark",
+    viewport: {width: 1280, height: 720},
+  });
+  const secondPage = await secondContext.newPage();
+
+  async function projectionFor(actorPage: Page, gameID: string): Promise<Projection> {
+    const credential = await actorPage.evaluate((id) =>
+      sessionStorage.getItem(`munchkin:credential:${id}`), gameID);
+    if (!credential) throw new Error("browser actor credential is missing from session storage");
+    const response = await request.get(
+      `${apiBase}/api/v1/games/${encodeURIComponent(gameID)}`,
+      {headers: {Authorization: `Bearer ${credential}`}},
+    );
+    if (!response.ok()) {
+      throw new Error(`browser projection failed: ${response.status()} ${await response.text()}`);
+    }
+    return projectionSchema.parse(await response.json());
+  }
+
+  async function waitForProjection(
+    actorPage: Page,
+    gameID: string,
+    predicate: (projection: Projection) => boolean,
+    message: string,
+  ): Promise<Projection> {
+    await expect.poll(async () => predicate(await projectionFor(actorPage, gameID)), {
+      message,
+      timeout: 20_000,
+      intervals: [100, 200, 400, 800],
+    }).toBe(true);
+    return projectionFor(actorPage, gameID);
+  }
+
+  async function clickAndWait(
+    actorPage: Page,
+    gameID: string,
+    click: () => Promise<void>,
+  ): Promise<Projection> {
+    const before = await projectionFor(actorPage, gameID);
+    await click();
+    return waitForProjection(
+      actorPage,
+      gameID,
+      (projection) => projection.version > before.version,
+      `projection did not advance after browser action at version ${before.version}`,
+    );
+  }
+
+  async function actorPageFor(
+    pages: readonly Page[],
+    gameID: string,
+    playerID: string,
+  ): Promise<Page> {
+    for (const actorPage of pages) {
+      if ((await projectionFor(actorPage, gameID)).you.player_id === playerID) return actorPage;
+    }
+    throw new Error(`no browser page owns projected actor ${playerID}`);
+  }
+
+  async function resolveCharitySheet(actorPage: Page, gameID: string): Promise<void> {
+    const projection = await projectionFor(actorPage, gameID);
+    const transfer = projection.interaction?.charity_transfer;
+    const action = projection.turn.available_actions.find((candidate) =>
+      candidate.type === "resolve_charity");
+    const instanceIDs = transfer?.instance_ids ?? action?.instance_ids ?? [];
+    const excess = transfer?.excess ?? action?.minimum ?? 0;
+    const recipientIDs = transfer?.eligible_recipient_ids ?? action?.target_player_ids ?? [];
+    const selected = projection.you.hand
+      .filter((card) => instanceIDs.includes(card.instance_id))
+      .sort((left, right) => Number(left.kind === "monster") - Number(right.kind === "monster"))
+      .slice(0, excess);
+    const dialog = actorPage.locator("dialog[open]");
+    await expect(dialog).toHaveAttribute("data-figma-desktop-node", "256:316");
+    const railButtons = dialog.locator(".charity-sheet__rail > button");
+    for (const card of selected) {
+      const handIndex = projection.you.hand.findIndex((candidate) =>
+        candidate.instance_id === card.instance_id);
+      const visibleIndex = projection.you.hand
+        .slice(0, handIndex)
+        .filter((candidate) => instanceIDs.includes(candidate.instance_id)).length;
+      await railButtons.nth(visibleIndex).click();
+    }
+    if (recipientIDs.length) {
+      await dialog.getByRole("button", {name: "Назначить получателей", exact: true}).click();
+      const recipientName = projection.players.find((candidate) =>
+        candidate.player_id === recipientIDs[0])?.name;
+      if (!recipientName) throw new Error("eligible charity recipient is absent from public roster");
+      const groups = dialog.locator(".charity-sheet__recipients > div");
+      for (let index = 0; index < excess; index += 1) {
+        await groups.nth(index).getByRole("button", {name: recipientName, exact: true}).click();
+      }
+    }
+    await clickAndWait(actorPage, gameID, async () => {
+      await dialog.getByRole("button", {
+        name: recipientIDs.length ? "Передать карты" : "Сбросить карты",
+        exact: true,
+      }).click();
+    });
+  }
+
+  async function resolveRequiredInteraction(actorPage: Page, gameID: string): Promise<boolean> {
+    const projection = await projectionFor(actorPage, gameID);
+    const interaction = projection.interaction;
+    if (!interaction?.response_required_for_you) return false;
+    if (interaction.public_kind === "charity_transfer") {
+      await resolveCharitySheet(actorPage, gameID);
+      return true;
+    }
+    if (interaction.public_kind === "death_loot_priority") {
+      const pass = interaction.actions.find((action) => action.type === "pass");
+      if (!pass) throw new Error("death-loot actor has no projected pass action");
+      const dialog = actorPage.locator("dialog[open]");
+      await expect(dialog).toBeVisible();
+      await clickAndWait(actorPage, gameID, async () => {
+        await dialog.getByRole("button", {name: /ПРОПУСТИТЬ/}).click();
+      });
+      return true;
+    }
+
+    const pass = interaction.actions.find((action) => action.type === "pass");
+    const choice = pass ?? interaction.actions.find((action) =>
+      action.type === "respond" || action.type === "accept" || action.type === "decline");
+    if (!choice) throw new Error(`${interaction.public_kind}: required actor has no executable response`);
+    const dialog = actorPage.locator("dialog[open]");
+    await expect(dialog).toBeVisible();
+    const option = dialog.locator(".interaction-action").filter({
+      hasText: pass
+        ? /Пасовать|Бросить на смывку/
+        : interaction.public_kind === "private_choice"
+          ? projection.you.hand.find((card) => choice.choice_ids?.includes(card.instance_id))?.name ?? /Ответить/
+          : /Ответить|Принять|Отклонить/,
+    }).first();
+    await expect(option).toBeVisible();
+    await option.click();
+    await clickAndWait(actorPage, gameID, async () => {
+      await dialog.locator(".interaction-submit").click();
+    });
+    return true;
+  }
+
+  async function drainRequiredInteractions(pages: readonly Page[], gameID: string): Promise<void> {
+    for (let round = 0; round < 24; round += 1) {
+      let progressed = false;
+      for (const actorPage of pages) {
+        if (await resolveRequiredInteraction(actorPage, gameID)) progressed = true;
+      }
+      const stillRequired = (await Promise.all(pages.map((actorPage) =>
+        projectionFor(actorPage, gameID))))
+        .some((projection) => projection.interaction?.response_required_for_you);
+      if (!stillRequired) return;
+      if (!progressed) throw new Error("required interaction remained without a browser response");
+    }
+    throw new Error("required browser interactions did not drain in bounded rounds");
+  }
+
+  async function advanceCompletedTurn(
+    pages: readonly Page[],
+    gameID: string,
+    actorPage: Page,
+    actorID: string,
+  ): Promise<Projection> {
+    for (let step = 0; step < 24; step += 1) {
+      await drainRequiredInteractions(pages, gameID);
+      const projection = await projectionFor(actorPage, gameID);
+      if (projection.turn.phase === "preparation" && projection.turn.player_id !== actorID) {
+        return projection;
+      }
+      if (projection.turn.phase === "charity" && !projection.interaction) {
+        const version = projection.version;
+        await waitForProjection(actorPage, gameID, (next) => next.version > version,
+          "frontend did not open or resolve the charity phase");
+        continue;
+      }
+      if (projection.turn.phase === "end_turn") {
+        await clickAndWait(actorPage, gameID, async () => {
+          await actorPage.getByRole("button", {name: "Закончить ход", exact: true}).click();
+        });
+        continue;
+      }
+      if (projection.turn.phase === "run_away" || projection.interaction) continue;
+      throw new Error(`browser turn stopped in ${projection.turn.phase}`);
+    }
+    throw new Error("browser turn did not advance in bounded steps");
+  }
+
+  try {
+    await expect(page.locator("[data-interactive='true']")).toBeVisible();
+    const createForm = page.locator(".lobby-form--create");
+    await createForm.locator("input[autocomplete='nickname']").fill("Алиса UI");
+    await createForm.getByRole("button", {name: "Создать комнату", exact: true}).click();
+    await expect(page).toHaveURL(/\/game\/[^/]+$/, {timeout: 20_000});
+    const gameID = decodeURIComponent(new URL(page.url()).pathname.split("/").at(-1) ?? "");
+    expect(gameID).not.toBe("");
+
+    await secondPage.goto(`${origin}/`);
+    await expect(secondPage.locator("[data-interactive='true']")).toBeVisible();
+    await secondPage.locator(".lobby-entry__mode-switch")
+      .getByRole("button", {name: "Войти", exact: true}).click();
+    const joinForm = secondPage.locator(".lobby-form--join");
+    await joinForm.locator("input[autocomplete='nickname']").fill("Борис UI");
+    await joinForm.locator("input[inputmode='text']").fill(gameID);
+    await joinForm.getByRole("button", {name: "Войти в комнату", exact: true}).click();
+    await expect(secondPage).toHaveURL(new RegExp(`/game/${gameID}$`), {timeout: 20_000});
+
+    const pages = [page, secondPage] as const;
+    await waitForProjection(page, gameID, (projection) => projection.players.length === 2,
+      "owner did not receive the joined public roster");
+    await clickAndWait(page, gameID, async () => {
+      await page.getByRole("button", {name: "Начать игру", exact: true}).click();
+    });
+
+    for (let step = 0; step < 8; step += 1) {
+      const ownerProjection = await projectionFor(page, gameID);
+      if (ownerProjection.turn.phase !== "setup") break;
+      const actorPage = await actorPageFor(pages, gameID, ownerProjection.turn.player_id);
+      const actorProjection = await projectionFor(actorPage, gameID);
+      expect(actorProjection.you.hand).toHaveLength(8);
+      const discard = actorProjection.turn.available_actions.find((action) =>
+        action.type === "resolve_charity");
+      if (discard) {
+        await resolveCharitySheet(actorPage, gameID);
+      } else {
+        await clickAndWait(actorPage, gameID, async () => {
+          await actorPage.getByRole("button", {name: "Закончить подготовку", exact: true}).click();
+        });
+      }
+    }
+
+    let activeProjection = await waitForProjection(
+      page,
+      gameID,
+      (projection) => projection.turn.phase === "preparation",
+      "setup did not advance to preparation",
+    );
+    let activePage: Page | undefined;
+    let initialActorID = "";
+    for (let turnAttempt = 0; turnAttempt < 8; turnAttempt += 1) {
+      activeProjection = await projectionFor(page, gameID);
+      initialActorID = activeProjection.turn.player_id;
+      activePage = await actorPageFor(pages, gameID, initialActorID);
+      activeProjection = await projectionFor(activePage, gameID);
+      await clickAndWait(activePage, gameID, async () => {
+        await activePage!.getByRole("button", {name: "Вышибить дверь", exact: true}).click();
+      });
+      await drainRequiredInteractions(pages, gameID);
+
+      activeProjection = await projectionFor(activePage, gameID);
+      if (activeProjection.turn.phase === "door_choice") {
+        const trouble = activeProjection.turn.available_actions.find((action) =>
+          action.type === "look_for_trouble" && action.source_instance_id);
+        if (trouble?.source_instance_id) {
+          const monster = activeProjection.you.hand.find((card) =>
+            card.instance_id === trouble.source_instance_id);
+          if (!monster) throw new Error("projected Look for Trouble monster is absent from hand");
+          await activePage.getByRole("button", {name: "Открыть руку", exact: true}).click();
+          const hand = activePage.locator("dialog[open]");
+          await hand.getByRole("option").filter({hasText: monster.name}).click();
+          await clickAndWait(activePage, gameID, async () => {
+            await hand.getByRole("button", {name: "Искать неприятности", exact: true}).click();
+          });
+        } else {
+          await clickAndWait(activePage, gameID, async () => {
+            await activePage!.getByRole("button", {name: "Обыскать комнату", exact: true}).click();
+          });
+        }
+      }
+      activeProjection = await projectionFor(activePage, gameID);
+      if (activeProjection.turn.phase === "combat") break;
+      await advanceCompletedTurn(pages, gameID, activePage, initialActorID);
+    }
+    if (!activePage) throw new Error("browser flow has no active actor page");
+    activeProjection = await waitForProjection(activePage, gameID,
+      (projection) => projection.turn.phase === "combat",
+      "browser flow did not reach combat in bounded turns");
+    expect(activeProjection.turn.combat?.resolution_action?.type)
+      .toBe("request_combat_resolution");
+    await clickAndWait(activePage, gameID, async () => {
+      await activePage.getByRole("button", {name: "Завершить бой", exact: true}).click();
+    });
+    await drainRequiredInteractions(pages, gameID);
+
+    await advanceCompletedTurn(pages, gameID, activePage, initialActorID);
+
+    const nextProjection = await waitForProjection(
+      page,
+      gameID,
+      (projection) => projection.turn.phase === "preparation" &&
+        projection.turn.player_id !== initialActorID,
+      "end turn did not transfer preparation to the next actor",
+    );
+    const nextPage = await actorPageFor(pages, gameID, nextProjection.turn.player_id);
+    await expect(nextPage.getByRole("button", {name: "Вышибить дверь", exact: true})).toBeVisible();
+    await expect(activePage.getByRole("button", {name: "Вышибить дверь", exact: true})).toHaveCount(0);
+  } finally {
+    await secondContext.close();
+  }
+});
 
 const deathMonsterIDs = new Set([
   "renovation-drill",

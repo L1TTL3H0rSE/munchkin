@@ -16,7 +16,6 @@ import TargetRunAwaySurface from "./domains/TargetRunAwaySurface.vue";
 import InteractionActionList from "./core/InteractionActionList.vue";
 import InteractionDialog from "./core/InteractionDialog.vue";
 import DeathLootSurface from "./DeathLootSurface.vue";
-import EconomySurface from "./EconomySurface.vue";
 import {
   advancedCombatActionDetails,
   advancedCombatActionLabel,
@@ -24,10 +23,7 @@ import {
   type AdvancedCombatAction,
 } from "./advancedCombatModel";
 import {
-  economyActionKey,
-  economyActions,
   interactionHasCharityForm,
-  type EconomySubmission,
 } from "./economyModel";
 import {
   actionIsSelectable,
@@ -64,7 +60,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   submit: [action: InteractionActionView];
-  "submit-economy": [request: EconomySubmission];
 }>();
 
 const surfaceOpen = ref(false);
@@ -77,12 +72,8 @@ const interaction = computed<InteractionView | undefined>(() =>
   props.projection.interaction,
 );
 const acceptedHelper = computed(() => acceptedCombatHelper(props.projection));
-const economyEntries = computed(() => economyActions(
-  props.projection.turn.available_actions,
-));
-const economyOnly = computed(() => !interaction.value && economyEntries.value.length > 0);
 const activeSurface = computed(() => Boolean(
-  interaction.value || economyOnly.value || acceptedHelper.value || showRunAwaySummary.value
+  interaction.value || acceptedHelper.value || showRunAwaySummary.value
     || deathLootClosureNotice.value,
 ));
 const ownCards = computed<CardView[]>(() => [
@@ -116,7 +107,6 @@ const deathLootInteraction = computed(() =>
     ? interaction.value
     : undefined,
 );
-const showEconomy = computed(() => economyEntries.value.length > 0 || charityForm.value);
 const selectedAction = computed(() => selectableActions.value.find((action) =>
   action.action_id === selectedActionID.value,
 ));
@@ -134,7 +124,7 @@ const responseStateMessage = computed(() => interactionResponseMessage(
 ));
 const surfaceTitle = computed(() => interaction.value
   ? interactionTitle(interaction.value)
-  : "Действия экономики");
+  : "Взаимодействие");
 const dialogEyebrow = computed(() => {
   if (charityForm.value) {
     return "БЛАГОТВОРИТЕЛЬНОСТЬ";
@@ -148,9 +138,6 @@ const dialogEyebrow = computed(() => {
   return "СЕРВЕРНОЕ ОКНО";
 });
 const surfaceContext = computed(() => {
-  if (economyOnly.value) {
-    return "Выберите карты и цели только из доступных действий текущей проекции.";
-  }
   if (helperOfferMode.value) {
     return "Выберите только помощника и награду из текущих дескрипторов.";
   }
@@ -175,9 +162,6 @@ const statusMessage = computed(() => {
   if (responseStateMessage.value) {
     return responseStateMessage.value;
   }
-  if (economyOnly.value) {
-    return "Действия подтверждаются сервером после отправки.";
-  }
   return interaction.value?.response_required_for_you
     ? "Решение принадлежит текущему игроку."
     : "Текущее окно доступно только по проекции сервера.";
@@ -199,7 +183,6 @@ const deadlineLabel = computed(() => interaction.value
   : "");
 const surfaceKey = computed(() => [
   interactionRevisionKey(interaction.value),
-  economyEntries.value.map(({action, index}) => economyActionKey(action, index)).join("|"),
   deathLootClosureNotice.value,
   acceptedHelper.value
     ? `${acceptedHelper.value.helperPlayerID}:${acceptedHelper.value.rewardTreasures}`
@@ -228,10 +211,23 @@ function isAdvancedCombatAction(
 }
 
 function actionLabelFor(action: InteractionActionView, actionIndex: number): string {
+  if (interaction.value?.public_kind === "private_choice" && action.choice_ids?.length) {
+    const names = action.choice_ids.map((instanceID) =>
+      ownCards.value.find((card) => card.instance_id === instanceID)?.name,
+    ).filter((name): name is string => Boolean(name));
+    if (names.length) return names.join(" · ");
+  }
   if (action.theft_capability) {
     return "Выставить контрмеру";
   }
   if (targetInteraction.value || runAwayInteraction.value) {
+    if (
+      runAwayInteraction.value &&
+      action.type === "pass" &&
+      props.projection.turn.run_away?.current_player_id === props.projection.you.player_id
+    ) {
+      return "Бросить на смывку";
+    }
     return targetRunAwayActionLabel(action, actionIndex, ownCards.value);
   }
   if (isAdvancedCombatAction(action)) {
@@ -241,6 +237,9 @@ function actionLabelFor(action: InteractionActionView, actionIndex: number): str
 }
 
 function actionDetailsFor(action: InteractionActionView): string[] {
+  if (interaction.value?.public_kind === "private_choice" && action.choice_ids?.length) {
+    return ["Подтвердить этот серверно разрешённый вариант."];
+  }
   if (action.theft_capability) {
     return [
       "Собственная контркарта из текущей проекции.",
@@ -248,6 +247,16 @@ function actionDetailsFor(action: InteractionActionView): string[] {
     ];
   }
   if ((targetInteraction.value || runAwayInteraction.value) && interaction.value) {
+    if (
+      runAwayInteraction.value &&
+      action.type === "pass" &&
+      props.projection.turn.run_away?.current_player_id === props.projection.you.player_id
+    ) {
+      return [
+        "Закрыть окно ответов для себя.",
+        "После ответов остальных участников сервер сам бросит D6.",
+      ];
+    }
     return targetRunAwayActionDetails(
       action,
       props.projection,
@@ -274,7 +283,7 @@ watch(
       return;
     }
     selectedActionID.value = selectableActions.value[0]?.action_id ?? null;
-    surfaceOpen.value = Boolean(interaction.value || economyOnly.value);
+    surfaceOpen.value = Boolean(interaction.value);
   },
   {immediate: true},
 );
@@ -316,7 +325,7 @@ watch(
 
 <template>
   <section
-    v-if="activeSurface && !projection.you.dead"
+    v-if="activeSurface"
     class="interaction-surface"
     data-testid="interaction-surface"
     :data-state="terminal ? 'terminal' : busy ? 'pending' : 'open'"
@@ -333,7 +342,7 @@ watch(
     />
 
     <InteractionDialog
-      v-if="interaction || economyOnly"
+      v-if="interaction"
       v-model:open="surfaceOpen"
       :title="surfaceTitle"
       :context="surfaceContext"
@@ -347,10 +356,7 @@ watch(
       :deadline-label="deadlineLabel"
       :eyebrow="dialogEyebrow"
       :desktop-inline="Boolean(deathLootInteraction)"
-      :inbox-label="economyOnly ? 'ДЕЙСТВИЯ ТЕКУЩЕГО ХОДА' : undefined"
-      :inbox-status="economyOnly
-        ? 'Доступны решения по картам и целям'
-        : interaction?.response_required_for_you
+      :inbox-status="interaction?.response_required_for_you
         ? 'Требуется решение'
         : 'Окно открыто для текущей проекции'"
     >
@@ -380,19 +386,8 @@ watch(
         @submit="emit('submit', $event)"
       />
 
-      <EconomySurface
-        v-if="showEconomy"
-        :projection="projection"
-        :actions="economyEntries"
-        :interaction="interaction"
-        :busy="busy"
-        :force-dialog="true"
-        @submit="emit('submit-economy', $event)"
-      />
-
       <DeathLootSurface
         v-if="deathLootInteraction"
-        :projection="projection"
         :interaction="deathLootInteraction"
         :busy="busy"
         @submit="emit('submit', $event)"
@@ -408,7 +403,7 @@ watch(
 
       <p
         v-else-if="interaction && !deathLootInteraction && !selectableActions.length
-          && !helperOfferMode && !invitedHelperOffer && !charityForm && !showEconomy"
+          && !helperOfferMode && !invitedHelperOffer && !charityForm"
         class="interaction-opaque"
         role="status"
       >

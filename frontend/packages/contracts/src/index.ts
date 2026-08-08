@@ -39,6 +39,7 @@ export const actionTypeSchema = z.enum([
   "look_for_trouble",
   "loot_room",
   "use_ability",
+  "request_combat_resolution",
   "resolve_combat",
   "run_away",
   "choose_effect",
@@ -106,6 +107,13 @@ export const selfViewSchema = z.object({
   name: z.string().min(1),
   level: z.number().int().min(1).max(10),
   combat_strength: z.number().int(),
+  strength_breakdown: z.object({
+    base_strength: z.number().int(),
+    equipment_bonus: z.number().int(),
+    temporary_bonus: z.number().int(),
+    total_strength: z.number().int(),
+    hand_count: z.number().int().nonnegative(),
+  }).strict(),
   escape_bonus: z.number().int(),
   hand_limit: z.number().int().nonnegative(),
   character_tags: nullableArray(z.string().min(1)),
@@ -124,6 +132,15 @@ export const otherPlayerViewSchema = z.object({
   player_id: z.string().min(1),
   name: z.string().min(1),
   level: z.number().int().min(1).max(10),
+  combat_strength: z.number().int().optional(),
+  strength_breakdown: z.object({
+    base_strength: z.number().int(),
+    equipment_bonus: z.number().int(),
+    temporary_bonus: z.number().int(),
+    total_strength: z.number().int(),
+    hand_count: z.number().int().nonnegative(),
+  }).strict().optional(),
+  escape_bonus: z.number().int().optional(),
   hand_count: z.number().int().nonnegative(),
   carried: nullableArray(cardViewSchema),
   equipped: nullableArray(cardViewSchema),
@@ -181,6 +198,7 @@ export const actionViewSchema = z.object({
 
 export const turnViewSchema = z.object({
   player_id: z.string(),
+  number: z.number().int().nonnegative().optional(),
   phase: phaseSchema.or(z.literal("")),
   encounter: cardViewSchema.optional(),
   resolving: nullableArray(cardViewSchema),
@@ -421,6 +439,19 @@ export const projectionSchema = z.object({
   treasure_deck_count: z.number().int().nonnegative(),
   treasure_discard_count: z.number().int().nonnegative(),
   winner_player_id: z.string().optional(),
+  recent_combat_result: z.object({
+    outcome: z.enum(["victory", "defeat"]),
+    public_rewards: z.array(z.object({
+      player_id: z.string().min(1),
+      treasure_count: z.number().int().nonnegative(),
+      levels_gained: z.number().int().nonnegative(),
+    }).strict()),
+    viewer_reward: z.object({
+      player_id: z.string().min(1),
+      treasures: z.array(cardViewSchema),
+      levels_gained: z.number().int().nonnegative(),
+    }).strict().optional(),
+  }).strict().optional(),
   content_set_id: z.string().min(1),
   content_version: z.number().int().positive(),
   rules_profile_id: z.enum([

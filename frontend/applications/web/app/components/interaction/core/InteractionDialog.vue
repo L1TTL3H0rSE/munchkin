@@ -113,7 +113,7 @@ function close() {
 .interaction-sheet__error { color: var(--color-danger); }
 .interaction-sheet__content { min-width: 0; display: grid; gap: 12px; }
 
-@media (width >= 600px) {
+@media (width >= 1024px) {
   :deep(.sheet-dialog.interaction-flow-dialog--desktop-inline) {
     position: fixed;
     top: 88px;

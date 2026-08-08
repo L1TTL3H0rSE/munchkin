@@ -128,12 +128,33 @@ func finishSetup(
 	var all []EventEnvelope
 	for state.Turn.Phase == PhaseSetup {
 		var events []EventEnvelope
-		state, events = applyCommand(
-			t,
-			state,
-			Command{Type: CommandFinishSetup},
-			pack,
-		)
+		playerIndex := state.PlayerIndex(state.Turn.PlayerID)
+		if state.Players[playerIndex].SetupDiscardPending {
+			limit, err := handLimit(state, playerIndex, pack)
+			if err != nil {
+				t.Fatal(err)
+			}
+			excess := max(0, len(state.Players[playerIndex].Hand)-limit)
+			state, events = applyCommand(
+				t,
+				state,
+				Command{
+					Type: CommandResolveCharity,
+					InstanceIDs: append(
+						[]string(nil),
+						state.Players[playerIndex].Hand[:excess]...,
+					),
+				},
+				pack,
+			)
+		} else {
+			state, events = applyCommand(
+				t,
+				state,
+				Command{Type: CommandFinishSetup},
+				pack,
+			)
+		}
 		all = append(all, events...)
 	}
 	return state, all
@@ -318,6 +339,8 @@ func TestDemoPackDigestMaterializationAndGoNodeConformance(t *testing.T) {
 func TestSequentialSetupDealsFourPlusFour(t *testing.T) {
 	pack := testPack(t)
 	state, _ := startedState(t, pack, 2)
+	state.RulesProfileID = DeathLootProfileID
+	state.RulesProfileVersion = DeathLootProfileVersion
 	if state.Turn.Phase != PhaseSetup ||
 		state.Turn.PlayerID != "player-a" ||
 		len(state.Players[0].Hand) != 8 ||
@@ -332,11 +355,35 @@ func TestSequentialSetupDealsFourPlusFour(t *testing.T) {
 		t.Fatal("door opened before setup finished")
 	}
 	state, _ = applyCommand(t, state, Command{Type: CommandFinishSetup}, pack)
+	if !state.Players[0].SetupDiscardPending ||
+		state.Turn.PlayerID != "player-a" ||
+		state.Turn.Phase != PhaseSetup {
+		t.Fatalf("setup discard did not become mandatory: %#v", state)
+	}
+	projection, err := ProjectForActor(state, "player-a", pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projection.Turn.AvailableActions) != 1 ||
+		projection.Turn.AvailableActions[0].Type != CommandResolveCharity ||
+		projection.Turn.AvailableActions[0].Minimum != 3 ||
+		projection.Turn.AvailableActions[0].Maximum != 3 {
+		t.Fatalf("setup discard action=%#v", projection.Turn.AvailableActions)
+	}
+	state, _ = applyCommand(t, state, Command{
+		Type:        CommandResolveCharity,
+		InstanceIDs: append([]string(nil), state.Players[0].Hand[:3]...),
+	}, pack)
 	if state.Turn.PlayerID != "player-b" || state.Turn.Phase != PhaseSetup {
-		t.Fatalf("setup did not rotate: %#v", state.Turn)
+		t.Fatalf("setup did not rotate after discard: %#v", state.Turn)
 	}
 	state, _ = applyCommand(t, state, Command{Type: CommandFinishSetup}, pack)
-	if state.Turn.PlayerID != "player-a" || state.Turn.Phase != PhasePreparation {
+	state, _ = applyCommand(t, state, Command{
+		Type:        CommandResolveCharity,
+		InstanceIDs: append([]string(nil), state.Players[1].Hand[:3]...),
+	}, pack)
+	if state.Turn.PlayerID != "player-a" || state.Turn.Phase != PhasePreparation ||
+		state.Turn.Number != 1 {
 		t.Fatalf("first turn did not start: %#v", state.Turn)
 	}
 }
@@ -349,7 +396,8 @@ func TestOnePlayerFullTurnReplaysAndReturnsToSameActor(t *testing.T) {
 	envelopes = append(envelopes, added...)
 	state, added = completeTurnForTest(t, state, pack, "player-a")
 	envelopes = append(envelopes, added...)
-	if state.Turn.PlayerID != "player-a" || state.Turn.Phase != PhasePreparation {
+	if state.Turn.PlayerID != "player-a" || state.Turn.Phase != PhasePreparation ||
+		state.Turn.Number != 2 {
 		t.Fatalf("one-player turn did not cycle: %#v", state.Turn)
 	}
 	replayed, err := Replay(envelopes)
@@ -371,14 +419,16 @@ func TestTwoPlayersCompleteTurnsRotateBackToFirstActor(t *testing.T) {
 	state, added = completeTurnForTest(t, state, pack, "player-b")
 	envelopes = append(envelopes, added...)
 	if state.Turn.PlayerID != "player-b" ||
-		state.Turn.Phase != PhasePreparation {
+		state.Turn.Phase != PhasePreparation ||
+		state.Turn.Number != 2 {
 		t.Fatalf("first completed turn did not rotate to player-b: %#v", state.Turn)
 	}
 
 	state, added = completeTurnForTest(t, state, pack, "player-a")
 	envelopes = append(envelopes, added...)
 	if state.Turn.PlayerID != "player-a" ||
-		state.Turn.Phase != PhasePreparation {
+		state.Turn.Phase != PhasePreparation ||
+		state.Turn.Number != 3 {
 		t.Fatalf("second completed turn did not rotate to player-a: %#v", state.Turn)
 	}
 

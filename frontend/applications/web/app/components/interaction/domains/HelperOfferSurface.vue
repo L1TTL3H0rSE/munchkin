@@ -7,9 +7,7 @@ import type {
 
 import {
   helperCancelAction,
-  helperOfferAction,
-  helperOfferOptions,
-  helperRewardsFor,
+  helperOfferActions,
   isInvitedHelperOffer,
   projectedPlayerName,
   formatAbsoluteDeadline,
@@ -27,37 +25,21 @@ const emit = defineEmits<{
   submit: [action: InteractionActionView];
 }>();
 
-const selectedHelperPlayerID = ref("");
-const selectedRewardValue = ref("");
-const formError = ref("");
-
-const helperOptions = computed(() => helperOfferOptions(props.interaction.actions));
-const rewardValues = computed(() => helperRewardsFor(
-  helperOptions.value,
-  selectedHelperPlayerID.value,
-));
-const selectedAction = computed(() => helperOfferAction(
-  props.interaction.actions,
-  selectedHelperPlayerID.value,
-  Number(selectedRewardValue.value),
+const selectedActionID = ref("");
+const offerActions = computed(() => helperOfferActions(props.interaction.actions));
+const selectedAction = computed(() => offerActions.value.find((action) =>
+  action.action_id === selectedActionID.value,
 ));
 const cancelAction = computed(() => helperCancelAction(props.interaction));
 const invited = computed(() => isInvitedHelperOffer(props.interaction));
 
 function reset(): void {
-  const first = helperOptions.value[0];
-  selectedHelperPlayerID.value = first?.helperPlayerID ?? "";
-  selectedRewardValue.value = first?.rewardTreasures[0]?.toString() ?? "";
-  formError.value = "";
+  selectedActionID.value = offerActions.value[0]?.action_id ?? "";
 }
 
 function submitOffer(): void {
   const action = selectedAction.value;
-  if (!action) {
-    formError.value = "Выберите помощника и награду из текущей проекции.";
-    return;
-  }
-  formError.value = "";
+  if (!action || props.busy || props.terminal) return;
   emit("submit", action);
 }
 
@@ -76,15 +58,6 @@ watch(
   {immediate: true},
 );
 
-watch(
-  () => selectedHelperPlayerID.value,
-  () => {
-    if (!rewardValues.value.includes(Number(selectedRewardValue.value))) {
-      selectedRewardValue.value = rewardValues.value[0]?.toString() ?? "";
-    }
-    formError.value = "";
-  },
-);
 </script>
 
 <template>
@@ -111,51 +84,29 @@ watch(
   </section>
 
   <form
-    v-if="helperOptions.length"
+    v-if="offerActions.length"
     class="helper-offer-form interaction-helper-form"
     novalidate
     @submit.prevent="submitOffer"
   >
     <fieldset :disabled="busy || terminal">
-      <legend>Параметры предложения</legend>
-      <label for="interaction-helper-player">Помощник</label>
-      <select
-        id="interaction-helper-player"
-        v-model="selectedHelperPlayerID"
-        required
-        :aria-describedby="formError ? 'interaction-helper-error' : undefined"
-        :aria-invalid="formError ? 'true' : undefined"
-      >
-        <option
-          v-for="option in helperOptions"
-          :key="option.helperPlayerID"
-          :value="option.helperPlayerID"
+      <legend>Выбери вариант предложения</legend>
+      <div class="helper-offer-form__choices" role="listbox" aria-label="Варианты помощи">
+        <button
+          v-for="action in offerActions"
+          :key="action.action_id"
+          type="button"
+          role="option"
+          :aria-selected="action.action_id === selectedActionID"
+          :disabled="busy || terminal"
+          @click="selectedActionID = action.action_id"
         >
-          {{ projectedPlayerName(projection, option.helperPlayerID) }}
-        </option>
-      </select>
-
-      <label for="interaction-helper-reward">Награда помощнику, сокровищ</label>
-      <input
-        id="interaction-helper-reward"
-        v-model="selectedRewardValue"
-        type="number"
-        inputmode="numeric"
-        :min="rewardValues[0]"
-        :max="rewardValues[rewardValues.length - 1]"
-        step="1"
-        required
-        :aria-describedby="formError ? 'interaction-helper-error' : undefined"
-        :aria-invalid="formError ? 'true' : undefined"
-        @input="formError = ''"
-      >
-      <small v-if="rewardValues.length">
-        Доступно по текущей проекции: {{ rewardValues.join(", ") }}.
-      </small>
+          <span>ПОМОЩНИК</span>
+          <strong>{{ projectedPlayerName(projection, action.helper_player_id ?? '') }}</strong>
+          <small>{{ action.reward_treasures ?? 0 }} сокровища</small>
+        </button>
+      </div>
     </fieldset>
-    <p v-if="formError" id="interaction-helper-error" role="alert">
-      {{ formError }}
-    </p>
     <button type="submit" :disabled="busy || terminal || !selectedAction">
       {{ busy ? "Отправляем предложение…" : "Предложить помощь" }}
     </button>
@@ -217,30 +168,33 @@ watch(
   text-transform: uppercase;
 }
 
-.helper-offer-form select,
-.helper-offer-form input {
-  width: 100%;
-  min-height: 2.75rem;
+.helper-offer-form__choices {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px;
+}
+
+.helper-offer-form__choices button {
+  flex: 0 0 150px;
+  min-height: 218px;
+  display: grid;
+  align-content: end;
+  justify-items: start;
+  gap: 8px;
   border: 1px solid var(--color-line, #566044);
-  padding: .55rem .65rem;
+  border-radius: 14px;
+  padding: 102px 10px 10px;
   color: var(--color-text);
-  background: var(--color-paper);
+  background: linear-gradient(#aabdb5 0 92px, var(--color-paper) 92px);
+  box-shadow: 0 7px 18px rgb(59 46 40 / 14%);
   font: inherit;
+  text-align: start;
 }
 
-.helper-offer-form select:focus-visible,
-.helper-offer-form input:focus-visible {
-  outline: 2px solid var(--color-accent-strong);
-  outline-offset: 2px;
-}
-
-.helper-offer-form [aria-invalid="true"] {
-  border-color: #ef8d74;
-}
-
-.helper-offer-form > p[role="alert"] {
-  color: var(--color-danger);
-}
+.helper-offer-form__choices button[aria-selected="true"] { border: 3px solid var(--color-accent-strong); }
+.helper-offer-form__choices span { color: var(--color-accent-strong); font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.helper-offer-form__choices small { color: var(--color-text-muted); }
 
 .helper-offer-cancel {
   justify-self: start;

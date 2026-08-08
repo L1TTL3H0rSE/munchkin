@@ -897,6 +897,23 @@ func (service *Service) ResolveCharity(
 		expectedVersion,
 		fingerprint,
 		func(state game.State, actorID string, acceptedAt time.Time) (game.Command, error) {
+			if state.Turn.Phase == game.PhaseSetup {
+				if len(legacyInstanceIDs) != 0 || len(allocations) == 0 {
+					return game.Command{}, ErrInteractionAction
+				}
+				instanceIDs := make([]string, 0, len(allocations))
+				for _, allocation := range allocations {
+					if allocation.RecipientPlayerID != "" {
+						return game.Command{}, ErrInteractionAction
+					}
+					instanceIDs = append(instanceIDs, allocation.InstanceID)
+				}
+				return game.Command{
+					Type:        game.CommandResolveCharity,
+					ActorID:     actorID,
+					InstanceIDs: instanceIDs,
+				}, nil
+			}
 			profile, err := state.Profile()
 			if err != nil {
 				return game.Command{}, err

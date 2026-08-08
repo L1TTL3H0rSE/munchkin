@@ -1,33 +1,8 @@
-import type {
-  ActionDescriptor,
-  CardView,
-  CommandPayload,
-} from "@munchkin/contracts";
+import type {ActionDescriptor, CommandPayload} from "@munchkin/contracts";
 
 export type ActionEntry = {
   action: ActionDescriptor;
   index: number;
-};
-
-export type CardActionMode = "direct" | "contextual";
-
-export type CardActionState =
-  | "idle"
-  | "available"
-  | "selected"
-  | "pending"
-  | "confirmed"
-  | "disabled";
-
-export type CardActionBinding = ActionEntry & {
-  cardInstanceID: CardView["instance_id"];
-  key: string;
-  mode: CardActionMode;
-};
-
-export type CardActionMap = {
-  byCard: Map<string, CardActionBinding[]>;
-  cardBoundActionIndexes: Set<number>;
 };
 
 const selectionCommands = new Set([
@@ -50,6 +25,7 @@ export function actionLabel(action: ActionDescriptor) {
     look_for_trouble: "Искать неприятности",
     loot_room: "Обыскать комнату",
     use_ability: "Использовать способность",
+    request_combat_resolution: "Завершить бой",
     resolve_combat: "Завершить бой",
     run_away: "Смыться",
     choose_effect: "Подтвердить выбор",
@@ -109,42 +85,6 @@ export function selectionIsValid(
   return true;
 }
 
-export function reconcileActionState(
-  actions: Array<ActionDescriptor | ActionEntry>,
-  selections: Record<string, string[]>,
-  targets: Record<string, string>,
-) {
-  const liveKeys = new Set<string>();
-  actions.forEach((entry, index) => {
-    const action = "action" in entry ? entry.action : entry;
-    const actionIndex = "action" in entry ? entry.index : index;
-    const key = actionKey(action, actionIndex);
-    liveKeys.add(key);
-    const options = new Set(action.instance_ids ?? []);
-    if (selections[key]) {
-      selections[key] = selections[key].filter((id) => options.has(id));
-    }
-    const target = targets[key];
-    const targetOptions = new Set([
-      ...(action.target_instance_ids ?? []),
-      ...(action.target_player_ids ?? []),
-    ]);
-    if (target && !targetOptions.has(target)) {
-      Reflect.deleteProperty(targets, key);
-    }
-  });
-  for (const key of Object.keys(selections)) {
-    if (!liveKeys.has(key)) {
-      Reflect.deleteProperty(selections, key);
-    }
-  }
-  for (const key of Object.keys(targets)) {
-    if (!liveKeys.has(key)) {
-      Reflect.deleteProperty(targets, key);
-    }
-  }
-}
-
 export function buildCommandPayload(
   action: ActionDescriptor,
   selected: string[] = [],
@@ -173,100 +113,4 @@ export function buildCommandPayload(
     payload.ability_index = action.ability_index;
   }
   return payload;
-}
-
-export function actionKey(action: ActionDescriptor, index: number) {
-  return [
-    action.type,
-    action.source_instance_id ?? "",
-    action.ability_index ?? "",
-    index,
-  ].join(":");
-}
-
-export function actionNeedsContext(action: ActionDescriptor) {
-  return Boolean(
-    action.instance_ids?.length ||
-    action.target_instance_ids?.length ||
-    action.target_player_ids?.length ||
-    action.requested_instance_ids?.length ||
-    action.minimum !== undefined ||
-    action.maximum !== undefined ||
-    action.minimum_total !== undefined ||
-    action.instance_values,
-  );
-}
-
-export function actionMode(action: ActionDescriptor): CardActionMode {
-  return action.source_instance_id && !actionNeedsContext(action)
-    ? "direct"
-    : "contextual";
-}
-
-export function mapCardActions(
-  cards: CardView[],
-  entries: ActionEntry[],
-): CardActionMap {
-  const cardIDs = new Set(cards.map((card) => card.instance_id));
-  const byCard = new Map<string, CardActionBinding[]>();
-  const cardBoundActionIndexes = new Set<number>();
-
-  for (const entry of entries) {
-    const actionCardIDs = new Set<string>();
-    if (
-      entry.action.source_instance_id &&
-      cardIDs.has(entry.action.source_instance_id)
-    ) {
-      actionCardIDs.add(entry.action.source_instance_id);
-    }
-    for (const instanceID of entry.action.instance_ids ?? []) {
-      if (cardIDs.has(instanceID)) {
-        actionCardIDs.add(instanceID);
-      }
-    }
-    if (actionCardIDs.size === 0) {
-      continue;
-    }
-
-    cardBoundActionIndexes.add(entry.index);
-    for (const cardInstanceID of actionCardIDs) {
-      const bindings = byCard.get(cardInstanceID) ?? [];
-      bindings.push({
-        ...entry,
-        cardInstanceID,
-        key: actionKey(entry.action, entry.index),
-        mode: actionMode(entry.action),
-      });
-      byCard.set(cardInstanceID, bindings);
-    }
-  }
-
-  return {byCard, cardBoundActionIndexes};
-}
-
-export function cardActionState(
-  bindings: CardActionBinding[],
-  options: {
-    busy: boolean;
-    selected: boolean;
-    pending: boolean;
-    confirmed: boolean;
-  },
-): CardActionState {
-  if (bindings.length === 0) {
-    return "idle";
-  }
-  if (options.pending) {
-    return "pending";
-  }
-  if (options.busy) {
-    return "disabled";
-  }
-  if (options.confirmed) {
-    return "confirmed";
-  }
-  if (options.selected) {
-    return "selected";
-  }
-  return "available";
 }

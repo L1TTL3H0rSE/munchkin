@@ -20,8 +20,8 @@ const fixtures = new Map(
 
 describe("Figma state matrix", () => {
   it("keeps every source desktop state mapped to a parsed actor fixture", () => {
-    expect(figmaStateDescriptors).toHaveLength(40);
-    expect(new Set(figmaStateDescriptors.map((state) => state.nodeId)).size)
+    expect(figmaStateDescriptors).toHaveLength(43);
+    expect(new Set(figmaStateDescriptors.map((state) => state.name)).size)
       .toBe(figmaStateDescriptors.length);
 
     for (const state of figmaStateDescriptors) {
@@ -46,6 +46,18 @@ describe("Figma state matrix", () => {
       "254:221",
       "258:2674",
       "285:1566",
+      "267:708",
+      "165:42",
+      "271:3216",
+      "166:42",
+      "271:3010",
+      "164:42",
+      "291:1587",
+      "340:3475",
+      "342:3574",
+      "256:316",
+      "147:978",
+      "174:1735",
     ]);
   });
 
@@ -71,14 +83,28 @@ describe("Figma state matrix", () => {
 
   it("exhaustively maps every exported server action to a fixture descriptor", () => {
     for (const [actionType, coverage] of Object.entries(actionCoverage)) {
+      if (coverage.source === "not_projected") {
+        expect(coverage.fixtureID, actionType).toBeUndefined();
+        expect(coverage.semanticCheck, actionType).toContain("not-projected");
+        expect([...fixtures.values()].some((fixture) =>
+          fixture.projection.turn.available_actions.some((action) => action.type === actionType) ||
+          fixture.projection.turn.combat?.resolution_action?.type === actionType,
+        ), actionType).toBe(false);
+        continue;
+      }
       const fixture = fixtures.get(coverage.fixtureID);
       expect(fixture, actionType).toBeDefined();
-      expect(
-        fixture?.projection.turn.available_actions.some((action) =>
-          action.type === actionType,
-        ),
-        actionType,
-      ).toBe(true);
+      if (coverage.source === "combat_resolution") {
+        expect(fixture?.projection.turn.combat?.resolution_action?.type, actionType)
+          .toBe(actionType);
+      } else {
+        expect(
+          fixture?.projection.turn.available_actions.some((action) =>
+            action.type === actionType,
+          ),
+          actionType,
+        ).toBe(true);
+      }
       expect(coverage.semanticCheck).toContain("action-");
     }
   });
@@ -101,9 +127,6 @@ describe("Figma state matrix", () => {
     expect(figmaCompactHandoffs.lobbySelectedB.nodeId).toBe("228:14");
     expect(figmaCompactHandoffs.lobbyDesktopSelectedB.nodeId).toBe("240:53");
     expect([...figmaCompactHandoffs.integratedStates.fixtureIDs]).toContain("mobile-combat-multiple");
-    expect(excludedFigmaSources).toEqual([
-      expect.objectContaining({nodeId: "122:3", viewport: "360x800"}),
-    ]);
-    expect(excludedFigmaSources[0]?.reason).toContain("excluded");
+    expect(excludedFigmaSources).toEqual([]);
   });
 });

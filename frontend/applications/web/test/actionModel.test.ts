@@ -2,7 +2,6 @@ import {describe, expect, it} from "vitest";
 import {
   actionLabel,
   buildCommandPayload,
-  reconcileActionState,
   selectionIsValid,
 } from "../app/components/actionModel";
 import {buildContentAssetURL} from "../app/composables/useGameApi";
@@ -83,48 +82,6 @@ describe("server-supplied action mapping", () => {
     };
     expect(selectionIsValid(sale, ["cheap"])).toBe(false);
     expect(selectionIsValid(sale, ["cheap", "enough"])).toBe(true);
-  });
-
-  it("drops selections and targets that disappeared from a new projection", () => {
-    const selections = {
-      "sell_items:::0": ["kept", "stale"],
-      "old:::1": ["gone"],
-    };
-    const targets = {
-      "sell_items:::0": "stale-target",
-      "old:::1": "gone-target",
-    };
-    reconcileActionState([{
-      type: "sell_items",
-      instance_ids: ["kept"],
-      target_instance_ids: ["new-target"],
-    }], selections, targets);
-    expect(selections).toEqual({"sell_items:::0": ["kept"]});
-    expect(targets).toEqual({});
-  });
-
-  it("keeps a server-supplied player target during reconciliation", () => {
-    const selections = {};
-    const targets = {"play_card:curse-1::0": "player-b"};
-    reconcileActionState([{
-      type: "play_card",
-      source_instance_id: "curse-1",
-      target_player_ids: ["player-b"],
-    }], selections, targets);
-    expect(targets).toEqual({"play_card:curse-1::0": "player-b"});
-  });
-
-  it("keeps contextual selections keyed by their projection index", () => {
-    const selections = {"sell_items:::4": ["kept"]};
-    const targets = {};
-    reconcileActionState([{
-      action: {
-        type: "sell_items",
-        instance_ids: ["kept"],
-      },
-      index: 4,
-    }], selections, targets);
-    expect(selections).toEqual({"sell_items:::4": ["kept"]});
   });
 
   it("provides Russian labels for every core action", () => {
