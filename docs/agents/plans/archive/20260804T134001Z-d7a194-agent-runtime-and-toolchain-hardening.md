@@ -1,10 +1,14 @@
 # PLAN: agent runtime and toolchain hardening
 
 - **Plan ID:** `20260804T134001Z-d7a194-agent-runtime-and-toolchain-hardening`
-- **Статус:** awaiting_approval
+- **Статус:** cancelled
 - **Создан:** 2026-08-04 13:40:01 UTC
-- **Обновлён:** 2026-08-04 17:20 MSK
-- **Владелец:** Codex
+- **Обновлён:** 2026-08-09 01:12 MSK
+- **Владелец:** lifecycle claim transferred from stale session
+  `019fc743-f079-7d30-9756-e9aedfd5592e` to execution session
+  `019fe36c-a949-7320-92bf-7ddac8b5beab` for cancellation only
+- **Заменён:** `superseded by staged Leino product roadmap`, plan
+  `20260808T210727Z-bc4736-rebaseline-leino-product-roadmap`
 - **Workspace:** shared
 - **Ветка:** current
 - **Режим параллельности:** exclusive
@@ -368,7 +372,7 @@ read-only Terra fallback. Actual-model observation не подменяется c
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** cancelled without implementation approval
 - **Запрошено:** 2026-08-04 13:40:01 UTC
 - **Подтверждено:** —
 - **Формулировка/ограничения пользователя:** fix recurring bundled-runtime
@@ -380,7 +384,15 @@ read-only Terra fallback. Actual-model observation не подменяется c
 ## Ход выполнения
 
 - Draft создан атомарно; реализация не начата.
+- 2026-08-09: lifecycle-only cancellation after targeted stale-owner takeover;
+  implementation was never selected or approved. Exact reason:
+  `superseded by staged Leino product roadmap`. Research above is preserved
+  unchanged and superseded by plan
+  `20260808T210727Z-bc4736-rebaseline-leino-product-roadmap`.
 
 ## Итог
 
-Заполняется после реализации.
+Cancelled before implementation. Superseded by the staged Leino product
+roadmap in plan `20260808T210727Z-bc4736-rebaseline-leino-product-roadmap`;
+no toolchain, routing or harness capability from this plan was implemented or
+approved.

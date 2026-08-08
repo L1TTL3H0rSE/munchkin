@@ -1,10 +1,14 @@
 # PLAN: parallel agent worktree orchestration
 
 - **Plan ID:** `20260803T115527Z-a5636f-parallel-agent-worktree-orchestration`
-- **Статус:** awaiting_approval
+- **Статус:** cancelled
 - **Создан:** 2026-08-03 11:55:27 UTC
-- **Обновлён:** 2026-08-04 17:20 MSK
-- **Владелец:** Codex
+- **Обновлён:** 2026-08-09 01:12 MSK
+- **Владелец:** lifecycle claim transferred from stale session
+  `019fc743-f079-7d30-9756-e9aedfd5592e` to execution session
+  `019fe36c-a949-7320-92bf-7ddac8b5beab` for cancellation only
+- **Заменён:** `superseded by staged Leino product roadmap`, plan
+  `20260808T210727Z-bc4736-rebaseline-leino-product-roadmap`
 - **Workspace:** controller checkout + isolated linked worktrees under `.leino/runtime/worktrees/`
 - **Ветка:** `codex/frontend-remaining-plans`
 - **Режим параллельности:** exclusive
@@ -428,7 +432,7 @@ validated binding/fingerprint и передаёт готовый environment в 
 
 ## Согласование
 
-- **Статус:** awaiting user approval
+- **Статус:** cancelled without implementation approval
 - **Запрошено:** 2026-08-03 после read-only capability/conflict анализа
 - **Подтверждено:** —
 - **Формулировка/ограничения пользователя:** создать второй отдельный plan для
@@ -441,7 +445,15 @@ validated binding/fingerprint и передаёт готовый environment в 
 - Draft создан атомарно; implementation не начата.
 - Read-only проверка подтвердила local `codex exec -C` и exact-session resume,
   а также direct/transitive write-set dependencies.
+- 2026-08-09: lifecycle-only cancellation after targeted stale-owner takeover;
+  implementation was never selected or approved. Exact reason:
+  `superseded by staged Leino product roadmap`. Research above is preserved
+  unchanged and superseded by plan
+  `20260808T210727Z-bc4736-rebaseline-leino-product-roadmap`.
 
 ## Итог
 
-Заполняется после реализации.
+Cancelled before implementation. Superseded by the staged Leino product
+roadmap in plan `20260808T210727Z-bc4736-rebaseline-leino-product-roadmap`;
+no product, harness or worktree runtime capability from this plan was
+implemented or approved.

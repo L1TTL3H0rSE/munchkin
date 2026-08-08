@@ -59,6 +59,16 @@ ambiguity/risk, без фиксированной квоты агентов ил
 запись маркируется `root-only pending worktree orchestration`; до отдельного
 worktree plan все repository writes выполняет root.
 
+Standalone Leino roadmap из
+[`ADR-0010`](decisions/0010-standalone-leino-product-roadmap.md) задаёт semantic
+slugs и gates, но не является approval/select P01-P15. Exact child ID создаётся
+только в отдельной planning session и получает собственные manifest, write set,
+dependency preflight и explicit approval. До успешного P11 все repository
+writes остаются root-only; P11 доказывает одного bounded writer, а concurrent
+writers остаются запрещены до отдельного P12 и его evidence gate. Figma
+external artifacts всегда используют отдельную exact-resource single-writer
+consistency model и не наследуют repository write authority.
+
 Повторный select того же ID идемпотентен. Пока plan выбран, прямой select
 другого ID запрещён. Draft ownership без selected plan передаётся через
 `plan release`/`plan claim`; `--takeover` используется только после проверки,

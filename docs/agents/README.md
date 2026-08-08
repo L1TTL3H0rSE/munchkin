@@ -25,6 +25,7 @@ git status --short
 | `PROJECT_MEMORY.md` | Подтверждённые устойчивые ловушки |
 | `plans/README.md` | Plan lifecycle и manifests |
 | `decisions/` | Принятые сквозные решения |
+| `decisions/0010-standalone-leino-product-roadmap.md` | Standalone Leino boundary, staged P01-P14 roadmap и optional P15 |
 | `handoffs/` | Контекст длинной незавершённой задачи |
 | `backend/AGENTS.md` | Go engine/service правила |
 | `frontend/AGENTS.md` | Nuxt/pnpm/contract правила |

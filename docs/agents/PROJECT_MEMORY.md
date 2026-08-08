@@ -91,3 +91,16 @@
   `tools/leinoctl/src/session.mjs`, `tools/leinoctl/test/git.test.mjs`,
   `tools/leinoctl/test/session.test.mjs`, `docs/agents/HARNESS.md`.
 - **Проверено:** 2026-08-02.
+
+## MEM-009 — standalone Leino source of truth is staged, not current
+
+- **Факт:** Munchkin remains the current source and dogfood consumer for the
+  vendored generic `tools/leinoctl` implementation. Proposed `leinodev/leino`
+  becomes authoritative for generic CLI/core/schema only after separately
+  approved migration and package-consumer plans complete. ADR acceptance does
+  not approve P01-P15, parallel writers, dependency installs, push, publication
+  or Figma/external mutations.
+- **Источники:**
+  `docs/agents/decisions/0010-standalone-leino-product-roadmap.md`,
+  `docs/agents/HARNESS.md`.
+- **Проверено:** 2026-08-09.
