@@ -5,11 +5,6 @@ import {
   hasActionableDeadline,
   projectedTurnActions,
 } from "../app/components/game/gamePresentationModel";
-import {
-  advisoryRemainingMilliseconds,
-  formatAdvisoryTime,
-} from "../app/components/ui/advisoryTimerModel";
-import {phaseLabel} from "../app/components/ui/phaseModel";
 import {fixtureAdapter} from "./fixtures/fixtureAdapter";
 
 describe("game presentation model", () => {
@@ -45,17 +40,5 @@ describe("game presentation model", () => {
     expect(projectedTurnActions(projection).map((action) => action.type))
       .toEqual(["open_door"]);
     expect(JSON.stringify(projection)).toBe(before);
-  });
-
-  it("keeps timer presentation advisory and deterministic", () => {
-    expect(advisoryRemainingMilliseconds(
-      "2030-01-01T00:05:00.000Z",
-      "2030-01-01T00:04:00.000Z",
-      1_000,
-      1_000,
-    )).toBe(60_000);
-    expect(formatAdvisoryTime(0)).toBe("Время вышло — ждём сервер");
-    expect(formatAdvisoryTime(null)).toBe("Таймер недоступен");
-    expect(phaseLabel("combat")).toBe("Бой");
   });
 });

@@ -3,7 +3,7 @@ const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "";
 export default defineNuxtConfig({
   compatibilityDate: "2026-07-29",
   devtools: {enabled: true},
-  modules: ["@pinia/nuxt", "@nuxt/eslint"],
+  modules: ["@nuxt/eslint"],
   css: ["~/assets/scss/main.scss"],
   runtimeConfig: {
     cardStudio: {

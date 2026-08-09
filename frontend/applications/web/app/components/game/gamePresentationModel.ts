@@ -357,23 +357,6 @@ export function opponentStatus(
   return "ready";
 }
 
-export function opponentStatusLabel(status: OpponentStatus): string {
-  switch (status) {
-    case "active":
-      return "Ходит";
-    case "waiting":
-      return "Готовится";
-    case "dead":
-      return "Вне хода";
-    case "ready":
-      return "Готов";
-    default: {
-      const exhaustive: never = status;
-      return exhaustive;
-    }
-  }
-}
-
 export function hasActionableDeadline(projection: Projection): boolean {
   return Boolean(
     projection.interaction?.response_required_for_you

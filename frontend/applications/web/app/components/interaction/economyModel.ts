@@ -55,35 +55,12 @@ export function isEconomyAction(action: ActionDescriptor): action is EconomyActi
   return economyActionTypes.has(action.type);
 }
 
-export function economyActionKey(action: EconomyAction, index: number): string {
-  return [
-    action.type,
-    action.source_instance_id ?? "",
-    action.ability_index ?? "",
-    index,
-  ].join(":");
-}
-
 export function economyActions(
   actions: readonly ActionDescriptor[],
 ): Array<{action: EconomyAction; index: number}> {
   return actions.flatMap((action, index) =>
     isEconomyAction(action) ? [{action, index}] : [],
   );
-}
-
-export function ownCardByID(
-  projection: Projection,
-  instanceID: string,
-): CardView | undefined {
-  return [
-    ...projection.you.hand,
-    ...projection.you.carried,
-    ...projection.you.equipped,
-    ...projection.you.traits,
-    ...projection.you.attachments,
-    ...projection.you.persistent_curses,
-  ].find((card) => card.instance_id === instanceID);
 }
 
 export function ownCarriedCardsFor(
@@ -138,9 +115,5 @@ export function interactionHasCharityForm(
   interaction: InteractionView | undefined,
 ): boolean {
   return Boolean(interaction?.charity_transfer);
-}
-
-export function theftActionLabel(action: EconomyAction): string {
-  return action.type === "attempt_theft" ? "Начать кражу" : "Действие экономики";
 }
 

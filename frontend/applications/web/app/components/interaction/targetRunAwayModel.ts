@@ -116,12 +116,6 @@ export function targetRunAwayActionDetails(
     : ["Решение и результат подтверждает сервер."];
 }
 
-export function runAwayState(
-  projection: Projection,
-): RunAwayView | undefined {
-  return projection.turn.run_away;
-}
-
 export function runAwayCurrentPlayerName(projection: Projection): string {
   return targetPlayerName(projection, projection.turn.run_away?.current_player_id);
 }
