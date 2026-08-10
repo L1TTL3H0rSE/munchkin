@@ -28,6 +28,7 @@ import RunAwaySurface from "./RunAwaySurface.vue";
 import StrengthSheet from "./StrengthSheet.vue";
 import TurnActionSheet from "./TurnActionSheet.vue";
 import OpponentDetailsSheet from "./OpponentDetailsSheet.vue";
+import {useCompactGameViewport} from "../useCompactGameViewport";
 
 const props = defineProps<{
   projection: Projection;
@@ -43,21 +44,7 @@ const emit = defineEmits<{
   "submit-economy": [request: EconomySubmission];
   "submit-interaction": [action: InteractionActionView];
 }>();
-const compactViewport = ref(false);
-let compactMediaQuery: MediaQueryList | undefined;
-
-function syncCompactViewport(event?: MediaQueryListEvent): void {
-  compactViewport.value = event?.matches ?? compactMediaQuery?.matches ?? false;
-}
-
-onMounted(() => {
-  compactMediaQuery = window.matchMedia("(width < 1024px)");
-  syncCompactViewport();
-  compactMediaQuery.addEventListener("change", syncCompactViewport);
-});
-
-onBeforeUnmount(() => compactMediaQuery?.removeEventListener("change", syncCompactViewport));
-
+const compactViewport = useCompactGameViewport();
 const charityAction = computed<EconomyAction | undefined>(() => {
   const candidate = props.projection.turn.available_actions.find((action) =>
     action.type === "resolve_charity",

@@ -1,3 +1,3 @@
-export * from "./card";
-export * from "./game";
-export * from "./studio";
+export * from "./card.ts";
+export * from "./game.ts";
+export * from "./studio.ts";

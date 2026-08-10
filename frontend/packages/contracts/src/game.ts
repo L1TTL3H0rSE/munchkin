@@ -1,6 +1,6 @@
 import {z} from "zod";
 
-import {cardViewSchema} from "./card";
+import {cardViewSchema} from "./card.ts";
 
 const nullableArray = <T extends z.ZodTypeAny>(schema: T) =>
   z.array(schema).nullable().transform((value) => value ?? []);

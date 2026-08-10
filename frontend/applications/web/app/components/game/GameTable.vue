@@ -7,7 +7,6 @@ import type {
 import type {GameConnectionState} from "../../composables/useGameSessionController";
 import type {GameApiErrorKind} from "../../composables/useGameApi";
 import GameConnectionStatus from "../GameConnectionStatus.vue";
-import {useInteractionCountdown} from "../../composables/useInteractionCountdown";
 import {
   buildCommandPayload,
   type ActionEntry,
@@ -16,16 +15,15 @@ import CardPresentation from "./primitives/CardPresentation.vue";
 import DeckBack from "./primitives/DeckBack.vue";
 import DesktopGameHeader from "./desktop/DesktopGameHeader.vue";
 import MobileGameHeader from "./mobile/MobileGameHeader.vue";
+import RunAwaySurface from "./modals/RunAwaySurface.vue";
+import DeathLootSurface from "../interaction/DeathLootSurface.vue";
+import {useCompactGameViewport} from "./useCompactGameViewport";
 import {
   buildGamePresentationModel,
   opponentStatus,
 } from "./gamePresentationModel";
 import type {GameSheetRequest} from "./gameSheetModel";
-import {
-  deathLootOptions as projectedDeathLootOptions,
-  deathLootPassAction,
-  isDeathLootInteraction,
-} from "../interaction/deathLootModel";
+import {isDeathLootInteraction} from "../interaction/deathLootModel";
 import {
   actionIsSelectable,
   type InteractionActionView,
@@ -56,6 +54,7 @@ const emit = defineEmits<{
 }>();
 
 const presentation = computed(() => buildGamePresentationModel(props.projection));
+const compactViewport = useCompactGameViewport();
 const isFinished = computed(() => props.projection.status === "finished");
 const viewerWon = computed(() => isFinished.value &&
   props.projection.winner_player_id === props.projection.you.player_id);
@@ -106,7 +105,6 @@ const nextEncounterCard = computed(() =>
 );
 const currentPlayerName = computed(() => presentation.value.currentPlayerName);
 const roomIDVisible = ref(false);
-const selectedDeathLootActionID = ref<string>();
 const runAwayInteraction = computed(() => isRunAwayInteraction(props.projection.interaction)
   ? props.projection.interaction
   : undefined);
@@ -139,19 +137,6 @@ const currentRunAwayMonster = computed(() => runAwayMonsters.value.find((card) =
 const currentRunAwayIndex = computed(() => Math.max(0, runAwayMonsters.value.findIndex((card) =>
   card.instance_id === currentRunAwayMonsterID.value,
 )));
-const runAwayAction = computed(() => actorRunAwayInteraction.value?.actions.find((action) =>
-  action.type === "pass" && actionIsSelectable(action),
-) ?? actorRunAwayInteraction.value?.actions.find(actionIsSelectable));
-const runAwayChoiceActions = computed(() => runAwayChoiceInteraction.value?.actions.filter((action) =>
-  action.type === "respond" && action.choice_ids?.length === 1 && actionIsSelectable(action),
-) ?? []);
-const runAwayChoiceActionByMonster = computed(() => new Map(
-  runAwayChoiceActions.value.map((action) => [action.choice_ids![0]!, action]),
-));
-const selectedRunAwayChoiceActionID = ref<string>();
-const selectedRunAwayChoiceAction = computed(() => runAwayChoiceActions.value.find((action) =>
-  action.action_id === selectedRunAwayChoiceActionID.value,
-));
 const attemptedRunAwayMonsterIDs = computed(() => new Set(
   props.projection.turn.run_away?.attempts
     .filter((attempt) => attempt.player_id === props.projection.you.player_id)
@@ -160,78 +145,19 @@ const attemptedRunAwayMonsterIDs = computed(() => new Set(
 const attemptedRunAwayMonsterNames = computed(() => runAwayMonsters.value
   .filter((card) => attemptedRunAwayMonsterIDs.value.has(card.instance_id))
   .map((card) => card.name));
-const runAwayChoiceCards = computed(() => {
-  const optionOrder = props.projection.turn.pending_decision?.options ?? [];
-  const order = new Map(optionOrder.map((instanceID, index) => [instanceID, index]));
-  return [...runAwayMonsters.value].sort((left, right) => {
-    const leftIndex = order.get(left.instance_id);
-    const rightIndex = order.get(right.instance_id);
-    if (leftIndex !== undefined && rightIndex !== undefined) return leftIndex - rightIndex;
-    if (leftIndex !== undefined) return -1;
-    if (rightIndex !== undefined) return 1;
-    return 0;
-  });
-});
-const runAwayCountdown = useInteractionCountdown(
-  () => actorRunAwayInteraction.value?.deadline_at,
-  () => actorRunAwayInteraction.value?.server_time,
-);
-const runAwayChoiceCountdown = useInteractionCountdown(
-  () => runAwayChoiceInteraction.value?.deadline_at,
-  () => runAwayChoiceInteraction.value?.server_time,
-);
-const runAwayTimerText = computed(() => {
-  const seconds = runAwayCountdown.remainingSeconds.value;
-  return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
-});
-const runAwayChoiceTimerText = computed(() => {
-  const seconds = runAwayChoiceCountdown.remainingSeconds.value;
-  return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
-});
 const runAwayEscapeBonus = computed(() => props.projection.you.escape_bonus);
 const runAwayAttemptCopy = computed(() =>
   `${currentRunAwayIndex.value + 1} из ${Math.max(1, runAwayMonsters.value.length)}`,
 );
-const runAwayDesktopNode = computed(() => {
-  const attempts = props.projection.turn.run_away?.attempts ?? [];
-  return attempts.length > 0 ? "293:2026" : "285:1473";
-});
-
-watch(runAwayChoiceActions, (actions) => {
-  if (!actions.some((action) => action.action_id === selectedRunAwayChoiceActionID.value)) {
-    selectedRunAwayChoiceActionID.value = undefined;
-  }
-}, {immediate: true});
 const deathLootInteraction = computed(() => isDeathLootInteraction(props.projection.interaction)
   ? props.projection.interaction
   : undefined);
 const actorDeathLootInteraction = computed(() => deathLootInteraction.value?.response_required_for_you
   ? deathLootInteraction.value
   : undefined);
-const deathLootOptions = computed(() => projectedDeathLootOptions(deathLootInteraction.value));
-const deathLootPass = computed(() => deathLootPassAction(deathLootInteraction.value));
-const deathLootCountdown = useInteractionCountdown(
-  () => actorDeathLootInteraction.value?.deadline_at,
-  () => actorDeathLootInteraction.value?.server_time,
-);
-const deathLootTimerText = computed(() => {
-  const seconds = deathLootCountdown.remainingSeconds.value;
-  return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
-});
-const selectedDeathLootAction = computed<InteractionActionView | undefined>(() =>
-  deathLootOptions.value.find(({action}) => action.action_id === selectedDeathLootActionID.value)?.action
-  ?? (deathLootPass.value?.action_id === selectedDeathLootActionID.value ? deathLootPass.value : undefined),
-);
-
-watch([deathLootOptions, deathLootPass], ([options, passAction]) => {
-  const validIDs = new Set([
-    ...options.map(({action}) => action.action_id),
-    ...(passAction ? [passAction.action_id] : []),
-  ]);
-  if (selectedDeathLootActionID.value && !validIDs.has(selectedDeathLootActionID.value)) {
-    selectedDeathLootActionID.value = undefined;
-  }
-}, {immediate: true});
+const desktopDecisionActive = computed(() => !compactViewport.value && Boolean(
+  actorRunAwayInteraction.value || runAwayChoiceInteraction.value || actorDeathLootInteraction.value,
+));
 
 const handActionSourceIDs = computed(() => new Set(
   actionDescriptors.value
@@ -547,25 +473,6 @@ function openHand(cardID?: string): void {
   });
 }
 
-function submitDeathLoot(): void {
-  if (!selectedDeathLootAction.value || props.actionBusy) return;
-  emit("submit-interaction", selectedDeathLootAction.value);
-}
-
-function submitRunAway(): void {
-  if (!runAwayAction.value || props.actionBusy) return;
-  emit("submit-interaction", runAwayAction.value);
-}
-
-function selectRunAwayMonster(instanceID: string): void {
-  selectedRunAwayChoiceActionID.value = runAwayChoiceActionByMonster.value.get(instanceID)?.action_id;
-}
-
-function submitRunAwayMonsterChoice(): void {
-  if (!selectedRunAwayChoiceAction.value || props.actionBusy) return;
-  emit("submit-interaction", selectedRunAwayChoiceAction.value);
-}
-
 function submitHelp(): void {
   if (!selectedHelpAction.value || props.actionBusy) return;
   emit("submit-interaction", selectedHelpAction.value);
@@ -648,7 +555,27 @@ function submitHelp(): void {
         </section>
       </aside>
 
+      <RunAwaySurface
+        v-if="!compactViewport && (runAwayChoiceInteraction || actorRunAwayInteraction)"
+        variant="desktop"
+        :projection="projection"
+        :interaction="runAwayChoiceInteraction ?? actorRunAwayInteraction!"
+        :busy="actionBusy"
+        @submit="emit('submit-interaction', $event)"
+        @open-character="emit('open-sheet', {kind: 'character'})"
+      />
+
+      <DeathLootSurface
+        v-else-if="!compactViewport && actorDeathLootInteraction"
+        variant="desktop"
+        :interaction="actorDeathLootInteraction"
+        :busy="actionBusy"
+        @submit="emit('submit-interaction', $event)"
+        @open-character="emit('open-sheet', {kind: 'character'})"
+      />
+
       <main
+        v-else
         class="game-table__stage"
         :class="{'game-table__stage--observer': !isActorTurn}"
         aria-label="Игровая область"
@@ -755,7 +682,12 @@ function submitHelp(): void {
               <small>{{ action.type === "accept" ? `Общая сила ${projection.you.combat_strength + (projection.turn.combat?.player_strength ?? 0)} : ${projection.turn.combat?.monster_strength ?? 0}` : "Без последствий" }}</small>
               <p>{{ action.type === "accept" ? `Вступить в бой и получить ${helpInviteInteraction?.combat_help_offer?.reward_treasures ?? 0} сокровище.` : `${helpCombatantName} продолжит бой без твоей помощи.` }}</p>
             </button>
-            <article class="game-table__state-option-reward">
+            <article
+              class="game-table__state-option-reward"
+              role="option"
+              aria-disabled="true"
+              tabindex="-1"
+            >
               <span>НАГРАДА</span>
               <strong>{{ helpInviteInteraction?.combat_help_offer?.reward_treasures ?? 0 }} сокровище</strong>
               <p>Выдаётся только при победе и наличии награды.</p>
@@ -835,125 +767,6 @@ function submitHelp(): void {
           <footer>ПОСЛЕ ПОДТВЕРЖДЕНИЯ ХОД ПЕРЕЙДЁТ К СЛЕДУЮЩЕМУ ИГРОКУ</footer>
         </section>
 
-        <section
-          v-else-if="runAwayChoiceInteraction"
-          class="game-table__run-away-next"
-          data-figma-owner="game-board:run-away-next"
-          data-figma-desktop-node="294:2146"
-          aria-labelledby="desktop-run-away-next-title"
-        >
-          <header>
-            <div>
-              <h2 id="desktop-run-away-next-title">Следующий монстр</h2>
-              <p>Выбери, от кого пытаешься сбежать теперь.</p>
-            </div>
-          </header>
-          <div class="game-table__run-away-next-cards" aria-label="Порядок побега">
-            <button
-              v-for="card in runAwayChoiceCards"
-              :key="card.instance_id"
-              type="button"
-              :disabled="!runAwayChoiceActionByMonster.has(card.instance_id)"
-              :aria-pressed="selectedRunAwayChoiceAction?.choice_ids?.[0] === card.instance_id"
-              @click="selectRunAwayMonster(card.instance_id)"
-            >
-              <span class="game-table__run-away-next-art">ИЛЛЮСТРАЦИЯ</span>
-              <strong>{{ card.name }}</strong>
-              <small v-if="runAwayChoiceActionByMonster.has(card.instance_id)">
-                Уровень {{ card.combat_strength ?? 0 }} · не пройден
-              </small>
-              <small v-else>Побег завершён</small>
-              <p v-if="runAwayChoiceActionByMonster.has(card.instance_id)">
-                Непотребство: {{ card.bad_stuff_text ?? "применит сервер." }}
-              </p>
-              <p v-else>Этот монстр больше недоступен.</p>
-            </button>
-          </div>
-          <footer>
-            <span>ПОРЯДОК ВЛИЯЕТ НА ПОСЛЕДСТВИЯ ПРИ ПРОВАЛЕ</span>
-            <time :datetime="runAwayChoiceInteraction.deadline_at">{{ runAwayChoiceTimerText }}</time>
-          </footer>
-        </section>
-
-        <section
-          v-else-if="actorRunAwayInteraction"
-          class="game-table__run-away"
-          data-figma-owner="game-board:run-away-wide"
-          :data-figma-desktop-node="runAwayDesktopNode"
-          aria-labelledby="desktop-run-away-title"
-        >
-          <header>
-            <div>
-              <h2 id="desktop-run-away-title">Смыться</h2>
-              <p>Выбери монстра, от которого пытаешься сбежать первым.</p>
-            </div>
-            <time :datetime="actorRunAwayInteraction.deadline_at">{{ runAwayTimerText }}</time>
-          </header>
-          <div
-            class="game-table__run-away-cards"
-            role="region"
-            aria-label="Монстры для побега"
-            tabindex="0"
-          >
-            <article
-              v-for="(card, index) in runAwayMonsters"
-              :key="card.instance_id"
-              :class="{'game-table__run-away-card--selected': card.instance_id === currentRunAwayMonsterID}"
-              :aria-current="card.instance_id === currentRunAwayMonsterID ? 'true' : undefined"
-            >
-              <span class="game-table__run-away-art">ИЛЛЮСТРАЦИЯ</span>
-              <h3>{{ card.name }}</h3>
-              <small>{{ card.combat_strength ? `Уровень ${card.combat_strength}` : "Монстр" }} · {{ card.instance_id === currentRunAwayMonsterID ? "выбран" : `попытка ${index + 1}/${runAwayMonsters.length}` }}</small>
-              <p v-if="card.bad_stuff_text">Непотребство: {{ card.bad_stuff_text }}</p>
-              <b v-if="card.instance_id === currentRunAwayMonsterID">ВЫБРАНО</b>
-            </article>
-          </div>
-          <p class="game-table__run-away-bonus">БОНУС К ПОБЕГУ {{ signed(runAwayEscapeBonus) }}</p>
-          <footer>ЦЕЛЬ БРОСКА: 5+ · РЕЗУЛЬТАТ И ПОСЛЕДСТВИЯ ОПРЕДЕЛИТ СЕРВЕР</footer>
-        </section>
-
-        <section
-          v-else-if="actorDeathLootInteraction"
-          class="game-table__death-loot"
-          data-figma-owner="game-board:death-loot-wide"
-          data-figma-desktop-node="295:2355"
-          aria-labelledby="desktop-death-loot-title"
-        >
-          <header>
-            <h2 id="desktop-death-loot-title">Добыча погибшего игрока</h2>
-            <p>Выбери одну карту из доступного пула или откажись.</p>
-          </header>
-          <div class="game-table__death-loot-choices" role="listbox" aria-label="Доступная добыча">
-            <button
-              v-for="option in deathLootOptions"
-              :key="option.action.action_id"
-              type="button"
-              role="option"
-              :aria-selected="option.action.action_id === selectedDeathLootActionID"
-              @click="selectedDeathLootActionID = option.action.action_id"
-            >
-              <CardPresentation :card="option.card" variant="choice" choice-context="loot" />
-            </button>
-            <button
-              v-if="deathLootPass"
-              class="game-table__death-loot-pass"
-              type="button"
-              role="option"
-              :aria-selected="deathLootPass.action_id === selectedDeathLootActionID"
-              @click="selectedDeathLootActionID = deathLootPass.action_id"
-            >
-              <span aria-hidden="true">ИЛЛЮСТРАЦИЯ</span>
-              <strong>Пропустить</strong>
-              <small>Не брать карту</small>
-              <p>Сохранить текущий инвентарь.</p>
-            </button>
-          </div>
-          <footer>
-            <span>ПОСЛЕ ОТВЕТА ПРИОРИТЕТ ПЕРЕЙДЁТ К СЛЕДУЮЩЕМУ ИГРОКУ</span>
-            <time :datetime="actorDeathLootInteraction.deadline_at">{{ deathLootTimerText }}</time>
-          </footer>
-        </section>
-
         <div v-if="!isFinished && !actorDeathLootInteraction && !actorRunAwayInteraction && !runAwayChoiceInteraction && !hasDedicatedStage && presentation.encounterPageCount > 1" class="game-table__pager">
           {{ encounterPagerCopy }}
         </div>
@@ -1019,6 +832,7 @@ function submitHelp(): void {
       </main>
 
       <aside
+        v-if="!desktopDecisionActive"
         class="game-table__sidebar"
         :class="{'game-table__sidebar--finished': isFinished}"
         aria-label="Твой персонаж"
@@ -1227,41 +1041,9 @@ function submitHelp(): void {
               {{ actionBusy ? "Подтверждаем…" : "Продолжить" }}
             </button>
           </template>
-          <template v-else-if="runAwayChoiceInteraction">
-            <strong>Выбери следующего монстра</strong>
-            <p>После выбора станет доступен бросок.</p>
-            <button
-              class="game-primary-action game-table__desktop-action"
-              type="button"
-              :disabled="actionBusy || !selectedRunAwayChoiceAction"
-              @click="submitRunAwayMonsterChoice"
-            >
-              {{ actionBusy ? "Подтверждаем…" : "Подтвердить" }}
-            </button>
-          </template>
-          <template v-else-if="actorRunAwayInteraction">
-            <strong>Можно бросить кубик</strong>
-            <p>Сервер определит бросок и последствия.</p>
-            <button
-              class="game-primary-action game-table__desktop-action"
-              type="button"
-              :disabled="actionBusy || !runAwayAction"
-              @click="submitRunAway"
-            >
-              {{ actionBusy ? "Подтверждаем…" : "Бросить кубик" }}
-            </button>
-          </template>
-          <template v-else-if="deathLootInteraction?.response_required_for_you">
-            <strong>Подтверди карту</strong>
-            <p>{{ selectedDeathLootAction?.type === "pass" ? "Откажись от карты в этом приоритете." : "Выбор окончательный." }}</p>
-            <button
-              class="game-primary-action game-table__desktop-action"
-              type="button"
-              :disabled="actionBusy || !selectedDeathLootAction"
-              @click="submitDeathLoot"
-            >
-              {{ actionBusy ? "Подтверждаем…" : selectedDeathLootAction?.type === "pass" ? "Пас" : "Забрать карту" }}
-            </button>
+          <template v-else-if="runAwayChoiceInteraction || actorRunAwayInteraction || actorDeathLootInteraction">
+            <strong>{{ actorDeathLootInteraction ? "Подтверди карту" : runAwayChoiceInteraction ? "Выбери следующего монстра" : "Можно бросить кубик" }}</strong>
+            <p>{{ actorDeathLootInteraction ? "Выбор окончательный." : runAwayChoiceInteraction ? "После выбора станет доступен бросок." : "Сервер определит бросок и последствия." }}</p>
           </template>
           <template v-else-if="endTurnReady && primaryAction">
             <strong>Завершить текущий ход</strong>
@@ -1554,7 +1336,7 @@ function submitHelp(): void {
   padding: 28px 32px 24px;
   text-align: center;
 }
-.game-table__finished-card > span { min-width: 132px; height: 28px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 14px; padding: 0 14px; color: #fff9ef; background: var(--color-accent-strong); font-size: 11px; }
+.game-table__finished-card > span { min-width: 132px; height: 28px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 14px; padding: 0 14px; color: var(--color-surface); background: var(--color-accent-strong); font-size: 11px; }
 .game-table__finished-card strong { font-size: 28px; line-height: 34px; }
 .game-table__finished-card p { color: var(--color-text-muted); font-size: 14px; }
 .game-table__finished-card small { color: var(--color-accent-strong); font-size: 12px; }
@@ -1593,7 +1375,7 @@ function submitHelp(): void {
   background: var(--color-surface-card);
   text-align: center;
 }
-.game-table__state-card > span { width: 132px; min-height: 28px; display: grid; place-items: center; border-radius: 14px; color: var(--color-text-primary); background: var(--color-accent-strong); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+.game-table__state-card > span { width: 132px; min-height: 28px; display: grid; place-items: center; border-radius: 14px; color: var(--color-surface); background: var(--color-accent-strong); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
 .game-table__state-card > strong { font-family: inherit; font-size: 28px; }
 .game-table__state-card p { color: var(--color-text-primary); font-size: 14px; line-height: 1.5; }
 .game-table__state-card small { color: var(--color-text-muted); font-size: 12px; }
@@ -1632,128 +1414,12 @@ function submitHelp(): void {
 .game-table__state-options strong { padding-top: 4px; font-size: 11px; font-weight: 500; }
 .game-table__state-options p { margin: 0; font-size: 10px; line-height: 14px; }
 .game-table__state-options b { position: absolute; left: 10px; bottom: 8px; color: var(--color-accent-strong); font-size: 8px; letter-spacing: .08em; }
-.game-table__state-option-art { width: calc(100% + 20px); height: 92px; display: grid; place-items: center; margin-left: -10px; color: #fff9ef !important; background: #aabdb5; opacity: .76; }
+.game-table__state-options .game-table__state-option-art { width: calc(100% + 20px); height: 92px; display: grid; place-items: center; margin-left: -10px; color: var(--color-text-primary); background: color-mix(in srgb, var(--color-accent) 30%, var(--color-surface)); }
 .game-table__state-options--help-offer > button:not(.game-table__state-option-reward),
 .game-table__state-options--help-invite > button { flex-basis: 150px; }
-.game-table__state-option-reward { flex: 0 0 200px !important; grid-template-rows: auto auto minmax(0, 1fr) !important; align-content: start !important; gap: 14px !important; padding: 16px !important; box-shadow: none !important; }
+.game-table__state-options > .game-table__state-option-reward { flex: 0 0 200px; grid-template-rows: auto auto minmax(0, 1fr); align-content: start; gap: 14px; padding: 16px; box-shadow: none; }
 .game-table__state-option-reward > strong { font-size: 18px; font-weight: 700; }
 .game-table__state-options article.game-table__state-option-reward { height: 218px; box-sizing: border-box; border: 1px solid var(--color-line); border-radius: 14px; color: inherit; background: var(--color-surface-card); }
-
-.game-table__death-loot {
-  z-index: 5;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 16px;
-  box-sizing: border-box;
-  padding: 18px 16px 20px;
-}
-.game-table__death-loot header h2,
-.game-table__death-loot header p { margin: 0; }
-.game-table__death-loot header h2 { font-size: 20px; line-height: 24px; }
-.game-table__death-loot header p { margin-top: 6px; color: var(--color-text-secondary); font-size: 12px; }
-.game-table__death-loot-choices { min-width: 0; display: flex; align-items: center; justify-content: safe center; gap: 58px; overflow-x: auto; padding: 6px; }
-.game-table__death-loot-choices > button { flex: 0 0 auto; border: 2px solid transparent; border-radius: 14px; padding: 0; background: transparent; }
-.game-table__death-loot-choices > button[aria-selected="true"] { border-color: var(--color-accent-strong); }
-.game-table__death-loot-pass { width: 150px; height: 218px; display: grid; grid-template-rows: 92px auto auto 1fr; overflow: hidden; color: inherit; background: var(--color-surface-card) !important; box-shadow: 0 7px 18px rgb(59 46 40 / 14%); text-align: left; }
-.game-table__death-loot-pass > span { display: grid; place-items: center; color: #2d342f; background: #aabdb5; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
-.game-table__death-loot-pass strong,
-.game-table__death-loot-pass small,
-.game-table__death-loot-pass p { margin: 0; padding-inline: 10px; }
-.game-table__death-loot-pass strong { padding-top: 10px; font-size: 11px; }
-.game-table__death-loot-pass small { padding-top: 6px; color: var(--color-text-muted); font-size: 9px; }
-.game-table__death-loot-pass p { padding-top: 8px; font-size: 10px; line-height: 14px; }
-.game-table__death-loot footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--color-text-muted); font-size: 9px; letter-spacing: .04em; }
-.game-table__death-loot footer time { flex: 0 0 auto; color: var(--color-text-primary); font-size: 12px; letter-spacing: 0; }
-.game-table__death-loot + .game-table__pager,
-.game-table__encounter-rail--behind-death-loot { display: none; }
-
-.game-table__run-away-next {
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 16px;
-  box-sizing: border-box;
-  padding: 18px 24px 44px;
-}
-.game-table__run-away-next h2,
-.game-table__run-away-next header p,
-.game-table__run-away-next footer { margin: 0; }
-.game-table__run-away-next h2 { font-size: 20px; line-height: 24px; }
-.game-table__run-away-next header p { margin-top: 6px; color: var(--color-text-muted); font-size: 12px; }
-.game-table__run-away-next-cards {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: safe center;
-  gap: clamp(18px, 5vw, 58px);
-  overflow-x: auto;
-  padding: 6px;
-}
-.game-table__run-away-next-cards > button {
-  position: relative;
-  flex: 0 0 150px;
-  height: 218px;
-  display: grid;
-  grid-template-rows: 92px auto auto minmax(0, 1fr);
-  gap: 6px;
-  overflow: hidden;
-  box-sizing: border-box;
-  border: 2px solid transparent;
-  border-radius: 16px;
-  padding: 0;
-  color: inherit;
-  background: var(--color-surface-card);
-  box-shadow: 0 7px 18px rgb(59 46 40 / 14%);
-  font-weight: 400;
-  text-align: left;
-  cursor: pointer;
-}
-.game-table__run-away-next-cards > button:disabled { color: var(--color-text-muted); cursor: default; opacity: 1; }
-.game-table__run-away-next-cards > button[aria-pressed="true"] { border-color: var(--color-accent-strong); }
-.game-table__run-away-next-art {
-  display: grid;
-  place-items: center;
-  color: #2d342f;
-  background: #aabdb5;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: .08em;
-}
-.game-table__run-away-next-cards strong,
-.game-table__run-away-next-cards small,
-.game-table__run-away-next-cards p { margin: 0; padding-inline: 10px; }
-.game-table__run-away-next-cards strong { padding-top: 4px; font-size: 10px; font-weight: 500; line-height: 14px; }
-.game-table__run-away-next-cards small { color: var(--color-text-muted); font-size: 9px; }
-.game-table__run-away-next-cards p { font-size: 10px; line-height: 14px; }
-.game-table__run-away-next footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--color-text-muted); font-size: 9px; letter-spacing: .04em; }
-.game-table__run-away-next footer time { flex: 0 0 auto; color: var(--color-text-primary); font-size: 12px; letter-spacing: 0; }
-
-.game-table__run-away { width: 100%; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 16px; box-sizing: border-box; padding: 18px 24px 20px; }
-.game-table__run-away header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
-.game-table__run-away h2,
-.game-table__run-away header p,
-.game-table__run-away footer { margin: 0; }
-.game-table__run-away h2 { font-size: 20px; line-height: 24px; }
-.game-table__run-away header p { margin-top: 6px; color: var(--color-text-muted); font-size: 12px; }
-.game-table__run-away header time { flex: 0 0 70px; min-height: 28px; display: grid; place-items: center; border-radius: 999px; color: #fff9ef; background: var(--color-status-warning); font-size: 11px; }
-.game-table__run-away-cards { min-width: 0; display: flex; align-items: center; justify-content: safe center; gap: 58px; overflow-x: auto; }
-.game-table__run-away-cards article { position: relative; flex: 0 0 150px; height: 218px; display: grid; grid-template-rows: 92px auto auto minmax(0, 1fr); gap: 6px; overflow: hidden; box-sizing: border-box; border: 1px solid transparent; border-radius: 14px; background: var(--color-surface-card); box-shadow: 0 7px 18px rgb(59 46 40 / 14%); }
-.game-table__run-away-art { display: grid; place-items: center; color: #2d342f; background: #aabdb5; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
-.game-table__run-away-cards h3,
-.game-table__run-away-cards small,
-.game-table__run-away-cards p { margin: 0; padding-inline: 10px; }
-.game-table__run-away-cards h3 { padding-top: 4px; font-size: 11px; font-weight: 600; }
-.game-table__run-away-cards small { color: var(--color-text-muted); font-size: 9px; }
-.game-table__run-away-cards p { font-size: 10px; line-height: 14px; }
-.game-table__run-away-cards b { position: absolute; right: 10px; bottom: 8px; color: var(--color-action-primary); font-size: 8px; letter-spacing: .08em; }
-.game-table__run-away-card--selected { border-color: var(--color-action-primary) !important; }
-.game-table__run-away-bonus { justify-self: center; min-width: 230px; margin: 0; border: 1px solid var(--color-line); border-radius: 999px; padding: 6px 14px; color: var(--color-text-muted); font-size: 11px; text-align: center; }
-.game-table__run-away footer { color: var(--color-text-muted); font-size: 9px; font-weight: 700; letter-spacing: .02em; }
 
 .game-table__hand-rail > button {
   border: 0;
@@ -1828,7 +1494,7 @@ function submitHelp(): void {
   letter-spacing: .08em;
   text-transform: uppercase;
 }
-.game-table__character > span { color: #cfc5ba; }
+.game-table__character > span { color: color-mix(in srgb, var(--color-surface) 75%, var(--color-surface-inverse)); }
 .game-table__strength-score {
   width: 160px;
   min-height: 48px;
@@ -1836,8 +1502,8 @@ function submitHelp(): void {
   place-content: center;
   justify-self: center;
   border-radius: 999px;
-  color: #fff9ef;
-  background: #165a64;
+  color: var(--color-surface);
+  background: var(--color-info);
   box-shadow: 0 3px 5px rgb(46 43 41 / 24%);
   text-align: center;
 }
@@ -1870,7 +1536,7 @@ function submitHelp(): void {
   border: 0;
   border-radius: 16px;
   padding: 16px;
-  color: #fff9ef;
+  color: var(--color-surface);
   background: var(--color-ink);
   text-align: left;
   cursor: pointer;
@@ -1882,7 +1548,7 @@ function submitHelp(): void {
   min-height: 40px;
   display: inline-flex;
   align-items: center;
-  border: 1px solid #6f6861;
+  border: 1px solid var(--color-border-card);
   border-radius: 12px;
   padding: 0 10px;
   font-size: 9px;
@@ -1890,8 +1556,8 @@ function submitHelp(): void {
   text-transform: uppercase;
 }
 .game-table__character strong { margin-top: 12px; font-family: var(--font-card); font-size: 19px; }
-.game-table__character small { color: #cfc5ba; }
-.game-table__character em { margin-top: auto; color: #cfc5ba; font-size: 10px; font-style: normal; line-height: 1.4; }
+.game-table__character small { color: color-mix(in srgb, var(--color-surface) 75%, var(--color-surface-inverse)); }
+.game-table__character em { margin-top: auto; color: color-mix(in srgb, var(--color-surface) 75%, var(--color-surface-inverse)); font-size: 10px; font-style: normal; line-height: 1.4; }
 
 .game-table__action-panel {
   min-width: 0;
@@ -1915,14 +1581,14 @@ function submitHelp(): void {
   border: 0;
   border-radius: 14px;
   padding: 0 18px;
-  color: #fff9ef;
+  color: var(--color-surface);
   background: var(--color-accent-strong);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
 }
 .game-primary-action:disabled { opacity: .55; cursor: wait; }
-.game-table__action-panel .game-primary-action:disabled { color: #9b826f; background: #aac0b8; opacity: 1; cursor: default; }
+.game-table__action-panel .game-primary-action:disabled { color: var(--color-text-primary); background: var(--color-surface-control); opacity: 1; cursor: default; }
 .game-table__window-status { margin: 0; color: var(--color-text-muted); line-height: 1.4; }
 
 .game-table__hand {
@@ -1930,13 +1596,13 @@ function submitHelp(): void {
   min-width: 0;
   border-radius: 16px;
   padding: 16px 20px;
-  color: #fff9ef;
+  color: var(--color-surface);
   background: var(--color-ink);
   box-shadow: 0 4px 12px rgb(23 62 67 / 14%);
 }
 .game-table__hand header { min-height: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 15px; font-size: 9px; line-height: 14px; font-weight: 600; letter-spacing: .08em; }
 .game-table__hand header strong { text-transform: uppercase; }
-.game-table__hand header button { min-width: 0; min-height: 14px; height: 14px; border: 0; padding: 0; color: #cfc5ba; background: transparent; font: inherit; line-height: 14px; cursor: pointer; }
+.game-table__hand header button { min-width: 0; min-height: 14px; height: 14px; border: 0; padding: 0; color: color-mix(in srgb, var(--color-surface) 75%, var(--color-surface-inverse)); background: transparent; font: inherit; line-height: 14px; cursor: pointer; }
 .game-table__hand-rail { display: flex; justify-content: safe center; gap: 16px; min-width: 0; overflow-x: auto; padding-bottom: 4px; }
 
 @media (width < 1024px) {
@@ -1980,9 +1646,6 @@ function submitHelp(): void {
     overflow: hidden;
   }
   .game-table__stage--observer { grid-row: auto; }
-  .game-table__death-loot { display: none; }
-  .game-table__run-away-next { display: none; }
-  .game-table__run-away { display: none; }
   .game-table__state-panel {
     min-height: 416px;
     padding: 18px 14px 14px;
@@ -2038,10 +1701,10 @@ function submitHelp(): void {
     min-width: 0;
     min-height: 46px;
     overflow: hidden;
-    border: 1px solid #6f6861;
+    border: 1px solid var(--color-border-card);
     border-radius: 16px;
     padding: 0 10px;
-    color: #fff9ef;
+    color: var(--color-surface);
     background: transparent;
     font: inherit;
     font-size: 11px;
@@ -2066,9 +1729,9 @@ function submitHelp(): void {
   .mobile-game-table__dock-hand > span { display: flex; justify-content: center; gap: 4px; }
   .mobile-game-table__dock-hand i { width: 8px; height: 12px; display: block; border-radius: 3px; background: var(--color-action-response); }
   .mobile-game-table__dock-hand strong { font-size: 14px; }
-  .mobile-game-table__dock > .mobile-game-table__dock-primary { border-color: transparent; color: #fff9ef; background: var(--color-accent-strong); text-transform: uppercase; }
+  .mobile-game-table__dock > .mobile-game-table__dock-primary { border-color: transparent; color: var(--color-surface); background: var(--color-accent-strong); text-transform: uppercase; }
   .mobile-game-table__dock-character,
-  .mobile-game-table__dock-primary { padding-inline: 4px !important; font-size: 9px !important; text-transform: uppercase; }
+  .mobile-game-table__dock > .mobile-game-table__dock-primary { padding-inline: 4px; font-size: 9px; text-transform: uppercase; }
   .mobile-game-table__dock-spacer { min-width: 0; }
 }
 

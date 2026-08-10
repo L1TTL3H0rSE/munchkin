@@ -19,3 +19,7 @@ useHead({
 <template>
   <CardStudioPanel />
 </template>
+
+<style lang="scss">
+@use "../../assets/scss/pages/studio";
+</style>

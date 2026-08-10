@@ -201,64 +201,6 @@
   min-width: 0;
 }
 
-.lobby-entry .lobby-form {
-  gap: 12px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.lobby-entry .lobby-form__number,
-.lobby-entry .lobby-form > h2,
-.lobby-entry .lobby-form__description {
-  display: none;
-}
-
-.lobby-entry .lobby-form__fields {
-  gap: 12px;
-}
-
-.lobby-entry .lobby-form label {
-  gap: 6px;
-  color: var(--color-text-secondary);
-  font-size: 10px;
-}
-
-.lobby-entry .lobby-form input {
-  min-height: 48px;
-  margin-top: 0;
-  border-radius: var(--radius-control);
-  padding: 12px 14px;
-  background: var(--color-surface-control);
-  font-size: 14px;
-}
-
-.lobby-entry .lobby-form__submit {
-  width: 100%;
-  min-height: 52px;
-  justify-self: stretch;
-  border-color: var(--color-action-primary);
-  border-radius: 14px;
-  color: var(--color-surface);
-  background: var(--color-action-primary);
-  font-size: 14px;
-}
-
-.lobby-entry .lobby-form__submit:disabled {
-  border-color: #abbfb8;
-  color: #fff;
-  background: #abbfb8;
-}
-
-.lobby-entry .lobby-form__error,
-.lobby-entry .lobby-form__status,
-.lobby-entry .lobby-form__field-error {
-  margin: 0;
-  font-size: 10px;
-}
-
 .lobby-entry__note {
   text-align: center;
 }
@@ -317,10 +259,6 @@
     justify-self: center;
     gap: 24px;
     padding: 40px;
-  }
-
-  .lobby-entry .lobby-form {
-    gap: 16px;
   }
 
   .lobby-entry__footer-note {
