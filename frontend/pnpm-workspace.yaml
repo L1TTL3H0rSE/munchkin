@@ -10,7 +10,7 @@ allowBuilds:
 catalog:
   '@axe-core/playwright': 4.10.2
   '@playwright/test': 1.55.1
-  typescript: ^6.0.3
+  typescript: ^7.0.2
   '@types/node': ^25.9.1
   nuxt: ^4.4.6
   vue: ^3.5.34
