@@ -912,7 +912,8 @@ database; fake timers do not prove restart recovery.
 
 ## Implementation slices
 
-Каждый пункт требует отдельного exact approved plan.
+Каждый согласованный пункт фиксируется как ограниченная задача с фактическими
+результатами проверок из [verification guide](../conventions/checks.md).
 
 1. **Generic window kernel.** Pure model/events/predicates, stable IDs,
    actor-specific descriptors, fixed-time intents, close reasons и replay;

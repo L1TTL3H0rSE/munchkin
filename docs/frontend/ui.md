@@ -1010,7 +1010,8 @@ after checking repository authority, privacy and browser evidence.
 
 ## Implementation slices
 
-Each slice needs its own approved plan and canonical verification.
+Each authorized slice needs a bounded task record and the relevant ordinary
+checks in [the verification guide](../conventions/checks.md).
 
 1. **Deterministic UI fixtures and audit harness.** Add representative
    actor-specific projections, viewport assertions and selected browser/axe
@@ -1031,7 +1032,7 @@ Each slice needs its own approved plan and canonical verification.
    visual direction and static/reduced equivalents.
 8. **Expanded state coverage.** Run complete phase, error, stale, offline,
    timeout, victory, zoom, forced-colors and density matrix in CI/manual gates
-   selected by the tooling plan.
+   selected by the component's verification commands.
 
 Generic windows precede combat/help so domain UI cannot create a one-off
 modal/timer protocol.

@@ -1,9 +1,5 @@
 import {$fetch, type FetchOptions} from "ofetch";
 
-export type GameFetch = (
-  url: string,
-  options?: Pick<FetchOptions<"json">, "method" | "headers" | "body" | "signal">,
-) => Promise<unknown>;
 import {
   commandResultSchema,
   combatHelpRequestSchema,
@@ -32,6 +28,11 @@ import {
   safeGameApiMessage,
 } from "./apiErrors.js";
 import {consumeGameStream} from "./realtime.js";
+
+export type GameFetch = (
+  url: string,
+  options?: Pick<FetchOptions<"json">, "headers" | "body" | "signal"> & {method?: "GET" | "POST"},
+) => Promise<unknown>;
 
 export interface GameRequestOptions {
   signal?: AbortSignal;
