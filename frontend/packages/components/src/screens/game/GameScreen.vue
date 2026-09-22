@@ -67,11 +67,13 @@ watch(
       v-if="showDeathState"
       kind="death"
       :projection="routeState.projection"
+      @retry="emit('retry')"
     />
     <SystemStateSurface
       v-else-if="showDeathRecovery"
       kind="death-recovery"
       :projection="routeState.projection"
+      @retry="emit('retry')"
     />
     <template v-else>
       <GameTable

@@ -22,7 +22,7 @@ export function gameScreenArgs(fixtureID: string) {
     isBusy: false,
     onRetry: fn(),
     onExecute: fn(),
-    onSubmitInteraction: fn(),
-    onSubmitEconomy: fn(),
+    "onSubmit-interaction": fn(),
+    "onSubmit-economy": fn(),
   };
 }
