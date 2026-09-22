@@ -34,4 +34,3 @@
 - Authenticated in-process SSE hub передаёт только version invalidation.
 - Backend остаётся source of truth; reconnect/gap лечится HTTP resync.
 - Root `docker-compose.yml` и `scripts/dev.sh`.
-

@@ -2,8 +2,8 @@ import {describe, expect, it} from "vitest";
 
 import {projectionSchema} from "@munchkin/contracts";
 
-import {fixtureAdapter} from "./fixtureAdapter.ts";
-import {parseFixtureProjection} from "./fixtureData.ts";
+import {fixtureAdapter} from "../../../../packages/components/test/fixtures/fixtureAdapter.ts";
+import {parseFixtureProjection} from "../../../../packages/components/test/fixtures/fixtureData.ts";
 
 describe("UI fixture privacy boundary", () => {
   it("keeps foreign hands out of actor-specific public players", () => {

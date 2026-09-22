@@ -32,7 +32,7 @@ docker/data/
 !.vscode/extensions.json
 !.vscode/settings.json
 
-leino-impact.json
+storybook-static/
 
 # Terraform local, generated and potentially secret-bearing artifacts.
 **/.terraform/**

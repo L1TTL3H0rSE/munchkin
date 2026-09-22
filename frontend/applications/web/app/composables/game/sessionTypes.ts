@@ -13,15 +13,10 @@ import type {
 import type {
   GameCommandOptions,
   GameRequestOptions,
-} from "./apiClient";
-import type {GameApiError} from "./apiErrors";
+  GameApiError,
+} from "@munchkin/api";
 
-export type GameConnectionState =
-  | "connecting"
-  | "connected"
-  | "resyncing"
-  | "offline"
-  | "failed";
+export type {GameConnectionState} from "@munchkin/shared";
 
 export interface GameSessionAPI {
   getGame: (

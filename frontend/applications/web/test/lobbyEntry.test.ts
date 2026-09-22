@@ -1,11 +1,12 @@
 import {describe, expect, it} from "vitest";
 
+import {lobbyFormError} from "../app/composables/lobbyError";
+
 import {GameApiError} from "../app/composables/useGameApi";
 import {
-  lobbyFormError,
   validateLobbyInput,
   type LobbyFormInput,
-} from "../app/components/lobby/lobbyModel";
+} from "../../../packages/components/src/components/lobby/lobbyModel";
 
 describe("lobby form model", () => {
   it("validates create and join inputs without a shared busy state", () => {

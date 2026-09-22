@@ -1,10 +1,10 @@
 import {describe, expect, it} from "vitest";
 
-import {fixtureAdapter} from "./fixtures/fixtureAdapter";
+import {fixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
 import {
   buildGamePresentationModel,
   selectPrimarySurface,
-} from "../app/components/game/gamePresentationModel";
+} from "../../../packages/components/src/components/game/gamePresentationModel";
 
 describe("game table view model", () => {
   it("selects exactly one primary surface with required decisions first", () => {

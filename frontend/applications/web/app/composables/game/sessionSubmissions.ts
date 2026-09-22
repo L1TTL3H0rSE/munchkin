@@ -9,13 +9,13 @@ import type {
   Projection,
 } from "@munchkin/contracts";
 
-import type {EconomySubmission} from "../../components/interaction/economyModel";
+import type {EconomySubmission} from "@munchkin/components";
 
 import {
   GameApiError,
   normalizeGameApiError,
   safeGameApiMessage,
-} from "./apiErrors";
+} from "@munchkin/api";
 import type {
   GameConnectionState,
   GameSessionAPI,

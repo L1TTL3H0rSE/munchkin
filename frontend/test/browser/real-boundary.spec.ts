@@ -4,7 +4,7 @@ import {
   commandResultSchema,
   lobbyResultSchema,
   projectionSchema,
-} from "../../packages/contracts/src/index.ts";
+} from "@munchkin/contracts";
 
 test.skip(
   process.env.MUNCHKIN_REAL_E2E !== "1",

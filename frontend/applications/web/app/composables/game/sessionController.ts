@@ -12,8 +12,8 @@ import {
   normalizeGameApiError,
   safeGameApiMessage,
   type GameApiErrorKind,
-} from "./apiErrors";
-import {createVersionedResync} from "./realtime";
+} from "@munchkin/api";
+import {createVersionedResync} from "@munchkin/api";
 import {createSessionSubmissions} from "./sessionSubmissions";
 import type {
   GameConnectionState,

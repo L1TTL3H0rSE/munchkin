@@ -1,12 +1,12 @@
 import {describe, expect, it} from "vitest";
 
-import {fixtureAdapter} from "./fixtures/fixtureAdapter";
+import {fixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
 import {
   charitySurfaceData,
   economyActions,
   ownCarriedCardsFor,
   ownHandCardsFor,
-} from "../app/components/interaction/economyModel";
+} from "../../../packages/components/src/components/interaction/economyModel";
 
 describe("player economy surface models", () => {
   it("keeps offer cards and theft costs actor-owned", () => {

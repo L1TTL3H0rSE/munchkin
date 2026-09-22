@@ -4,7 +4,7 @@ import {
   buildConnectionPresentation,
   buildRouteSystemState,
   buildSystemSurface,
-} from "../app/components/game/status/systemStateModel";
+} from "../../../packages/components/src/components/game/status/systemStateModel";
 
 const projection = {
   game_id: "fixture-system",

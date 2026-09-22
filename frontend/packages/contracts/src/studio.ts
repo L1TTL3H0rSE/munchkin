@@ -1,6 +1,6 @@
 import {z} from "zod";
 
-import {cardKindSchema, deckKindSchema} from "./card.ts";
+import {cardKindSchema, deckKindSchema} from "./card.js";
 
 export const studioCardIDSchema = z.string()
   .min(1)

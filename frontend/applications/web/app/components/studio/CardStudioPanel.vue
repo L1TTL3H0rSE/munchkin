@@ -7,7 +7,7 @@ import type {
 } from "@munchkin/contracts";
 import StudioCardList from "./StudioCardList.vue";
 import StudioJobHistory from "./StudioJobHistory.vue";
-import CardPresentation from "../game/primitives/CardPresentation.vue";
+import {CardPresentation} from "@munchkin/components";
 import {createCardStudioAPI} from "./useCardStudioApi";
 
 const token = ref("");

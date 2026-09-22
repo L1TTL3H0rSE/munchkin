@@ -2,7 +2,7 @@ import {expect, test} from "@playwright/test";
 import {
   commandResultSchema,
   projectionSchema,
-} from "../../packages/contracts/src/index.ts";
+} from "@munchkin/contracts";
 
 import {
   assertNoRootOverflow,

@@ -22,4 +22,3 @@
   `docs/history/leino/plans/archive/20260731T005308Z-3beea1-production-security-and-supply-chain.md`
   and `docs/history/leino/plans/archive/20260731T005307Z-5662b5-postgres-object-storage-backup-and-restore.md`.
 - **Проверено:** 2026-08-01.
-

@@ -8,8 +8,8 @@ import {
   isCombatantHelperOffer,
   isInvitedHelperOffer,
   projectedPlayerName,
-} from "../app/components/interaction/helperOfferModel";
-import {createFixtureAdapter} from "./fixtures/fixtureAdapter";
+} from "../../../packages/components/src/components/interaction/helperOfferModel";
+import {createFixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
 
 const fixtures = createFixtureAdapter();
 

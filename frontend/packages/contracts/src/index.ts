@@ -1,3 +1,3 @@
-export * from "./card.ts";
-export * from "./game.ts";
-export * from "./studio.ts";
+export * from "./card.js";
+export * from "./game.js";
+export * from "./studio.js";

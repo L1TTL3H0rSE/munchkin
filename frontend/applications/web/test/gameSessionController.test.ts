@@ -20,11 +20,11 @@ import {
   type GameSessionAPI,
   type GameSessionScheduler,
 } from "../app/composables/useGameSessionController";
-import {createFixtureAdapter} from "./fixtures/fixtureAdapter";
+import {createFixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
 import {
   economyActions,
   type EconomySubmission,
-} from "../app/components/interaction/economyModel";
+} from "../../../packages/components/src/components/interaction/economyModel";
 
 const baseProjection = parseGameProjection(JSON.parse(readFileSync(new URL(
   "../../../../backend/game/internal/transport/httpapi/testdata/"

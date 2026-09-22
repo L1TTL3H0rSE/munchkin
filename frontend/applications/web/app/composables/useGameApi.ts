@@ -1,21 +1,21 @@
-import {createGameApi} from "./game/apiClient";
+import {createGameApi} from "@munchkin/api";
 
 export {
   buildContentAssetURL,
   parseGameProjection,
   type GameCommandOptions,
   type GameRequestOptions,
-} from "./game/apiClient";
+} from "@munchkin/api";
 export {
   GameApiError,
   normalizeGameApiError,
   safeGameApiMessage,
   type GameApiErrorKind,
-} from "./game/apiErrors";
-export {createVersionedResync} from "./game/realtime";
+} from "@munchkin/api";
+export {createVersionedResync} from "@munchkin/api";
 
 export function useGameApi() {
   const config = useRuntimeConfig();
   const baseURL = String(config.public.apiBase).replace(/\/$/, "");
-  return createGameApi(baseURL);
+  return createGameApi(baseURL, $fetch);
 }

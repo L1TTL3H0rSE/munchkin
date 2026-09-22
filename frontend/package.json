@@ -3,20 +3,23 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.8.0",
+  "packageManager": "pnpm@11.22.0",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
     "dev": "pnpm --filter @munchkin/web dev",
-    "build": "pnpm --filter @munchkin/web build",
-    "lint": "pnpm -r --if-present lint",
-    "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present test",
+    "build": "pnpm build:local && pnpm --filter @munchkin/web build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --workspace-concurrency=1 -r test",
     "check": "pnpm typecheck && pnpm test",
     "test:browser": "node test/run-playwright.mjs test --workers=1",
     "test:a11y": "node test/run-playwright.mjs test a11y.spec.ts --workers=1",
-    "test:visual": "node test/run-playwright.mjs test visual.spec.ts --workers=1"
+    "test:visual": "node test/run-playwright.mjs test visual.spec.ts --workers=1",
+    "build:local": "pnpm --filter @munchkin/contracts build && pnpm --filter @munchkin/shared build && pnpm --filter @munchkin/api build && pnpm --filter @munchkin/components build:local",
+    "storybook": "pnpm --filter @munchkin/components storybook",
+    "build:storybook": "pnpm --filter @munchkin/components build:storybook"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
@@ -30,13 +33,7 @@
   "devDependencies": {
     "@axe-core/playwright": "catalog:",
     "@playwright/test": "catalog:",
-    "typescript": "catalog:"
-  },
-  "pnpm": {
-    "overrides": {
-      "brace-expansion@1.1.17": "1.1.18",
-      "brace-expansion@2.1.3": "2.1.4",
-      "brace-expansion@5.0.8": "5.0.9"
-    }
+    "typescript": "catalog:",
+    "@munchkin/contracts": "workspace:*"
   }
 }

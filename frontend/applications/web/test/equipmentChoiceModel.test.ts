@@ -4,8 +4,8 @@ import {
   equipEntryFor,
   exactEquipCandidates,
   unequipEntryFor,
-} from "../app/components/game/equipmentChoiceModel";
-import {fixtureAdapter} from "./fixtures/fixtureAdapter";
+} from "../../../packages/components/src/components/game/equipmentChoiceModel";
+import {fixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
 
 describe("equipment choice model", () => {
   it("exposes only server-permitted cards for the selected equipment slot", () => {

@@ -8,8 +8,8 @@ import {
   combatEffectTarget,
   combatEffects,
   combatMonsters,
-} from "../app/components/interaction/advancedCombatModel";
-import {createFixtureAdapter} from "./fixtures/fixtureAdapter";
+} from "../../../packages/components/src/components/interaction/advancedCombatModel";
+import {createFixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
 
 const fixtures = createFixtureAdapter();
 

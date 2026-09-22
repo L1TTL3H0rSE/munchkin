@@ -1,0 +1,58 @@
+{
+  "name": "@munchkin/components",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./screens": {
+      "types": "./dist/screens/index.d.ts",
+      "import": "./dist/screens/index.js"
+    },
+    "./styles": "./dist/style.css",
+    "./scss/*": "./src/assets/scss/*"
+  },
+  "scripts": {
+    "generate": "node scripts/generate-components.mjs",
+    "build": "pnpm generate && vite build && vue-tsc -p tsconfig.build.json",
+    "build:local": "pnpm build",
+    "lint": "eslint src test",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run --project unit",
+    "test:stories": "vitest run --project storybook",
+    "storybook": "storybook dev -p 6108",
+    "build:storybook": "storybook build"
+  },
+  "dependencies": {
+    "@munchkin/contracts": "workspace:*",
+    "@munchkin/shared": "workspace:*"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@typescript-eslint/parser": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vue": "catalog:",
+    "vue-tsc": "catalog:",
+    "sass-embedded": "catalog:",
+    "vite": "catalog:",
+    "@vitejs/plugin-vue": "catalog:",
+    "storybook": "catalog:",
+    "@storybook/vue3-vite": "catalog:",
+    "@storybook/addon-vitest": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "playwright": "catalog:",
+    "eslint-plugin-vue": "catalog:",
+    "vue-eslint-parser": "catalog:"
+  }
+}

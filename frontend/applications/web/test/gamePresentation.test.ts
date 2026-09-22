@@ -4,8 +4,8 @@ import {
   buildGamePresentationModel,
   hasActionableDeadline,
   projectedTurnActions,
-} from "../app/components/game/gamePresentationModel";
-import {fixtureAdapter} from "./fixtures/fixtureAdapter";
+} from "../../../packages/components/src/components/game/gamePresentationModel";
+import {fixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
 
 describe("game presentation model", () => {
   it("maps every actor-safe fixture into explicit state families", () => {

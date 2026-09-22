@@ -3,10 +3,10 @@ import {describe, expect, it} from "vitest";
 import {
   buildCommandPayload,
   selectionIsValid,
-} from "../app/components/actionModel";
+} from "../../../packages/components/src/components/actionModel";
 import {
   interactionCanDismiss,
-} from "../app/components/interaction/interactionModel";
+} from "../../../packages/components/src/components/interaction/interactionModel";
 import {
   runAwayAttemptMonsterName,
   runAwayAttemptPlayerName,
@@ -17,8 +17,8 @@ import {
   runAwayMonsterName,
   targetRunAwayActionDetails,
   targetRunAwayActionLabel,
-} from "../app/components/interaction/targetRunAwayModel";
-import {createFixtureAdapter} from "./fixtures/fixtureAdapter";
+} from "../../../packages/components/src/components/interaction/targetRunAwayModel";
+import {createFixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
 
 const fixtures = createFixtureAdapter();
 

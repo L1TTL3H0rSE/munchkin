@@ -21,5 +21,5 @@ useHead({
 </template>
 
 <style lang="scss">
-@use "../../assets/scss/pages/studio";
+@use "@munchkin/components/scss/pages/studio";
 </style>

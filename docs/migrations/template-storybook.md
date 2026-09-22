@@ -41,10 +41,10 @@ part of the production entry. Studio remains dev-only and disabled by default.
 
 | Task | Owner | Worktree | Base | Paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| Bootstrap and baseline | root | migration | bc79001 | workflow/docs/scripts/CI | running |
-| Donor boundary research | donor_boundaries, read-only | donor clones | above | docs/config/screens | running |
-| Screen/state inventory | screen_inventory, read-only | migration | bc79001 | frontend | running |
-| Workspace + first vertical slice | root | migration | after bootstrap | frontend | pending |
+| Bootstrap and baseline | root | migration | bc79001 | workflow/docs/scripts/CI | complete f9a0acf |
+| Donor boundary research | donor_boundaries, read-only | donor clones | above | docs/config/screens | complete |
+| Screen/state inventory | screen_inventory, read-only | migration | bc79001 | frontend | complete |
+| Workspace + first vertical slice | root | migration | f9a0acf | frontend | complete, commit below |
 | Independent screen families | native writers | separate worktrees | fixed integration commit | assigned later | pending |
 | Integrated review and verification | root + reviewer | migration | final integration | full diff | pending |
 
@@ -94,3 +94,41 @@ restart completed research or alter the original checkout.
 - Tool policy rejected a combined recursive directory-removal shell command.
   Removed only verified tracked retired files with ordinary git rm instead;
   no permission or sandbox changes, no untracked/user files removed.
+
+## Foundation checkpoint
+
+- Bootstrap commit: f9a0acf4a97f721423b8ae7a2b132558bcfc57ef.
+- A fresh read-only CLI session in this worktree actually read replacement
+  instructions and found no local hook registration. Native worktree_probe wrote,
+  read and removed its own temporary file in the clean probe worktree, without
+  Leino. This does not assert reload of the original parent session's hooks.
+- Baseline Chromium installed: original lobby 11/11 PASS before UI changes.
+  Baseline public/_nuxt assets: 8,953,969 bytes; Nuxt output 24 MB (gzip 9.65 MB).
+- Actual PostgreSQL contract PASS using a disposable tmpfs container named
+  munchkin-migration-postgres-20260922. Container remains for final checks; root
+  must stop only this owned container at completion. postgres-contract.log.
+- Workspace now uses pnpm 11.22.0, catalog Storybook 10.5.8/Vite 8.2.1/Vitest
+  4.1.11 from donor stack, keeps Node >=24 and existing Nuxt/Vue/TypeScript versions.
+  Contracts/shared/api/components expose built dist; shared owns countdown/types,
+  api owns HTTP/SSE/errors, web keeps credential/session/route controllers.
+- Product screens LobbyScreen and GameScreen are exported only by /screens.
+  GameScreen reuses the original table/modal coordinator with typed required
+  props and intent emits. No game transition moved to presentation.
+- All original components/styles moved with their visual behavior intact. Lobby
+  PNGs are local public assets, not inlined multi-megabyte module strings. Studio
+  remains in Nuxt with its existing development/auth gates.
+- Test fixtures moved to components/test/fixtures for shared Storybook/E2E usage;
+  original privacy tests remain. Production imports never use this directory.
+- First vertical proof: build:local PASS; lint/typecheck PASS; unit PASS
+  (web 160 + shared countdown 3, preserving the original 163; added api 2 and
+  generator 2); static Storybook PASS; Storybook Chromium 5/5 PASS; actual Nuxt
+  dist consumer build PASS; migrated lobby browser 11/11 PASS, no changed
+  assertions or snapshots. Logs foundation-*, lobby-story*, lobby-consumer-build,
+  lobby-migrated-browser in the evidence directory.
+- Intermediate browser launch failures were module resolution of direct contracts
+  source imports after dist conversion. Tests now use the public package; root
+  test tooling explicitly depends on contracts. No test skipped to resolve this.
+- Next: pin foundation commit, delegate three disjoint story families in separate
+  worktrees. Root owns coverage mapping/guards, CI/Docker/docs and integration.
+  Remaining: complete all states, browser/visual/real-boundary checks, graph and
+  coverage negative cases, final Docker/clean-checkout checks and reviewer.

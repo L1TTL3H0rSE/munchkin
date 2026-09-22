@@ -3,7 +3,7 @@ import {
   actionLabel,
   buildCommandPayload,
   selectionIsValid,
-} from "../app/components/actionModel";
+} from "../../../packages/components/src/components/actionModel";
 import {buildContentAssetURL} from "../app/composables/useGameApi";
 
 describe("server-supplied action mapping", () => {

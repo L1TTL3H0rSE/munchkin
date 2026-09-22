@@ -1,10 +1,13 @@
+import {fileURLToPath} from "node:url";
+
 const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "";
 
 export default defineNuxtConfig({
   compatibilityDate: "2026-07-29",
   devtools: {enabled: true},
   modules: ["@nuxt/eslint"],
-  css: ["~/assets/scss/main.scss"],
+  css: ["@munchkin/components/styles"],
+  nitro: {publicAssets: [{dir: fileURLToPath(new URL("../../packages/components/public", import.meta.url))}]},
   runtimeConfig: {
     cardStudio: {
       enabled: process.env.CARD_STUDIO_ENABLED === "true",

@@ -2,7 +2,7 @@ import {expect, test, type Page} from "@playwright/test";
 
 import {
   fixtureAdapter,
-} from "../../applications/web/test/fixtures/fixtureAdapter.ts";
+} from "../../packages/components/test/fixtures/fixtureAdapter.ts";
 import {
   figmaStateDescriptors,
   figmaStateRuntime,

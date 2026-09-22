@@ -11,8 +11,8 @@ import {
   phaseCoverage,
   statusCoverage,
 } from "../../../test/browser/figmaStateMatrix.ts";
-import {fixtureAdapter} from "./fixtures/fixtureAdapter";
-import {buildGamePresentationModel} from "../app/components/game/gamePresentationModel";
+import {fixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
+import {buildGamePresentationModel} from "../../../packages/components/src/components/game/gamePresentationModel";
 
 const fixtures = new Map(
   fixtureAdapter.list().map((fixture) => [fixture.id, fixture]),

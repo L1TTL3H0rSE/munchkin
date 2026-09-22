@@ -3,7 +3,7 @@ import {expect, test, type Page, type Route} from "@playwright/test";
 
 import {
   lobbySummarySchema,
-} from "../../packages/contracts/src/index.ts";
+} from "@munchkin/contracts";
 
 import {
   assertMediaPreferences,

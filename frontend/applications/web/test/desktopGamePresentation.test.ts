@@ -6,8 +6,8 @@ import {
   gameStateFamily,
   opponentStatus,
   projectedTurnActions,
-} from "../app/components/game/gamePresentationModel";
-import {fixtureAdapter} from "./fixtures/fixtureAdapter";
+} from "../../../packages/components/src/components/game/gamePresentationModel";
+import {fixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
 
 describe("desktop game presentation", () => {
   it.each([

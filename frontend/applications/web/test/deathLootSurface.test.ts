@@ -6,8 +6,8 @@ import {
   deathLootPassAction,
   deathLootTerminalMessage,
   isDeathLootInteraction,
-} from "../app/components/interaction/deathLootModel";
-import {fixtureAdapter} from "./fixtures/fixtureAdapter";
+} from "../../../packages/components/src/components/interaction/deathLootModel";
+import {fixtureAdapter} from "../../../packages/components/test/fixtures/fixtureAdapter";
 
 describe("death loot surface model", () => {
   it("maps only actor-visible cards to current server descriptors", () => {

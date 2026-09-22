@@ -4,12 +4,12 @@ import {
   commandResultSchema,
   lobbyResultSchema,
   projectionSchema,
-} from "../../packages/contracts/src/index.ts";
+} from "@munchkin/contracts";
 
 import {
   fixtureAdapter,
   type UiFixtureDefinition,
-} from "../../applications/web/test/fixtures/fixtureAdapter.ts";
+} from "../../packages/components/test/fixtures/fixtureAdapter.ts";
 
 export const fixtureCredential = "fixture-browser-token-0000000000000000000000000000";
 
