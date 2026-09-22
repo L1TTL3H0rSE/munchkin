@@ -106,8 +106,8 @@ restart completed research or alter the original checkout.
 - Baseline Chromium installed: original lobby 11/11 PASS before UI changes.
   Baseline public/_nuxt assets: 8,953,969 bytes; Nuxt output 24 MB (gzip 9.65 MB).
 - Actual PostgreSQL contract PASS using a disposable tmpfs container named
-  munchkin-migration-postgres-20260922. Container remains for final checks; root
-  must stop only this owned container at completion. postgres-contract.log.
+  munchkin-migration-postgres-20260922. It was stopped after final checks; no
+  permanent volume was attached or removed. postgres-contract.log.
 - Workspace now uses pnpm 11.22.0, catalog Storybook 10.5.8/Vite 8.2.1/Vitest
   4.1.11 from donor stack, keeps Node >=24 and existing Nuxt/Vue/TypeScript versions.
   Contracts/shared/api/components expose built dist; shared owns countdown/types,
@@ -144,7 +144,7 @@ slots are granted serially, never shared by running workers.
 | Table/hand/equipment | table_screens | munchkin-worktrees/table, codex/migration-table | d9b93a6 | TableScreen.stories.ts | 50 Chromium PASS; integrated 8e95fb9 |
 | Interaction/dialog | interaction_screens | munchkin-worktrees/interactions, codex/migration-interactions | d9b93a6 | InteractionScreen.stories.ts | 56 Chromium PASS; integrated adea28b |
 | Lobby/system | entry_screens | munchkin-worktrees/entry, codex/migration-entry | d9b93a6 | LobbyScreen.stories.ts, SystemScreen.stories.ts | 53 Chromium PASS; integrated f8780aa |
-| Shared integration | root | migration | d9b93a6 | guards/config/CI/docs/exports | integrated ed18b61, clean-worktree fix 544e32b; final acceptance in progress |
+| Shared integration | root | migration | d9b93a6 | guards/config/CI/docs/exports | complete through23e21ab; final verification recorded below |
 
 Root shared fixes: 2c14e6d forwards existing recovery retry and corrects event-spy
 names; 8ce87e4/3bccca2 stop retained combat detail from displacing current end-turn
@@ -197,7 +197,7 @@ story, empty-catalog and forbidden-import negative tests fail as intended.
   produces no diff against its committed generated index.
 - Repository8 tests, runner6, content32, demo semantic digest PASS. Final Go
   build/vet/test all PASS; postgres package ran against the isolated tmpfs DB
-  (not skipped). Compose config PASS; Docker build/smoke still pending.
+  (not skipped). Compose config and Docker build/runtime smoke PASS.
 - Independent reviewer found moved-doc relative links broken. Path-only fix
   applied to active docs; reviewer reran local-link scan:PASS. No observed
   authority/privacy or production fixture/dist regression in integrated review.
@@ -241,9 +241,19 @@ story, empty-catalog and forbidden-import negative tests fail as intended.
 - Coverage mapping is executable in frontend/packages/components/test/storyCoverage.ts:
   state/Figma node -> production screen -> story ID/viewport -> props/emits/actions
   -> behavioral and visual checks. All56 original scenario fixtures are represented.
-- Still to close: refresh clean verification with the final story/reconnect test
-  changes, stop the owned tmpfs PostgreSQL container, record final commit. No game
-  backend/content behavior changed; original checkout and user config untouched.
+- Final implementation commit:23e21ab9792d22a9b9df700542ddbc37c21a28da.
+  Verification worktree090f1c060431077e06f4d9a947a3fcbf519b50a4 has an identical
+  tracked tree. Repeated frozen install, build:local, lint, check (typecheck +195
+  unit tests), static Storybook159 and actual Nuxt consumer build all PASS;
+  final-clean-*.log. Generator left both worktrees clean; Leino absent from PATH.
+- Final fresh read-only session at090f1c0 loaded the current five instruction/
+  configuration files, including Storybook check commands. No Leino approvals or
+  repository hook registrations; acceptance-fresh-session.txt/jsonl. It performed
+  no writes, tests, installs, subagent launches or permission changes.
+- All owned temporary servers and three disposable Docker containers are stopped;
+  no labelled migration container remains. Local branches/worktrees and evidence
+  are retained for continuation. No game backend/content behavior changed;
+  original main remains bc79001 with the same two user-owned changes.
 
 ## Acceptance gaps and limits
 
