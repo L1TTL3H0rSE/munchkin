@@ -41,4 +41,14 @@ describe("game presentation model", () => {
       .toEqual(["open_door"]);
     expect(JSON.stringify(projection)).toBe(before);
   });
+
+  it("does not promote a retained combat detail over the current end-turn action", () => {
+    const projection = fixtureAdapter.getProjection("end-turn-ready");
+    expect(projection.turn.combat?.resolution_action).toBeDefined();
+    expect(projectedTurnActions(projection)).toEqual(projection.turn.available_actions);
+    expect(projectedTurnActions(projection).map((action) => action.type)).toEqual(["end_turn"]);
+    const combat = fixtureAdapter.getProjection("full-roster-combat");
+    expect(projectedTurnActions(combat).map((action) => action.type))
+      .toContain("request_combat_resolution");
+  });
 });
