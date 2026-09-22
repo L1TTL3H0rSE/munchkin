@@ -1,6 +1,5 @@
 .git
 .codex
-.leino/runtime
 .agents
 docs
 node_modules

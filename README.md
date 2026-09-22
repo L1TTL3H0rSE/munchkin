@@ -33,7 +33,7 @@ cp .env.example .env
 Остановить стек:
 
 ```bash
-./leinoctl compose --jobs 8 -- down
+./scripts/dev.sh down
 ```
 
 Данные PostgreSQL сохраняются в named volume `munchkin_postgres-data`.
@@ -82,8 +82,8 @@ Nuxt/Vue client
 - realtime не передаёт состояние — только новую version и причину resync;
 - card pack — immutable data с canonical digest, а не исполняемый script.
 
-Подробности game boundary: `docs/agents/ARCHITECTURE.md` и ADR в
-`docs/agents/decisions/`.
+Подробности game boundary: `docs/backend/architecture.md` и ADR в
+`docs/decisions/`.
 
 ## Подготовка production infrastructure
 
@@ -171,15 +171,15 @@ Join и все gameplay commands требуют `Idempotency-Key`; actor опр�
 ## Проверки
 
 ```bash
-./leinoctl preflight --require-toolchain
-node --test --test-isolation=none .codex/hooks/test/*.test.mjs
-node --test tools/leinoctl/test/*.test.mjs
+node scripts/check-text.mjs
+node --test scripts/test/*.test.mjs
+node --test frontend/test/run-playwright.test.mjs
 node --test content/tools/validate.test.mjs
 node content/tools/validate.mjs content/sets/demo/cards.json
 cd backend/game && go test ./...
 cd frontend && corepack pnpm install --frozen-lockfile
 cd frontend && corepack pnpm lint && corepack pnpm check && corepack pnpm build
-./leinoctl compose --jobs 8 -- config
+./scripts/dev.sh config
 ```
 
 PostgreSQL contract suite запускается при наличии `TEST_DATABASE_URL`.
@@ -188,14 +188,7 @@ images.
 
 ## AI-assisted workflow
 
-`AGENTS.md`, `.agents/skills`, `.codex`, `.leino` и vendored
-`tools/leinoctl` образуют repository harness. Любое изменение сначала получает
-отдельный согласованный plan; `leinoctl` строит impact graph, запускает
-canonical checks и сверяет финальный write set.
-
-Первичная bootstrap-session создала hooks, поэтому их runtime enforcement
-начинается со следующей trusted Codex session. Их код и tests уже проверены
-вручную.
+Start with [docs/README.md](docs/README.md) and applicable `AGENTS.md`. Use ordinary package/Go/Node checks and isolated Git worktrees for independent writers. Historical plans are non-normative evidence in `docs/history/leino`.
 
 ## License
 

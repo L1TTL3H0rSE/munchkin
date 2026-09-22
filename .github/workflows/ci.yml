@@ -21,12 +21,9 @@ concurrency:
   group: munchkin-ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  LEINO_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-
 jobs:
-  harness:
-    name: Harness and repository policy
+  repository:
+    name: Repository checks
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -39,11 +36,10 @@ jobs:
           node-version: 24
       - name: Run repository gates
         run: |
-          node --test --test-isolation=none .codex/hooks/test/*.test.mjs
-          node --test tools/leinoctl/test/*.test.mjs
-          node .codex/hooks/plan-lint.mjs
-          ./leinoctl preflight
-          ./scripts/ci-impact.sh
+          node --test scripts/test/*.test.mjs
+          node scripts/check-text.mjs
+          node --test frontend/test/run-playwright.test.mjs
+          git diff --check
 
   content:
     name: Content validation
@@ -163,7 +159,7 @@ jobs:
   publish:
     name: Publish immutable Yandex image pair
     needs:
-      - harness
+      - repository
       - content
       - backend-unit
       - backend-postgres

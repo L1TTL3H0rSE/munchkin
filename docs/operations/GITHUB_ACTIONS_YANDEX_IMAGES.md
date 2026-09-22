@@ -94,8 +94,8 @@ From repository root:
 bash -n scripts/ci/yandex-wif-token.sh
 terraform fmt -check -recursive infra/terraform
 ./scripts/terraform-check.sh
-./leinoctl verify --changed
-./leinoctl scope-check --plan 20260731T005255Z-b3ea2b-github-actions-yandex-images
+node scripts/check-text.mjs
+git diff --check
 ```
 
 The helper requires `curl`, `jq`, `base64` and the GitHub-provided

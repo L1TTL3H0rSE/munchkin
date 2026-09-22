@@ -67,14 +67,14 @@ For a fresh documentation dry-run from the repository root, use only these
 read-only/local checks:
 
 ```bash
-node .codex/hooks/plan-lint.mjs
+node --test scripts/test/*.test.mjs
 node scripts/ci/verify-action-pins.mjs
 bash scripts/production/security-audit.sh
 bash scripts/terraform-check.sh
 docker compose --parallel 8 -f compose.production.yml config --quiet
 ```
 
-The canonical `./leinoctl verify --changed` remains the lifecycle gate. A
+Use the complete check list in `docs/conventions/checks.md`. A
 Docker daemon, cloud credential, owner-only Monium session or production host
 is not silently substituted when a command cannot run.
 

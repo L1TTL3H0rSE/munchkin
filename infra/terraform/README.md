@@ -384,9 +384,7 @@ terraform fmt -check -recursive infra/terraform
 Скрипт может скачать pinned provider из Terraform Registry, но не обращается к
 Yandex Cloud API и не создаёт resources.
 
-Текущий GitLab harness выполняет только `leinoctl verify --dry-run`, поэтому
-он проверяет impact graph, но не устанавливает Terraform и не исполняет этот
-focused check. До отдельного CI/toolchain plan `terraform-check.sh` остаётся
+Terraform verification remains the independent `scripts/terraform-check.sh` command. До отдельного CI/toolchain plan `terraform-check.sh` остаётся
 обязательным локальным gate; полагаться на pipeline как на HCL/lockfile
 валидацию нельзя.
 

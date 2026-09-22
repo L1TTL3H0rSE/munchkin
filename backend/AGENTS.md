@@ -52,8 +52,4 @@ rollback и concurrent expected-version race. PostgreSQL adapter проверя�
 тем же repository contract suite на реальной БД, когда меняются migrations
 или persistence.
 
-После focused tests:
-
-```bash
-./leinoctl verify --paths backend/game/<changed-path>
-```
+Also run `go build ./...` and `go vet ./...`. See ../../docs/conventions/checks.md for the real PostgreSQL contract and full checks.

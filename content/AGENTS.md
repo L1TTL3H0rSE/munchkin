@@ -21,9 +21,4 @@ Content packs являются данными, а не исполняемым к
 node content/tools/validate.mjs content/sets/demo/cards.json
 ```
 
-Изменение schema/effect registry требует проверки backend consumer и
-frontend presentation:
-
-```bash
-./leinoctl verify --paths content/<changed-path>
-```
+Schema/effect changes must also pass backend and frontend contract/consumer checks. See ../docs/conventions/checks.md.

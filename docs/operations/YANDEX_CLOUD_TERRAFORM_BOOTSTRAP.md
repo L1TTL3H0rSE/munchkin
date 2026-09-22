@@ -3,7 +3,7 @@
 - **Назначение:** действия владельца проекта до первого infrastructure plan.
 - **Платформа владельца:** Windows 10/11, PowerShell.
 - **Проверено по официальной документации:** 2026-07-30.
-- **Архитектурное решение:** [ADR-0009](../agents/decisions/0009-yandex-cloud-terraform-production.md).
+- **Архитектурное решение:** [ADR-0009](../decisions/0009-yandex-cloud-terraform-production.md).
 - **Важно:** эта инструкция подготавливает доступы и решения. Она не создаёт
   production VM, сеть, registry, DNS-зону или database.
 
