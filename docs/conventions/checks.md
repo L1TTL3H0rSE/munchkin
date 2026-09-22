@@ -37,6 +37,8 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build:storybook
+pnpm --filter @munchkin/components exec playwright install chromium
+pnpm --filter @munchkin/components test:stories
 pnpm --filter @munchkin/web build
 node test/run-playwright.mjs test --workers=1
 ```

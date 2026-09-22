@@ -1,6 +1,7 @@
 # Template / screen Storybook migration
 
-Status: in progress. Owner: root orchestrator. Authorized in full by the user on
+Status: implementation complete; final acceptance has pre-existing browser gaps
+(listed below). Owner: root orchestrator. Authorized in full by the user on
 2026-09-22 and `C:/Dev/_Personal/munchkin/munchkin-migration-mandate.md`.
 That authorization replaces the repository's former per-plan approval and
 single-checkout writer restrictions for this migration. No remote push, production
@@ -44,9 +45,9 @@ part of the production entry. Studio remains dev-only and disabled by default.
 | Bootstrap and baseline | root | migration | bc79001 | workflow/docs/scripts/CI | complete f9a0acf |
 | Donor boundary research | donor_boundaries, read-only | donor clones | above | docs/config/screens | complete |
 | Screen/state inventory | screen_inventory, read-only | migration | bc79001 | frontend | complete |
-| Workspace + first vertical slice | root | migration | f9a0acf | frontend | complete, commit below |
-| Independent screen families | native writers | separate worktrees | fixed integration commit | assigned later | pending |
-| Integrated review and verification | root + reviewer | migration | final integration | full diff | pending |
+| Workspace + first vertical slice | root | migration | f9a0acf | frontend | complete d9b93a6 |
+| Independent screen families | native writers | table/interactions/entry | d9b93a6 | four story files | complete, integrated commits below |
+| Integrated review and verification | root + reviewer | migration + verification + baseline | final integration / bc79001 | full diff | checks executed;45 baseline browser failures remain |
 
 ## Initial evidence
 
@@ -128,10 +129,8 @@ restart completed research or alter the original checkout.
 - Intermediate browser launch failures were module resolution of direct contracts
   source imports after dist conversion. Tests now use the public package; root
   test tooling explicitly depends on contracts. No test skipped to resolve this.
-- Next: pin foundation commit, delegate three disjoint story families in separate
-  worktrees. Root owns coverage mapping/guards, CI/Docker/docs and integration.
-  Remaining: complete all states, browser/visual/real-boundary checks, graph and
-  coverage negative cases, final Docker/clean-checkout checks and reviewer.
+- Foundation was pinned before the three disjoint story families were delegated.
+  Root retained guards/config/exports/CI/docs and integration ownership.
 
 ## Parallel screen checkpoint (2026-09-22)
 
@@ -142,10 +141,10 @@ slots are granted serially, never shared by running workers.
 
 | Task | Owner | Worktree/branch | Base | Owned paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| Table/hand/equipment | table_screens | munchkin-worktrees/table, codex/migration-table | d9b93a6 | TableScreen.stories.ts | 50 Chromium stories PASS, finishing commit |
-| Interaction/dialog | interaction_screens | munchkin-worktrees/interactions, codex/migration-interactions | d9b93a6 | InteractionScreen.stories.ts | browser correction/expanded variants |
-| Lobby/system | entry_screens | munchkin-worktrees/entry, codex/migration-entry | d9b93a6 | LobbyScreen.stories.ts, SystemScreen.stories.ts | 51 Chromium PASS + room pair pending |
-| Shared integration | root | migration | d9b93a6 | guards/config/CI/docs/exports | in progress |
+| Table/hand/equipment | table_screens | munchkin-worktrees/table, codex/migration-table | d9b93a6 | TableScreen.stories.ts | 50 Chromium PASS; integrated 8e95fb9 |
+| Interaction/dialog | interaction_screens | munchkin-worktrees/interactions, codex/migration-interactions | d9b93a6 | InteractionScreen.stories.ts | 56 Chromium PASS; integrated adea28b |
+| Lobby/system | entry_screens | munchkin-worktrees/entry, codex/migration-entry | d9b93a6 | LobbyScreen.stories.ts, SystemScreen.stories.ts | 53 Chromium PASS; integrated f8780aa |
+| Shared integration | root | migration | d9b93a6 | guards/config/CI/docs/exports | integrated ed18b61, clean-worktree fix 544e32b; final acceptance in progress |
 
 Root shared fixes: 2c14e6d forwards existing recovery retry and corrects event-spy
 names; 8ce87e4/3bccca2 stop retained combat detail from displacing current end-turn
@@ -157,8 +156,8 @@ issues; no baseline assertions/snapshots removed.
 - Source production graph traverses 95 modules: PASS. Added negative reachable
   fixture imports from root, screens and application; empty graph negative case;
   built module guard rejects test/design-only dependencies. 7 guard/generator
-  tests PASS. Guarded component build PASS. Coverage guard implementation awaits
-  worker integration: 43 existing Figma states +13 lobby states at both viewports.
+  tests PASS. Guarded component build PASS. Final coverage guard results appear
+  below:43 existing Figma states +13 lobby states at both viewports.
 - Library/app builds use dist. Test fixture files retain all56 scenarios. Workers
   are adding extra existing scenario variants, not new product features.
 - Current pre-existing compact terminal limitation: winner/result is shown, but
@@ -171,8 +170,8 @@ issues; no baseline assertions/snapshots removed.
   Source Figma IDs retained; full fresh visual parity is not claimed.
 - Root updated Docker manifests for all built packages and pnpm11.22.0, CI for
   ordinary gates+Storybook/Chromium, docs for current ownership. No CI remote run,
-  image publication or production action was invoked. These changes need final
-  integrated checks, Docker build and clean checkout verification.
+  image publication or production action was invoked. Final integrated, Docker
+  and clean checkout verification results appear below.
 
 ## Integrated acceptance checkpoint
 
@@ -202,8 +201,58 @@ story, empty-catalog and forbidden-import negative tests fail as intended.
 - Independent reviewer found moved-doc relative links broken. Path-only fix
   applied to active docs; reviewer reran local-link scan:PASS. No observed
   authority/privacy or production fixture/dist regression in integrated review.
-- Full original Chromium browser/visual suite is currently running on4183,
-  session28420, log final-browser.log. Snapshots remain unchanged. Await exact
-  result; then real two-player boundary, isolated Docker build/smoke, standalone
-  story screenshots, clean worktree reproduction. Do not claim these pending
-  checks passed. Original checkout and user config remain untouched.
+- Full original Chromium browser/visual suite:196 PASS,45 FAIL /241, log
+  final-browser.log. Independent bc79001 baseline ran all49 tests in the four
+  failing families:4 PASS,45 FAIL with exactly the same failure set. See
+  baseline-browser-comparison.log and baseline-failure-comparison.json.
+  Breakdown:5 death-loot,3 helper-offer,2 target-run-away,35 visual. Reviewer
+  confirmed source/fixture drift predates migration; representative combat and
+  mobile lobby actual PNGs are byte-identical between baseline and migration.
+  All41 committed snapshots and original assertions remain unchanged.
+- Clean worktree verification started at ed18b61, frozen install/build/lint PASS.
+  Typecheck exposed GameFetch.method being wider than Nuxt's fetch method union;
+  narrowed it to actual GET/POST usage in544e32b (verification cherry-pick020c163).
+  Rebuilt API, then clean check (types+tests), static Storybook159 and web build
+  PASS. Logs clean-*. Integration build:local/typecheck also rerun after this fix.
+- A final fresh read-only CLI session actually read the five current instruction
+  and config files at020c163. No per-plan Leino approval or local hook registration
+  remains; session remained read-only. final-fresh-session.txt/jsonl. This does
+  not assert inspection or unloading of global managed hooks.
+- Real Go/Nuxt two-player suite:2/2 PASS, final-real-boundary-resync.log. The first
+  test now additionally disconnects an observer browser, advances the other actor,
+  restores the network, and asserts a newer actor-specific GET plus rendered
+  data-phase. Existing complete-turn and multiplayer/privacy assertions remain.
+  Initial invocation used an empty content environment by mistake (demo fallback);
+  corrected to explicit moscow/v5. An initial reconnect probe expected an idle
+  SSE stream to close before traffic; Chromium keeps it open, so the test now
+  advances the real other actor before asserting disconnection and resync.
+- Docker config/build PASS for isolated project munchkin-migration-20260922:
+  final-docker-build.log. Built images were started without volumes; API health,
+  Nuxt SSR, built CSS and both original PNG byte lengths PASS in
+  docker-image-smoke.log. Both owned smoke containers were stopped and removed.
+- Standalone static Storybook manager caught an iframe-resize race absent from
+  Vitest. All four story families now wait for the exact same required width;
+  assertions were not removed. Component lint/types, static159 coverage and all
+  159 Chromium stories PASS again (story-viewport-*, final-stories-after-viewport-fix).
+  Actual manager plus six wide/compact views PASS without backend requests,
+  console/page errors or broken images. standalone-storybook-smoke.log and
+  storybook-manager.png/screens-*.png; root visually inspected manager and compact
+  preparation. Final reviewer found no remaining actionable migration regression.
+- Coverage mapping is executable in frontend/packages/components/test/storyCoverage.ts:
+  state/Figma node -> production screen -> story ID/viewport -> props/emits/actions
+  -> behavioral and visual checks. All56 original scenario fixtures are represented.
+- Still to close: refresh clean verification with the final story/reconnect test
+  changes, stop the owned tmpfs PostgreSQL container, record final commit. No game
+  backend/content behavior changed; original checkout and user config untouched.
+
+## Acceptance gaps and limits
+
+- Acceptance is partial because the preserved legacy browser/visual suite is not
+  green:45 independently reproduced baseline failures above. Do not update its
+  snapshots or weaken assertions to hide them; repairing unrelated fixture and
+  old-snapshot drift is separate work.
+- Full fresh Figma parity was not established: screenshot provider returned an
+  asset URL, but viewing it failed. Existing real node IDs/materials and baseline
+  images were retained. Compact terminal limitations above remain unchanged.
+- Remote CI/publication/production were not run; no push or remote-main merge.
+  Fresh session verifies repository instructions only, not global managed hooks.

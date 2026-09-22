@@ -1,5 +1,5 @@
 import type {Meta, StoryObj} from "@storybook/vue3-vite";
-import {expect, fn, userEvent, within} from "storybook/test";
+import {expect, fn, userEvent, waitFor, within} from "storybook/test";
 import {lobbyErrorForKind} from "../../components/lobby/lobbyModel";
 import LobbyScreen from "./LobbyScreen.vue";
 
@@ -16,7 +16,7 @@ const meta = {
   parameters: {lobby: true},
   globals: {viewport: {value: "wide"}},
   beforeEach: async ({globals}) => {
-    await expect(window.innerWidth).toBe(globals.viewport.value === "compact" ? 360 : 1440);
+    await waitFor(() => expect(window.innerWidth).toBe(globals.viewport.value === "compact" ? 360 : 1440));
   },
 } satisfies Meta<typeof LobbyScreen>;
 export default meta;

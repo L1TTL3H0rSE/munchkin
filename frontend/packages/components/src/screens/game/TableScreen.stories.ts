@@ -17,7 +17,7 @@ type Context = Parameters<Play>[0];
 
 async function checkLayout({canvasElement, globals}: Context): Promise<void> {
   const compact = globals.viewport.value === "compact";
-  await expect(window.innerWidth).toBe(compact ? 360 : 1440);
+  await waitFor(() => expect(window.innerWidth).toBe(compact ? 360 : 1440));
   await expect(canvasElement.querySelectorAll(".game-table")).toHaveLength(1);
   const desktop = canvasElement.querySelector(".desktop-game-header");
   const mobile = canvasElement.querySelector(".mobile-game-header");

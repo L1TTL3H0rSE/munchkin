@@ -1,5 +1,5 @@
 import type {Meta, StoryObj} from "@storybook/vue3-vite";
-import {expect, userEvent, within} from "storybook/test";
+import {expect, userEvent, waitFor, within} from "storybook/test";
 import {gameScreenArgs} from "../../../test/screenFixtures";
 import GameScreen from "./GameScreen.vue";
 
@@ -9,7 +9,7 @@ const meta = {
   args: gameScreenArgs("stale-projection"),
   globals: {viewport: {value: "wide"}},
   beforeEach: async ({globals}) => {
-    await expect(window.innerWidth).toBe(globals.viewport.value === "compact" ? 360 : 1440);
+    await waitFor(() => expect(window.innerWidth).toBe(globals.viewport.value === "compact" ? 360 : 1440));
   },
 } satisfies Meta<typeof GameScreen>;
 export default meta;

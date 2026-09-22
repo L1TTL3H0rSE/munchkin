@@ -16,7 +16,7 @@ const compact = {viewport: {value: "compact"}};
 
 async function screen(context: Context) {
   const width = context.globals.viewport.value === "compact" ? 360 : 1440;
-  await expect(window.innerWidth).toBe(width);
+  await waitFor(() => expect(window.innerWidth).toBe(width));
   return within(context.canvasElement);
 }
 

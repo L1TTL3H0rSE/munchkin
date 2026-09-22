@@ -464,6 +464,32 @@ test("two browser actors complete one authoritative turn through the Figma UI", 
     await expect(nextPage.getByRole("button", {name: "Открыть дверь", exact: true})).toBeVisible();
     await expect(activePage.getByRole("button", {name: "Открыть дверь", exact: true})).toHaveCount(0);
     expect(runAwayMonsterChoiceSubmitted).toBe(true);
+
+    const connection = activePage.getByLabel("Состояние соединения", {exact: true});
+    await expect(connection).toHaveText("В СЕТИ");
+    await activePage.context().setOffline(true);
+    try {
+      await clickAndWait(nextPage, gameID, async () => {
+        await nextPage.getByRole("button", {name: "Открыть дверь", exact: true}).click();
+      });
+      const changedProjection = await projectionFor(nextPage, gameID);
+      expect(changedProjection.version).toBeGreaterThan(nextProjection.version);
+      expect(changedProjection.turn.phase).not.toBe(nextProjection.turn.phase);
+      await expect(connection).toHaveText("НЕТ СВЯЗИ", {timeout: 20_000});
+
+      const refreshResponse = activePage.waitForResponse((response) =>
+        response.url() === `${apiBase}/api/v1/games/${encodeURIComponent(gameID)}` &&
+        response.request().method() === "GET" && response.status() === 200,
+      );
+      await activePage.context().setOffline(false);
+      const refreshed = projectionSchema.parse(await (await refreshResponse).json());
+      expect(refreshed.version).toBeGreaterThanOrEqual(changedProjection.version);
+      expect(refreshed.you.player_id).toBe(initialActorID);
+      await expect(connection).toHaveText("В СЕТИ", {timeout: 20_000});
+      await expect(activePage.locator(".game-table")).toHaveAttribute("data-phase", refreshed.turn.phase);
+    } finally {
+      await activePage.context().setOffline(false);
+    }
   } finally {
     await secondContext.close();
   }
