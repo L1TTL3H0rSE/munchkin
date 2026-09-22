@@ -50,5 +50,8 @@ describe("game presentation model", () => {
     const combat = fixtureAdapter.getProjection("full-roster-combat");
     expect(projectedTurnActions(combat).map((action) => action.type))
       .toContain("request_combat_resolution");
+    for (const id of ["victory-six-player", "single-finished"]) {
+      expect(projectedTurnActions(fixtureAdapter.getProjection(id))).toEqual([]);
+    }
   });
 });

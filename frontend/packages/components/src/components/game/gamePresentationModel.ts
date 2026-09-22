@@ -57,7 +57,8 @@ export type GamePresentationModel = {
 
 export function projectedTurnActions(projection: Projection): ActionDescriptor[] {
   const actions = [...projection.turn.available_actions];
-  if (actingPlayerID(projection) !== projection.you.player_id || projection.turn.phase !== "combat") {
+  if (projection.status !== "active" || actingPlayerID(projection) !== projection.you.player_id ||
+    projection.turn.phase !== "combat") {
     return actions;
   }
   const resolution = projection.turn.combat?.resolution_action;
