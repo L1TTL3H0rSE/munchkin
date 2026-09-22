@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, ref, watch} from "vue";
+import {computed, nextTick, ref, watch} from "vue";
 import type {CommandPayload} from "@munchkin/contracts";
 import type {GameApiErrorKind, GameConnectionState} from "@munchkin/shared";
 import type {ActionEntry} from "../../components/actionModel";
@@ -28,6 +28,7 @@ const emit = defineEmits<{
   "submit-economy": [request: EconomySubmission];
 }>();
 const requestedSheet = ref<GameSheetRequest>();
+let sheetOpener: HTMLElement | null = null;
 const showDeathState = computed(() => Boolean(
   props.routeState.kind === "game" &&
   props.routeState.projection.you.dead &&
@@ -40,13 +41,25 @@ const showDeathRecovery = computed(() => Boolean(
   props.routeState.projection.interaction.death_loot?.remaining_count === 0,
 ));
 function openSheet(request: GameSheetRequest): void {
+  if (!requestedSheet.value) {
+    sheetOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
   requestedSheet.value = request;
+}
+async function closeSheet(): Promise<void> {
+  requestedSheet.value = undefined;
+  const opener = sheetOpener;
+  sheetOpener = null;
+  await nextTick();
+  if (opener?.isConnected) {
+    opener.focus();
+  }
 }
 watch(
   () => "projection" in props.routeState ? props.routeState.projection.version : undefined,
-  (version, previousVersion) => {
+  async (version, previousVersion) => {
     if (version !== undefined && previousVersion !== undefined && version > previousVersion) {
-      requestedSheet.value = undefined;
+      await closeSheet();
     }
   },
 );
@@ -95,7 +108,7 @@ watch(
         :connection-state="connectionState"
         :busy="isBusy"
         :error-message="interactionError || errorMessage"
-        @close="requestedSheet = undefined"
+        @close="closeSheet"
         @open-sheet="openSheet"
         @execute="(entry, payload) => emit('execute', entry, payload)"
         @submit-interaction="emit('submit-interaction', $event)"
