@@ -1,11 +1,14 @@
 FROM node:24-alpine@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS build
 
-RUN corepack enable && corepack prepare pnpm@10.8.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.22.0 --activate
 WORKDIR /app
 
 COPY frontend/package.json frontend/pnpm-workspace.yaml frontend/pnpm-lock.yaml frontend/tsconfig.base.json ./
 COPY frontend/applications/web/package.json applications/web/package.json
 COPY frontend/packages/contracts/package.json packages/contracts/package.json
+COPY frontend/packages/shared/package.json packages/shared/package.json
+COPY frontend/packages/api/package.json packages/api/package.json
+COPY frontend/packages/components/package.json packages/components/package.json
 RUN pnpm install --frozen-lockfile
 
 COPY frontend/ ./

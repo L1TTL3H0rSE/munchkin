@@ -23,7 +23,7 @@ test("dev script preserves Compose commands and rejects unsafe options", () => {
       assert.equal(result.status, 0, result.stderr);
       assert.deepEqual(result.stdout.trim().split(/\r?\n/), ["compose", "--parallel", "8", "-f", "docker-compose.yml", ...expected]);
     }
-    for (const args of [["down", "-v"], ["down", "--volumes"], ["--parallel=2"]]) {
+    for (const args of [["down", "-v"], ["down", "--volumes"], ["down", "--volumes=true"], ["--parallel=2"]]) {
       assert.equal(run(args).status, 2);
     }
     assert.equal(run(["config"], "3").status, 2);

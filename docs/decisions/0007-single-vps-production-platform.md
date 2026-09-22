@@ -162,9 +162,9 @@ security, observability и recoverability важнее имитации multi-no
 
 ## Связанные материалы
 
-- [Infrastructure roadmap](../INFRASTRUCTURE_ROADMAP.md)
+- [Infrastructure roadmap](../architecture/INFRASTRUCTURE_ROADMAP.md)
 - [ADR-0009: Yandex Cloud and Terraform](0009-yandex-cloud-terraform-production.md)
-- [Yandex Cloud owner bootstrap](../../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md)
+- [Yandex Cloud owner bootstrap](../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md)
 - [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
 - [GitHub: publishing Docker images](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
 - [GitHub: deployments and environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)

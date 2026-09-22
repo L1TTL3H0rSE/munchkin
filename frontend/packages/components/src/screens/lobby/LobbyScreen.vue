@@ -133,6 +133,6 @@ function selectMode(mode: LobbyFormMode): void { selectedMode.value = mode; }
 </template>
 
 
-<style lang="scss">
+<style scoped lang="scss">
 @use "../../assets/scss/pages/lobby";
 </style>

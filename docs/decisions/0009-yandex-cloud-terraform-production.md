@@ -134,7 +134,7 @@ IP, registry, buckets, KMS keys, service accounts, WIF, Lockbox и Cloud DNS
 zone вручную до соответствующего implementation plan не создаются.
 
 Полный owner workflow находится в
-[`docs/operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md`](../../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md).
+[`docs/operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md`](../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md).
 
 ### Identity and CI
 
@@ -267,8 +267,8 @@ Billing budget отправляет уведомления, но не являе
 ## Связанные материалы
 
 - [ADR-0007: Single-VPS production platform](0007-single-vps-production-platform.md)
-- [Infrastructure roadmap](../INFRASTRUCTURE_ROADMAP.md)
-- [Owner bootstrap runbook](../../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md)
+- [Infrastructure roadmap](../architecture/INFRASTRUCTURE_ROADMAP.md)
+- [Owner bootstrap runbook](../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md)
 - [Yandex Cloud: Terraform quickstart](https://yandex.cloud/ru/docs/terraform/quickstart)
 - [Yandex Cloud: Terraform provider authentication](https://yandex.cloud/ru/docs/terraform/authentication)
 - [Yandex Cloud: Terraform state in Object Storage](https://yandex.cloud/ru/docs/terraform/tutorials/terraform-state-storage)

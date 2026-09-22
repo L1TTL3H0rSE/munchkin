@@ -2,8 +2,8 @@
 
 - **Статус:** normative
 - **Область:** `frontend/`
-- **Последний source audit:** 2026-07-30
-- **Runtime:** Nuxt 4, Vue 3, Pinia, TypeScript, Zod, pnpm
+- **Последний source audit:** 2026-09-22
+- **Runtime:** Nuxt 4, Vue 3, TypeScript, Zod, pnpm, Storybook
 
 ## Как читать документ
 
@@ -67,6 +67,9 @@ frontend/
     web/                  # Nuxt application и Nitro Card Studio boundary
   packages/
     contracts/            # public HTTP/realtime/Studio wire schemas
+    api/                  # parsed HTTP/SSE transport, no app stores
+    shared/               # independent shared types and countdown
+    components/           # presentation, screens, tokens; separate story/test data
   pnpm-workspace.yaml     # catalog и workspace packages
   pnpm-lock.yaml          # единственный frontend lockfile
 ```
@@ -78,20 +81,26 @@ frontend/
 | HTTP/realtime request и response schema | `packages/contracts` | page/component |
 | DTO-derived public TypeScript type | рядом со schema через `z.infer` | вручную дублированный interface |
 | Route composition, route params, top-level SEO | `app/pages` | generic component |
-| Повторяемый visual surface | `app/components/<feature>` | page template copy |
+| Product screen / visual surface | `packages/components/src/screens` / `src/components` | page template copy |
 | Headless feature state/lifecycle | `app/composables` либо feature-local composable | global singleton без причины |
 | Pure mapping/validation/view model | feature-local `.ts` module | Vue lifecycle callback |
 | Cross-route client state | Pinia store только после доказанного shared ownership | store «на всякий случай» |
 | Browser credential persistence | выбранный session adapter | URL, Pinia devtools, logs |
-| External HTTP/SSE transport | typed adapter/composable | scattered `$fetch` в components |
+| External HTTP/SSE transport | `packages/api` + app runtime adapter | scattered `$fetch` в components |
 | Nitro-only secret/provider/filesystem logic | `server/` | public runtime config или client bundle |
 | Deterministic fixture/mock | рядом с adapter/test support | условные fake branches во всех consumers |
-| Global reset, tokens, shared primitives | `app/assets` | произвольные page selectors |
+| Global reset, tokens, shared primitives | `packages/components/src/assets` | произвольные page selectors |
 | Component styles | компонент/feature, scoped по умолчанию | растущий общий stylesheet |
 
 Новый package создаётся только при реальной independent ownership boundary:
 несколько consumers, отдельный public contract и собственные checks. Размер
 каталога сам по себе не является причиной.
+
+Все пакеты экспортируют собранный `dist`; реальный Nuxt consumer проверяет эти
+экспорты. `@munchkin/components/screens` содержит только используемые приложением
+экраны, с обязательными props и intent emits. В библиотеке импорты Vue явные;
+Nuxt autoimports, router, HTTP и application stores остаются в приложении.
+Fixture defaults и story/design-only imports запрещены в product dependency graph.
 
 ### Composition root
 

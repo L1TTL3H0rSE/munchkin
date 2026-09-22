@@ -192,7 +192,7 @@ versioning и migration/replay tests. Old games не угадывают новы
 
 Полная phase/capability map, projection rules, sequence diagrams, test matrix
 и retrospective choices:
-[Multiplayer interaction protocol](../GAME_INTERACTION_PROTOCOL.md).
+[Multiplayer interaction protocol](../backend/interactions.md).
 
 Связанные решения:
 

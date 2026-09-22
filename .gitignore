@@ -33,6 +33,7 @@ docker/data/
 !.vscode/settings.json
 
 storybook-static/
+.browser-evidence/
 
 # Terraform local, generated and potentially secret-bearing artifacts.
 **/.terraform/**

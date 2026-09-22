@@ -41,6 +41,8 @@ backend-unit:
     GOMODCACHE: ${CI_PROJECT_DIR}/.cache/go-mod
   script:
     - cd backend/game
+    - go build ./...
+    - go vet ./...
     - go test ./...
 
 backend-postgres:
@@ -82,18 +84,22 @@ frontend:
       - frontend/.pnpm-store
   before_script:
     - corepack enable
-    - corepack prepare pnpm@10.8.0 --activate
+    - corepack prepare pnpm@11.22.0 --activate
     - cd frontend
     - pnpm config set store-dir .pnpm-store
     - pnpm install --frozen-lockfile
   script:
+    - pnpm build:local
     - pnpm lint
     - pnpm check
-    - pnpm build
+    - pnpm build:storybook
+    - pnpm --filter @munchkin/web build
+    - pnpm --filter @munchkin/components exec playwright install --with-deps chromium
+    - pnpm --filter @munchkin/components test:stories
 
 frontend-browser:
   stage: test
-  image: mcr.microsoft.com/playwright:v1.52.0-noble
+  image: node:24-bookworm
   cache:
     key:
       files:
@@ -102,37 +108,22 @@ frontend-browser:
       - frontend/.pnpm-store
   before_script:
     - corepack enable
-    - corepack prepare pnpm@10.8.0 --activate
+    - corepack prepare pnpm@11.22.0 --activate
     - cd frontend
     - pnpm config set store-dir .pnpm-store
     - pnpm install --frozen-lockfile
+    - pnpm build:local
+    - pnpm exec playwright install --with-deps chromium
   script:
-    - |
-      set -eu
-      export NUXT_PUBLIC_API_BASE="http://127.0.0.1:4173"
-      pnpm --filter @munchkin/web dev --host 127.0.0.1 --port 4173 > .playwright-server.log 2>&1 &
-      server_pid=$!
-      cleanup() {
-        kill "$server_pid" 2>/dev/null || true
-      }
-      trap cleanup EXIT
-      for attempt in $(seq 1 60); do
-        if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
-          break
-        fi
-        sleep 1
-      done
-      curl --fail --silent http://127.0.0.1:4173/ > /dev/null
-      pnpm test:browser
-      pnpm test:a11y
-      pnpm test:visual
+    - pnpm test:browser
+  after_script:
+    - mkdir -p frontend/.browser-evidence
+    - for evidence in /tmp/munchkin-playwright-*; do if [ -d "$evidence" ]; then cp -R "$evidence" frontend/.browser-evidence/; fi; done
   artifacts:
     when: always
     expire_in: 7 days
     paths:
-      - frontend/test/browser/artifacts/
-      - frontend/test/browser/report/
-      - frontend/test/browser/test-results/
+      - frontend/.browser-evidence/
 
 compose-config:
   stage: test

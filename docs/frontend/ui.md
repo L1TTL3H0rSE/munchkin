@@ -16,10 +16,10 @@
 
 Нормативные frontend architecture, placement, naming, TypeScript, CSS
 ownership и review rules находятся в
-[`FRONTEND_ENGINEERING_SPEC.md`](FRONTEND_ENGINEERING_SPEC.md). Здесь они не
+[`engineering.md`](engineering.md). Здесь они не
 дублируются. Authoritative multiplayer timing, privacy, CAS и replay rules
 находятся в
-[`GAME_INTERACTION_PROTOCOL.md`](GAME_INTERACTION_PROTOCOL.md). Product UI
+[`../backend/interactions.md`](../backend/interactions.md). Product UI
 потребляет эти правила и не создаёт параллельный протокол.
 
 Слова «должен», «запрещён» и «обязателен» задают TARGET. Конкретные имена
@@ -179,7 +179,7 @@ Source-аудит подтверждает наличие CURRENT phase/error/re
 ### FUTURE multiplayer interaction states
 
 Эти states появляются только после implementation server projection из
-`GAME_INTERACTION_PROTOCOL.md`.
+`../backend/interactions.md`.
 
 | State | Surface | Required information |
 |---|---|---|

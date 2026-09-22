@@ -685,7 +685,7 @@ runtime records remain owner-gated and unrun.
   `backend/game/Dockerfile`, `frontend/Dockerfile`,
   `backend/game/cmd/server/main.go`,
   `backend/game/internal/transport/httpapi/router.go`.
-- [ADR-0009: Yandex Cloud and Terraform](decisions/0009-yandex-cloud-terraform-production.md)
+- [ADR-0009: Yandex Cloud and Terraform](../decisions/0009-yandex-cloud-terraform-production.md)
 - [Yandex Cloud owner bootstrap](../operations/YANDEX_CLOUD_TERRAFORM_BOOTSTRAP.md)
 - [Yandex Cloud: Terraform quickstart](https://yandex.cloud/ru/docs/terraform/quickstart)
 - [Yandex Cloud: Terraform state in Object Storage](https://yandex.cloud/ru/docs/terraform/tutorials/terraform-state-storage)

@@ -511,4 +511,4 @@ rollback.
 - [ADR-0005: original card art studio](0005-original-card-art-studio.md)
 - [ADR-0007: single-VPS production platform](0007-single-vps-production-platform.md)
 - [ADR-0008: multiplayer interaction windows](0008-multiplayer-interaction-windows.md)
-- [Production infrastructure roadmap](../INFRASTRUCTURE_ROADMAP.md)
+- [Production infrastructure roadmap](../architecture/INFRASTRUCTURE_ROADMAP.md)

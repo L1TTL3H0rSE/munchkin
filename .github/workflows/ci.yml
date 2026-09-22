@@ -73,7 +73,10 @@ jobs:
           cache: true
       - name: Test backend
         working-directory: backend/game
-        run: go test ./...
+        run: |
+          go build ./...
+          go vet ./...
+          go test ./...
 
   backend-postgres:
     name: Backend PostgreSQL service contract
@@ -123,16 +126,48 @@ jobs:
       - name: Enable pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@10.8.0 --activate
+          corepack prepare pnpm@11.22.0 --activate
       - name: Install frontend dependencies
         working-directory: frontend
         run: pnpm install --frozen-lockfile
       - name: Run frontend gates
         working-directory: frontend
         run: |
+          pnpm build:local
           pnpm lint
           pnpm check
-          pnpm build
+          pnpm build:storybook
+          pnpm --filter @munchkin/web build
+          pnpm --filter @munchkin/components exec playwright install --with-deps chromium
+          pnpm --filter @munchkin/components test:stories
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:browser --grep-invert 'real-boundary'
+
+  frontend-real-boundary:
+    name: Frontend real two-player boundary
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version: 1.25.12
+      - name: Verify real boundary
+        working-directory: frontend
+        env:
+          MUNCHKIN_REAL_E2E: "1"
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.22.0 --activate
+          pnpm install --frozen-lockfile
+          pnpm build:local
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:browser real-boundary.spec.ts --project=chromium
 
   compose-config:
     name: Compose configuration
@@ -164,6 +199,7 @@ jobs:
       - backend-unit
       - backend-postgres
       - frontend
+      - frontend-real-boundary
       - compose-config
       - docker-smoke
     if: >-

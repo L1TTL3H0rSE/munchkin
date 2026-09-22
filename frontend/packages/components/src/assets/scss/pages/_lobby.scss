@@ -1,10 +1,5 @@
 @use "../api" as api;
 
-.app-shell--lobby .app-main {
-  min-height: 100svh;
-  min-height: 100dvh;
-}
-
 .lobby-page {
   min-width: 0;
   min-height: 100svh;

@@ -1,6 +1,6 @@
 # Стек
 
-Снимок создан 2026-07-29. Перед update сверяй manifest/lock конкретного
+Обновлено 2026-09-22. Перед update сверяй manifest/lock конкретного
 компонента.
 
 ## Backend
@@ -15,12 +15,16 @@
 
 ## Frontend
 
-- Node.js 24 для одинакового local/CI harness.
-- pnpm 10.8+.
-- Nuxt 4, Vue 3, Pinia, TypeScript, Zod.
+- Node.js >=24 для одинаковых local/CI проверок.
+- pnpm 11.22.0 из packageManager.
+- Nuxt 4, Vue 3, TypeScript, Zod; Pinia не установлен без потребителя.
+- Storybook 10.5.8, Vite 8.2.1, Vitest 4.1.11, Chromium через Playwright.
 - Один workspace lockfile в `frontend/pnpm-lock.yaml`.
 - `applications/web` — deployable UI.
-- `packages/contracts` — wire schemas/fixtures.
+- `packages/contracts` — wire schemas; `api` — HTTP/SSE transport.
+- `packages/shared` — независимые типы/countdown; `components` — presentation.
+- Product screens доступны через `@munchkin/components/screens` и dist exports.
+- Fixtures живут отдельно в `components/test/fixtures`, не в production exports.
 
 ## Content
 

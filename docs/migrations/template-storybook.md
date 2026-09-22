@@ -132,3 +132,78 @@ restart completed research or alter the original checkout.
   worktrees. Root owns coverage mapping/guards, CI/Docker/docs and integration.
   Remaining: complete all states, browser/visual/real-boundary checks, graph and
   coverage negative cases, final Docker/clean-checkout checks and reviewer.
+
+## Parallel screen checkpoint (2026-09-22)
+
+Foundation pinned at d9b93a64a5fdb827abe1fb85d1ed6a95d24c69f3. Native workers
+verified separate worktrees/branches before writing; each owns only family story
+files. Shared fixes remain root-owned and are cherry-picked by workers. Browser
+slots are granted serially, never shared by running workers.
+
+| Task | Owner | Worktree/branch | Base | Owned paths | Status |
+| --- | --- | --- | --- | --- | --- |
+| Table/hand/equipment | table_screens | munchkin-worktrees/table, codex/migration-table | d9b93a6 | TableScreen.stories.ts | 50 Chromium stories PASS, finishing commit |
+| Interaction/dialog | interaction_screens | munchkin-worktrees/interactions, codex/migration-interactions | d9b93a6 | InteractionScreen.stories.ts | browser correction/expanded variants |
+| Lobby/system | entry_screens | munchkin-worktrees/entry, codex/migration-entry | d9b93a6 | LobbyScreen.stories.ts, SystemScreen.stories.ts | 51 Chromium PASS + room pair pending |
+| Shared integration | root | migration | d9b93a6 | guards/config/CI/docs/exports | in progress |
+
+Root shared fixes: 2c14e6d forwards existing recovery retry and corrects event-spy
+names; 8ce87e4/3bccca2 stop retained combat detail from displacing current end-turn
+or finished presentation actions (available server actions unchanged; regression
+assertions added); ff4197e preserves the original table focus target across an
+optional Character -> Actions sheet chain. Native keyboard checks exposed these
+issues; no baseline assertions/snapshots removed.
+
+- Source production graph traverses 95 modules: PASS. Added negative reachable
+  fixture imports from root, screens and application; empty graph negative case;
+  built module guard rejects test/design-only dependencies. 7 guard/generator
+  tests PASS. Guarded component build PASS. Coverage guard implementation awaits
+  worker integration: 43 existing Figma states +13 lobby states at both viewports.
+- Library/app builds use dist. Test fixture files retain all56 scenarios. Workers
+  are adding extra existing scenario variants, not new product features.
+- Current pre-existing compact terminal limitation: winner/result is shown, but
+  detailed results toggle/list remains desktop-only; terminal Character/Hand dock
+  does not mount optional coordinator. This migration preserves that layout;
+  do not claim those compact dock actions are functional or Figma parity proven.
+- Live Figma screenshot request for existing file bmxy6z3Z0bBLHLYryYJYrP node240:53
+  succeeded (1440x900 original). Provider returned short-lived URL, not local image;
+  web image fetch unavailable. Existing41 regression PNGs remain untouched.
+  Source Figma IDs retained; full fresh visual parity is not claimed.
+- Root updated Docker manifests for all built packages and pnpm11.22.0, CI for
+  ordinary gates+Storybook/Chromium, docs for current ownership. No CI remote run,
+  image publication or production action was invoked. These changes need final
+  integrated checks, Docker build and clean checkout verification.
+
+## Integrated acceptance checkpoint
+
+Integrated worker commits:8e95fb9(table50), f8780aa(lobby/system53),
+adea28b(interactions56). All56 original fixture scenarios now appear in real
+screen stories. Source+built catalog check maps43 existing Figma states +13 lobby
+states to159 stories and both viewport dimensions. The missing-state, missing
+story, empty-catalog and forbidden-import negative tests fail as intended.
+
+- Final frozen install, build:local, lint, typecheck, pnpm test PASS. Web27 files /
+  161 tests (one additional action-priority regression); components10, API2,
+  shared3 plus existing contracts suite. No original assertion removed.
+- Final build:storybook PASS (159 actual catalog entries); integrated Chromium
+  Storybook159/159 PASS. Static manager emits its existing nonfatal >500kB chunk
+  warning; no invented budget/disabled threshold. Storybook browser compile emits
+  Vue decodeEntities warning, no test failure.
+- Actual Nuxt dist consumer build PASS:23.7MB/gzip9.59MB server+public output.
+  public/_nuxt assets now588,213 bytes versus8,953,969 baseline; two original PNGs
+  are served once at /munchkin instead of duplicated/inlined JS. Total image bytes
+  are still part of the delivered site; this is no claimed performance budget.
+- Product source boundary95 modules PASS; built Vite module graph PASS; no fixture
+  marker/story import in production dist/_nuxt. Repeated component generator
+  produces no diff against its committed generated index.
+- Repository8 tests, runner6, content32, demo semantic digest PASS. Final Go
+  build/vet/test all PASS; postgres package ran against the isolated tmpfs DB
+  (not skipped). Compose config PASS; Docker build/smoke still pending.
+- Independent reviewer found moved-doc relative links broken. Path-only fix
+  applied to active docs; reviewer reran local-link scan:PASS. No observed
+  authority/privacy or production fixture/dist regression in integrated review.
+- Full original Chromium browser/visual suite is currently running on4183,
+  session28420, log final-browser.log. Snapshots remain unchanged. Await exact
+  result; then real two-player boundary, isolated Docker build/smoke, standalone
+  story screenshots, clean worktree reproduction. Do not claim these pending
+  checks passed. Original checkout and user config remain untouched.

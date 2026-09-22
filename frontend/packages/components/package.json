@@ -20,14 +20,16 @@
   },
   "scripts": {
     "generate": "node scripts/generate-components.mjs",
-    "build": "pnpm generate && vite build && vue-tsc -p tsconfig.build.json",
+    "build": "pnpm generate && pnpm check:boundaries && vite build && vue-tsc -p tsconfig.build.json",
     "build:local": "pnpm build",
     "lint": "eslint src test",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run --project unit",
     "test:stories": "vitest run --project storybook",
     "storybook": "storybook dev -p 6108",
-    "build:storybook": "storybook build"
+    "build:storybook": "storybook build && pnpm check:stories",
+    "check:boundaries": "node scripts/check-public-surface.mjs",
+    "check:stories": "node scripts/check-story-coverage.mjs"
   },
   "dependencies": {
     "@munchkin/contracts": "workspace:*",

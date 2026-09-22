@@ -12,7 +12,7 @@ fi
 
 for argument in "$@"; do
   case "$argument" in
-    --parallel|--parallel=*|-v|--volumes)
+    --parallel|--parallel=*|-v|--volumes|--volumes=*)
       echo "Use MUNCHKIN_COMPOSE_PARALLEL; volume deletion is unsupported" >&2
       exit 2
       ;;

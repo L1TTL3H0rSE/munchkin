@@ -2,6 +2,7 @@ import type {Preview} from "@storybook/vue3-vite";
 import "../src/assets/scss/main.scss";
 
 const preview: Preview = {
+  initialGlobals: {viewport: {value: "wide"}},
   parameters: {
     layout: "fullscreen",
     viewport: {

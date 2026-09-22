@@ -52,12 +52,26 @@ GAME_CONTENT_PATH=../../content/sets/demo/cards.json go run ./cmd/server
 
 ```bash
 cd frontend
-corepack pnpm install
+corepack pnpm install --frozen-lockfile
+corepack pnpm build:local
 corepack pnpm dev
 ```
 
 Для PostgreSQL задайте `DATABASE_URL` и `AUTO_MIGRATE=true`; полный набор
 переменных показан в `.env.example` и `docker-compose.yml`.
+
+Экранный Storybook работает без игрового backend:
+
+```bash
+cd frontend
+pnpm build:local
+pnpm storybook
+```
+
+Адрес: <http://localhost:6108>. Приложение и истории используют одни
+`LobbyScreen`/`GameScreen` из `@munchkin/components/screens`; демонстрационные
+проекции остаются в test/story data. Полные команды проверок находятся в
+[docs/conventions/checks.md](docs/conventions/checks.md).
 
 ## Архитектура
 
