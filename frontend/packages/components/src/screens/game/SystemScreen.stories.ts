@@ -99,6 +99,10 @@ const retrySurface: Story["play"] = async ({canvasElement, args}) => {
   const canvas = within(canvasElement);
   await expect(canvasElement.querySelectorAll(".system-state-surface")).toHaveLength(1);
   await expect(canvasElement.querySelector(".game-table")).not.toBeInTheDocument();
+  // No death-loot fallback: neither the inline board, the compact sheet nor loot controls.
+  await expect(canvasElement.querySelector("[data-testid='death-loot-surface'], .game-table__death-loot, dialog[open]"))
+    .not.toBeInTheDocument();
+  await expect(canvas.queryByRole("button", {name: /Забрать|Пас/})).not.toBeInTheDocument();
   await userEvent.click(canvas.getByRole("button", {name: /Продолжить|Попробовать снова/}));
   await expect(args.onRetry).toHaveBeenCalledOnce();
   await expect(args.onExecute).not.toHaveBeenCalled();
@@ -163,9 +167,20 @@ const terminal: Story["play"] = async ({canvasElement, args, globals}) => {
     await expect(canvasElement.querySelector(".mobile-game-table__dock-primary")).not.toBeInTheDocument();
   } else {
     const results = canvas.getByRole("button", {name: "Открыть итоги"});
+    await expect(canvasElement.querySelector(".game-table__action-panel")).toContainElement(results);
+    await expect(results).toHaveAttribute("aria-expanded", "false");
+    await expect(canvasElement.querySelector("#desktop-final-results")).not.toBeInTheDocument();
     await userEvent.click(results);
     await expect(results).toHaveAttribute("aria-expanded", "true");
-    await expect(canvas.getByRole("list", {name: "Финальные результаты игроков"})).toBeVisible();
+    await expect(results).toHaveAccessibleName("Скрыть итоги");
+    const list = canvas.getByRole("list", {name: "Финальные результаты игроков"});
+    await expect(list).toBeVisible();
+    await expect(list).toHaveAttribute("id", "desktop-final-results");
+    if (!("projection" in args.routeState)) {
+      throw new Error("Terminal story requires a projection");
+    }
+    await expect(within(list).getAllByRole("listitem")).toHaveLength(args.routeState.projection.players.length);
+    await expect(list).toHaveTextContent("Победитель");
     await userEvent.click(results);
     await expect(results).toHaveAttribute("aria-expanded", "false");
   }
