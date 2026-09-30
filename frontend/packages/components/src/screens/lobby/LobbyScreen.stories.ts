@@ -1,6 +1,7 @@
 import type {Meta, StoryObj} from "@storybook/vue3-vite";
 import {expect, fn, userEvent, waitFor, within} from "storybook/test";
-import {lobbyErrorForKind} from "../../components/lobby/lobbyModel";
+import {ref} from "vue";
+import {lobbyErrorForKind, type LobbyFormInput} from "../../components/lobby/lobbyModel";
 import LobbyScreen from "./LobbyScreen.vue";
 
 const meta = {
@@ -79,11 +80,13 @@ export const Pending: Story = {
   args: {forms: {...meta.args.forms, create: {busy: true, error: null, successful: false}}},
   play: async ({canvasElement, args}) => {
     await expect(canvasElement.querySelector(".lobby-form--create")).toHaveAttribute("aria-busy", "true");
+    await expect(canvasElement.querySelector(".lobby-form--create")).toHaveAttribute("data-state", "loading");
     const canvas = within(canvasElement);
     await userEvent.type(canvas.getByRole("textbox", {name: "Твоё имя"}), "Создатель");
     await expect(canvas.getByRole("button", {name: "Создаём…"})).toBeDisabled();
     await userEvent.click(canvas.getByRole("button", {name: "Войти"}));
     await expect(canvasElement.querySelector(".lobby-form--join")).toHaveAttribute("data-state", "idle");
+    await expect(canvas.getByRole("button", {name: "Войти в комнату"})).toBeEnabled();
     await userEvent.type(canvas.getByRole("textbox", {name: "Твоё имя"}), "Гость");
     await userEvent.type(canvas.getByRole("textbox", {name: "ID комнаты"}), "K7M2{Enter}");
     await expect(args.onSubmit).toHaveBeenCalledOnce();
@@ -110,6 +113,12 @@ export const JoinPendingCompact: Story = {...JoinPending, globals: {viewport: {v
 export const KeyboardModes: Story = {
   play: async ({canvasElement}) => {
     const canvas = within(canvasElement);
+    const entry = canvasElement.querySelector(".lobby-entry");
+    const createForm = canvasElement.querySelector(".lobby-form--create");
+    const joinForm = canvasElement.querySelector(".lobby-form--join");
+    await expect(entry).toHaveAttribute("data-mode", "create");
+    await expect(createForm).toBeVisible();
+    await expect(joinForm).not.toBeVisible();
     const create = canvas.getByRole("button", {name: "Создать"});
     create.focus();
     await userEvent.tab();
@@ -117,6 +126,9 @@ export const KeyboardModes: Story = {
     await expect(join).toHaveFocus();
     await userEvent.keyboard("{Enter}");
     await expect(join).toHaveAttribute("aria-pressed", "true");
+    await expect(entry).toHaveAttribute("data-mode", "join");
+    await expect(createForm).not.toBeVisible();
+    await expect(joinForm).toBeVisible();
     await userEvent.tab();
     const name = canvas.getByRole("textbox", {name: "Твоё имя"});
     await expect(name).toHaveFocus();
@@ -124,7 +136,9 @@ export const KeyboardModes: Story = {
     await userEvent.tab();
     await expect(canvas.getByRole("textbox", {name: "ID комнаты"})).toHaveFocus();
     await userEvent.click(create);
-    await expect(canvasElement.querySelector(".lobby-form--join")).not.toBeVisible();
+    await expect(entry).toHaveAttribute("data-mode", "create");
+    await expect(createForm).toBeVisible();
+    await expect(joinForm).not.toBeVisible();
     await userEvent.click(join);
     await expect(canvas.getByRole("textbox", {name: "Твоё имя"})).toHaveValue("Сохранено");
   },
@@ -152,11 +166,45 @@ export const RoomNotFound: Story = {
   },
 };
 export const RoomNotFoundCompact: Story = {...RoomNotFound, globals: {viewport: {value: "compact"}}};
+/** The server answers the submitted join with not-found, as the web page maps a 404. */
+export const RoomNotFoundResponse: Story = {
+  args: {initialMode: "join"},
+  render: (args) => ({
+    components: {LobbyScreen},
+    setup() {
+      const forms = ref(args.forms);
+      function submit(input: LobbyFormInput): void {
+        args.onSubmit?.(input);
+        forms.value = {...forms.value, join: {busy: false, successful: false, error: lobbyErrorForKind("not_found")}};
+      }
+      return {forms, initialMode: args.initialMode, submit};
+    },
+    template: '<LobbyScreen :forms="forms" :initial-mode="initialMode" @submit="submit" />',
+  }),
+  play: async ({canvasElement, args}) => {
+    const canvas = within(canvasElement);
+    const room = canvas.getByRole("textbox", {name: "ID комнаты"});
+    const name = canvas.getByRole("textbox", {name: "Твоё имя"});
+    await userEvent.type(room, "game_missing");
+    await userEvent.type(name, "Борис");
+    await userEvent.click(canvas.getByRole("button", {name: "Войти в комнату"}));
+    await expect(args.onSubmit).toHaveBeenCalledWith({mode: "join", displayName: "Борис", gameID: "game_missing"});
+    await expect(canvasElement.querySelector(".lobby-form--join")).toHaveAttribute("data-state", "error");
+    await expect(canvas.getByText("Комната не найдена. Проверьте код и повторите попытку.")).toBeVisible();
+    await expect(room).toHaveValue("game_missing");
+    await expect(name).toHaveValue("Борис");
+    await waitFor(() => expect(room).toHaveFocus());
+    await expect(room).toHaveAttribute("aria-describedby", "lobby-join-form-game-id-error");
+  },
+};
+export const RoomNotFoundResponseCompact: Story = {...RoomNotFoundResponse, globals: {viewport: {value: "compact"}}};
 export const ServerError: Story = {
   args: {forms: {...meta.args.forms, create: {busy: false, successful: false, error: lobbyErrorForKind("transient")}}},
   play: async ({canvasElement}) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("alert")).toHaveTextContent("Сейчас не получается открыть комнату.");
+    await expect(canvas.getByRole("alert")).toHaveTextContent("Можно повторить попытку.");
+    await expect(canvasElement.querySelector(".lobby-form--create")).toHaveAttribute("data-state", "error");
     await expect(canvas.getByRole("button", {name: "Создать комнату"})).toBeEnabled();
   },
 };
