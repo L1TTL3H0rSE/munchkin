@@ -65,7 +65,7 @@ it("accepts committed provenance produced by built-in ImageGen", async () => {
   }));
 
   const mismatchedBuiltIn = structuredClone(provenance);
-  mismatchedBuiltIn.records[0].quality = "low";
+  mismatchedBuiltIn.records[0]!.quality = "low";
   expect(() => provenanceManifestSchema.parse(mismatchedBuiltIn)).toThrow(
     /unexposed quality is reserved/,
   );

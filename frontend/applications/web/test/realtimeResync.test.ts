@@ -27,13 +27,13 @@ describe("versioned realtime resync", () => {
     const second = controller.request(3);
 
     version = 2;
-    refreshes[0].resolve();
+    refreshes[0]!.resolve();
     await Promise.resolve();
     await Promise.resolve();
     expect(refreshes).toHaveLength(2);
 
     version = 3;
-    refreshes[1].resolve();
+    refreshes[1]!.resolve();
     await Promise.all([first, second]);
     expect(refreshes).toHaveLength(2);
     expect(version).toBe(3);
@@ -52,12 +52,12 @@ describe("versioned realtime resync", () => {
 
     const first = controller.request();
     const second = controller.request();
-    refreshes[0].resolve();
+    refreshes[0]!.resolve();
     await Promise.resolve();
     await Promise.resolve();
     expect(refreshes).toHaveLength(2);
 
-    refreshes[1].resolve();
+    refreshes[1]!.resolve();
     await Promise.all([first, second]);
     expect(refreshes).toHaveLength(2);
   });

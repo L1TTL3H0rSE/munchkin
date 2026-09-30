@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -277,14 +278,14 @@ func LoadPack(filePath string) (Pack, error) {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&pack); err != nil {
-		return Pack{}, fmt.Errorf("%w: %v", ErrInvalidContent, err)
+		return Pack{}, fmt.Errorf("%w: %w", ErrInvalidContent, err)
 	}
 	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		if err == nil {
 			err = fmt.Errorf("multiple JSON values")
 		}
-		return Pack{}, fmt.Errorf("%w: trailing content: %v", ErrInvalidContent, err)
+		return Pack{}, fmt.Errorf("%w: trailing content: %w", ErrInvalidContent, err)
 	}
 	if err := pack.Validate(); err != nil {
 		return Pack{}, err
@@ -300,7 +301,7 @@ func validateCanonicalSource(raw []byte) error {
 	decoder.UseNumber()
 	var value any
 	if err := decoder.Decode(&value); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidContent, err)
+		return fmt.Errorf("%w: %w", ErrInvalidContent, err)
 	}
 	return validateCanonicalValue(value, "$")
 }
@@ -1166,11 +1167,11 @@ func validAssetPath(value string) bool {
 func validateAssetFiles(cards []Card, setDirectory string) error {
 	root, err := filepath.Abs(setDirectory)
 	if err != nil {
-		return fmt.Errorf("%w: resolve content directory: %v", ErrInvalidContent, err)
+		return fmt.Errorf("%w: resolve content directory: %w", ErrInvalidContent, err)
 	}
 	root, err = filepath.EvalSymlinks(root)
 	if err != nil {
-		return fmt.Errorf("%w: resolve content directory: %v", ErrInvalidContent, err)
+		return fmt.Errorf("%w: resolve content directory: %w", ErrInvalidContent, err)
 	}
 	for _, card := range cards {
 		if card.Image == "" {
@@ -1179,7 +1180,7 @@ func validateAssetFiles(cards []Card, setDirectory string) error {
 		candidate := filepath.Join(root, filepath.FromSlash(card.Image))
 		candidate, err = filepath.EvalSymlinks(candidate)
 		if err != nil {
-			return fmt.Errorf("%w: card %s image: %v", ErrInvalidContent, card.ID, err)
+			return fmt.Errorf("%w: card %s image: %w", ErrInvalidContent, card.ID, err)
 		}
 		relative, err := filepath.Rel(root, candidate)
 		if err != nil ||

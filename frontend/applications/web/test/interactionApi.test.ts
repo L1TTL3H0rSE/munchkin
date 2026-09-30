@@ -25,10 +25,11 @@ const combatProjection = projectionSchema.parse(
     import.meta.url,
   ), "utf8")) as unknown,
 );
-const materialAction = combatProjection.interaction?.actions.find(
+const combatInteraction = combatProjection.interaction;
+const materialAction = combatInteraction?.actions.find(
   (action) => action.source_instance_id !== undefined,
 );
-if (!combatProjection.interaction || !materialAction) {
+if (!combatInteraction || !materialAction) {
   throw new Error("combat interaction fixture was not parsed");
 }
 
@@ -128,7 +129,7 @@ describe("interaction API adapter", () => {
       combatProjection.game_id,
       "credential",
       combatProjection.version,
-      combatProjection.interaction.interaction_id,
+      combatInteraction.interaction_id,
       materialAction.action_id,
       "respond",
     );

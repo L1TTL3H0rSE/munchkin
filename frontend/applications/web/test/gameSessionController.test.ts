@@ -123,6 +123,9 @@ function createAPI(initialProjection = projectionAt(7)) {
   const command = vi.fn<GameSessionAPI["command"]>(
     async () => commandResult(initialProjection),
   );
+  const requestCombatResolution = vi.fn<GameSessionAPI["requestCombatResolution"]>(
+    async () => commandResult(initialProjection),
+  );
   const interaction = vi.fn<GameSessionAPI["interaction"]>(
     async () => commandResult(initialProjection),
   );
@@ -154,6 +157,7 @@ function createAPI(initialProjection = projectionAt(7)) {
   const api = {
     getGame,
     command,
+    requestCombatResolution,
     interaction,
     combatHelp,
     economyOffer,
@@ -165,6 +169,7 @@ function createAPI(initialProjection = projectionAt(7)) {
     api,
     getGame,
     command,
+    requestCombatResolution,
     interaction,
     combatHelp,
     economyOffer,

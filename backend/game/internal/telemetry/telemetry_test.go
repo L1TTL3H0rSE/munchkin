@@ -271,7 +271,7 @@ func assertSafeAttributes(t *testing.T, values []attribute.KeyValue) {
 		if _, exists := allowed[string(value.Key)]; !exists {
 			t.Fatalf("unallowlisted attribute key=%q", value.Key)
 		}
-		serialized := strings.ToLower(value.Value.Emit())
+		serialized := strings.ToLower(value.Value.String())
 		for _, forbidden := range []string{
 			"private",
 			"credential",
@@ -319,7 +319,7 @@ func assertSafeMetricAttributes(
 func attributeValues(values []attribute.KeyValue) string {
 	var result strings.Builder
 	for _, value := range values {
-		result.WriteString(value.Value.Emit())
+		result.WriteString(value.Value.String())
 		result.WriteByte(' ')
 	}
 	return result.String()

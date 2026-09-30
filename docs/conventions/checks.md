@@ -8,6 +8,7 @@ From the repository root:
 
 ```sh
 node scripts/check-text.mjs
+node scripts/lint-go.mjs
 node --test scripts/test/*.test.mjs
 node --test frontend/test/run-playwright.test.mjs
 node --test content/tools/validate.test.mjs
@@ -23,6 +24,11 @@ go build ./...
 go vet ./...
 go test ./...
 ```
+
+`node scripts/lint-go.mjs` runs the pinned golangci-lint (`backend/game/.golangci.yml`)
+with a per-checkout cache. Besides errcheck/errorlint/staticcheck/unused it enforces
+engine purity: `internal/game` may not import RNG, network, SQL, telemetry, logging
+or other internal layers, nor read the clock or environment.
 
 The PostgreSQL service contract needs a real disposable database:
 `TEST_DATABASE_URL=... go test ./internal/repository/postgres -run TestPostgresServiceContract -count=1`.
