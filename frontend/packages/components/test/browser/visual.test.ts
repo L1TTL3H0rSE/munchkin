@@ -89,7 +89,8 @@ const cases: [name: string, capture: Capture, options?: Options][] = [
 
   ["mobile-setup", story(table.PreparationCompact, compact)],
   ["mobile-door", story(table.DoorReadyCompact, compact)],
-  ["mobile-combat-one", story(table.PostDoorChoiceCompact, compact)],
+  // The story's play opens the hand sheet; the legacy frame is the table before any interaction.
+  ["mobile-combat-one", fixture("single-door-choice", compact)],
   ["mobile-combat-multiple", story(table.ActiveTurnCompact, compact)],
   ["mobile-reward", story(table.RewardReceivedCompact, compact)],
   ["mobile-run-away", story(table.NextRunAwayAttemptCompact, compact)],

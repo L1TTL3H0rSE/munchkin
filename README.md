@@ -190,11 +190,15 @@ node --test scripts/test/*.test.mjs
 node --test frontend/test/run-playwright.test.mjs
 node --test content/tools/validate.test.mjs
 node content/tools/validate.mjs content/sets/demo/cards.json
+node scripts/lint-go.mjs
 cd backend/game && go test ./...
 cd frontend && corepack pnpm install --frozen-lockfile
 cd frontend && corepack pnpm lint && corepack pnpm check && corepack pnpm build
+cd frontend && corepack pnpm test:browser && corepack pnpm test:e2e
 ./scripts/dev.sh config
 ```
+
+Полный список и порядок: [docs/conventions/checks.md](docs/conventions/checks.md).
 
 PostgreSQL contract suite запускается при наличии `TEST_DATABASE_URL`.
 GitLab CI поднимает реальный PostgreSQL и отдельно собирает оба container

@@ -1,5 +1,5 @@
 import {storyNameFromExport, toId} from "storybook/internal/csf";
-import {figmaStateDescriptors, type FigmaDesktopStateName} from "./figmaStateMatrix";
+import {figmaStateDescriptors, type FigmaDesktopStateName} from "./figmaStateMatrix.ts";
 
 export const stateFamilies = {
   ActiveTurn: "Table", HandExpanded: "Table", HandFastEquip: "Table",

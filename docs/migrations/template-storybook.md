@@ -1,11 +1,61 @@
 # Template / screen Storybook migration
 
-Status: implementation complete; final acceptance has pre-existing browser gaps
-(listed below). Owner: root orchestrator. Authorized in full by the user on
+Status: complete. The 2026-09-22 pass left 45 red legacy browser tests; the
+2026-09-30 follow-up (first section below) replaced that suite and is green except
+the Docker-dependent checks listed there. Owner: root orchestrator. Authorized in full by the user on
 2026-09-22 and `C:/Dev/_Personal/munchkin/munchkin-migration-mandate.md`.
 That authorization replaces the repository's former per-plan approval and
 single-checkout writer restrictions for this migration. No remote push, production
 changes, donor writes, global tooling changes or permanent-volume deletion.
+
+## Follow-up 2026-09-30: fixture suite retired, template delta ported
+
+Bases: Munchkin `f4c485a` (= origin/main); template-monorepo `73b14b2` (two
+commits after the frozen `370f1ec`); roleplay-website local `8887d3c` (no
+tooling/Storybook change since `ed71a13`). Branch `claude/template-storybook-followup`.
+
+| Task | Owner | Worktree/branch | Base | Result |
+| --- | --- | --- | --- | --- |
+| Foundation, Leino archive, CI/docs | root | main checkout | f4c485a | faff07a |
+| Layout geometry + lobby | writer | munchkin-worktrees/layout | faff07a | 62ae76d |
+| Game/interaction semantics | writer | munchkin-worktrees/semantics | faff07a | ecd9683, 7b70276 |
+| Visual references + axe | writer | munchkin-worktrees/visual | faff07a | 3a3c68e |
+| Template quality ports, E2E shell, integration | root | main checkout | faff07a | cb37661 .. merge |
+
+Decisions (ADR-0012): the fixture-mocked app Playwright suite, `fixtureSupport`,
+the Figma state matrix spec and the 41 app-page baselines are deleted. Every
+legacy assertion was dispositioned by the writers: ported to story play
+functions or `packages/components/test/browser/{layout,semantics,a11y,visual}`,
+moved to web unit tests (HTTP bodies, lobby error mapping), moved to
+`test:e2e` (skip link, reduced motion, Studio), or changed to current fixture
+copy with the old/new values recorded in the writer reports. Component-model
+unit tests moved from the web app to the components package. The Playwright
+runner is real-boundary only (no `MUNCHKIN_REAL_E2E` flag); one Playwright
+1.62.1 serves all browser checks; `@axe-core/playwright` replaced by `axe-core`.
+The old baselines were rendered with a different font stack (macOS-style Inter);
+new references are per platform (`-chromium-win32`) at native size.
+
+Template ports: SCSS `api` emits no CSS (4 duplicated `:root` blocks -> 1, test
+fails on the old layout); typed `no-floating-promises` in every package (found
+one un-awaited Storybook `expect`); web tests now typechecked (fixed 8 latent
+test type errors, incl. an incomplete fake `GameSessionAPI`); golangci-lint
+v2.12.2 with engine-purity depguard/forbidigo (RNG/env/clock probes fail) and
+its production findings fixed (error wrapping, three dead engine helpers).
+Skipped as not useful here: template eslint conventions/boundaries/a11y-warn
+rules, dist-fresh/check-packages scripts, ADR-index check, demo components.
+Leino: archived plans/handoffs/harness docs (`docs/history/leino`) and the
+`docs/agents` stub removed from the tree (git history keeps them); references
+now point at the operations runbooks. ADR-0010 stays as a superseded record.
+
+Pre-existing product gaps found by the ports (not changed, from f828536):
+death-loot closure notice removed (focus drops to body when the server closes
+the window); death-loot observer has no waiting surface; compact header shows
+"ЧУЖОЙ ХОД" instead of "УСПЕХ" in the run-away result; `helper-invite` overflows
+1440x900 vertically (hand below the fold, scrollHeight 1199).
+
+Environment: C: briefly hit 0 bytes free during parallel installs (external
+Docker VM growth); afterwards the Docker daemon stopped answering, so the
+Docker image build and the real PostgreSQL contract could not run in this pass.
 
 ## Reproducible bases and work
 
