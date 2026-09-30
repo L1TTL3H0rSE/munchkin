@@ -13,32 +13,21 @@ changes, donor writes, global tooling changes or permanent-volume deletion.
 Branch `claude/template-storybook-followup` (pushed, not merged). Run from the
 repository root unless noted; stop on the first unexpected failure.
 
-1. **Docker unblock (needs the owner).** The Docker daemon stopped answering after
-   C: ran out of space; `docker version` times out. Restart Docker Desktop, then
-   check that no client from this pass is still waiting (`docker compose ... build
-   game web`, `docker image ls postgres`, `docker ps`) and that no
-   `munchkin-followup-*` container or image exists (`docker ps -a`,
-   `docker image ls 'munchkin-followup-*'`). Keep >= 15 GB free on C:.
-2. **Image build + smoke.**
-   `COMPOSE_PROJECT_NAME=munchkin-followup ./scripts/dev.sh build game web`, start
-   both images without volumes, check API health, Nuxt SSR, built CSS and both lobby
-   PNGs, then remove the smoke containers/images. Never `down -v`.
-3. **Real PostgreSQL contract.** Disposable tmpfs container, e.g.
-   `docker run -d --rm --name munchkin-pg-contract -e POSTGRES_DB=munchkin_test
-   -e POSTGRES_USER=munchkin -e POSTGRES_PASSWORD=munchkin -p 127.0.0.1:55432:5432
-   --tmpfs /var/lib/postgresql/data postgres:17.10-alpine`, then from backend/game
-   `TEST_DATABASE_URL=postgres://munchkin:munchkin@127.0.0.1:55432/munchkin_test?sslmode=disable
-   go test ./internal/repository/postgres -run TestPostgresServiceContract -count=1 -v`
-   (must show the test running, not skipped), then `docker stop munchkin-pg-contract`.
-4. **Remote CI.** Open a PR from the branch and read the first GitHub run: new
+Done 2026-09-30 after Docker Desktop was restarted: real PostgreSQL contract on a
+disposable tmpfs `postgres:17.10-alpine` (4/4 package tests PASS, not skipped);
+isolated `munchkin-followup` image build PASS; images run without volumes: API
+`/healthz` 200, Nuxt SSR 200 with lobby + skip link, built CSS has one token
+definition, both lobby PNGs byte-identical. Smoke containers/images removed.
+
+1. **Remote CI.** Open a PR from the branch and read the first GitHub run: new
    golangci-lint step in backend-unit, typed lint, web test typecheck,
    `pnpm test:browser` with `UPDATE_SNAPSHOT=all` (Linux records, does not
    compare), `pnpm test:e2e` without the old flag, Postgres service job, Docker
    smoke. Then the GitLab pipeline (its browser job was removed; E2E stays GitHub-only).
-5. **Fresh-session check.** Open a new agent session and confirm it reads the edited
+2. **Fresh-session check.** Open a new agent session and confirm it reads the edited
    AGENTS.md, frontend/AGENTS.md, backend/AGENTS.md and docs/conventions/checks.md
    (test:browser/test:e2e, lint-go, no Leino).
-6. **Product gaps (decide, then fix or accept; all predate the migration, f828536).**
+3. **Product gaps (decide, then fix or accept; all predate the migration, f828536).**
    Each fix needs a story/browser assertion and, for visuals, a reviewed reference:
    - death-loot: server closure no longer shows a focused `role=status` notice;
      focus falls to `body` (was `InteractionSurface.vue`,
@@ -48,7 +37,7 @@ repository root unless noted; stop on the first unexpected failure.
      (`MobileGameHeader.vue`);
    - `helper-invite` at 1440x900: hand below the fold (scrollHeight 1199);
      `victory-six-player` overflows by 1 px.
-7. **Optional hardening.**
+4. **Optional hardening.**
    - `no-floating-promises` with `ignoreVoid: false` (template default) after checking
      the ~10 deliberate `void` calls catch their own errors;
    - lint/typecheck `frontend/test/browser/*.spec.ts` and `playwright.config.ts`
@@ -57,7 +46,7 @@ repository root unless noted; stop on the first unexpected failure.
      `internal/game/content.go` or move file IO out (lint forbids only env/clock/RNG);
    - Linux screenshot references from a pinned image if CI should compare visuals;
    - Vitest waits 10 s on exit after `toMatchScreenshot` (exit code stays 0).
-8. **Cleanup and merge.** After the PR is green: remove worktrees
+5. **Cleanup and merge.** After the PR is green: remove worktrees
    `../munchkin-worktrees/{layout,semantics,visual}` and branches
    `claude/followup-*`; decide on the old local `codex/migration-*` branches;
    merge to main. The owner's `.codex/config.toml` edit and the untracked mandate
@@ -109,8 +98,8 @@ the window); death-loot observer has no waiting surface; compact header shows
 1440x900 vertically (hand below the fold, scrollHeight 1199).
 
 Environment: C: briefly hit 0 bytes free during parallel installs (external
-Docker VM growth); afterwards the Docker daemon stopped answering, so the
-Docker image build and the real PostgreSQL contract could not run in this pass.
+Docker VM growth); the Docker daemon then hung until it was restarted. The
+Docker build/smoke and real PostgreSQL contract ran afterwards (see above).
 
 ## Reproducible bases and work
 
