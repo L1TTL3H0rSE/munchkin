@@ -16,3 +16,5 @@ docker/data
 **/storybook-static
 **/.browser-evidence
 **/.cache
+**/__screenshots__
+**/.vitest-attachments
