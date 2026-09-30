@@ -61,6 +61,24 @@ describe("lobby form model", () => {
     expect(unexpected.message).not.toContain("raw provider response");
   });
 
+  it("maps HTTP lobby failures to bounded copy without the raw backend response", () => {
+    const httpError = (status: number, code: string) => Object.assign(
+      new Error(`[POST] /api/v1/lobbies: ${status} token=raw-backend-detail`),
+      {name: "FetchError", response: {status, _data: {error: true, code, message: "token=raw-backend-detail"}}},
+    );
+    const unavailable = lobbyFormError(httpError(503, "internal_error"));
+    const missing = lobbyFormError(httpError(404, "not_found"));
+
+    expect(unavailable).toEqual({
+      field: "form",
+      kind: "transient",
+      message: "Сейчас не получается открыть комнату. Повторите попытку через несколько секунд.",
+      retryable: true,
+    });
+    expect(missing).toMatchObject({field: "gameID", kind: "not_found", retryable: false});
+    expect(JSON.stringify([unavailable, missing])).not.toContain("raw-backend-detail");
+  });
+
   it("uses product-language messages for every server failure kind", () => {
     const kinds = [
       "auth",
