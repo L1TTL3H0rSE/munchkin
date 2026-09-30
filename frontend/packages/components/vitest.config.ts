@@ -11,7 +11,14 @@ type MediaPreferences = {reducedMotion?: "reduce" | "no-preference"; forcedColor
 const chromium = (name: string, port: number) => ({
   enabled: true,
   headless: true,
-  provider: playwright({contextOptions: {reducedMotion: "reduce", locale: "ru-RU", timezoneId: "UTC"}}),
+  provider: playwright({contextOptions: {
+    reducedMotion: "reduce",
+    locale: "ru-RU",
+    timezoneId: "UTC",
+    // Larger than every test frame: Vitest scales the test iframe down to fit the page,
+    // which would store 1440-wide screenshots at 0.8 scale.
+    viewport: {width: 1920, height: 1280},
+  }}),
   api: {port},
   screenshotFailures: false,
   instances: [{browser: "chromium" as const, name, viewport: {width: 1440, height: 900}}],
