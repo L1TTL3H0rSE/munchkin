@@ -8,6 +8,61 @@ That authorization replaces the repository's former per-plan approval and
 single-checkout writer restrictions for this migration. No remote push, production
 changes, donor writes, global tooling changes or permanent-volume deletion.
 
+## Remaining work (one sweep)
+
+Branch `claude/template-storybook-followup` (pushed, not merged). Run from the
+repository root unless noted; stop on the first unexpected failure.
+
+1. **Docker unblock (needs the owner).** The Docker daemon stopped answering after
+   C: ran out of space; `docker version` times out. Restart Docker Desktop, then
+   check that no client from this pass is still waiting (`docker compose ... build
+   game web`, `docker image ls postgres`, `docker ps`) and that no
+   `munchkin-followup-*` container or image exists (`docker ps -a`,
+   `docker image ls 'munchkin-followup-*'`). Keep >= 15 GB free on C:.
+2. **Image build + smoke.**
+   `COMPOSE_PROJECT_NAME=munchkin-followup ./scripts/dev.sh build game web`, start
+   both images without volumes, check API health, Nuxt SSR, built CSS and both lobby
+   PNGs, then remove the smoke containers/images. Never `down -v`.
+3. **Real PostgreSQL contract.** Disposable tmpfs container, e.g.
+   `docker run -d --rm --name munchkin-pg-contract -e POSTGRES_DB=munchkin_test
+   -e POSTGRES_USER=munchkin -e POSTGRES_PASSWORD=munchkin -p 127.0.0.1:55432:5432
+   --tmpfs /var/lib/postgresql/data postgres:17.10-alpine`, then from backend/game
+   `TEST_DATABASE_URL=postgres://munchkin:munchkin@127.0.0.1:55432/munchkin_test?sslmode=disable
+   go test ./internal/repository/postgres -run TestPostgresServiceContract -count=1 -v`
+   (must show the test running, not skipped), then `docker stop munchkin-pg-contract`.
+4. **Remote CI.** Open a PR from the branch and read the first GitHub run: new
+   golangci-lint step in backend-unit, typed lint, web test typecheck,
+   `pnpm test:browser` with `UPDATE_SNAPSHOT=all` (Linux records, does not
+   compare), `pnpm test:e2e` without the old flag, Postgres service job, Docker
+   smoke. Then the GitLab pipeline (its browser job was removed; E2E stays GitHub-only).
+5. **Fresh-session check.** Open a new agent session and confirm it reads the edited
+   AGENTS.md, frontend/AGENTS.md, backend/AGENTS.md and docs/conventions/checks.md
+   (test:browser/test:e2e, lint-go, no Leino).
+6. **Product gaps (decide, then fix or accept; all predate the migration, f828536).**
+   Each fix needs a story/browser assertion and, for visuals, a reviewed reference:
+   - death-loot: server closure no longer shows a focused `role=status` notice;
+     focus falls to `body` (was `InteractionSurface.vue`,
+     `data-testid=death-loot-closure-notice`);
+   - death-loot observer: no waiting surface while loot is distributed;
+   - compact run-away result header shows "ЧУЖОЙ ХОД" where desktop shows "УСПЕХ"
+     (`MobileGameHeader.vue`);
+   - `helper-invite` at 1440x900: hand below the fold (scrollHeight 1199);
+     `victory-six-player` overflows by 1 px.
+7. **Optional hardening.**
+   - `no-floating-promises` with `ignoreVoid: false` (template default) after checking
+     the ~10 deliberate `void` calls catch their own errors;
+   - lint/typecheck `frontend/test/browser/*.spec.ts` and `playwright.config.ts`
+     (no tsconfig covers the frontend root today);
+   - decide whether engine content loading may keep `os.ReadFile`/`os.Stat` in
+     `internal/game/content.go` or move file IO out (lint forbids only env/clock/RNG);
+   - Linux screenshot references from a pinned image if CI should compare visuals;
+   - Vitest waits 10 s on exit after `toMatchScreenshot` (exit code stays 0).
+8. **Cleanup and merge.** After the PR is green: remove worktrees
+   `../munchkin-worktrees/{layout,semantics,visual}` and branches
+   `claude/followup-*`; decide on the old local `codex/migration-*` branches;
+   merge to main. The owner's `.codex/config.toml` edit and the untracked mandate
+   file are intentionally left out of every commit.
+
 ## Follow-up 2026-09-30: fixture suite retired, template delta ported
 
 Bases: Munchkin `f4c485a` (= origin/main); template-monorepo `73b14b2` (two
@@ -113,17 +168,6 @@ part of the production entry. Studio remains dev-only and disabled by default.
   remains outstanding until explicitly tested.
 - Baseline frozen install, Go build/vet/test, content checks and Compose config
   started before implementation; results to be recorded below.
-
-## Remaining acceptance work
-
-Bootstrap removal; package builds/exports and consumer; full story/state mapping;
-positive and negative public-surface/coverage checks; deterministic Chromium
-stories and interactions; existing unit/contract/browser/privacy/real-PostgreSQL
-checks; visual baseline comparison; Docker config/build and real two-player smoke;
-fresh checkout and fresh-session checks; final reviewer and evidence report.
-
-Resume by reading this file and `git status` in the integration worktree. Do not
-restart completed research or alter the original checkout.
 
 ## Bootstrap evidence and decisions
 
