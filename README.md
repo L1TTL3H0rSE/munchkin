@@ -202,7 +202,7 @@ images.
 
 ## AI-assisted workflow
 
-Start with [docs/README.md](docs/README.md) and applicable `AGENTS.md`. Use ordinary package/Go/Node checks and isolated Git worktrees for independent writers. Historical plans are non-normative evidence in `docs/history/leino`.
+Start with [docs/README.md](docs/README.md) and applicable `AGENTS.md`. Use ordinary package/Go/Node checks and isolated Git worktrees for independent writers.
 
 ## License
 

@@ -6,7 +6,7 @@ import {GameApiError} from "../app/composables/useGameApi";
 import {
   validateLobbyInput,
   type LobbyFormInput,
-} from "../../../packages/components/src/components/lobby/lobbyModel";
+} from "@munchkin/components";
 
 describe("lobby form model", () => {
   it("validates create and join inputs without a shared busy state", () => {

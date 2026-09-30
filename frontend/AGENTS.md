@@ -19,8 +19,9 @@ JSON escape hatch or optimistic authoritative result. Reconnect/gap refreshes th
 actor projection. Studio remains opt-in and separately authenticated.
 
 Use pnpm build:local, pnpm lint, pnpm typecheck, pnpm test, pnpm build:storybook,
-and pnpm --filter @munchkin/web build. See ../docs/conventions/checks.md.
-Browser entry: node test/run-playwright.mjs test --workers=1 (also cwd-independent
-from repository root). It uses Node >=24, unique OS-temp artifacts and bounded
-cleanup of its own processes. No implicit install or snapshot update. Compare
-existing screenshots; do not bulk-update baselines to hide a regression.
+pnpm test:browser, pnpm test:e2e and pnpm --filter @munchkin/web build. See
+../docs/conventions/checks.md. Each package tests what it owns: component models
+and screen states in components (unit, story play functions, test/browser), app
+controllers/adapters in web. New UI states get a screen story; there is no
+fixture-mocked app suite. test:e2e is the real browser -> Nuxt -> Go flow only.
+Compare existing screenshots; do not bulk-update references to hide a regression.

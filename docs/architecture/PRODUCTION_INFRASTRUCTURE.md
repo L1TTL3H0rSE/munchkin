@@ -72,12 +72,12 @@ not an implied property of this single-VM contest topology.
 
 | Capability | Repository evidence | Current boundary |
 |---|---|---|
-| Authoritative game, actor-specific projection and version invalidation | `docs/backend/architecture.md`, backend tests, archived game plans | Local engine/application evidence; no public game session is claimed here |
-| Readiness and one-shot migrations | [readiness runbook](../operations/READINESS_MIGRATIONS_AND_OTEL.md), archived [backend readiness plan](../history/leino/plans/archive/20260731T005306Z-fb49f6-backend-readiness-and-opentelemetry.md) | Local tests/checks passed; production migration and public smoke unrun |
-| Production Compose, Traefik and controlled deploy boundary | [deployment runbook](../operations/PRODUCTION_DEPLOYMENT.md), archived [Compose/deploy plan](../history/leino/plans/archive/20260731T005306Z-3de45e-production-compose-traefik-and-deploy.md) | Digest-pinned desired state and static checks passed; VM/bootstrap/DNS/TLS/deploy unrun |
-| OTel privacy path, dashboard and alerts | [observability runbook](../operations/OBSERVABILITY.md), archived [telemetry plan](../history/leino/plans/archive/20260731T005307Z-54ac2f-telemetry-backend-dashboards-and-alerts.md) | Collector/dashboard/alert contracts are local; Monium import, trace query and 60-minute soak unrun |
-| Off-host backup and isolated restore | [backup runbook](../operations/POSTGRES_BACKUP_AND_RESTORE.md), archived [backup plan](../history/leino/plans/archive/20260731T005307Z-5662b5-postgres-object-storage-backup-and-restore.md) | Scripts/Terraform/static checks passed; bucket mutation, first backup and restore drill unrun |
-| Security and supply chain | [security](../operations/PRODUCTION_SECURITY.md), [supply chain](../operations/SUPPLY_CHAIN.md), archived [security plan](../history/leino/plans/archive/20260731T005308Z-3beea1-production-security-and-supply-chain.md) | Local contracts, pins, static audit and canonical verify passed; live GitHub/WIF/registry/host evidence unrun |
+| Authoritative game, actor-specific projection and version invalidation | `docs/backend/architecture.md`, backend tests | Local engine/application evidence; no public game session is claimed here |
+| Readiness and one-shot migrations | [readiness runbook](../operations/READINESS_MIGRATIONS_AND_OTEL.md) | Local tests/checks passed; production migration and public smoke unrun |
+| Production Compose, Traefik and controlled deploy boundary | [deployment runbook](../operations/PRODUCTION_DEPLOYMENT.md) | Digest-pinned desired state and static checks passed; VM/bootstrap/DNS/TLS/deploy unrun |
+| OTel privacy path, dashboard and alerts | [observability runbook](../operations/OBSERVABILITY.md) | Collector/dashboard/alert contracts are local; Monium import, trace query and 60-minute soak unrun |
+| Off-host backup and isolated restore | [backup runbook](../operations/POSTGRES_BACKUP_AND_RESTORE.md) | Scripts/Terraform/static checks passed; bucket mutation, first backup and restore drill unrun |
+| Security and supply chain | [security](../operations/PRODUCTION_SECURITY.md), [supply chain](../operations/SUPPLY_CHAIN.md) | Local contracts, pins, static audit and canonical verify passed; live GitHub/WIF/registry/host evidence unrun |
 | Production URL and contest flow | [five-minute demo](../demo/CONTEST_DEMO.md) | `munchkin.l1ttl3h0rse.ru` is an expected hostname only; valid HTTPS smoke is not recorded |
 
 The archived plans are the durable evidence index. Their completed acceptance

@@ -44,6 +44,5 @@ Never expose secrets or touch production/user data/permanent volumes without
 explicit scope. Do not change global tools or donor repositories. No reset/clean/
 force checkout. Use scripts/dev.sh for local Compose; direct Compose invocations
 have exactly one --parallel N (N >= 4). No volume deletion in dev scripts.
-Historical documents in docs/history are evidence, not current instructions.
 Changing instruction/hook files does not prove they loaded in an existing session;
 verify in a fresh session and report this limitation when untested.

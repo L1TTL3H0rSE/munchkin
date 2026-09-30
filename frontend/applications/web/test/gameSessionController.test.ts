@@ -24,7 +24,7 @@ import {createFixtureAdapter} from "../../../packages/components/test/fixtures/f
 import {
   economyActions,
   type EconomySubmission,
-} from "../../../packages/components/src/components/interaction/economyModel";
+} from "@munchkin/components";
 
 const baseProjection = parseGameProjection(JSON.parse(readFileSync(new URL(
   "../../../../backend/game/internal/transport/httpapi/testdata/"

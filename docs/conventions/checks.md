@@ -37,16 +37,25 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build:storybook
-pnpm --filter @munchkin/components exec playwright install chromium
-pnpm --filter @munchkin/components test:stories
 pnpm --filter @munchkin/web build
-node test/run-playwright.mjs test --workers=1
+pnpm --filter @munchkin/components exec playwright install chromium
+pnpm test:browser
+pnpm test:e2e
 ```
 
-Use `MUNCHKIN_REAL_E2E=1` with the real-boundary browser suite for the two-player
-HTTP/SSE flow. The browser runner owns temporary artifacts and bounded cleanup;
-failed artifacts remain at its printed OS-temp path. Run heavy browser checks
-serially on assigned free ports. The runner is independent of the calling cwd.
+`pnpm test:browser` runs every Storybook story in Chromium plus the components
+`browser` project: layout geometry, axe (serious/critical) and screenshot
+regression of the product screens. Screenshot references are per platform
+(`*-chromium-win32.png`); review new or changed frames before committing them and
+never bulk-update to hide a regression. CI on Linux sets `UPDATE_SNAPSHOT=all`, so
+there it records frames without comparing them. Pass `STORYBOOK_TEST_PORT` /
+`BROWSER_TEST_PORT` for parallel runs.
+
+`pnpm test:e2e` is the real two-player browser -> Nuxt -> Go HTTP/SSE flow
+(`frontend/test/browser`). It needs Go; the runner starts both servers, owns
+temporary artifacts and bounded cleanup, and is independent of the calling cwd.
+Failed artifacts remain at its printed OS-temp path. Presentation states are not
+tested here: they live in screen stories.
 
 New checks need positive and representative negative cases. Missing files, empty
 story catalogs or skipped suites are not successful verification. Keep existing

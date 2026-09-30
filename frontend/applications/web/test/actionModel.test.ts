@@ -3,7 +3,7 @@ import {
   actionLabel,
   buildCommandPayload,
   selectionIsValid,
-} from "../../../packages/components/src/components/actionModel";
+} from "@munchkin/components";
 import {buildContentAssetURL} from "../app/composables/useGameApi";
 
 describe("server-supplied action mapping", () => {

@@ -19,8 +19,8 @@ catalog:
   '@vitest/browser-playwright': 4.1.11
   playwright: 1.62.1
   ofetch: 1.5.1
-  '@axe-core/playwright': 4.10.2
-  '@playwright/test': 1.55.1
+  axe-core: 4.10.3
+  '@playwright/test': 1.62.1
   typescript: ^6.0.3
   '@types/node': ^25.9.1
   nuxt: ^4.4.6

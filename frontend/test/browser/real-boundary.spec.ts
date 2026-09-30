@@ -6,11 +6,6 @@ import {
   projectionSchema,
 } from "@munchkin/contracts";
 
-test.skip(
-  process.env.MUNCHKIN_REAL_E2E !== "1",
-  "real-boundary smoke is opt-in because it starts Go and Nuxt servers",
-);
-
 type Actor = {
   player_id: string;
   credential: string;
