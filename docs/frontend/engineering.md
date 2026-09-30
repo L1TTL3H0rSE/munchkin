@@ -654,9 +654,10 @@ pnpm build
 
 Repository checks are documented in `docs/conventions/checks.md`. Contract changes also verify the backend fixture and actual consumer.
 
-Browser/a11y/visual tooling добавляется отдельным implementation plan, если
-dependency отсутствует. До этого manual evidence записывается честно и не
-выдаётся за автоматизированный regression gate.
+Состояния UI проверяются на уровне экранов: story play functions и
+`packages/components/test/browser` (геометрия, axe, screenshots) через
+`pnpm test:browser`. App-level браузерный набор `pnpm test:e2e` ходит только в
+реальные Nuxt и Go; fixture-подмена HTTP в приложении не используется.
 
 ## Review gates
 
@@ -720,8 +721,8 @@ Copy-ready checklist для любого frontend change:
 - One `main.scss` entry now owns the semantic token/reset/app-shell layers;
   Card Studio has an explicitly isolated compatibility layer.
 - `sass-embedded` is a direct web devDependency resolved by the single
-  `frontend/pnpm-lock.yaml`; pinned Chromium/axe/visual harnesses are present
-  in the frontend workspace.
+  `frontend/pnpm-lock.yaml`; one pinned Playwright/Chromium serves Storybook,
+  component browser tests (axe, screenshots) and the real-boundary E2E.
 
 ### Gap matrix
 

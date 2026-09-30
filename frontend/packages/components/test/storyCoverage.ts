@@ -34,7 +34,7 @@ export const screenCoverage = [
     emits: "execute / submit-interaction / submit-economy / retry",
     actions: state.serverActions,
     behavior: state.semanticCheck,
-    visualEvidence: `figma-state-owners.spec.ts + visual.spec.ts (${state.visualFamily})`,
+    visualEvidence: `story play + test/browser semantics/layout/a11y/visual (${state.visualFamily})`,
     stories: [
       {id: toId(`Screens/${stateFamilies[state.name]}`, storyNameFromExport(state.name)), viewport: "1440x900"},
       {id: toId(`Screens/${stateFamilies[state.name]}`, storyNameFromExport(`${state.name}Compact`)), viewport: "360x640"},
@@ -49,7 +49,7 @@ export const screenCoverage = [
     emits: "submit(mode, displayName, gameID?)",
     actions: ["create", "join"],
     behavior: "validation, focus, Enter, mode switching, independent pending and safe errors",
-    visualEvidence: "lobby.spec.ts + visual.spec.ts (lobby)",
+    visualEvidence: "story play + test/browser layout/a11y/visual (lobby)",
     stories: [
       {id: toId("Screens/Lobby", storyNameFromExport(state)), viewport: "1440x900"},
       {id: toId("Screens/Lobby", storyNameFromExport(`${state}Compact`)), viewport: "360x640"},

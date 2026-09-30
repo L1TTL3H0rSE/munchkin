@@ -4,6 +4,8 @@ import {storybookTest} from "@storybook/addon-vitest/vitest-plugin";
 import {defineConfig, mergeConfig} from "vitest/config";
 import viteConfig from "./vite.config.ts";
 
+type MediaPreferences = {reducedMotion?: "reduce" | "no-preference"; forcedColors?: "active" | "none"};
+
 // Explicit ports below 49152: Windows reserves dynamic-range blocks (Hyper-V/WSL/Docker)
 // and a collision there is EACCES, which Vite does not retry.
 const chromium = (name: string, port: number) => ({
@@ -16,6 +18,12 @@ const chromium = (name: string, port: number) => ({
   commands: {
     parkPointer: async ({page}: {page: {mouse: {move: (x: number, y: number) => Promise<void>}}}) => {
       await page.mouse.move(-1, -1);
+    },
+    emulateMedia: async (
+      {page}: {page: {emulateMedia: (options: MediaPreferences) => Promise<void>}},
+      options: MediaPreferences,
+    ) => {
+      await page.emulateMedia(options);
     },
   },
   expect: {toMatchScreenshot: {timeout: 20_000}},

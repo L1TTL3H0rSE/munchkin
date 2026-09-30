@@ -1,6 +1,6 @@
 import {composeStory} from "@storybook/vue3-vite";
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {page, userEvent} from "vitest/browser";
+import {commands, page, userEvent} from "vitest/browser";
 import GameScreen from "../../src/screens/game/GameScreen.vue";
 import lobbyMeta from "../../src/screens/lobby/LobbyScreen.stories";
 import LobbyScreen from "../../src/screens/lobby/LobbyScreen.vue";
@@ -281,4 +281,28 @@ describe("lobby layout", () => {
     expect(top).toBeGreaterThanOrEqual(0);
     expect(bottom).toBeLessThanOrEqual(window.visualViewport?.height ?? window.innerHeight);
   });
+});
+
+describe("media preferences", () => {
+  afterEach(async () => {
+    await commands.emulateMedia({reducedMotion: "reduce", forcedColors: "none"});
+  });
+
+  for (const target of ["lobby", "theft-response", "target-private-choice"] as const) {
+    it.each(projectViewports)(`${target} keeps reduced motion, forced colors and a visible focus ring at %ix%i`, async (width, height) => {
+      if (target === "lobby") {
+        await renderLobby({width, height});
+      } else {
+        await renderScreen(target, {width, height});
+      }
+      await commands.emulateMedia({reducedMotion: "reduce", forcedColors: "active"});
+      expect(matchMedia("(prefers-reduced-motion: reduce)").matches).toBe(true);
+      expect(matchMedia("(forced-colors: active)").matches).toBe(true);
+      expect(getComputedStyle(document.documentElement).scrollBehavior).toBe("auto");
+      await userEvent.tab();
+      const focused = document.activeElement;
+      expect(focused).not.toBe(document.body);
+      expect(getComputedStyle(focused!).outlineStyle).not.toBe("none");
+    });
+  }
 });
