@@ -85,7 +85,8 @@ async function reach(setup: FigmaRuntimeSetup): Promise<void> {
 }
 
 describe("Figma state owners", () => {
-  it.each(figmaStateDescriptors)("$name mounts its exact Figma owner, copy and server action", async (descriptor) => {
+  const states = figmaStateDescriptors.map((descriptor) => [descriptor.name, descriptor] as const);
+  it.each(states)("%s mounts its exact Figma owner, copy and server action", async (_name, descriptor) => {
     const runtime = figmaStateRuntime[descriptor.name];
     const args = stories[descriptor.name].args as ScreenArgs;
     if ("projection" in args.routeState) {
