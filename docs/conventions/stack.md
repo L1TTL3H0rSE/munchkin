@@ -1,11 +1,11 @@
 # Стек
 
-Обновлено 2026-09-22. Перед update сверяй manifest/lock конкретного
+Обновлено 2026-09-30. Перед update сверяй manifest/lock конкретного
 компонента.
 
 ## Backend
 
-- Go directive: 1.25.12.
+- Go directive: 1.25.12; golangci-lint v2.12.2 (`scripts/lint-go.mjs`).
 - Один module `backend/game`.
 - Standard `net/http` transport.
 - PostgreSQL через pgx v5.
@@ -18,7 +18,8 @@
 - Node.js >=24 для одинаковых local/CI проверок.
 - pnpm 11.22.0 из packageManager.
 - Nuxt 4, Vue 3, TypeScript, Zod; Pinia не установлен без потребителя.
-- Storybook 10.5.8, Vite 8.2.1, Vitest 4.1.11, Chromium через Playwright.
+- Storybook 10.5.8, Vite 8.2.1, Vitest 4.1.11; один Playwright 1.62.1/Chromium
+  для stories, component browser tests и real-boundary E2E.
 - Один workspace lockfile в `frontend/pnpm-lock.yaml`.
 - `applications/web` — deployable UI.
 - `packages/contracts` — wire schemas; `api` — HTTP/SSE transport.

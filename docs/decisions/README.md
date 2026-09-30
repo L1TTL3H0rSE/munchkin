@@ -13,3 +13,4 @@ ADR фиксирует причину сквозного принятого ре
 - `0009-yandex-cloud-terraform-production.md`
 - `0010-standalone-leino-product-roadmap.md` — historical, superseded for Munchkin
 - `0011-template-screen-storybook.md`
+- `0012-screen-level-ui-verification.md`
