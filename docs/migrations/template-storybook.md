@@ -1,11 +1,125 @@
 # Template / screen Storybook migration
 
-Status: implementation complete; final acceptance has pre-existing browser gaps
-(listed below). Owner: root orchestrator. Authorized in full by the user on
+Status: complete. The 2026-09-22 pass left 45 red legacy browser tests; the
+2026-09-30 follow-up (first section below) replaced that suite and is green except
+the Docker-dependent checks listed there. Owner: root orchestrator. Authorized in full by the user on
 2026-09-22 and `C:/Dev/_Personal/munchkin/munchkin-migration-mandate.md`.
 That authorization replaces the repository's former per-plan approval and
 single-checkout writer restrictions for this migration. No remote push, production
 changes, donor writes, global tooling changes or permanent-volume deletion.
+
+## Remaining work (one sweep)
+
+Branch `claude/template-storybook-followup` (pushed, not merged). Run from the
+repository root unless noted; stop on the first unexpected failure.
+
+Done 2026-09-30 after Docker Desktop was restarted: real PostgreSQL contract on a
+disposable tmpfs `postgres:17.10-alpine` (4/4 package tests PASS, not skipped);
+isolated `munchkin-followup` image build PASS; images run without volumes: API
+`/healthz` 200, Nuxt SSR 200 with lobby + skip link, built CSS has one token
+definition, both lobby PNGs byte-identical. Smoke containers/images removed.
+
+1. **Remote CI.** Open a PR from the branch and read the first GitHub run: new
+   golangci-lint step in backend-unit, typed lint, web test typecheck,
+   `pnpm test:browser` with `UPDATE_SNAPSHOT=all` (Linux records, does not
+   compare), `pnpm test:e2e` without the old flag, Postgres service job, Docker
+   smoke. Then the GitLab pipeline (its browser job was removed; E2E stays GitHub-only).
+2. **Fresh-session check.** Open a new agent session and confirm it reads the edited
+   AGENTS.md, frontend/AGENTS.md, backend/AGENTS.md and docs/conventions/checks.md
+   (test:browser/test:e2e, lint-go, no Leino).
+3. **Product gaps (decide, then fix or accept; all predate the migration, f828536).**
+   Paths are under `frontend/packages/components/src/components/`. Each fix needs a
+   story/browser assertion; reviewed screenshot changes where frames move.
+   - [fix] death-loot closure: f828536 removed the `role=status` notice that
+     `InteractionSurface.vue` focused when a newer projection dropped the window. Now the
+     board (`game/GameTable.vue:569`) or dialog (`game/modals/GameModalCoordinator.vue:157`)
+     unmounts, the generic surface stays suppressed (`GameModalCoordinator.vue:131`), focus
+     falls to `body`, nothing is announced, after every pick. Restore a player-facing
+     status + focus; flip the closure case in `test/browser/semantics.test.ts`.
+   - [decide] death-loot observer: `DeathLootDialog.vue:34` and the desktop board
+     (`GameTable.vue:156`) are actor-only, so observers see a plain table. Add a public
+     "loot is being distributed" status (no loot identities) unless Figma has none.
+   - [decide] compact result header: `game/mobile/MobileGameHeader.vue:15` shows the turn
+     headline only on the actor's turn, so after a run-away result (turn already passed)
+     compact says "ЧУЖОЙ ХОД" while desktop says "УСПЕХ"/"ПРОВАЛ". One-line condition.
+   - [fix] desktop 1440x900: in `helper-invite` the help panel
+     (`GameTable.vue:627`) is 794 px, the stage stretches to the full column and the hand
+     (shown on purpose for invites, `GameTable.vue:1089`) moves to y=900-1183 (page
+     scrolls 299 px). Cap the panel to the stage row or hide the hand per Figma 293:1866;
+     re-review `desktop-help-incoming`. `victory-six-player`: finished action panel is
+     204 px instead of 194, document 901 px.
+4. **Optional hardening.**
+   - [do] lint/typecheck the frontend root: `test/browser/*.spec.ts` (real-boundary is
+     1.2k lines), `playwright.config.ts` and `test/run-playwright.mjs` are in no tsconfig
+     and no ESLint run (`pnpm -r` skips the workspace root); errors surface only in the
+     CI E2E job. Add `frontend/tsconfig.json` + root lint/typecheck steps.
+   - [decide] ship the design fonts: tokens name Inter and Literata
+     (`assets/scss/base/_tokens.scss:39-41`) but no `@font-face` exists, so players get
+     whatever is installed (Segoe UI on Windows). Root cause of the old baseline drift and
+     of per-platform references. Bundling both (SIL OFL, add licenses) changes visuals for
+     most users and re-baselines all 41 references; then Linux references from
+     `mcr.microsoft.com/playwright:v1.62.1-noble` can replace `UPDATE_SNAPSHOT=all`.
+   - [skip unless wanted] `ignoreVoid: false`: all 11 `void` sites already handle
+     errors (`.catch` or internal try/catch); switching only forces explicit style.
+   - [document or split] engine file IO: `backend/game/internal/game/content.go` `LoadPack`
+     uses `os.ReadFile`/`os.Stat`, called only at startup (`cmd/server/main.go:25`);
+     rules and replay never touch the filesystem. Either document + lint-forbid other
+     `os` file calls in `internal/game`, or move file reading to `cmd/server`.
+   - [ignore] Vitest waits ~10 s on exit after `toMatchScreenshot` (exit code 0).
+5. **Cleanup and merge.** After the PR is green: remove worktrees
+   `../munchkin-worktrees/{layout,semantics,visual}` and branches
+   `claude/followup-*`; decide on the old local `codex/migration-*` branches;
+   merge to main. The owner's `.codex/config.toml` edit and the untracked mandate
+   file are intentionally left out of every commit.
+
+## Follow-up 2026-09-30: fixture suite retired, template delta ported
+
+Bases: Munchkin `f4c485a` (= origin/main); template-monorepo `73b14b2` (two
+commits after the frozen `370f1ec`); roleplay-website local `8887d3c` (no
+tooling/Storybook change since `ed71a13`). Branch `claude/template-storybook-followup`.
+
+| Task | Owner | Worktree/branch | Base | Result |
+| --- | --- | --- | --- | --- |
+| Foundation, Leino archive, CI/docs | root | main checkout | f4c485a | faff07a |
+| Layout geometry + lobby | writer | munchkin-worktrees/layout | faff07a | 62ae76d |
+| Game/interaction semantics | writer | munchkin-worktrees/semantics | faff07a | ecd9683, 7b70276 |
+| Visual references + axe | writer | munchkin-worktrees/visual | faff07a | 3a3c68e |
+| Template quality ports, E2E shell, integration | root | main checkout | faff07a | cb37661 .. merge |
+
+Decisions (ADR-0012): the fixture-mocked app Playwright suite, `fixtureSupport`,
+the Figma state matrix spec and the 41 app-page baselines are deleted. Every
+legacy assertion was dispositioned by the writers: ported to story play
+functions or `packages/components/test/browser/{layout,semantics,a11y,visual}`,
+moved to web unit tests (HTTP bodies, lobby error mapping), moved to
+`test:e2e` (skip link, reduced motion, Studio), or changed to current fixture
+copy with the old/new values recorded in the writer reports. Component-model
+unit tests moved from the web app to the components package. The Playwright
+runner is real-boundary only (no `MUNCHKIN_REAL_E2E` flag); one Playwright
+1.62.1 serves all browser checks; `@axe-core/playwright` replaced by `axe-core`.
+The old baselines were rendered with a different font stack (macOS-style Inter);
+new references are per platform (`-chromium-win32`) at native size.
+
+Template ports: SCSS `api` emits no CSS (4 duplicated `:root` blocks -> 1, test
+fails on the old layout); typed `no-floating-promises` in every package (found
+one un-awaited Storybook `expect`); web tests now typechecked (fixed 8 latent
+test type errors, incl. an incomplete fake `GameSessionAPI`); golangci-lint
+v2.12.2 with engine-purity depguard/forbidigo (RNG/env/clock probes fail) and
+its production findings fixed (error wrapping, three dead engine helpers).
+Skipped as not useful here: template eslint conventions/boundaries/a11y-warn
+rules, dist-fresh/check-packages scripts, ADR-index check, demo components.
+Leino: archived plans/handoffs/harness docs (`docs/history/leino`) and the
+`docs/agents` stub removed from the tree (git history keeps them); references
+now point at the operations runbooks. ADR-0010 stays as a superseded record.
+
+Pre-existing product gaps found by the ports (not changed, from f828536):
+death-loot closure notice removed (focus drops to body when the server closes
+the window); death-loot observer has no waiting surface; compact header shows
+"ЧУЖОЙ ХОД" instead of "УСПЕХ" in the run-away result; `helper-invite` overflows
+1440x900 vertically (hand below the fold, scrollHeight 1199).
+
+Environment: C: briefly hit 0 bytes free during parallel installs (external
+Docker VM growth); the Docker daemon then hung until it was restarted. The
+Docker build/smoke and real PostgreSQL contract ran afterwards (see above).
 
 ## Reproducible bases and work
 
@@ -63,17 +177,6 @@ part of the production entry. Studio remains dev-only and disabled by default.
   remains outstanding until explicitly tested.
 - Baseline frozen install, Go build/vet/test, content checks and Compose config
   started before implementation; results to be recorded below.
-
-## Remaining acceptance work
-
-Bootstrap removal; package builds/exports and consumer; full story/state mapping;
-positive and negative public-surface/coverage checks; deterministic Chromium
-stories and interactions; existing unit/contract/browser/privacy/real-PostgreSQL
-checks; visual baseline comparison; Docker config/build and real two-player smoke;
-fresh checkout and fresh-session checks; final reviewer and evidence report.
-
-Resume by reading this file and `git status` in the integration worktree. Do not
-restart completed research or alter the original checkout.
 
 ## Bootstrap evidence and decisions
 

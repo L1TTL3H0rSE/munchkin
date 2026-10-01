@@ -1,0 +1,57 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - depguard
+    - errcheck
+    - errorlint
+    - forbidigo
+    - govet
+    - ineffassign
+    - nilerr
+    - noctx
+    - nolintlint
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - unused
+  settings:
+    errcheck:
+      # Read-only content handles; a close error cannot lose data.
+      exclude-functions:
+        - (*os.File).Close
+        - (*os.Root).Close
+    staticcheck:
+      # S1016 would replace explicit projection allowlists with struct conversions.
+      checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022", "-S1016"]
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    depguard:
+      rules:
+        deprecated:
+          files: ["$all"]
+          deny:
+            - {pkg: github.com/pkg/errors, desc: use errors and fmt.Errorf with %w}
+            - {pkg: io/ioutil, desc: use io and os}
+        engine-purity:
+          files: ["**/internal/game/**"]
+          deny:
+            - {pkg: math/rand, desc: realized randomness enters the engine as events}
+            - {pkg: crypto/rand, desc: realized randomness enters the engine as events}
+            - {pkg: net, desc: the engine is pure; transport lives outside}
+            - {pkg: database/sql, desc: persistence lives in internal/repository}
+            - {pkg: github.com/jackc/pgx, desc: persistence lives in internal/repository}
+            - {pkg: go.opentelemetry.io, desc: telemetry wraps the engine from outside}
+            - {pkg: log, desc: the engine does not log}
+            - {pkg: github.com/leinodev/munchkin/backend/game/internal, desc: the engine depends on no other layer}
+    forbidigo:
+      forbid:
+        - {pattern: '^time\.(Now|Since|Until)$', msg: the engine reads no clock}
+        - {pattern: '^os\.(Getenv|LookupEnv|Environ)$', msg: the engine reads no environment}
+  exclusions:
+    generated: strict
+    rules:
+      - {path-except: internal/game/, linters: [forbidigo]}
+      - {path: _test\.go, linters: [forbidigo, errcheck, noctx, bodyclose]}

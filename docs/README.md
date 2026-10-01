@@ -11,7 +11,6 @@ by accepted decisions, these documents and dated project memory.
 - [Confirmed project memory](PROJECT_MEMORY.md)
 - [Migration progress and evidence](migrations/template-storybook.md)
 - [Infrastructure](architecture/PRODUCTION_INFRASTRUCTURE.md) and [operations](operations/PRODUCTION_DEPLOYMENT.md)
-- [Historical workflow archive](history/leino/README.md), non-normative
 
 Munchkin retains its pure game engine, HTTP/SSE contracts, credential model,
 immutable content and separate Studio boundary. Template conventions do not

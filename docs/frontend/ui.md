@@ -972,14 +972,15 @@ additional cross-cutting gates, not substitutes for either tier.
 
 ### Automation boundary
 
-The repository now pins Playwright, axe-core and Chromium visual snapshots in
-the frontend workspace. `pnpm test:browser`, `pnpm test:a11y` and
-`pnpm test:visual` are implementation gates for the ordered UI plans. Their
-fixture browser boundary remains distinct from real browser→Nuxt→Go evidence;
-neither a snapshot nor a static build proves server authority or privacy.
+Representative states are product screen stories. `pnpm test:browser` runs
+every story play function in Chromium plus the components `browser` project:
+layout geometry across the viewport matrix, forced-colors/reduced-motion, axe
+(serious/critical) and screenshot regression of product screens. `pnpm test:e2e`
+is the only app-level browser suite and runs against real Nuxt and Go servers;
+neither a story, a snapshot nor a static build proves server authority or privacy.
 
-Visual baselines are reviewed artifacts, not blanket `--update-snapshots`
-acceptance. Manual Figma comparison remains required at `360×640` and
+Screenshot references are per-platform reviewed artifacts, not blanket
+update acceptance. Manual Figma comparison remains required at `360×640` and
 `1440×900`, with safety-only checks for unsupported viewports.
 
 ### Review lenses

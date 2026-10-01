@@ -25,10 +25,11 @@ const combatProjection = projectionSchema.parse(
     import.meta.url,
   ), "utf8")) as unknown,
 );
-const materialAction = combatProjection.interaction?.actions.find(
+const combatInteraction = combatProjection.interaction;
+const materialAction = combatInteraction?.actions.find(
   (action) => action.source_instance_id !== undefined,
 );
-if (!combatProjection.interaction || !materialAction) {
+if (!combatInteraction || !materialAction) {
   throw new Error("combat interaction fixture was not parsed");
 }
 
@@ -128,7 +129,7 @@ describe("interaction API adapter", () => {
       combatProjection.game_id,
       "credential",
       combatProjection.version,
-      combatProjection.interaction.interaction_id,
+      combatInteraction.interaction_id,
       materialAction.action_id,
       "respond",
     );
@@ -180,6 +181,85 @@ describe("interaction API adapter", () => {
     expect(options.body).not.toHaveProperty("helper_player_id");
     expect(options.body).not.toHaveProperty("reward_treasures");
     expect(options.body).not.toHaveProperty("deadline_at");
+  });
+
+  function stubCommandTransport() {
+    const fetchMock = vi.fn().mockResolvedValue({
+      game_id: projection.game_id,
+      command_id: "command_fixture",
+      version: projection.version,
+      replayed: false,
+      projection,
+    });
+    vi.stubGlobal("useRuntimeConfig", () => ({
+      public: {apiBase: "https://game.example.test"},
+    }));
+    vi.stubGlobal("$fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("sends a card command as expected version plus the component payload only", async () => {
+    const fetchMock = stubCommandTransport();
+    const api = useGameApi();
+
+    await api.command(projection.game_id, "credential", "play_target_effect", 7, {
+      instance_id: "target-effect-card",
+      target_player_id: "player_1",
+    });
+    await api.command(projection.game_id, "credential", "choose_effect", 7, {
+      choice_ids: ["hero-card-1"],
+    });
+
+    const [targetURL, target] = fetchMock.mock.calls[0] ?? [];
+    expect(targetURL).toBe(
+      "https://game.example.test/api/v1/games/game_fixture/commands/play-target-effect",
+    );
+    expect(target.body).toEqual({
+      expected_version: 7,
+      instance_id: "target-effect-card",
+      target_player_id: "player_1",
+    });
+    const [choiceURL, choice] = fetchMock.mock.calls[1] ?? [];
+    expect(choiceURL).toBe(
+      "https://game.example.test/api/v1/games/game_fixture/commands/choose-effect",
+    );
+    expect(choice.body).toEqual({expected_version: 7, choice_ids: ["hero-card-1"]});
+  });
+
+  it("sends exact economy and charity clauses without requested cards on gifts", async () => {
+    const fetchMock = stubCommandTransport();
+    const api = useGameApi();
+
+    await api.economyOffer(projection.game_id, "credential", 7, "gift", "player_1", ["transfer-card-1"], []);
+    await api.economyOffer(projection.game_id, "credential", 7, "trade", "player_2", ["transfer-card-2"], [
+      "opaque-recipient-card-1",
+    ]);
+    await api.resolveCharity(projection.game_id, "credential", 7, [
+      {instance_id: "charity-card-1", recipient_player_id: "player_1"},
+      {instance_id: "charity-card-2", recipient_player_id: "player_2"},
+    ]);
+
+    const bodies = fetchMock.mock.calls.map(([url, options]) => [url, options.body]);
+    expect(bodies).toEqual([
+      ["https://game.example.test/api/v1/games/game_fixture/commands/propose-gift", {
+        expected_version: 7,
+        recipient_player_id: "player_1",
+        offered_instance_ids: ["transfer-card-1"],
+      }],
+      ["https://game.example.test/api/v1/games/game_fixture/commands/propose-trade", {
+        expected_version: 7,
+        recipient_player_id: "player_2",
+        offered_instance_ids: ["transfer-card-2"],
+        requested_instance_ids: ["opaque-recipient-card-1"],
+      }],
+      ["https://game.example.test/api/v1/games/game_fixture/commands/resolve-charity", {
+        expected_version: 7,
+        allocations: [
+          {instance_id: "charity-card-1", recipient_player_id: "player_1"},
+          {instance_id: "charity-card-2", recipient_player_id: "player_2"},
+        ],
+      }],
+    ]);
   });
 
   it("rejects an invalid action ID before transport", async () => {

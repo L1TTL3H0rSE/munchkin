@@ -271,7 +271,6 @@ async function startManagedServers(
 ) {
   const port = Number(env.PLAYWRIGHT_PORT ?? 4173);
   const apiPort = Number(env.PLAYWRIGHT_API_PORT ?? 18080);
-  const isRealE2E = env.MUNCHKIN_REAL_E2E === "1";
   const baseURL = env.WEB_BASE_URL ?? `http://127.0.0.1:${port}`;
   const servers = [];
   const nuxtURL = new URL(baseURL).toString();
@@ -294,9 +293,7 @@ async function startManagedServers(
         cwd: path.join(frontendRoot, "applications", "web"),
         env: {
           ...env,
-          NUXT_PUBLIC_API_BASE: isRealE2E
-            ? `http://127.0.0.1:${apiPort}`
-            : baseURL,
+          NUXT_PUBLIC_API_BASE: `http://127.0.0.1:${apiPort}`,
         },
         spawnImpl,
         stdout,
@@ -311,37 +308,35 @@ async function startManagedServers(
     });
   }
 
-  if (isRealE2E) {
-    const apiURL = `http://127.0.0.1:${apiPort}/healthz`;
-    const apiAlreadyRunning = await probeURL(apiURL, fetchImpl);
-    if (!apiAlreadyRunning) {
-      const gameServer = spawnManagedServer(
-        "Go game server",
-        "go",
-        ["run", "-tags=munchkin_e2e", "./cmd/server"],
-        {
-          cwd: path.join(repositoryRoot, "backend", "game"),
-          env: {
-            ...env,
-            SERVER_ADDR: `127.0.0.1:${apiPort}`,
-            GAME_CONTENT_PATH: env.GAME_CONTENT_PATH ?? "../../content/sets/moscow/v5/cards.json",
-            MUNCHKIN_TEST_MODE: "1",
-            MUNCHKIN_TEST_RANDOM_SEED: env.MUNCHKIN_TEST_RANDOM_SEED ?? "120",
-            AUTO_MIGRATE: "false",
-            CORS_ALLOWED_ORIGINS: baseURL,
-          },
-          spawnImpl,
-          stdout,
-          stderr,
+  const apiURL = `http://127.0.0.1:${apiPort}/healthz`;
+  const apiAlreadyRunning = await probeURL(apiURL, fetchImpl);
+  if (!apiAlreadyRunning) {
+    const gameServer = spawnManagedServer(
+      "Go game server",
+      "go",
+      ["run", "-tags=munchkin_e2e", "./cmd/server"],
+      {
+        cwd: path.join(repositoryRoot, "backend", "game"),
+        env: {
+          ...env,
+          SERVER_ADDR: `127.0.0.1:${apiPort}`,
+          GAME_CONTENT_PATH: env.GAME_CONTENT_PATH ?? "../../content/sets/moscow/v5/cards.json",
+          MUNCHKIN_TEST_MODE: "1",
+          MUNCHKIN_TEST_RANDOM_SEED: env.MUNCHKIN_TEST_RANDOM_SEED ?? "120",
+          AUTO_MIGRATE: "false",
+          CORS_ALLOWED_ORIGINS: baseURL,
         },
-      );
-      servers.push(gameServer);
-      await waitForServer(gameServer, {
-        url: apiURL,
-        fetchImpl,
-        timeoutMs: serverTimeoutMs,
-      });
-    }
+        spawnImpl,
+        stdout,
+        stderr,
+      },
+    );
+    servers.push(gameServer);
+    await waitForServer(gameServer, {
+      url: apiURL,
+      fetchImpl,
+      timeoutMs: serverTimeoutMs,
+    });
   }
 
   return servers;

@@ -326,16 +326,6 @@ func targetResponseActors(state State, initiatorID string) []string {
 	return actorIDs
 }
 
-func runAwayResponseActors(state State) []string {
-	actorIDs := make([]string, 0, len(state.Players))
-	for _, player := range state.Players {
-		if !player.Dead {
-			actorIDs = append(actorIDs, player.ID)
-		}
-	}
-	return actorIDs
-}
-
 func targetEffectWindow(
 	state State,
 	interactionID string,
@@ -644,36 +634,6 @@ func combatHelpWindow(
 		},
 		Status: InteractionWindowOpen,
 	}, nil
-}
-
-func combatHelpRewardMaximum(state State, pack Pack) (int, error) {
-	if state.Turn.Encounter == nil {
-		return 0, fmt.Errorf("%w: missing encounter", ErrIllegalCommand)
-	}
-	playerIndex := state.PlayerIndex(state.Turn.PlayerID)
-	if playerIndex < 0 {
-		return 0, fmt.Errorf("%w: missing combatant", ErrIllegalCommand)
-	}
-	monsterCard, _, exists := pack.DefinitionForInstance(
-		state,
-		state.Turn.Encounter.MonsterInstanceID,
-	)
-	if !exists || monsterCard.Monster == nil {
-		return 0, fmt.Errorf("%w: invalid monster", ErrInvalidContent)
-	}
-	modifier, err := treasureRewardModifier(
-		state,
-		playerIndex,
-		pack,
-		monsterCard.Monster.Tags,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return min(
-		max(0, monsterCard.Monster.Treasures+modifier),
-		len(state.TreasureDeck)+len(state.TreasureDiscard),
-	), nil
 }
 
 func combatInterventionDeadlineAfter(
@@ -1026,15 +986,6 @@ func discardResolvingInstance(state *State, instanceID string, pack Pack) error 
 	if !removed {
 		return fmt.Errorf("%w: card %s is not resolving", ErrIllegalCommand, instanceID)
 	}
-	return appendDiscard(state, instanceID, pack)
-}
-
-func discardEncounter(state *State, pack Pack) error {
-	if state.Turn.Encounter == nil {
-		return nil
-	}
-	instanceID := state.Turn.Encounter.MonsterInstanceID
-	state.Turn.Encounter = nil
 	return appendDiscard(state, instanceID, pack)
 }
 

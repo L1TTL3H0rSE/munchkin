@@ -18,7 +18,6 @@
   WIF/registry, Monium and backup runtime evidence. The expected hostname is
   not a public URL claim until valid HTTPS smoke is recorded.
 - **Источники:** `docs/architecture/PRODUCTION_INFRASTRUCTURE.md`,
-  `docs/demo/CONTEST_DEMO.md`, archived plans
-  `docs/history/leino/plans/archive/20260731T005308Z-3beea1-production-security-and-supply-chain.md`
-  and `docs/history/leino/plans/archive/20260731T005307Z-5662b5-postgres-object-storage-backup-and-restore.md`.
+  `docs/demo/CONTEST_DEMO.md`, `docs/operations/PRODUCTION_SECURITY.md`
+  and `docs/operations/POSTGRES_BACKUP_AND_RESTORE.md`.
 - **Проверено:** 2026-08-01.

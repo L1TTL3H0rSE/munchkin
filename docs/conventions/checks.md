@@ -8,6 +8,7 @@ From the repository root:
 
 ```sh
 node scripts/check-text.mjs
+node scripts/lint-go.mjs
 node --test scripts/test/*.test.mjs
 node --test frontend/test/run-playwright.test.mjs
 node --test content/tools/validate.test.mjs
@@ -24,6 +25,11 @@ go vet ./...
 go test ./...
 ```
 
+`node scripts/lint-go.mjs` runs the pinned golangci-lint (`backend/game/.golangci.yml`)
+with a per-checkout cache. Besides errcheck/errorlint/staticcheck/unused it enforces
+engine purity: `internal/game` may not import RNG, network, SQL, telemetry, logging
+or other internal layers, nor read the clock or environment.
+
 The PostgreSQL service contract needs a real disposable database:
 `TEST_DATABASE_URL=... go test ./internal/repository/postgres -run TestPostgresServiceContract -count=1`.
 A skipped database test is not a pass. Never point this suite at user/production data.
@@ -37,16 +43,25 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build:storybook
-pnpm --filter @munchkin/components exec playwright install chromium
-pnpm --filter @munchkin/components test:stories
 pnpm --filter @munchkin/web build
-node test/run-playwright.mjs test --workers=1
+pnpm --filter @munchkin/components exec playwright install chromium
+pnpm test:browser
+pnpm test:e2e
 ```
 
-Use `MUNCHKIN_REAL_E2E=1` with the real-boundary browser suite for the two-player
-HTTP/SSE flow. The browser runner owns temporary artifacts and bounded cleanup;
-failed artifacts remain at its printed OS-temp path. Run heavy browser checks
-serially on assigned free ports. The runner is independent of the calling cwd.
+`pnpm test:browser` runs every Storybook story in Chromium plus the components
+`browser` project: layout geometry, axe (serious/critical) and screenshot
+regression of the product screens. Screenshot references are per platform
+(`*-chromium-win32.png`); review new or changed frames before committing them and
+never bulk-update to hide a regression. CI on Linux sets `UPDATE_SNAPSHOT=all`, so
+there it records frames without comparing them. Pass `STORYBOOK_TEST_PORT` /
+`BROWSER_TEST_PORT` for parallel runs.
+
+`pnpm test:e2e` is the real two-player browser -> Nuxt -> Go HTTP/SSE flow
+(`frontend/test/browser`). It needs Go; the runner starts both servers, owns
+temporary artifacts and bounded cleanup, and is independent of the calling cwd.
+Failed artifacts remain at its printed OS-temp path. Presentation states are not
+tested here: they live in screen stories.
 
 New checks need positive and representative negative cases. Missing files, empty
 story catalogs or skipped suites are not successful verification. Keep existing

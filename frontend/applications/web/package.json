@@ -8,7 +8,7 @@
     "postinstall": "nuxt prepare",
     "build": "nuxt build",
     "lint": "eslint .",
-    "typecheck": "nuxt typecheck",
+    "typecheck": "nuxt typecheck && vue-tsc --noEmit -p test/tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {

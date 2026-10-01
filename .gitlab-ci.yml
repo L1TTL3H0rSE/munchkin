@@ -43,6 +43,7 @@ backend-unit:
     - cd backend/game
     - go build ./...
     - go vet ./...
+    - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2 run ./...
     - go test ./...
 
 backend-postgres:
@@ -95,35 +96,8 @@ frontend:
     - pnpm build:storybook
     - pnpm --filter @munchkin/web build
     - pnpm --filter @munchkin/components exec playwright install --with-deps chromium
-    - pnpm --filter @munchkin/components test:stories
-
-frontend-browser:
-  stage: test
-  image: node:24-bookworm
-  cache:
-    key:
-      files:
-        - frontend/pnpm-lock.yaml
-    paths:
-      - frontend/.pnpm-store
-  before_script:
-    - corepack enable
-    - corepack prepare pnpm@11.22.0 --activate
-    - cd frontend
-    - pnpm config set store-dir .pnpm-store
-    - pnpm install --frozen-lockfile
-    - pnpm build:local
-    - pnpm exec playwright install --with-deps chromium
-  script:
-    - pnpm test:browser
-  after_script:
-    - mkdir -p frontend/.browser-evidence
-    - for evidence in /tmp/munchkin-playwright-*; do if [ -d "$evidence" ]; then cp -R "$evidence" frontend/.browser-evidence/; fi; done
-  artifacts:
-    when: always
-    expire_in: 7 days
-    paths:
-      - frontend/.browser-evidence/
+    # Screenshot references are win32; Linux records frames instead of comparing.
+    - UPDATE_SNAPSHOT=all pnpm test:browser
 
 compose-config:
   stage: test

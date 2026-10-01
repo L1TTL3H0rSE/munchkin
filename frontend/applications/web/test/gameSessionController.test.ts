@@ -24,7 +24,7 @@ import {createFixtureAdapter} from "../../../packages/components/test/fixtures/f
 import {
   economyActions,
   type EconomySubmission,
-} from "../../../packages/components/src/components/interaction/economyModel";
+} from "@munchkin/components";
 
 const baseProjection = parseGameProjection(JSON.parse(readFileSync(new URL(
   "../../../../backend/game/internal/transport/httpapi/testdata/"
@@ -123,6 +123,9 @@ function createAPI(initialProjection = projectionAt(7)) {
   const command = vi.fn<GameSessionAPI["command"]>(
     async () => commandResult(initialProjection),
   );
+  const requestCombatResolution = vi.fn<GameSessionAPI["requestCombatResolution"]>(
+    async () => commandResult(initialProjection),
+  );
   const interaction = vi.fn<GameSessionAPI["interaction"]>(
     async () => commandResult(initialProjection),
   );
@@ -154,6 +157,7 @@ function createAPI(initialProjection = projectionAt(7)) {
   const api = {
     getGame,
     command,
+    requestCombatResolution,
     interaction,
     combatHelp,
     economyOffer,
@@ -165,6 +169,7 @@ function createAPI(initialProjection = projectionAt(7)) {
     api,
     getGame,
     command,
+    requestCombatResolution,
     interaction,
     combatHelp,
     economyOffer,
@@ -469,6 +474,74 @@ describe("game session controller", () => {
       .toBe("stable-command-id");
     expect(harness.controller.projection.value?.version)
       .toBe(nextProjection.version);
+  });
+
+  it("submits a death-loot pick by opaque window and action IDs only", async () => {
+    const lootProjection = fixtureAdapter.getProjection("death-loot");
+    const pick = lootProjection.interaction?.actions.find((candidate) => candidate.type === "respond");
+    if (!pick?.choice_ids?.length) {
+      throw new Error("death-loot fixture must expose a card pick");
+    }
+    const harness = createHarness({api: createAPI(lootProjection)});
+    await harness.controller.start(lootProjection.game_id);
+
+    await harness.controller.submitInteraction(pick);
+
+    expect(harness.interaction).toHaveBeenCalledOnce();
+    expect(harness.interaction.mock.calls[0]?.slice(0, 6)).toEqual([
+      lootProjection.game_id,
+      "credential-secret",
+      lootProjection.version,
+      pick.interaction_id,
+      pick.action_id,
+      "respond",
+    ]);
+  });
+
+  it("sends component card payloads and charity allocations at the live version", async () => {
+    const targetProjection = fixtureAdapter.getProjection("target-initiator");
+    const targetAction = targetProjection.turn.available_actions[0];
+    if (targetAction?.type !== "play_target_effect") {
+      throw new Error("target fixture must expose a target effect");
+    }
+    const target = createHarness({api: createAPI(targetProjection)});
+    await target.controller.start(targetProjection.game_id);
+    const payload = {
+      instance_id: "target-effect-card",
+      target_player_id: "player_1",
+    } satisfies CommandPayload;
+
+    await target.controller.submitAction(targetAction, payload);
+
+    expect(target.command.mock.calls[0]?.slice(0, 5)).toEqual([
+      targetProjection.game_id,
+      "credential-secret",
+      "play_target_effect",
+      targetProjection.version,
+      payload,
+    ]);
+
+    const charityProjection = fixtureAdapter.getProjection("charity-transfer");
+    const charityWindow = charityProjection.interaction?.interaction_id;
+    if (!charityWindow) {
+      throw new Error("charity fixture must expose its server window");
+    }
+    const allocations = [
+      {instance_id: "charity-card-1", recipient_player_id: "player_1"},
+      {instance_id: "charity-card-2", recipient_player_id: "player_2"},
+    ];
+    const charity = createHarness({api: createAPI(charityProjection)});
+    await charity.controller.start(charityProjection.game_id);
+
+    await charity.controller.submitEconomy({kind: "charity", interactionID: charityWindow, allocations});
+
+    expect(charity.resolveCharity).toHaveBeenCalledOnce();
+    expect(charity.resolveCharity.mock.calls[0]?.slice(0, 4)).toEqual([
+      charityProjection.game_id,
+      "credential-secret",
+      charityProjection.version,
+      allocations,
+    ]);
   });
 
   it("submits economy clauses with one idempotent retry and no optimistic move", async () => {

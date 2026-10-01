@@ -52,4 +52,4 @@ rollback и concurrent expected-version race. PostgreSQL adapter проверя�
 тем же repository contract suite на реальной БД, когда меняются migrations
 или persistence.
 
-Also run `go build ./...` and `go vet ./...`. See ../../docs/conventions/checks.md for the real PostgreSQL contract and full checks.
+Also run `go build ./...`, `go vet ./...` and `node ../../scripts/lint-go.mjs` (engine purity is lint-enforced). See ../../docs/conventions/checks.md for the real PostgreSQL contract and full checks.
