@@ -15,7 +15,7 @@
     "@munchkin/contracts": "workspace:*",
     "nuxt": "catalog:",
     "openai": "7.1.0",
-    "sharp": "0.35.3",
+    "sharp": "0.35.4",
     "vue": "catalog:",
     "zod": "catalog:",
     "@munchkin/components": "workspace:*",
