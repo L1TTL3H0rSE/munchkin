@@ -5,7 +5,7 @@
 
 ## Backend
 
-- Go directive: 1.25.12; golangci-lint v2.12.2 (`scripts/lint-go.mjs`).
+- Go directive: 1.25.13; golangci-lint v2.12.2 (`scripts/lint-go.mjs`).
 - Один module `backend/game`.
 - Standard `net/http` transport.
 - PostgreSQL через pgx v5.

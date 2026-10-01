@@ -69,7 +69,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
         with:
-          go-version: 1.25.12
+          go-version: 1.25.13
           cache: true
       - name: Test backend
         working-directory: backend/game
@@ -106,7 +106,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
         with:
-          go-version: 1.25.12
+          go-version: 1.25.13
           cache: true
       - name: Test PostgreSQL contract
         working-directory: backend/game
@@ -160,7 +160,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
         with:
-          go-version: 1.25.12
+          go-version: 1.25.13
       - name: Verify real boundary
         working-directory: frontend
         run: |
@@ -239,7 +239,7 @@ jobs:
       - name: Set up Go for security tooling
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
         with:
-          go-version: 1.25.12
+          go-version: 1.25.13
           cache: false
       - name: Claim probe
         run: |

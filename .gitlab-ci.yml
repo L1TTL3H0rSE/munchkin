@@ -30,7 +30,7 @@ content:
 
 backend-unit:
   stage: test
-  image: golang:1.25.1-bookworm
+  image: golang:1.25.13-bookworm
   cache:
     key: go-${CI_COMMIT_REF_SLUG}
     paths:
@@ -48,7 +48,7 @@ backend-unit:
 
 backend-postgres:
   stage: test
-  image: golang:1.25.1-bookworm
+  image: golang:1.25.13-bookworm
   services:
     - name: postgres:17-alpine
       alias: postgres
