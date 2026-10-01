@@ -28,24 +28,44 @@ definition, both lobby PNGs byte-identical. Smoke containers/images removed.
    AGENTS.md, frontend/AGENTS.md, backend/AGENTS.md and docs/conventions/checks.md
    (test:browser/test:e2e, lint-go, no Leino).
 3. **Product gaps (decide, then fix or accept; all predate the migration, f828536).**
-   Each fix needs a story/browser assertion and, for visuals, a reviewed reference:
-   - death-loot: server closure no longer shows a focused `role=status` notice;
-     focus falls to `body` (was `InteractionSurface.vue`,
-     `data-testid=death-loot-closure-notice`);
-   - death-loot observer: no waiting surface while loot is distributed;
-   - compact run-away result header shows "ЧУЖОЙ ХОД" where desktop shows "УСПЕХ"
-     (`MobileGameHeader.vue`);
-   - `helper-invite` at 1440x900: hand below the fold (scrollHeight 1199);
-     `victory-six-player` overflows by 1 px.
+   Paths are under `frontend/packages/components/src/components/`. Each fix needs a
+   story/browser assertion; reviewed screenshot changes where frames move.
+   - [fix] death-loot closure: f828536 removed the `role=status` notice that
+     `InteractionSurface.vue` focused when a newer projection dropped the window. Now the
+     board (`game/GameTable.vue:569`) or dialog (`game/modals/GameModalCoordinator.vue:157`)
+     unmounts, the generic surface stays suppressed (`GameModalCoordinator.vue:131`), focus
+     falls to `body`, nothing is announced, after every pick. Restore a player-facing
+     status + focus; flip the closure case in `test/browser/semantics.test.ts`.
+   - [decide] death-loot observer: `DeathLootDialog.vue:34` and the desktop board
+     (`GameTable.vue:156`) are actor-only, so observers see a plain table. Add a public
+     "loot is being distributed" status (no loot identities) unless Figma has none.
+   - [decide] compact result header: `game/mobile/MobileGameHeader.vue:15` shows the turn
+     headline only on the actor's turn, so after a run-away result (turn already passed)
+     compact says "ЧУЖОЙ ХОД" while desktop says "УСПЕХ"/"ПРОВАЛ". One-line condition.
+   - [fix] desktop 1440x900: in `helper-invite` the help panel
+     (`GameTable.vue:627`) is 794 px, the stage stretches to the full column and the hand
+     (shown on purpose for invites, `GameTable.vue:1089`) moves to y=900-1183 (page
+     scrolls 299 px). Cap the panel to the stage row or hide the hand per Figma 293:1866;
+     re-review `desktop-help-incoming`. `victory-six-player`: finished action panel is
+     204 px instead of 194, document 901 px.
 4. **Optional hardening.**
-   - `no-floating-promises` with `ignoreVoid: false` (template default) after checking
-     the ~10 deliberate `void` calls catch their own errors;
-   - lint/typecheck `frontend/test/browser/*.spec.ts` and `playwright.config.ts`
-     (no tsconfig covers the frontend root today);
-   - decide whether engine content loading may keep `os.ReadFile`/`os.Stat` in
-     `internal/game/content.go` or move file IO out (lint forbids only env/clock/RNG);
-   - Linux screenshot references from a pinned image if CI should compare visuals;
-   - Vitest waits 10 s on exit after `toMatchScreenshot` (exit code stays 0).
+   - [do] lint/typecheck the frontend root: `test/browser/*.spec.ts` (real-boundary is
+     1.2k lines), `playwright.config.ts` and `test/run-playwright.mjs` are in no tsconfig
+     and no ESLint run (`pnpm -r` skips the workspace root); errors surface only in the
+     CI E2E job. Add `frontend/tsconfig.json` + root lint/typecheck steps.
+   - [decide] ship the design fonts: tokens name Inter and Literata
+     (`assets/scss/base/_tokens.scss:39-41`) but no `@font-face` exists, so players get
+     whatever is installed (Segoe UI on Windows). Root cause of the old baseline drift and
+     of per-platform references. Bundling both (SIL OFL, add licenses) changes visuals for
+     most users and re-baselines all 41 references; then Linux references from
+     `mcr.microsoft.com/playwright:v1.62.1-noble` can replace `UPDATE_SNAPSHOT=all`.
+   - [skip unless wanted] `ignoreVoid: false`: all 11 `void` sites already handle
+     errors (`.catch` or internal try/catch); switching only forces explicit style.
+   - [document or split] engine file IO: `backend/game/internal/game/content.go` `LoadPack`
+     uses `os.ReadFile`/`os.Stat`, called only at startup (`cmd/server/main.go:25`);
+     rules and replay never touch the filesystem. Either document + lint-forbid other
+     `os` file calls in `internal/game`, or move file reading to `cmd/server`.
+   - [ignore] Vitest waits ~10 s on exit after `toMatchScreenshot` (exit code 0).
 5. **Cleanup and merge.** After the PR is green: remove worktrees
    `../munchkin-worktrees/{layout,semantics,visual}` and branches
    `claude/followup-*`; decide on the old local `codex/migration-*` branches;
